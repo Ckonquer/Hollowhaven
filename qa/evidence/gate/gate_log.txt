@@ -1,0 +1,26 @@
+0.00 READY renderer=forward_plus adapter=NVIDIA GeForce RTX 4090
+0.50 POS 0.67 0.50 0.00 keyD=true
+1.00 POS 2.67 0.50 0.00 keyD=true
+1.50 POS 4.67 0.50 0.00 keyD=true
+2.00 SHOT saved C:/Users/Ali/Desktop/Hollowhaven/builds/gate/evidence/ingame_t2.png
+2.05 POS 6.07 0.50 0.00 keyD=false
+2.55 POS 6.07 0.50 0.00 keyD=false
+3.05 POS 6.07 0.50 0.00 keyD=false
+3.55 POS 6.07 0.50 0.00 keyD=false
+4.05 POS 6.07 0.50 0.00 keyD=false
+4.55 POS 6.07 0.50 0.00 keyD=false
+5.05 POS 6.07 0.50 0.00 keyD=false
+5.55 POS 6.07 0.50 0.00 keyD=false
+6.05 POS 6.07 0.50 0.00 keyD=false
+6.55 POS 6.07 0.50 0.00 keyD=false
+7.05 POS 6.07 0.50 0.00 keyD=false
+7.55 POS 6.07 0.50 0.00 keyD=false
+8.05 POS 6.07 0.50 0.00 keyD=false
+8.55 POS 6.07 0.50 0.00 keyD=false
+9.05 POS 6.07 0.50 0.00 keyD=false
+9.55 POS 6.07 0.50 0.00 keyD=false
+10.05 POS 6.07 0.50 0.00 keyD=false
+10.55 POS 6.07 0.50 0.00 keyD=false
+11.06 POS 6.07 0.50 0.00 keyD=false
+11.56 POS 6.07 0.50 0.00 keyD=false
+12.00 QUIT

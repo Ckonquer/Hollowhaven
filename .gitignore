@@ -9,3 +9,4 @@ game/**/*.import.tmp
 *.tmp
 # Test/scratch output
 qa/tmp/
+qa/tmp/

@@ -12,6 +12,7 @@ extends Node
 ##   --max-seconds=<n>                                hard watchdog quit
 ##   --no-focus-pause                                 don't auto-pause when the window loses focus
 ##   --windowed                                       ignore the fullscreen setting
+##   --qa-telemetry=<file> [--qa-interval=0.1]        rich JSON-lines telemetry for the QA bot (src/qa/qa_telemetry.gd)
 ## Debug builds only (editor binary):
 ##   --area=surface|below [--spawn=<id>]              start a new game directly in an area
 ##   --load-save                                      continue from the save directly
@@ -64,6 +65,11 @@ func _ready() -> void:
 		_log_interval = float(args.get("log-interval", "1.0"))
 	if args.has("perf-log"):
 		_perf_file = FileAccess.open(String(args["perf-log"]), FileAccess.WRITE)
+	if args.has("qa-telemetry"):
+		var qa: Node = load("res://src/qa/qa_telemetry.gd").new()
+		qa.name = "QATelemetry"
+		qa.setup(String(args["qa-telemetry"]), float(args.get("qa-interval", "0.1")))
+		add_child(qa)
 	if is_cheat_allowed() and args.has("settings"):
 		for kv in String(args["settings"]).split(","):
 			var p := kv.split("=")
