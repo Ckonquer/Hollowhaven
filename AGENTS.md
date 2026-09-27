@@ -16,7 +16,7 @@ Read first: `GAME_SPEC.md` (design) and `docs/ARCHITECTURE.md` (code contracts).
 * Unit tests (headless):            `tools/test.sh` or `tools/test.sh <filter>`
 * Parse-check every script:         `tools/test.sh parse_all`
 * Re-import assets (after adding audio/fonts): `tools/godot.sh --headless --path game --import`
-* Run the game (debug, windowed):   `tools/godot.sh --path game --windowed --resolution 1600x900`
+* Run the game (debug, windowed):   `tools/godot.sh --path game --resolution 1600x900 -- --windowed`
 * Jump into an area (debug only):   `... -- --area=surface --spawn=haven_start`
 * Area screenshots (debug only):    `... -- --area=surface --cams="x,y,z,yaw,pitch;..." --shot-dir=<abs dir>`
 * Preview one visual script:        `... -- --preview=res://src/companions/mochi.gd --shot-dir=<abs dir>`

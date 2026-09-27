@@ -534,3 +534,38 @@ func test_camera_starts_at_full_distance_after_a_teleport() -> void:
 	var cam_z: float = player.get_camera().global_position.z - SPOT.z
 	assert_true(cam_z < 2.0 - 0.05, "a wall behind the spawn: the camera starts in front of it (z %.2f)" % cam_z)
 	wall.queue_free()
+
+
+class FakeCompanion extends FakeNode:
+	var befriended := true
+
+	func is_befriended() -> bool:
+		return befriended
+
+
+func test_follower_does_not_steal_focus_from_gatherables() -> void:
+	# Found in a real-input playthrough: Pebble following at Krystal's heels made "Talk to Pebble" win
+	# over the grass she was reaching for. Befriended companions only win when nothing else is near.
+	_allow_input()
+	var grass := _fake(SPOT + Vector3(0.3, 0, -1.2), {"tool": "hand", "name": "Tall Grass"}, {"text": "Pull Tall Grass", "enabled": true})
+	var pal := FakeCompanion.new()
+	pal.info = {}
+	pal.interaction = {"text": "Talk to Pebble", "enabled": true}
+	pal.add_to_group("companion")
+	add_child(pal)
+	pal.global_position = SPOT + Vector3(-0.2, 0, -0.9)     # even closer than the grass
+	await wait_physics(4)
+	player.probe.refresh()
+	assert_eq(player.get_focus_target(), grass, "the grass keeps the focus over a following companion")
+	grass.queue_free()
+	await wait_physics(3)
+	player.probe.refresh()
+	assert_eq(player.get_focus_target(), pal, "with nothing else near, the companion can still be talked to")
+	pal.befriended = false
+	# Grass a bit further away: a befriended follower would lose to it, a wild creature must not.
+	var grass2 := _fake(SPOT + Vector3(0.3, 0, -1.9), {"tool": "hand", "name": "Tall Grass"}, {"text": "Pull Tall Grass", "enabled": true})
+	await wait_physics(4)
+	player.probe.refresh()
+	assert_eq(player.get_focus_target(), pal, "a WILD creature (befriending) is not deprioritised")
+	grass2.queue_free()
+	pal.queue_free()

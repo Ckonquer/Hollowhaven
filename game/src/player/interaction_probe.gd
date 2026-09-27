@@ -59,6 +59,9 @@ func _physics_process(delta: float) -> void:
 
 
 ## Forces a re-evaluation now (e.g. right before interacting).
+const COMPANION_FOCUS_PENALTY := 1.2
+
+
 func refresh() -> void:
 	if player == null or not is_instance_valid(player) or not player.is_inside_tree() or not enabled:
 		_set_focus(null, {}, {})
@@ -110,6 +113,10 @@ func _consider(space: PhysicsDirectSpaceState3D, collider: Object, ppos: Vector3
 	var col3 := collider as Node3D
 	var surf := surface_distance(col3, ppos)
 	var score := Logic.score_candidate(ppos, facing, col3.global_position, surf, max_dist, from_ray)
+	# A befriended companion trotting at Krystal's heels must not steal the focus from the grass, bush or stone she
+	# is actually reaching for: companions only win when looked at directly or when nothing else is near.
+	if score != INF and not from_ray and (owner_node as Node).is_in_group("companion") and owner_node.has_method("is_befriended") and bool(owner_node.is_befriended()):
+		score += COMPANION_FOCUS_PENALTY
 	if score == INF or score >= _best_score:
 		return
 	if _seen.has(owner_node) and not from_ray:

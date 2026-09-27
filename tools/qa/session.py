@@ -17,14 +17,16 @@ from hhbot import Bot, GameWindow, Telemetry
 
 class Session:
     def __init__(self, exe: str, out_dir: str | Path, save_dir: str | Path, name: str,
-                 resolution: str = "1600x900", extra: list[str] | None = None, cwd: str | None = None):
+                 resolution: str = "1600x900", extra: list[str] | None = None, cwd: str | None = None,
+                 pre_args: list[str] | None = None):
         self.exe = exe
-        self.out = Path(out_dir)
+        self.out = Path(out_dir).resolve()
         self.out.mkdir(parents=True, exist_ok=True)
-        self.save_dir = Path(save_dir)
+        self.save_dir = Path(save_dir).resolve()
         self.name = name
         self.resolution = resolution
         self.extra = extra or []
+        self.pre_args = pre_args or []
         self.cwd = cwd
         self.proc: subprocess.Popen | None = None
         self.tele_path = self.out / f"{name}_telemetry.jsonl"
@@ -35,7 +37,7 @@ class Session:
     def start(self, wait_for=None, timeout: float = 60.0):
         if self.tele_path.exists():
             self.tele_path.unlink()
-        args = ["--windowed", "--resolution", self.resolution, "--position", "80,60", "--",
+        args = self.pre_args + ["--windowed", "--resolution", self.resolution, "--position", "80,60", "--",
                 f"--qa-telemetry={self.tele_path.as_posix()}", "--qa-interval=0.1",
                 f"--save-dir={self.save_dir.as_posix()}", "--no-focus-pause"] + self.extra
         self.proc = subprocess.Popen([self.exe] + args, cwd=self.cwd)

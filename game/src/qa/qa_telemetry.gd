@@ -145,6 +145,13 @@ func _collect_nearby() -> Array:
 				e["id"] = String(n.get("node_id"))
 			if g == "enemy" and n.has_method("is_threatening"):
 				e["threat"] = n.is_threatening()
+			if g == "enemy":
+				var st = n.get("state")
+				if st != null:
+					e["state"] = str(st)
+				var h = n.get("health")
+				if h != null and is_instance_valid(h):
+					e["hp"] = snappedf(float(h.hp), 0.1)
 			out.append(e)
 	out.sort_custom(func(a, b): return a["dist"] < b["dist"])
 	if out.size() > 60:
@@ -167,8 +174,20 @@ func _collect_buttons() -> Array:
 
 
 func _collect_buttons_rec(n: Node, xf: Transform2D, out: Array) -> void:
-	if out.size() > 120:
+	if out.size() > 160:
 		return
+	if n is Control and n.get("index") != null and n.get("hud_style") != null and "stack" in n:
+		# Inventory slot widget (src/ui/widgets/item_slot.gd): expose for drag/double-click tests.
+		var sc: Control = n
+		if sc.is_visible_in_tree() and not bool(sc.get("hud_style")):
+			var r0 := sc.get_global_rect()
+			var a: Vector2 = xf * r0.position
+			var b2: Vector2 = xf * (r0.position + r0.size)
+			var st = sc.get("stack")
+			var owner_inv = sc.get("inv")
+			out.append({"text": "slot:%s:%d" % ["bag" if owner_inv == GameState.inventory else "other", int(sc.get("index"))],
+				"item": String(st["id"]) if st is Dictionary else "", "count": int(st["count"]) if st is Dictionary else 0,
+				"rect": [int(a.x), int(a.y), int(b2.x - a.x), int(b2.y - a.y)], "disabled": false, "clipped": _is_clipped(sc, r0)})
 	if n is BaseButton:
 		var b: BaseButton = n
 		if b.is_visible_in_tree():
@@ -178,10 +197,42 @@ func _collect_buttons_rec(n: Node, xf: Transform2D, out: Array) -> void:
 			var text := ""
 			if b is Button:
 				text = (b as Button).text
+			if text == "":
+				text = _child_label_text(b)
 			if text == "" and b.tooltip_text != "":
 				text = b.tooltip_text
 			if text == "":
 				text = String(b.name)
-			out.append({"text": text, "rect": [int(tl.x), int(tl.y), int(br.x - tl.x), int(br.y - tl.y)], "disabled": b.disabled})
+			out.append({"text": text, "rect": [int(tl.x), int(tl.y), int(br.x - tl.x), int(br.y - tl.y)], "disabled": b.disabled,
+				"clipped": _is_clipped(b, r)})
 	for c in n.get_children():
 		_collect_buttons_rec(c, xf, out)
+
+
+## Concatenated text of Labels inside a text-less button (e.g. recipe rows).
+func _child_label_text(n: Node) -> String:
+	var parts: PackedStringArray = []
+	for c in n.get_children():
+		if c is Label and (c as Label).text.strip_edges() != "":
+			parts.append((c as Label).text.strip_edges())
+		elif c is RichTextLabel and (c as RichTextLabel).get_parsed_text().strip_edges() != "":
+			parts.append((c as RichTextLabel).get_parsed_text().strip_edges())
+		elif c.get_child_count() > 0:
+			var sub := _child_label_text(c)
+			if sub != "":
+				parts.append(sub)
+		if parts.size() >= 3:
+			break
+	return " | ".join(parts)
+
+
+## True if the button is (partly) scrolled out of an ancestor that clips its contents.
+func _is_clipped(b: Control, r: Rect2) -> bool:
+	var p := b.get_parent()
+	while p != null:
+		if p is Control and ((p as Control).clip_contents or p is ScrollContainer):
+			var pr := (p as Control).get_global_rect()
+			if not pr.encloses(r.grow(-2.0)):
+				return true
+		p = p.get_parent()
+	return false

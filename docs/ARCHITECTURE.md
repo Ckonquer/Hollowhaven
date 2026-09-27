@@ -237,3 +237,27 @@ to load, and skips missing modules (building system, director, companion spawner
 never blocks everyone else. That also means: check the Godot output for "script failed to load".
 Do NOT run `--import` (only the integrator / audio module do) and do not start the editor GUI.
 Always use `timeout` and `--max-seconds` / `--quit-at` so no process is left running.
+
+## Conventions added during integration (all additive)
+* **Prompts**: `player.get_prompt()` returns `{text, action, enabled, reason?}`. Axe/pickaxe harvestables always
+  prompt the `attack` action ("Chop Oak Tree"); pressing E on them also swings the owned tool. Hand gathering
+  calls `harvest_hit(player, "")`. Interactables may implement `set_focused(on: bool)` (probe calls it).
+* **Player**: `stamina` is writable (bed refill), `play_emote("stop")` ends looping emotes, `eat(id) -> bool`,
+  render layer 12 (bit 1<<11) is Krystal's (custom cull masks must include it).
+* **Shared world scripts**: `src/world/common/resource_node.gd` (`setup({node_id, kind, tool, hits, drops,
+  respawn_minutes, visual, name, tint, scale, glow_light})`, signals `harvested_out`, `respawned`) and
+  `world_item.gd` (`static spawn(item_id, count, pos, persistent := true, parent := null)`, `collect()`).
+  Surface area also exposes `surface_at(pos)`, `water_level_at(x, z)`; terrain collider `get_surface_at(pos)`.
+* **Enemies**: optional boss setup keys `arena_radius`, `crack`; boss signal `anchor_burned(pos)`;
+  `stalker.pass_overhead() -> bool`; brazier setup keys `lit`, `persist_flag`; combat target conventions
+  `on_hit_blocked(attacker, dir)`, `get_aim_point()`, `hit_radius`, `hit_color`. The stalker emits
+  `Events.horror_event("authored:stalker_ambush")`.
+* **Director**: `suppress(seconds, replace := false)`; suppressions >= 600 s are holds replaced by the next call.
+* **Settings** (core QA): `Settings.RANGES`, `coerce_value(key, v)`, `sanitize_bindings(d)`, `actions_using(ev)`,
+  optional `load_settings(path)` / `save(path)`. **SaveSystem**: recovers a complete `.tmp`, moves corrupt
+  saves aside (`slot1.corrupt-<unix>.json`). **GameState**: `max_bond_xp()`; quests are also polled once/second.
+* **QuestLog**: `step_string(step, field)` returns `alt_<field>` text in arachnophobia mode — UI uses it.
+* **Windowed runs**: Godot does not report engine flags in `OS.get_cmdline_args()`, so to keep a debug/QA run
+  windowed also pass the user arg: `... --resolution 1600x900 -- --windowed ...`.
+* **QA telemetry** (`src/qa/qa_telemetry.gd`, `--qa-telemetry=<file>`): read-only JSON lines used by the
+  external real-input bot (`tools/qa/`).
