@@ -4,6 +4,36 @@ extends Node
 ## Discovers res://tests/unit/**/test_*.gd. Exit code 0 = all passed, 1 = failures.
 
 var results: Array = []
+var _catcher: ScriptErrorCatcher = null
+
+
+## Records GDScript runtime errors (type SCRIPT) so a test whose code crashes mid-way FAILS instead of
+## silently passing. push_error()/warnings are not counted here (suites may expect those).
+class ScriptErrorCatcher extends Logger:
+	var entries: Array = []
+	var _mutex := Mutex.new()
+
+	func _log_error(_function: String, file: String, line: int, code: String, rationale: String, _editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type != ERROR_TYPE_SCRIPT:
+			return
+		_mutex.lock()
+		entries.append("SCRIPT ERROR %s %s (%s:%d)" % [code, rationale, file, line])
+		_mutex.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
+
+	func count() -> int:
+		_mutex.lock()
+		var n := entries.size()
+		_mutex.unlock()
+		return n
+
+	func since(n: int) -> Array:
+		_mutex.lock()
+		var out := entries.slice(n)
+		_mutex.unlock()
+		return out
 
 
 func _ready() -> void:
@@ -11,6 +41,8 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	_catcher = ScriptErrorCatcher.new()
+	OS.add_logger(_catcher)
 	var filter := Debug.arg("filter", "")
 	var files := []
 	_collect("res://tests/unit", files)
@@ -41,9 +73,12 @@ func _run() -> void:
 			total += 1
 			inst._failures = []
 			GameState.active = false
+			var err_mark := _catcher.count()
 			await inst.before_each()
 			await inst.call(m)
 			await inst.after_each()
+			for e in _catcher.since(err_mark):
+				inst._failures.append(e)
 			var ok: bool = inst._failures.is_empty()
 			if not ok:
 				failed += 1
