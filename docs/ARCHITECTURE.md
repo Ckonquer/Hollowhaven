@@ -158,7 +158,11 @@ overlapping the player/companions, slope ok), place (consumes item, `GameState.a
 spawns node), rotate (R), dismantle (X on a looked-at structure: refund via give_item; chests only when
 empty or contents fit), emits `Events.build_mode_changed / build_selection_changed /
 build_placement_state`. Exposes `static spawn_structure(area, uid) -> Node3D` used when loading.
-The surface area calls `load("res://src/building/structure_factory.gd").spawn_all(self)` on load.
+**Entry point:** `src/building/building_system.gd` with `static func attach(area: Node) -> void` — Game
+calls it right after the surface area loads (before companions spawn). `attach` spawns every saved
+structure of that area (GameState.structures) and adds the BuildMode node (group "build_mode", method
+`begin(item_id)` used by the player when a placeable hotbar item is used). The surface area itself does
+NOT need to call anything.
 Structure nodes implement the interaction contract (chest → `Game.open_panel("storage", {"uid": uid})`,
 bed → sleep: fade, `GameState.skip_to_morning()`, heal, `area.register_spawn("bed", xform)` +
 `Game.set_respawn("surface", "bed")`, save; workbench → `Game.open_panel("crafting", {"station": "workbench"})`;
@@ -188,7 +192,9 @@ Mouse: panels call `Game.push_ui(name)` when opened and `Game.pop_ui(name)` when
 menus (inventory/crafting/storage/journal/map/pause/settings) also `Game.set_paused(true/false)`.
 
 ### Horror (`src/horror/`)
-`director.gd` (Node; created by the Below area): `setup({"area": area, "seed": int})`, `suppress(seconds)`,
+`director.gd` (Node; **Game creates it** for the "below" area: `setup({"area": area, "seed": int})`
+is called before `add_child` under the area root; `Game.director` references it. The Below area only
+places anchors and emits authored events): `setup(...)`, `suppress(seconds)`,
 `get_state()`, `debug_log: Array[String]`, pure-logic core testable without a scene (see
 `data/horror_events.gd`). Uses anchors: `Marker3D` nodes in group "director_anchor" with metadata
 `zone` (mine/ruins/silk), `kind` (sound/doorway/ceiling/floor/spawn), optional `room`.
@@ -222,6 +228,12 @@ Visual preview: `tools/godot.sh --path game --windowed --resolution 1280x720 -- 
 (see tests/preview/preview_stage.gd). Area screenshots (debug build):
 `tools/godot.sh --path game --windowed --resolution 1600x900 -- --area=surface --cams="x,y,z,yawdeg,pitchdeg;..." --shot-dir=<abs dir> [--hour=18]`.
 Then look at the PNGs (Read tool) and iterate on what you actually see.
-Headless parse check of the whole project: `tools/godot.sh --headless --path game --quit 2>&1 | grep -E "ERROR|SCRIPT"`.
+Parse/compile check (headless): `tools/parse_check.sh res://src/<your_module>` (or no arg = everything).
+Stable debug test arena (flat ground, slopes, stairs with ramp collision, doorway, corner, ledge,
+companion spawn ids): `tools/godot.sh --path game --windowed --resolution 1600x900 -- --area=arena`
+(file tests/preview/arena.gd). Use it when the real areas are still being built by someone else.
+Game falls back to tests/preview/fallback_player.gd / fallback_ui.gd if the real player/UI scripts fail
+to load, and skips missing modules (building system, director, companion spawner) - so a broken module
+never blocks everyone else. That also means: check the Godot output for "script failed to load".
 Do NOT run `--import` (only the integrator / audio module do) and do not start the editor GUI.
 Always use `timeout` and `--max-seconds` / `--quit-at` so no process is left running.

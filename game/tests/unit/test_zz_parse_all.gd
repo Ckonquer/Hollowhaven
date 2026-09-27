@@ -1,6 +1,6 @@
 extends "res://tests/test_case.gd"
 ## Loads every script in the project so parse/compile errors fail loudly.
-## Run alone with: tools/test.sh parse_all
+## Run alone with: tools/test.sh parse_all   (or tools/parse_check.sh res://src/player to limit)
 
 const ROOTS := ["res://autoload", "res://data", "res://src", "res://scenes", "res://tests/preview"]
 
@@ -10,7 +10,10 @@ func test_all_scripts_compile() -> void:
 	for r in ROOTS:
 		_collect(r, files)
 	assert_true(files.size() > 10, "found scripts")
+	var prefix := Debug.arg("parse-prefix", "")
 	for path in files:
+		if prefix != "" and not String(path).begins_with(prefix):
+			continue
 		var s = load(path)
 		if s == null:
 			fail("failed to load " + path)

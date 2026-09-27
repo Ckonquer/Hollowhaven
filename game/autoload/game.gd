@@ -9,6 +9,11 @@ const PLAYER_SCRIPT := "res://src/player/player.gd"
 const UI_ROOT_SCRIPT := "res://src/ui/ui_root.gd"
 const COMPANION_SPAWNER := "res://src/companions/companion_spawner.gd"
 const WORLD_ITEM_SCRIPT := "res://src/world/common/world_item.gd"
+const BUILDING_SYSTEM := "res://src/building/building_system.gd"
+const DIRECTOR_SCRIPT := "res://src/horror/director.gd"
+const TEST_AREAS := {"arena": "res://tests/preview/arena.tscn"}   # debug builds only
+const FALLBACK_PLAYER := "res://tests/preview/fallback_player.gd"
+const FALLBACK_UI := "res://tests/preview/fallback_ui.gd"
 
 var mode: String = "boot"          # boot | title | playing | dead | cutscene | loading
 var player: Node3D = null          # the player CharacterBody3D (src/player/player.gd)
@@ -18,6 +23,7 @@ var area_id: String = ""
 var companion_nodes: Dictionary = {}   # companion id -> node in the current area
 var zone_id: String = ""
 var in_safe_zone: bool = true
+var director: Node = null          # horror director in the Below (src/horror/director.gd)
 
 var _ui_stack: Array = []
 var _transitioning := false
@@ -109,7 +115,13 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	_ui_stack.clear()
 	Events.ui_stack_changed.emit(0)
 	_free_gameplay_nodes()
-	var err := get_tree().change_scene_to_file(AREAS.get(target_area, AREAS["surface"]))
+	var scene_path: String = AREAS.get(target_area, "")
+	if scene_path == "" and Debug.is_cheat_allowed():
+		scene_path = TEST_AREAS.get(target_area, "")
+	if scene_path == "":
+		scene_path = AREAS["surface"]
+		target_area = "surface"
+	var err := get_tree().change_scene_to_file(scene_path)
 	if err != OK:
 		push_error("Game: cannot load area %s (%s)" % [target_area, error_string(err)])
 	await get_tree().process_frame
@@ -119,21 +131,33 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	zone_id = ""
 	GameState.player["area"] = target_area
 	if ui == null:
-		var ui_script: Script = load(UI_ROOT_SCRIPT)
-		ui = ui_script.new()
+		ui = _safe_new(UI_ROOT_SCRIPT, FALLBACK_UI)
 		add_child(ui)
 	# Player
-	var pscript: Script = load(PLAYER_SCRIPT)
-	player = pscript.new()
+	player = _safe_new(PLAYER_SCRIPT, FALLBACK_PLAYER)
 	area.add_child(player)
 	var xform := _spawn_transform(spawn_id, use_saved_position and target_area == "surface")
 	if player.has_method("read_from_state"):
 		player.read_from_state()
 	player.teleport(xform)
 	GameState.player["spawn"] = spawn_id
+	# Area systems: building (surface) and the horror director (below)
+	if target_area == "surface":
+		var bs: Script = _safe_load(BUILDING_SYSTEM)
+		if bs != null and bs.has_method("attach"):
+			bs.attach(area)
+	director = null
+	if target_area == "below":
+		var ds: Script = _safe_load(DIRECTOR_SCRIPT)
+		if ds != null:
+			director = ds.new()
+			director.name = "HorrorDirector"
+			if director.has_method("setup"):
+				director.setup({"area": area, "seed": int(Debug.arg("seed", "0")) if Debug.has_arg("seed") else randi()})
+			area.add_child(director)
 	# Companions and persistent dropped items
-	var spawner: Script = load(COMPANION_SPAWNER)
-	if spawner != null:
+	var spawner: Script = _safe_load(COMPANION_SPAWNER)
+	if spawner != null and spawner.has_method("spawn_for_area"):
 		companion_nodes = spawner.spawn_for_area(area, target_area, player)
 	for d in GameState.dropped_in_area(target_area):
 		spawn_dropped_item(String(d["uid"]))
@@ -148,6 +172,25 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 		await ui.fade_in(0.6)
 	if prev_mode == "title":
 		pass
+
+
+## Loads a script, returning null (with an error) instead of crashing if it is missing or broken.
+func _safe_load(path: String) -> Script:
+	if not ResourceLoader.exists(path):
+		return null
+	var s: Script = load(path)
+	if s == null or not s.can_instantiate():
+		push_error("Game: script failed to load: " + path)
+		return null
+	return s
+
+
+## Instantiates a script with a fallback (keeps development builds playable while modules change).
+func _safe_new(path: String, fallback: String) -> Node:
+	var s := _safe_load(path)
+	if s == null:
+		s = _safe_load(fallback)
+	return s.new()
 
 
 func _spawn_transform(spawn_id: String, use_saved: bool) -> Transform3D:
@@ -182,6 +225,7 @@ func set_respawn(target_area: String, spawn_id: String) -> void:
 
 
 func _free_gameplay_nodes() -> void:
+	director = null
 	player = null
 	companion_nodes = {}
 	area = null
@@ -193,7 +237,7 @@ func spawn_dropped_item(uid: String) -> void:
 	var d := GameState.get_dropped(uid)
 	if d.is_empty() or area == null or String(d["area"]) != area_id:
 		return
-	var s: Script = load(WORLD_ITEM_SCRIPT)
+	var s: Script = _safe_load(WORLD_ITEM_SCRIPT)
 	if s != null and s.has_method("spawn_from_state"):
 		s.spawn_from_state(area, uid)
 
