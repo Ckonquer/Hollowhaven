@@ -1,0 +1,11 @@
+# Toolchain binaries (reinstall with tools/setup_toolchain.ps1)
+.tools/
+# Build outputs and packaged releases
+builds/
+dist/
+# Godot caches
+game/.godot/
+game/**/*.import.tmp
+*.tmp
+# Test/scratch output
+qa/tmp/

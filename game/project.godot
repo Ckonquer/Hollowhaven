@@ -1,0 +1,81 @@
+; Engine configuration file.
+; Hollowhaven - For Krystal
+
+config_version=5
+
+[application]
+
+config/name="Hollowhaven"
+config/description="Hollowhaven - For Krystal"
+config/version="0.1.0"
+run/main_scene="res://scenes/boot.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Hollowhaven"
+boot_splash/bg_color=Color(0.105, 0.09, 0.12, 1)
+boot_splash/show_image=false
+boot_splash/fullsize=false
+run/max_fps=0
+config/icon="res://icon.svg"
+
+[autoload]
+
+Events="*res://autoload/events.gd"
+Settings="*res://autoload/settings.gd"
+ItemDB="*res://autoload/item_db.gd"
+GameState="*res://autoload/game_state.gd"
+SaveSystem="*res://autoload/save_system.gd"
+Audio="*res://autoload/audio.gd"
+Game="*res://autoload/game.gd"
+Debug="*res://autoload/debug.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1600
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/vsync/vsync_mode=1
+
+[gui]
+
+theme/custom_font="res://assets/fonts/Nunito-Variable.ttf"
+theme/default_font_antialiasing=1
+
+[input]
+
+ui_accept={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194309,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+
+[layer_names]
+
+3d_physics/layer_1="world"
+3d_physics/layer_2="player"
+3d_physics/layer_3="companion"
+3d_physics/layer_4="enemy"
+3d_physics/layer_5="interact"
+3d_physics/layer_6="structure"
+3d_physics/layer_7="pickup"
+3d_physics/layer_8="trigger"
+3d_physics/layer_9="hitbox"
+
+[physics]
+
+common/physics_ticks_per_second=60
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+anti_aliasing/quality/msaa_3d=2
+anti_aliasing/quality/screen_space_aa=1
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=3
+textures/default_filters/anisotropic_filtering_level=3
+environment/defaults/default_clear_color=Color(0.105, 0.09, 0.12, 1)
