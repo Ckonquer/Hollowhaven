@@ -30,7 +30,7 @@ func _ready() -> void:
 	_note_it.position = Vector3(-0.62, 0.0, 0.05)
 	add_child(_note_it)
 	_key_it = Interactable.new()
-	_key_it.setup({"text": "Take the Foreman's Key", "size": Vector3(0.7, 0.8, 0.6), "offset": Vector3(0, 1.45, 0), "handler": Callable(self, "_take_key"), "text_func": Callable(self, "_key_text")})
+	_key_it.setup({"text": "Take the Foreman's Key", "size": Vector3(0.75, 1.9, 0.6), "offset": Vector3(0, 0.95, 0), "handler": Callable(self, "_take_key"), "text_func": Callable(self, "_key_text")})
 	_key_it.position = Vector3(0.78, 0.0, 0.25)
 	add_child(_key_it)
 	_refresh()

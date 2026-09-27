@@ -136,8 +136,11 @@ class Play:
         if not self.goto(HAVEN, tol=2.5):
             raise StepFailed("could not get home")
 
-    def face(self, pos, tol=4.0):
-        return self.bot.face_point(pos, tol)
+    def face(self, pos, tol=4.0, turn_body=False):
+        ok = self.bot.face_point(pos, tol)
+        if turn_body:
+            self.bot.hold("W", 0.08)   # the camera turned; a tiny step turns Krystal to match
+        return ok
 
     # ------------------------------------------------------------------ interaction
     def approach(self, e, stop=1.3, calm=False):
@@ -155,7 +158,7 @@ class Play:
             k = (d - stop) / d
             tgt = (me[0] + (p[0] - me[0]) * k, me[2] + (p[2] - me[2]) * k)
             self.goto(tgt, tol=0.6, sprint=(d > 8 and not calm), timeout=40)
-        self.face(p)
+        self.face(p, turn_body=d <= stop + 0.3)
         time.sleep(0.25)
 
     def companion_entry(self, cid):
@@ -767,6 +770,7 @@ def build_steps(p: Play, args):
                 break
             p.goto(spot, tol=0.35, sprint=False)
             p.face((19.6, 1.5, -44.55), tol=3)
+            b.hold("W", 0.1)          # a tiny step so Krystal herself turns toward the key board
             time.sleep(0.4)
             if p.prompt_matches(["Foreman's Key"]):
                 b.tap("E")
