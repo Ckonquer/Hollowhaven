@@ -44,7 +44,7 @@ func _ready() -> void:
 		var step := Kit.box(Vector3(2, 0.25, 0.4), Palette.WOOD)
 		add_child(step)
 		step.position = Vector3(-10, 0.125 + i * 0.25, -8 - i * 0.4)
-	_ramp_collider(Vector3(-10, 0, -8.2), Vector3(2, 0.1, 3.4), atan2(2.0, 3.2))
+	_ramp_collider(Vector3(-10, 0, -8.2), Vector3(2, 0.1, 3.85), atan2(2.0, 3.0))
 	_block(Vector3(-10, 1.0, -12.2), Vector3(3, 2, 2), Palette.WOOD_DARK)
 	# Wall with doorway and a corner
 	_block(Vector3(0, 1.5, -18), Vector3(4, 3, 0.4), Palette.STONE)

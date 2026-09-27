@@ -17,7 +17,9 @@ extends Node
 ##   --area=surface|below [--spawn=<id>]              start a new game directly in an area
 ##   --load-save                                      continue from the save directly
 ##   --cams="x,y,z,yaw,pitch;..." --shot-dir=<dir>    free camera screenshots at poses, then quit
-##   --hour=<0-24>  --flags=a,b  --give=item:n,item:n  --befriend=mochi,lumi  --settings=key=val,key=val
+##   --hour=<0-24>  --flags=a,b  --give=item:n,item:n  --befriend=mochi,lumi:follow  --settings=key=val,key=val
+##   --spawn-enemy=brambling:2,gloomling:1            spawn enemies near the player after the area loads
+## NOTE: to get a real window size pass the user arg too:  ... --resolution 1600x900 -- --windowed ...
 ##   --preview=<res://script.gd> [--shot-dir=<dir>]   preview stage: spin a node built from a script
 
 var args: Dictionary = {}
@@ -46,7 +48,7 @@ func _ready() -> void:
 				args[s.substr(2, eq - 2)] = s.substr(eq + 1)
 			else:
 				args[s.substr(2)] = "true"
-	keep_running_unfocused = args.has("no-focus-pause") or headless
+	keep_running_unfocused = args.has("no-focus-pause") or headless or args.has("cams") or args.has("shots")
 	if args.has("save-dir"):
 		SaveSystem.set_save_dir(String(args["save-dir"]))
 	if args.has("seed"):
@@ -120,10 +122,19 @@ func _boot_area() -> void:
 	for g in arg("give").split(",", false):
 		var p := g.split(":")
 		GameState.give_item(p[0], int(p[1]) if p.size() > 1 else 1)
-	for c in arg("befriend").split(",", false):
+	# --befriend=mochi,lumi:follow  (":follow" makes that one the active follower)
+	for entry in arg("befriend").split(",", false):
+		var parts := String(entry).split(":")
+		var c: String = parts[0]
 		GameState.companion(c)["befriended"] = true
 		GameState.companion(c)["assignment"] = "home"
+		if parts.size() > 1 and parts[1] == "follow":
+			GameState.set_companion_assignment(c, "follow")
 	await Game.load_area(arg("area", "surface"), arg("spawn", "haven_start"), false)
+	if args.has("spawn-enemy") and ResourceLoader.exists("res://src/enemies/enemy_factory.gd"):
+		var ef: Script = load("res://src/enemies/enemy_factory.gd")
+		if ef != null and ef.has_method("debug_spawn_from_args"):
+			ef.debug_spawn_from_args()
 	if args.has("cams"):
 		_run_cams()
 

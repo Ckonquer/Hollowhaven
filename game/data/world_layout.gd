@@ -10,9 +10,9 @@ const KILL_Y := -40.0                     # below this the player is recovered t
 const HAVEN_CENTER := Vector2(0, 0)
 const HAVEN_RADIUS := 20.0                # safe zone radius (no enemy spawns / director never runs on surface anyway)
 const BUILD_AREA := {"center": Vector2(0, 0), "radius": 16.0, "grid": 1.0,
-	"blocked": [ {"center": Vector2(0, -6), "radius": 3.5},   # Ward Stone
-				 {"center": Vector2(4, 3), "radius": 2.2},    # campfire
-				 {"center": Vector2(0, 7), "radius": 1.8} ]}  # player start spot (kept clear)
+	"blocked": [ {"center": Vector2(0, -6), "radius": 3.5, "name": "Ward Stone"},
+				 {"center": Vector2(4, 3), "radius": 2.2, "name": "campfire"},
+				 {"center": Vector2(0, 7), "radius": 1.8} ]}   # start path: generic "needs to stay clear" message
 
 ## Named places (shown on the map and used for zone detection). radius = zone size.
 const LANDMARKS := {

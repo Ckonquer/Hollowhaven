@@ -67,6 +67,9 @@ func boot() -> void:
 
 
 func goto_title() -> void:
+	if area_id != "":
+		Events.area_exiting.emit(area_id)
+	area_id = ""
 	mode = "title"
 	GameState.active = false
 	_ui_stack.clear()
@@ -136,16 +139,24 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	# Player
 	player = _safe_new(PLAYER_SCRIPT, FALLBACK_PLAYER)
 	area.add_child(player)
-	var xform := _spawn_transform(spawn_id, use_saved_position and target_area == "surface")
+	var use_saved := use_saved_position and target_area == "surface"
+	var had_spawn: bool = area.get("spawns") is Dictionary and area.spawns.has(spawn_id)
+	var xform := _spawn_transform(spawn_id, use_saved)
 	if player.has_method("read_from_state"):
 		player.read_from_state()
 	player.teleport(xform)
 	GameState.player["spawn"] = spawn_id
-	# Area systems: building (surface) and the horror director (below)
-	if target_area == "surface":
+	# Area systems: building (surface) and the horror director (below).
+	# BuildMode is added after the player on purpose so its _input() runs first.
+	if target_area == "surface" or (target_area == "arena" and Debug.is_cheat_allowed()):
 		var bs: Script = _safe_load(BUILDING_SYSTEM)
 		if bs != null and bs.has_method("attach"):
 			bs.attach(area)
+		# Structures (e.g. the bed) register their spawns deferred: re-place the player if the
+		# requested spawn only exists now.
+		await get_tree().process_frame
+		if not use_saved and not had_spawn and area.get("spawns") is Dictionary and area.spawns.has(spawn_id):
+			player.teleport(area.get_spawn(spawn_id))
 	director = null
 	if target_area == "below":
 		var ds: Script = _safe_load(DIRECTOR_SCRIPT)
@@ -190,6 +201,9 @@ func _safe_new(path: String, fallback: String) -> Node:
 	var s := _safe_load(path)
 	if s == null:
 		s = _safe_load(fallback)
+	if s == null:
+		push_error("Game: neither %s nor its fallback could be loaded" % path)
+		return Node3D.new() if fallback.contains("player") else CanvasLayer.new()
 	return s.new()
 
 
@@ -214,8 +228,18 @@ func change_area(target_area: String, spawn_id: String) -> void:
 	if player != null and is_instance_valid(player) and player.has_method("write_to_state"):
 		player.write_to_state()
 	await load_area(target_area, spawn_id, false)
-	set_respawn(target_area, spawn_id)
+	# Back on the surface, Krystal still wakes in her bed if she has slept in one.
+	set_respawn(target_area, _bed_spawn_or(spawn_id) if target_area == "surface" else spawn_id)
 	SaveSystem.save_game()
+
+
+func _bed_spawn_or(default_spawn: String) -> String:
+	for uid in GameState.structures:
+		var st: Dictionary = GameState.structures[uid]
+		var data = st.get("data", {})
+		if String(st.get("id", "")) == "bed" and data is Dictionary and bool(data.get("respawn", false)):
+			return "bed"
+	return default_spawn
 
 
 ## Sets where Krystal wakes after being defeated (bed, checkpoint lanterns, mine entry...).
@@ -387,4 +411,7 @@ func quit_to_title() -> void:
 
 func quit_game() -> void:
 	Settings.save()
+	if Audio.has_method("stop_all"):
+		Audio.stop_all()
+	await get_tree().process_frame
 	get_tree().quit()

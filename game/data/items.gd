@@ -4,7 +4,7 @@ extends RefCounted
 ##   name, desc          display text
 ##   cat                 resource | tool | weapon | food | placeable | seed | key | equipment | decor
 ##   stack               max stack size (1 for tools)
-##   icon                icon shape id used by the icon renderer (see src/art/icon_factory.gd)
+##   icon                icon shape id used by the icon renderer (see src/ui/icon_factory.gd)
 ##   color               base color for icon / pickup tint
 ##   tool                "axe" | "pickaxe" (for tools) ; power = hits multiplier
 ##   damage, reach       melee stats for tools/weapons

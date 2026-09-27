@@ -3,7 +3,7 @@ extends RefCounted
 ## Building is only allowed inside the Haven build area (see data/world_layout.gd BUILD_AREA).
 ## Fields:
 ##   name, item        display name and the item refunded on dismantle (100% refund)
-##   layer             occupancy layer: "floor" | "object" | "edge" | "roof"
+##   layer             occupancy layer: "floor" | "decor" (rugs: furniture may stand on them) | "object" | "edge" | "roof"
 ##   snap              "cell"   - footprint snapped to the 1 m grid (rotation 0/90/180/270)
 ##                     "floor2" - 2x2 m tile on the even 2 m grid
 ##                     "edge2"  - 2 m wall on a 2 m grid line (rotation 0 = along X, 90 = along Z)
@@ -28,7 +28,7 @@ const STRUCTURES := {
 	"fence": {"name": "Picket Fence", "item": "fence", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.9, "solid": true, "interact": ""},
 	"lantern_post": {"name": "Lantern Post", "item": "lantern_post", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.2, "solid": true, "interact": "", "light": {"color": Color("ffc978"), "energy": 1.6, "range": 7.0}},
 	"flower_pot": {"name": "Flower Pot", "item": "flower_pot", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.8, "solid": false, "interact": ""},
-	"rug": {"name": "Woven Rug", "item": "rug", "layer": "object", "snap": "cell", "size": Vector2i(2, 2), "height": 0.03, "solid": false, "interact": ""},
+	"rug": {"name": "Woven Rug", "item": "rug", "layer": "decor", "snap": "cell", "size": Vector2i(2, 2), "height": 0.03, "solid": false, "interact": ""},
 	"table": {"name": "Table", "item": "table", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.8, "solid": true, "interact": ""},
 	"stool": {"name": "Stool", "item": "stool", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.5, "solid": false, "interact": ""},
 	"pebble_cairn": {"name": "Pebble Cairn", "item": "pebble_cairn", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.7, "solid": false, "interact": ""},

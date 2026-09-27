@@ -248,4 +248,4 @@ func test_haven_keep_clear_circles_explain_themselves() -> void:
 	assert_eq(String(P.validate("storage_chest", Vector3(4.5, 0, 3.5), 0, ctx)["reason"]), "Too close to the campfire")
 	assert_eq(String(P.validate("storage_chest", Vector3(0.5, 0, 7.5), 0, ctx)["reason"]), P.MSG_CLEAR, "unnamed circle stays generic")
 	var raw: Array = preload("res://data/world_layout.gd").BUILD_AREA["blocked"]
-	assert_false((raw[0] as Dictionary).has("name"), "the shared layout data is never modified")
+	assert_false((raw[2] as Dictionary).has("name"), "the shared layout data is never modified (the unnamed circle stays unnamed)")

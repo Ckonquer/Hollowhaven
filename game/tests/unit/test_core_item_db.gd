@@ -10,7 +10,7 @@ const EnemiesData := preload("res://data/enemies.gd")
 const HorrorData := preload("res://data/horror_events.gd")
 const Layout := preload("res://data/world_layout.gd")
 
-const LAYERS := ["floor", "object", "edge", "roof"]
+const LAYERS := ["decor", "floor", "object", "edge", "roof"]
 const SNAPS := ["cell", "floor2", "edge2", "roof2"]
 const INTERACTS := ["", "storage", "sleep", "farm", "station"]
 const TOOL_KINDS := ["axe", "pickaxe"]

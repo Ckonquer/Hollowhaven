@@ -79,3 +79,4 @@ lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
 lights_and_shadows/positional_shadow/soft_shadow_filter_quality=3
 textures/default_filters/anisotropic_filtering_level=3
 environment/defaults/default_clear_color=Color(0.105, 0.09, 0.12, 1)
+occlusion_culling/use_occlusion_culling=true
