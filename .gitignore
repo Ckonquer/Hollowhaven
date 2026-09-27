@@ -10,3 +10,4 @@ game/**/*.import.tmp
 # Test/scratch output
 qa/tmp/
 qa/tmp/
+__pycache__/

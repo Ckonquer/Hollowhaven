@@ -74,6 +74,14 @@ const REBINDABLE := [
 	["journal", "Journal"], ["map", "Map"], ["companion_command", "Companion: Follow / Wait"],
 ]
 
+## Valid ranges of numeric settings; set_value() and load_settings() clamp into them.
+const RANGES := {
+	"mouse_sensitivity": [0.1, 2.0], "fov": [55.0, 95.0], "camera_distance": [2.5, 8.0],
+	"master_volume": [0.0, 1.0], "music_volume": [0.0, 1.0], "ambience_volume": [0.0, 1.0],
+	"sfx_volume": [0.0, 1.0], "ui_volume": [0.0, 1.0],
+	"horror_intensity": [0, 2], "max_fps": [0, 1000], "render_scale": [0.5, 1.0], "quality": [0, 2],
+}
+
 var values: Dictionary = {}
 
 
@@ -88,31 +96,107 @@ func get_value(key: String) -> Variant:
 	return values.get(key, DEFAULTS.get(key))
 
 
+## Sets a value. Known keys are coerced to their default's type (a slider's 1.0 becomes the int 1 for
+## "horror_intensity", 1 becomes 1.0 for "fov", ...) and clamped to RANGES; incompatible values are
+## rejected with a warning so the settings never hold a wrong type.
 func set_value(key: String, value: Variant) -> void:
-	if values.get(key) == value:
+	var v: Variant = coerce_value(key, value)
+	if v == null:
+		push_warning("Settings: rejected value %s for '%s'" % [str(value), key])
 		return
-	values[key] = value
+	var cur: Variant = values.get(key)
+	if values.has(key) and typeof(cur) == typeof(v) and cur == v:
+		return
+	values[key] = v
+	if key == "bindings":
+		setup_input_map()
 	if key in ["fullscreen", "vsync", "max_fps", "render_scale"]:
 		apply_video()
 	Events.settings_changed.emit(key)
 
 
-func load_settings() -> void:
+## Converts `value` to the type of DEFAULTS[key] (clamped to RANGES). Returns null when the value
+## cannot represent that setting. Unknown keys pass through unchanged.
+func coerce_value(key: String, value: Variant) -> Variant:
+	if not DEFAULTS.has(key):
+		return value
+	var def: Variant = DEFAULTS[key]
+	var out: Variant = null
+	match typeof(def):
+		TYPE_BOOL:
+			if value is bool:
+				out = value
+			elif value is int or value is float:
+				out = (value != 0)
+			elif value is String:
+				var s := String(value).strip_edges().to_lower()
+				if s in ["true", "1", "on", "yes"]:
+					out = true
+				elif s in ["false", "0", "off", "no"]:
+					out = false
+		TYPE_INT:
+			if value is int:
+				out = value
+			elif value is float and is_finite(value):
+				out = roundi(value)
+			elif value is bool:
+				out = 1 if value else 0
+			elif value is String and String(value).strip_edges().is_valid_int():
+				out = String(value).strip_edges().to_int()
+			if out != null and RANGES.has(key):
+				out = clampi(int(out), int(RANGES[key][0]), int(RANGES[key][1]))
+		TYPE_FLOAT:
+			if value is int or value is float:
+				out = float(value)
+			elif value is String and String(value).strip_edges().is_valid_float():
+				out = String(value).strip_edges().to_float()
+			if out != null and not is_finite(float(out)):
+				out = null
+			if out != null and RANGES.has(key):
+				out = clampf(float(out), float(RANGES[key][0]), float(RANGES[key][1]))
+		TYPE_DICTIONARY:
+			if value is Dictionary:
+				out = sanitize_bindings(value) if key == "bindings" else value.duplicate(true)
+	return out
+
+
+## Keeps only known actions whose binding lists hold valid "key:<code>" / "mouse:<button>" strings.
+func sanitize_bindings(b: Dictionary) -> Dictionary:
+	var out := {}
+	for action in b:
+		if not (action is String or action is StringName) or not DEFAULT_BINDINGS.has(String(action)):
+			continue
+		var list: Variant = b[action]
+		if not (list is Array or list is PackedStringArray):
+			continue
+		var clean: Array = []
+		for e in list:
+			if (e is String or e is StringName) and _deserialize(String(e)) != null and not clean.has(String(e)):
+				clean.append(String(e))
+		if not clean.is_empty():
+			out[String(action)] = clean
+	return out
+
+
+## Loads persisted settings (the default path is the player's settings file; tests pass a temp path).
+## Values are coerced/clamped like set_value(); unknown keys and invalid values are ignored.
+## Call setup_input_map() afterwards if the bindings should take effect immediately.
+func load_settings(path: String = PATH) -> void:
 	var cf := ConfigFile.new()
-	if cf.load(PATH) != OK:
+	if cf.load(path) != OK:
 		return
 	for key in DEFAULTS:
 		if cf.has_section_key("settings", key):
-			var v = cf.get_value("settings", key)
-			if typeof(v) == typeof(DEFAULTS[key]) or (DEFAULTS[key] is float and (v is int or v is float)):
-				values[key] = float(v) if DEFAULTS[key] is float else v
+			var v: Variant = coerce_value(key, cf.get_value("settings", key))
+			if v != null:
+				values[key] = v
 
 
-func save() -> void:
+func save(path: String = PATH) -> void:
 	var cf := ConfigFile.new()
 	for key in values:
 		cf.set_value("settings", key, values[key])
-	var err := cf.save(PATH)
+	var err := cf.save(path)
 	if err != OK:
 		push_warning("Settings: could not save (%s)" % error_string(err))
 
@@ -150,35 +234,65 @@ func apply_video() -> void:
 # --- Input map ---------------------------------------------------------------------
 
 func setup_input_map() -> void:
-	var binds: Dictionary = values.get("bindings", {})
+	var raw_binds: Variant = values.get("bindings", {})
+	var binds: Dictionary = raw_binds if raw_binds is Dictionary else {}
 	for action in DEFAULT_BINDINGS:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.2)
 		InputMap.action_erase_events(action)
-		var list: Array = binds.get(action, DEFAULT_BINDINGS[action])
+		var raw: Variant = binds.get(action, [])
+		var list: Array = raw if raw is Array else []
 		if list.is_empty():
 			list = DEFAULT_BINDINGS[action]
 		for b in list:
-			var ev := _deserialize(String(b))
+			var ev := _deserialize(str(b))
 			if ev:
 				InputMap.action_add_event(action, ev)
 
 
 ## Replaces the primary binding of `action` with `event` (secondary default kept for movement).
+## If the new input was one of the action's secondary bindings it is not listed twice.
 func rebind(action: String, event: InputEvent) -> void:
+	if not DEFAULT_BINDINGS.has(action):
+		push_warning("Settings: cannot rebind unknown action '%s'" % action)
+		return
 	var s := _serialize(event)
 	if s == "":
 		return
-	var binds: Dictionary = values.get("bindings", {}).duplicate(true)
-	var cur: Array = binds.get(action, DEFAULT_BINDINGS.get(action, [])).duplicate()
+	var raw_binds: Variant = values.get("bindings", {})
+	var binds: Dictionary = raw_binds.duplicate(true) if raw_binds is Dictionary else {}
+	var existing: Variant = binds.get(action, DEFAULT_BINDINGS[action])
+	var cur: Array = existing.duplicate() if existing is Array else []
 	if cur.is_empty():
 		cur = [s]
 	else:
 		cur[0] = s
+	for i in range(cur.size() - 1, 0, -1):
+		if str(cur[i]) == s:
+			cur.remove_at(i)
 	binds[action] = cur
 	values["bindings"] = binds
 	setup_input_map()
 	Events.settings_changed.emit("bindings")
+
+
+## Actions (from DEFAULT_BINDINGS) currently bound to the same key/button as `event`, e.g. to warn
+## about conflicts in the rebinding UI.
+func actions_using(event: InputEvent) -> Array:
+	var s := _serialize(event)
+	var out := []
+	if s == "":
+		return out
+	var raw_binds: Variant = values.get("bindings", {})
+	var binds: Dictionary = raw_binds if raw_binds is Dictionary else {}
+	for action in DEFAULT_BINDINGS:
+		var raw: Variant = binds.get(action, [])
+		var list: Array = raw if (raw is Array and not raw.is_empty()) else DEFAULT_BINDINGS[action]
+		for b in list:
+			if str(b) == s:
+				out.append(action)
+				break
+	return out
 
 
 func reset_bindings() -> void:
@@ -224,14 +338,14 @@ func _serialize(ev: InputEvent) -> String:
 
 func _deserialize(s: String) -> InputEvent:
 	var parts := s.split(":")
-	if parts.size() != 2:
+	if parts.size() != 2 or not parts[1].is_valid_int() or parts[1].to_int() <= 0:
 		return null
 	if parts[0] == "key":
 		var k := InputEventKey.new()
-		k.physical_keycode = int(parts[1])
+		k.physical_keycode = parts[1].to_int() as Key
 		return k
 	if parts[0] == "mouse":
 		var m := InputEventMouseButton.new()
-		m.button_index = int(parts[1])
+		m.button_index = parts[1].to_int() as MouseButton
 		return m
 	return null

@@ -65,7 +65,10 @@ func category(id: String) -> String:
 
 
 func is_quest_item(id: String) -> bool:
-	return bool(item(id).get("quest", false)) or item(id)["cat"] == "key"
+	if not _items.has(id):
+		return false
+	var d: Dictionary = _items[id]
+	return bool(d.get("quest", false)) or d["cat"] == "key"
 
 
 func items_in_category(cat: String) -> Array:

@@ -1,0 +1,315 @@
+extends "res://tests/test_case.gd"
+## UI root integration (headless): panels open/close with pausing and the UI stack, Esc closes the
+## top panel first, hotkeys switch panels, every panel builds, hints show once per id, toasts
+## aggregate pickups, the tracker follows the quest, and the death / chapter overlays behave.
+
+const UiRootScript := preload("res://src/ui/ui_root.gd")
+const UiUtil := preload("res://src/ui/ui_util.gd")
+const PausePanel := preload("res://src/ui/panels/pause_panel.gd")
+const InventoryPanel := preload("res://src/ui/panels/inventory_panel.gd")
+const TitleScreen := preload("res://src/ui/title_screen.gd")
+const CompanionPanel := preload("res://src/ui/panels/companion_panel.gd")
+const JournalPanel := preload("res://src/ui/panels/journal_panel.gd")
+
+var ui: CanvasLayer
+var _mode_before := ""
+
+
+func before_each() -> void:
+	UiUtil.allow_settings_save = false
+	fresh_state()
+	_mode_before = Game.mode
+	Game.mode = "playing"
+	ui = UiRootScript.new()
+	add_child(ui)
+	await wait_frames(2)
+
+
+func after_each() -> void:
+	if ui != null and is_instance_valid(ui):
+		ui.close_all()
+		ui.queue_free()
+	await wait_frames(2)
+	get_tree().paused = false
+	Game.mode = _mode_before
+	for p in Game._ui_stack.duplicate():
+		Game.pop_ui(String(p))
+
+
+func _key(action: String) -> InputEventKey:
+	var ev := InputEventKey.new()
+	var evs := InputMap.action_get_events(action)
+	var src: InputEventKey = evs[0]
+	ev.physical_keycode = src.physical_keycode
+	ev.pressed = true
+	return ev
+
+
+func test_open_close_pauses_and_tracks_ui_stack() -> void:
+	ui.open("inventory")
+	assert_true(ui.is_open("inventory"))
+	assert_true(Game.is_ui_open(), "Game knows a panel is open")
+	assert_true(get_tree().paused, "full-screen panel pauses the world")
+	ui.close("inventory")
+	await wait_frames(1)
+	assert_false(ui.is_open("inventory"))
+	assert_false(Game.is_ui_open())
+	assert_false(get_tree().paused, "unpaused after closing")
+
+
+func test_companion_menu_does_not_pause() -> void:
+	ui.open("companion", {"id": "mochi"})
+	assert_true(ui.is_open("companion"))
+	assert_false(get_tree().paused, "the small companion menu keeps the world running")
+	assert_true(Game.is_ui_open())
+
+
+func test_escape_closes_top_panel_first() -> void:
+	ui.open("pause")
+	ui.open("settings")
+	assert_eq(ui.top_panel(), "settings")
+	ui._input(_key("pause"))
+	assert_false(ui.is_open("settings"), "Esc closed settings")
+	assert_true(ui.is_open("pause"), "pause stays open")
+	assert_true(get_tree().paused)
+	ui._input(_key("pause"))
+	assert_false(ui.is_open("pause"))
+	assert_false(get_tree().paused)
+	ui._input(_key("pause"))
+	assert_true(ui.is_open("pause"), "Esc with nothing open opens pause")
+
+
+func test_hotkeys_toggle_and_switch_panels() -> void:
+	ui._input(_key("inventory"))
+	assert_true(ui.is_open("inventory"))
+	ui._input(_key("craft"))
+	assert_false(ui.is_open("inventory"), "switching closes the previous gameplay panel")
+	assert_true(ui.is_open("crafting"))
+	ui._input(_key("craft"))
+	assert_false(ui.is_open("crafting"), "same key closes it")
+	ui._input(_key("help"))
+	assert_true(ui.is_open("controls"))
+	ui.close_all()
+	ui.open("pause")
+	ui._input(_key("map"))
+	assert_false(ui.is_open("map"), "hotkeys don't open panels over the pause menu")
+	ui._input(_key("help"))
+	assert_true(ui.is_open("controls"), "the help overlay stacks over the pause menu")
+	assert_eq(ui.top_panel(), "controls")
+	ui._input(_key("pause"))
+	assert_true(ui.is_open("pause") and not ui.is_open("controls"), "Esc returns to the pause menu")
+	Game.mode = "dead"
+	ui.close_all()
+	ui._input(_key("journal"))
+	assert_false(ui.is_open("journal"), "no panels while defeated")
+
+
+func test_every_panel_builds_and_closes() -> void:
+	GameState.give_item("wood", 5)
+	GameState.give_item("berries", 3)
+	GameState.give_item("foreman_key", 1)
+	GameState.befriend("mochi")
+	GameState.discover_lore("test_note")
+	var args := {"storage": {"uid": "s_test"}, "companion": {"id": "mochi"}, "confirm": {"title": "T", "text": "x"}}
+	for name in UiRootScript.PANELS:
+		if name == "comfort":
+			continue
+		ui.open(String(name), args.get(name, {}))
+		await wait_frames(2)
+		assert_true(ui.is_open(String(name)), "%s opened" % name)
+		var p: Control = ui.panels[name]
+		assert_true(p.window != null and p.window.size.x > 100.0, "%s has a laid-out window" % name)
+		var vp: Vector2 = ui.root.size
+		assert_true(p.window.size.x <= vp.x + 1.0 and p.window.size.y <= vp.y + 1.0, "%s fits on screen (%s in %s)" % [name, p.window.size, vp])
+		ui.close(String(name))
+		await wait_frames(1)
+		assert_false(ui.is_open(String(name)))
+	assert_false(get_tree().paused)
+
+
+func test_hints_show_once_and_respect_setting() -> void:
+	var hints: Control = ui.hud.hints
+	var old_hints: Variant = Settings.get_value("show_hints")
+	Settings.values["show_hints"] = true
+	assert_true(hints.on_hint("t_chop", "Press {attack} to chop."), "first time shows")
+	assert_true(bool(GameState.get_flag("hint_t_chop")), "remembered in GameState flags")
+	assert_false(hints.on_hint("t_chop", "Press {attack} to chop."), "never repeats")
+	# persists through a save round trip
+	var d := GameState.to_dict()
+	GameState.from_dict(d)
+	assert_false(hints.on_hint("t_chop", "again"), "still remembered after loading")
+	Settings.values["show_hints"] = false
+	assert_false(hints.on_hint("t_new", "Hidden"), "disabled hints are not shown")
+	assert_false(bool(GameState.get_flag("hint_t_new")), "and not marked as seen")
+	Settings.values["show_hints"] = old_hints
+	var txt := String(hints.format_hint("Press {interact}", Callable(UiUtil, "settings_label")))
+	assert_true(txt.contains(Settings.action_label("interact")), txt)
+	assert_false(txt.contains("{interact}"))
+
+
+func test_pickups_aggregate_into_one_toast() -> void:
+	var toasts: Control = ui.toasts
+	GameState.give_item("wood", 1)
+	GameState.give_item("wood", 1)
+	GameState.give_item("wood", 2)
+	assert_eq(toasts.model.entries.size(), 1)
+	assert_eq(int(toasts.model.entries[0]["count"]), 4)
+	assert_eq(toasts.views.size(), 1, "one toast on screen")
+	GameState.give_item("foreman_key", 1)
+	var mentions := 0
+	for e in toasts.model.entries:
+		assert_ne(String(e["key"]), "item:foreman_key", "key items never show as '+1' pickups")
+		if String(e["text"]).contains(ItemDB.display_name("foreman_key")):
+			mentions += 1
+			assert_eq(String(e["item"]), "foreman_key", "key item toast carries its icon")
+	assert_eq(mentions, 1, "exactly one toast for the key item (notify is merged)")
+
+
+func test_tracker_follows_the_quest() -> void:
+	var tr: Control = ui.hud.tracker
+	await wait_frames(1)
+	assert_true(tr.visible)
+	assert_eq(tr.title_l.text, String(GameState.quests.current_step()["title"]))
+	GameState.set_flag("read_ward_intro", true)
+	GameState.quests.evaluate()
+	await wait_frames(1)
+	assert_eq(tr.title_l.text, String(GameState.quests.current_step()["title"]), "updates on objectives_changed")
+
+
+func test_death_overlay_ends_on_black() -> void:
+	var t0 := Time.get_ticks_msec()
+	await ui.show_death()
+	var secs := float(Time.get_ticks_msec() - t0) / 1000.0
+	assert_true(secs > 1.8 and secs < 4.0, "about 2.5 s (%.2f)" % secs)
+	assert_almost(ui.fade_rect.color.a, 1.0, 0.01, "respawn happens under black")
+	await ui.fade_in(0.1)
+	assert_almost(ui.fade_rect.color.a, 0.0, 0.01)
+
+
+func test_chapter_card_appears_and_leaves() -> void:
+	ui.show_chapter_card("Chapter One", "The Dimming Ward")
+	await wait_frames(1)
+	assert_eq(ui.overlay_layer.get_child_count(), 1)
+	var card: Node = ui.overlay_layer.get_child(0)
+	card.hold = 0.0
+	await card.finished
+	await wait_frames(1)
+	assert_eq(ui.overlay_layer.get_child_count(), 0, "card frees itself")
+
+
+func test_pure_panel_helpers() -> void:
+	assert_eq(PausePanel.unstuck_spawn("surface", {"respawn_area": "surface", "respawn_spawn": "bed"}), "bed")
+	assert_eq(PausePanel.unstuck_spawn("surface", {"respawn_area": "surface", "respawn_spawn": "mine_exit"}), "haven_respawn")
+	assert_eq(PausePanel.unstuck_spawn("surface", {"respawn_area": "below", "respawn_spawn": "lantern_2"}), "haven_respawn")
+	assert_eq(PausePanel.unstuck_spawn("below", {"respawn_area": "below", "respawn_spawn": "lantern_2"}), "lantern_2")
+	assert_eq(PausePanel.unstuck_spawn("below", {"respawn_area": "surface", "respawn_spawn": "bed"}), "mine_entry")
+	assert_eq(InventoryPanel.use_action("berries"), "Eat")
+	assert_eq(InventoryPanel.use_action("workbench"), "Place in the Haven")
+	assert_eq(InventoryPanel.use_action("stone"), "")
+	assert_eq(TitleScreen.continue_text({"meta": {"day": 4, "step_title": "A Timid Friend", "play_seconds": 1500.0}}), "Day 4  ·  A Timid Friend  ·  25 min played")
+	assert_eq(TitleScreen.continue_text({}), "")
+	assert_eq(CompanionPanel.status_text("lumi"), "Not yet befriended")
+	for id in ItemDB.creature_ids():
+		assert_true(JournalPanel.unmet_hint(String(id)).length() > 10)
+
+
+func test_full_screen_layers_cover_the_screen() -> void:
+	# The damage vignette / screen flash and the quest banner layer must span the whole canvas
+	# (a zero-sized layer silently hides every flash and pushes the banner off-screen).
+	await wait_frames(1)
+	var vp: Vector2 = ui.root.size
+	assert_true(vp.x > 100.0, "root laid out")
+	var fx: Control = ui.hud.fx
+	assert_true(fx.size.distance_to(vp) < 1.0, "screen fx covers the screen (%s vs %s)" % [fx.size, vp])
+	assert_true((fx.vignette as Control).size.distance_to(vp) < 1.0, "vignette covers the screen (%s)" % (fx.vignette as Control).size)
+	assert_true((fx.flash as Control).size.distance_to(vp) < 1.0, "flash covers the screen (%s)" % (fx.flash as Control).size)
+	var qb: Control = ui.quest_banner
+	assert_true(qb.size.distance_to(vp) < 1.0, "quest banner layer covers the screen (%s)" % qb.size)
+	qb.show_text("New goal: A Timid Friend")
+	await wait_frames(2)
+	var p: Control = qb.panel
+	assert_true(p.position.x > 0.0 and p.position.x + p.size.x < vp.x, "banner centred on screen (x=%.0f w=%.0f)" % [p.position.x, p.size.x])
+	assert_almost(p.position.x + p.size.x * 0.5, vp.x * 0.5, 2.0, "banner centred")
+	# a screen flash really shows (softly capped) and fades
+	Events.screen_flash.emit(Color(1, 1, 1, 1), 0.4)
+	await wait_seconds(0.08)
+	var a: float = (fx.flash as ColorRect).color.a
+	assert_true(a > 0.05 and a <= fx.MAX_FLASH_ALPHA + 0.001, "flash visible but capped (%.2f)" % a)
+
+
+func test_quest_banner_waits_for_menus_and_toasts_stay_under_them() -> void:
+	assert_true(ui.top_layer.get_index() < ui.panel_layer.get_index(), "toasts/banner are drawn under menus")
+	ui.open("inventory")
+	ui.quest_banner.show_text("New goal: A Timid Friend")
+	await wait_frames(2)
+	assert_false(ui.quest_banner.panel.visible, "no banner hidden behind an open menu")
+	ui.close("inventory")
+	await wait_frames(3)
+	assert_true(ui.quest_banner.panel.visible, "queued banner plays once the menu closes")
+	assert_eq(ui.quest_banner.label.text, "A Timid Friend")
+
+
+func test_overlapping_fades_never_leave_a_caller_waiting() -> void:
+	# e.g. the bed fades out, then Krystal is defeated and the death screen fades too: the first
+	# caller must still resume (Game.load_area awaiting a killed tween would softlock the game).
+	var state := {"first_done": false}
+	var first := func() -> void:
+		await ui.fade_out(0.6)
+		state["first_done"] = true
+	first.call()
+	await wait_frames(2)
+	await ui.fade_in(0.1)
+	await wait_frames(2)
+	assert_true(bool(state["first_done"]), "the interrupted fade_out returned")
+	assert_almost(ui.fade_rect.color.a, 0.0, 0.01, "the newer fade wins")
+	assert_eq(ui.fade_rect.mouse_filter, Control.MOUSE_FILTER_IGNORE, "clicks pass again after fading in")
+	await ui.fade_out(0.0)
+	assert_almost(ui.fade_rect.color.a, 1.0, 0.01, "instant fade")
+	await ui.fade_in(0.0)
+	assert_almost(ui.fade_rect.color.a, 0.0, 0.01)
+
+
+func test_confirm_returns_the_chosen_button() -> void:
+	var state := {"choice": "<none>"}
+	var run := func() -> void:
+		state["choice"] = await ui.confirm("Quit?", "Sure?", [["save", "Save", "AccentButton"], ["quit", "Quit", ""]])
+	run.call()
+	await wait_frames(2)
+	assert_true(ui.is_open("confirm"), "confirm card shown")
+	assert_true(get_tree().paused, "confirm pauses like a menu")
+	ui.panels["confirm"]._choose("quit")
+	await wait_frames(2)
+	assert_eq(String(state["choice"]), "quit", "confirm() returns the chosen id")
+	assert_false(ui.is_open("confirm"), "card closed after choosing")
+	# Esc / close button -> "cancel"
+	state["choice"] = "<none>"
+	run.call()
+	await wait_frames(2)
+	ui._input(_key("pause"))
+	await wait_frames(2)
+	assert_eq(String(state["choice"]), "cancel", "dismissing the card answers cancel")
+	assert_false(get_tree().paused)
+
+
+func test_ending_is_awaitable_and_skippable() -> void:
+	var state := {"done": false}
+	var run := func() -> void:
+		await ui.show_ending()
+		state["done"] = true
+	run.call()
+	await wait_frames(2)
+	var e: Control = ui._ending
+	assert_not_null(e, "ending overlay shown")
+	var k := InputEventKey.new()
+	k.physical_keycode = KEY_SPACE
+	k.pressed = true
+	e._input(k)
+	assert_true(int(e._phase) < 3, "not skippable in the first seconds")
+	await wait_seconds(4.2)
+	e._input(k)
+	assert_eq(int(e._phase), 3, "any key skips to 'Continue exploring your Haven'")
+	assert_false(bool(state["done"]), "still waiting for the player")
+	e._finish()
+	await wait_seconds(1.0)
+	assert_true(bool(state["done"]), "show_ending returns after Continue")
+	assert_null(ui._ending)

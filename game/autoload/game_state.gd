@@ -6,6 +6,8 @@ extends Node
 const Inventory := preload("res://src/core/inventory.gd")
 const QuestLog := preload("res://src/core/quest_log.gd")
 const Layout := preload("res://data/world_layout.gd")
+const CreaturesData := preload("res://data/creatures.gd")
+const COMPANION_ASSIGNMENTS := ["wild", "home", "follow", "wait"]
 
 const HOTBAR_SIZE := 8
 const INVENTORY_SIZE := 32
@@ -36,6 +38,7 @@ var next_uid: int = 1
 
 var _eval_pending := false
 var _minute_accum := 0.0
+var _quest_poll := 0.0
 
 
 func _ready() -> void:
@@ -55,10 +58,19 @@ func _process(delta: float) -> void:
 	if not active:
 		return
 	# Buff timers tick in real seconds while playing (not while paused: autoload pauses with tree).
-	for b in buffs.keys():
-		buffs[b]["remaining"] = float(buffs[b]["remaining"]) - delta
-		if buffs[b]["remaining"] <= 0.0:
-			buffs.erase(b)
+	if not buffs.is_empty():   # keys() allocates: skip the per-frame copy when there is nothing to tick
+		for b in buffs.keys():
+			buffs[b]["remaining"] = float(buffs[b]["remaining"]) - delta
+			if buffs[b]["remaining"] <= 0.0:
+				buffs.erase(b)
+	# Safety net (documented in quest_log.gd): once per second, complete the current step if its
+	# objectives are met even when no signal announced the change (e.g. state set directly).
+	_quest_poll += delta
+	if _quest_poll >= 1.0:
+		_quest_poll = 0.0
+		var cur: Dictionary = quests.current_step()
+		if not cur.is_empty() and quests.step_done(cur):
+			request_quest_eval()
 
 
 ## Resets everything to a blank state (used by new_game and before loading).
@@ -127,7 +139,10 @@ func give_item(id: String, count: int, drop_pos: Variant = null) -> int:
 
 
 ## Removes items (backpack first, then key pouch). All-or-nothing.
+## Taking zero (or a negative amount) trivially succeeds and changes nothing.
 func take_item(id: String, count: int) -> bool:
+	if count <= 0:
+		return true
 	if ItemDB.is_quest_item(id):
 		if int(key_items.get(id, 0)) < count:
 			return false
@@ -153,6 +168,8 @@ func has_item(id: String, count: int = 1) -> bool:
 
 ## Best owned tool of a kind ("axe"/"pickaxe") or "" if none.
 func best_tool(kind: String) -> String:
+	if kind == "":
+		return ""   # "" would otherwise match every non-tool item (their tool field is "")
 	var best := ""
 	var best_power := -1.0
 	for s in inventory.slots:
@@ -201,7 +218,9 @@ func _player_feet() -> Vector3:
 # --- Flags, counters, lore ------------------------------------------------------------
 
 func set_flag(name: String, value: Variant = true) -> void:
-	if flags.get(name) == value:
+	# Compare types first: Godot 4.7 raises a script error for e.g. String == bool.
+	var cur: Variant = flags.get(name)
+	if flags.has(name) and typeof(cur) == typeof(value) and cur == value:
 		return
 	flags[name] = value
 	Events.flag_set.emit(name, value)
@@ -292,6 +311,7 @@ func add_structure(structure_id: String, pos: Vector3, rot_deg: float, area: Str
 		storages[uid] = Inventory.new(int(def.get("slots", 20)))
 	if def.get("interact", "") == "farm":
 		crops[uid] = {"crop": "", "planted_at": 0.0, "tended_minutes": 0.0}
+	request_quest_eval()   # "placed" objectives, even if the caller forgets Events.structure_placed
 	return uid
 
 
@@ -299,6 +319,7 @@ func remove_structure(uid: String) -> void:
 	structures.erase(uid)
 	storages.erase(uid)
 	crops.erase(uid)
+	request_quest_eval()
 
 
 func count_structures(structure_id: String) -> int:
@@ -360,10 +381,15 @@ func bond_level(id: String) -> int:
 	return ItemDB.bond_level_for_xp(int(companion(id)["bond_xp"]))
 
 
+## Bond xp cap (xp needed for the last bond level, data/creatures.gd).
+func max_bond_xp() -> int:
+	return int(CreaturesData.BOND_XP_PER_LEVEL[CreaturesData.BOND_XP_PER_LEVEL.size() - 1])
+
+
 func add_bond(id: String, xp: int) -> void:
 	var c := companion(id)
 	var before := bond_level(id)
-	c["bond_xp"] = min(int(c["bond_xp"]) + xp, 100)
+	c["bond_xp"] = clampi(int(c["bond_xp"]) + xp, 0, max_bond_xp())
 	var after := bond_level(id)
 	if after > before:
 		Events.companion_bond_changed.emit(id, after)
@@ -471,56 +497,226 @@ func to_dict() -> Dictionary:
 		"dropped": dropped.duplicate(true),
 		"lore": lore.duplicate(),
 		"total_minutes": total_minutes,
-		"stats": stats.duplicate(),
+		"stats": stats.duplicate(true),
 		"buffs": buffs.duplicate(true),
 		"next_uid": next_uid,
 	}
 
 
 ## Loads from a dictionary produced by to_dict(). Missing keys fall back to defaults.
+## Saves arrive through JSON, so every number is a float and any section may be damaged:
+## values are type-checked and normalised back to their runtime types (ints stay ints),
+## malformed entries are skipped (never a script error) and invariants are repaired
+## (one follower, a crop record for every plot, no orphan crops, next_uid above every used uid).
 func from_dict(d: Dictionary) -> void:
 	reset()
-	player_name = String(d.get("player_name", "Krystal"))
-	inventory.from_array(d.get("inventory", []))
-	for k in d.get("key_items", {}):
-		if ItemDB.has_item(k):
-			key_items[k] = int(d["key_items"][k])
-	hotbar_index = clampi(int(d.get("hotbar_index", 0)), 0, HOTBAR_SIZE - 1)
-	var p: Dictionary = d.get("player", {})
-	for k in p:
-		player[k] = p[k]
-	flags = d.get("flags", {}).duplicate(true)
-	for k in d.get("counters", {}):
-		counters[k] = int(d["counters"][k])
-	for id in d.get("companions", {}):
-		var rec := _new_companion_record()
-		rec.merge(d["companions"][id], true)
-		rec["bond_xp"] = int(rec["bond_xp"])
-		companions[id] = rec
-	active_companion = String(d.get("active_companion", ""))
-	if active_companion != "" and companion(active_companion)["assignment"] != "follow":
-		active_companion = ""
-	structures = d.get("structures", {}).duplicate(true)
-	for uid in structures:
-		var def := ItemDB.structure(String(structures[uid].get("id", "")))
+	player_name = _str(d.get("player_name"), "Krystal")
+	inventory.from_array(_arr(d.get("inventory")))
+	var ki := _dict(d.get("key_items"))
+	for k in ki:
+		if k is String and ItemDB.has_item(k) and _num(ki[k]) and int(ki[k]) > 0:
+			key_items[k] = int(ki[k])
+	hotbar_index = clampi(_int(d.get("hotbar_index"), 0), 0, HOTBAR_SIZE - 1)
+	_load_player(_dict(d.get("player")))
+	flags = {}
+	var fl := _dict(d.get("flags"))
+	for k in fl:
+		flags[str(k)] = _copy(fl[k])
+	var cn := _dict(d.get("counters"))
+	for k in cn:
+		if _num(cn[k]):
+			counters[str(k)] = int(cn[k])
+	var comps := _dict(d.get("companions"))
+	for id in comps:
+		if comps[id] is Dictionary:
+			companions[str(id)] = _load_companion(comps[id])
+	active_companion = _str(d.get("active_companion"), "")
+	_repair_followers()
+	structures = {}
+	var sts := _dict(d.get("structures"))
+	var saved_storages := _dict(d.get("storages"))
+	for uid in sts:
+		var e = sts[uid]
+		if not (e is Dictionary) or not (e.get("id") is String) or String(e["id"]) == "":
+			continue
+		var rec := {"id": String(e["id"]), "area": _str(e.get("area"), "surface"),
+			"pos": _vec_arr(e.get("pos"), [0.0, 0.0, 0.0]), "rot": _float(e.get("rot"), 0.0),
+			"data": _dict(e.get("data")).duplicate(true)}
+		for extra in e:
+			if not rec.has(extra):
+				rec[extra] = _copy(e[extra])
+		structures[str(uid)] = rec
+		var def := ItemDB.structure(rec["id"])
 		if def.get("interact", "") == "storage":
 			var inv := Inventory.new(int(def.get("slots", 20)))
-			inv.from_array(d.get("storages", {}).get(uid, []))
-			storages[uid] = inv
-	crops = d.get("crops", {}).duplicate(true)
+			inv.from_array(_arr(saved_storages.get(uid)))
+			storages[str(uid)] = inv
+	crops = {}
+	var cr := _dict(d.get("crops"))
 	for uid in structures:
-		if ItemDB.structure(String(structures[uid]["id"])).get("interact", "") == "farm" and not crops.has(uid):
-			crops[uid] = {"crop": "", "planted_at": 0.0, "tended_minutes": 0.0}
-	for k in d.get("depleted", {}):
-		depleted[k] = float(d["depleted"][k])
+		if ItemDB.structure(String(structures[uid]["id"])).get("interact", "") != "farm":
+			continue
+		var c: Dictionary = _dict(cr.get(uid)).duplicate(true)
+		c["crop"] = _str(c.get("crop"), "")
+		c["planted_at"] = _float(c.get("planted_at"), 0.0)
+		c["tended_minutes"] = _float(c.get("tended_minutes"), 0.0)
+		crops[uid] = c
+	var dep := _dict(d.get("depleted"))
+	for k in dep:
+		if _num(dep[k]):
+			depleted[str(k)] = float(dep[k])
 	dropped = []
-	for it in d.get("dropped", []):
-		if it is Dictionary and ItemDB.has_item(String(it.get("item", ""))):
-			dropped.append(it.duplicate(true))
-	lore = d.get("lore", []).duplicate()
-	total_minutes = float(d.get("total_minutes", 480.0))
-	stats.merge(d.get("stats", {}), true)
-	buffs = d.get("buffs", {}).duplicate(true)
-	next_uid = max(int(d.get("next_uid", 1)), 1)
-	quests.from_dict(d.get("quests", {}))
+	var needs_uid: Array = []   # dropped items with a missing/duplicate uid: re-labelled, never discarded
+	var seen_drop_uids := {}
+	for it in _arr(d.get("dropped")):
+		if not (it is Dictionary) or not (it.get("item") is String) or not ItemDB.has_item(it["item"]):
+			continue
+		var cnt := _int(it.get("count"), 0)
+		if cnt <= 0:
+			continue
+		var rec: Dictionary = it.duplicate(true)
+		rec["uid"] = _str(it.get("uid"), "")
+		rec["count"] = cnt
+		rec["area"] = _str(it.get("area"), "surface")
+		rec["pos"] = _vec_arr(it.get("pos"), [0.0, 0.0, 0.0])
+		if rec["uid"] == "" or seen_drop_uids.has(rec["uid"]):
+			needs_uid.append(rec)
+			continue
+		seen_drop_uids[rec["uid"]] = true
+		dropped.append(rec)
+	lore = []
+	for l in _arr(d.get("lore")):
+		if l is String and not lore.has(l):
+			lore.append(l)
+	total_minutes = maxf(_float(d.get("total_minutes"), total_minutes), 0.0)
+	var st := _dict(d.get("stats"))
+	for k in st:
+		var def_v: Variant = stats.get(k)
+		if def_v is int and _num(st[k]):
+			stats[k] = int(st[k])
+		elif def_v is float and _num(st[k]):
+			stats[k] = float(st[k])
+		elif def_v is int or def_v is float:
+			pass   # not a usable number (wrong type or INF): keep the default
+		elif def_v == null or typeof(def_v) == typeof(st[k]):
+			stats[k] = _copy(st[k])
+	buffs = {}
+	var bf := _dict(d.get("buffs"))
+	for k in bf:
+		var b = bf[k]
+		if b is Dictionary and _num(b.get("mult")) and _num(b.get("remaining")) and float(b["remaining"]) > 0.0:
+			buffs[str(k)] = {"mult": float(b["mult"]), "remaining": float(b["remaining"])}
+	next_uid = maxi(maxi(_int(d.get("next_uid"), 1), 1), _max_uid_suffix() + 1)
+	for rec in needs_uid:
+		rec["uid"] = new_uid("d")
+		dropped.append(rec)
+	quests.from_dict(_dict(d.get("quests")))
 	active = true
+
+
+func _load_player(p: Dictionary) -> void:
+	for k in p:
+		var def_v: Variant = player.get(k)
+		var v: Variant = p[k]
+		if k == "pos":
+			player["pos"] = _vec_arr(v, null)
+		elif def_v is float:
+			if _num(v):
+				player[k] = float(v)
+		elif def_v is String or def_v is bool:
+			if typeof(v) == typeof(def_v):
+				player[k] = v
+		else:
+			player[k] = _copy(v)
+	# A save never legitimately holds a dead/negative player: wake up healthy (spec: no-loss recovery).
+	player["max_hp"] = maxf(float(player["max_hp"]), 1.0)
+	player["max_stamina"] = maxf(float(player["max_stamina"]), 1.0)
+	if float(player["hp"]) <= 0.0 or float(player["hp"]) > float(player["max_hp"]):
+		player["hp"] = float(player["max_hp"])
+	player["stamina"] = clampf(float(player["stamina"]), 0.0, float(player["max_stamina"]))
+
+
+func _load_companion(src: Dictionary) -> Dictionary:
+	var rec := _new_companion_record()
+	for k in src:
+		if not rec.has(k):
+			rec[k] = _copy(src[k])   # keep extra fields other modules may store
+	rec["befriended"] = bool(src.get("befriended")) if (src.get("befriended") is bool or _num(src.get("befriended"))) else false
+	rec["bond_xp"] = clampi(_int(src.get("bond_xp"), 0), 0, max_bond_xp())
+	var a := _str(src.get("assignment"), "")
+	if not COMPANION_ASSIGNMENTS.has(a):
+		a = "home" if rec["befriended"] else "wild"
+	rec["assignment"] = a
+	rec["wait_area"] = _str(src.get("wait_area"), "")
+	rec["wait_pos"] = _vec_arr(src.get("wait_pos"), null)
+	for k in ["last_pet_day", "last_gift_day", "last_fed_day"]:
+		rec[k] = _int(src.get(k), -1)
+	return rec
+
+
+## One-follower rule after loading: active_companion must be following; any other "follow"
+## record either becomes the follower (if none) or is sent home.
+func _repair_followers() -> void:
+	if active_companion != "" and (not companions.has(active_companion) or companions[active_companion]["assignment"] != "follow"):
+		active_companion = ""
+	for id in companions:
+		if companions[id]["assignment"] == "follow" and id != active_companion:
+			if active_companion == "":
+				active_companion = id
+			else:
+				companions[id]["assignment"] = "home"
+
+
+## Highest numeric suffix among the uids in use (structures "s12", dropped "d7", ...).
+func _max_uid_suffix() -> int:
+	var m := 0
+	var uids: Array = structures.keys()
+	for it in dropped:
+		uids.append(it["uid"])
+	for u in uids:
+		var digits := ""
+		for ch in String(u):
+			if ch >= "0" and ch <= "9":
+				digits += ch
+			else:
+				digits = ""
+		if digits != "" and digits.length() < 10:
+			m = maxi(m, digits.to_int())
+	return m
+
+
+## A usable number from a save. Non-finite floats are rejected: JSON writes INF as 1e99999 and reads it
+## back as INF, so one runtime glitch (e.g. an INF position or clock) would otherwise persist forever.
+static func _num(v: Variant) -> bool:
+	return v is int or (v is float and is_finite(v))
+
+
+static func _dict(v: Variant) -> Dictionary:
+	return v if v is Dictionary else {}
+
+
+static func _arr(v: Variant) -> Array:
+	return v if v is Array else []
+
+
+static func _str(v: Variant, def: String) -> String:
+	return String(v) if (v is String or v is StringName) else def
+
+
+static func _copy(v: Variant) -> Variant:
+	return v.duplicate(true) if (v is Dictionary or v is Array) else v
+
+
+static func _int(v: Variant, def: int) -> int:
+	return int(v) if _num(v) else def
+
+
+static func _float(v: Variant, def: float) -> float:
+	return float(v) if _num(v) else def
+
+
+## [x, y, z] as floats, or `def` when `v` is not a list of three numbers.
+static func _vec_arr(v: Variant, def: Variant) -> Variant:
+	if v is Array and v.size() == 3 and _num(v[0]) and _num(v[1]) and _num(v[2]):
+		return [float(v[0]), float(v[1]), float(v[2])]
+	return def

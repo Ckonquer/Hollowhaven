@@ -32,6 +32,16 @@ func step_by_id(id: String) -> Dictionary:
 	return {}
 
 
+## Player-facing text of a step field ("title", "text", "hint"), honouring the arachnophobia option
+## through optional "alt_<field>" entries in data/quests.gd (e.g. "alt_text" of the "silk" step).
+## UI should use this instead of reading step["title"] / step["text"] directly.
+func step_string(step: Dictionary, field: String) -> String:
+	var alt := "alt_" + field
+	if step.has(alt) and bool(Settings.get_value("arachnophobia")):
+		return String(step[alt])
+	return String(step.get(field, ""))
+
+
 func is_completed(step_id: String) -> bool:
 	return completed.has(step_id)
 
@@ -58,11 +68,11 @@ func _begin_step(announce: bool = true) -> void:
 			b[o["counter"]] = GameState.get_counter(o["counter"])
 	baselines[s["id"]] = b
 	Events.quest_step_started.emit(s["id"])
-	var hint: String = s.get("hint", "")
+	var hint: String = step_string(s, "hint")
 	if hint != "":
 		Events.hint.emit("quest_" + String(s["id"]), hint)
 	if announce:
-		Events.notify.emit("New goal: " + String(s["title"]), "quest")
+		Events.notify.emit("New goal: " + step_string(s, "title"), "quest")
 	Events.objectives_changed.emit()
 
 
@@ -143,7 +153,7 @@ func _complete(s: Dictionary) -> void:
 		for item_id in give:
 			GameState.give_item(item_id, int(give[item_id]))
 		Events.quest_step_completed.emit(id)
-		Events.notify.emit("Goal complete: " + String(s["title"]), "quest")
+		Events.notify.emit("Goal complete: " + step_string(s, "title"), "quest")
 		if String(oc.get("message", "")) != "":
 			Events.notify.emit(oc["message"], "info")
 	if index < QuestsData.STEPS.size() - 1:
@@ -157,12 +167,30 @@ func to_dict() -> Dictionary:
 	return {"index": index, "completed": completed.duplicate(), "baselines": baselines.duplicate(true)}
 
 
+## Restores from to_dict() output (usually via JSON: numbers arrive as floats). Malformed parts are
+## ignored rather than raising script errors; baselines are normalised back to ints.
 func from_dict(d: Dictionary) -> void:
-	index = clampi(int(d.get("index", 0)), 0, QuestsData.STEPS.size())
+	var idx: Variant = d.get("index", 0)
+	var idx_ok: bool = idx is int or (idx is float and is_finite(idx))
+	index = clampi(int(idx) if idx_ok else 0, 0, QuestsData.STEPS.size())
 	completed = []
-	for c in d.get("completed", []):
-		completed.append(String(c))
-	baselines = d.get("baselines", {}).duplicate(true)
+	var comp: Variant = d.get("completed", [])
+	if comp is Array:
+		for c in comp:
+			if (c is String or c is StringName) and not completed.has(String(c)):
+				completed.append(String(c))
+	baselines = {}
+	var bl: Variant = d.get("baselines", {})
+	if bl is Dictionary:
+		for sid in bl:
+			if not (bl[sid] is Dictionary):
+				continue
+			var b := {}
+			for counter in bl[sid]:
+				var v: Variant = bl[sid][counter]
+				if v is int or (v is float and is_finite(v)):
+					b[str(counter)] = int(v)
+			baselines[str(sid)] = b
 	# Repair: every step before `index` must be marked completed (rewards were already granted).
 	for i in min(index, QuestsData.STEPS.size()):
 		var sid: String = QuestsData.STEPS[i]["id"]

@@ -80,9 +80,13 @@ func totals() -> Dictionary:
 
 ## Adds up to `count` items, filling existing stacks first, then empty slots (hotbar first).
 ## Returns the number that did NOT fit (0 = everything was added).
+## Unknown item ids never enter an inventory (they would be silently discarded on load): all `count` is returned.
 func add(id: String, count: int) -> int:
 	if count <= 0:
 		return 0
+	if not ItemDB.has_item(id):
+		push_warning("Inventory: refusing unknown item '%s'" % id)
+		return count
 	var mx := ItemDB.stack_max(id)
 	var left := count
 	for i in size:
@@ -139,13 +143,25 @@ func remove_from_slot(i: int, count: int) -> int:
 	return take
 
 
+## Sets a slot to `stack` ({"id", "count"}) or clears it (null / count <= 0).
+## Malformed stacks (not a Dictionary, missing/unknown id) are ignored with a warning so data is never mangled.
 func set_slot(i: int, stack: Variant) -> void:
 	if i < 0 or i >= size:
 		return
-	if stack == null or int(stack.get("count", 0)) <= 0:
+	if stack == null:
 		slots[i] = null
+		changed.emit()
+		return
+	if not (stack is Dictionary) or not _is_number(stack.get("count", 0)):
+		push_warning("Inventory: set_slot ignored malformed stack %s" % str(stack))
+		return
+	if int(stack.get("count", 0)) <= 0:
+		slots[i] = null
+	elif not ItemDB.has_item(str(stack.get("id", ""))):
+		push_warning("Inventory: set_slot ignored unknown item %s" % str(stack.get("id", "")))
+		return
 	else:
-		slots[i] = {"id": String(stack["id"]), "count": int(stack["count"])}
+		slots[i] = {"id": str(stack["id"]), "count": int(stack["count"])}
 	changed.emit()
 
 
@@ -177,7 +193,7 @@ func move(from: int, to: int) -> void:
 ## Moves as much of slot `i` as fits into `other`. Returns how many moved.
 func transfer_slot_to(other: RefCounted, i: int) -> int:
 	var s = get_slot(i)
-	if s == null:
+	if s == null or other == null or other == self:
 		return 0
 	var id: String = s["id"]
 	var n: int = int(s["count"])
@@ -204,7 +220,11 @@ func sort_items(keep_hotbar: bool = true) -> void:
 		var cy := order.find(ItemDB.category(y))
 		if cx != cy:
 			return cx < cy
-		return ItemDB.display_name(x) < ItemDB.display_name(y))
+		var nx := ItemDB.display_name(x)
+		var ny := ItemDB.display_name(y)
+		if nx != ny:
+			return nx < ny
+		return String(x) < String(y))   # deterministic tie-break
 	var idx := start
 	for id in ids:
 		var left: int = t[id]
@@ -226,14 +246,22 @@ func to_array() -> Array:
 	return out
 
 
+## Replaces the contents from a to_array() result. Malformed entries and unknown item ids are
+## skipped safely (never a script error); counts are normalised to int (JSON loads them as float).
 func from_array(arr: Array) -> void:
 	for i in size:
 		slots[i] = null
-	for i in min(arr.size(), size):
+	for i in mini(arr.size(), size):
 		var s = arr[i]
-		if s is Dictionary and s.has("id") and int(s.get("count", 0)) > 0 and ItemDB.has_item(String(s["id"])):
+		if not (s is Dictionary) or not (s.get("id") is String) or not _is_number(s.get("count", 0)):
+			continue
+		if int(s.get("count", 0)) > 0 and ItemDB.has_item(String(s["id"])):
 			slots[i] = {"id": String(s["id"]), "count": int(s["count"])}
 	changed.emit()
+
+
+static func _is_number(v: Variant) -> bool:
+	return v is int or (v is float and is_finite(v))   # JSON reads 1e99999 back as INF
 
 
 ## Deep copy of the slot array (for transactional operations).
