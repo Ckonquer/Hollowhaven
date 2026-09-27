@@ -29,6 +29,9 @@ func _ready() -> void:
 	Events.say.connect(func(speaker: String, text: String, _d: float): _push_msg("say", speaker + ": " + text))
 	Events.hint.connect(func(id: String, text: String): _push_msg("hint", id + ": " + text))
 	Events.caption.connect(func(text: String): _push_msg("caption", text))
+	Events.game_saved.connect(func(ok: bool): _push_msg("saved", "journey saved" if ok else "save FAILED"))
+	Events.player_died.connect(func(): _push_msg("event", "player died"))
+	Events.quest_step_completed.connect(func(id: String): _push_msg("quest", "completed " + id))
 	Events.build_mode_changed.connect(func(active: bool): _build["active"] = active)
 	Events.build_selection_changed.connect(func(item_id: String): _build["item"] = item_id)
 	Events.build_placement_state.connect(func(valid: bool, reason: String):

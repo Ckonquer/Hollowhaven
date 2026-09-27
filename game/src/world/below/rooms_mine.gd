@@ -236,7 +236,7 @@ static func _office(b: Builder, area: Node3D) -> void:
 	b.col_cyl(Vector3(13.0, 0.5, -47.2), 0.36, 1.0, "stone")
 	Props.crate(b, Vector3(19.3, 0, -47.3), 0.7, 5.0)
 	Props.crate(b, Vector3(19.35, 0.7, -47.25), 0.55, -18.0)
-	Props.lamp(n, Vector3(16.0, 3.4, -43.6), {"style": "hanging", "hang": 0.6, "energy": 1.1, "range": 7.0, "color": LAMP})
+	Props.lamp(n, Vector3(16.0, 3.4, -43.6), {"style": "hanging", "hang": 0.6, "energy": 0.6, "range": 6.0, "color": LAMP})
 	var _r := r
 
 

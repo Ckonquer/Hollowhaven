@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Hollowhaven"
 config/description="Hollowhaven - For Krystal"
-config/version="0.1.0"
+config/version="0.9.0"
 run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/use_custom_user_dir=true

@@ -114,8 +114,9 @@ func _consider(space: PhysicsDirectSpaceState3D, collider: Object, ppos: Vector3
 	var surf := surface_distance(col3, ppos)
 	var score := Logic.score_candidate(ppos, facing, col3.global_position, surf, max_dist, from_ray)
 	# A befriended companion trotting at Krystal's heels must not steal the focus from the grass, bush or stone she
-	# is actually reaching for: companions only win when looked at directly or when nothing else is near.
-	if score != INF and not from_ray and (owner_node as Node).is_in_group("companion") and owner_node.has_method("is_befriended") and bool(owner_node.is_befriended()):
+	# is actually reaching for. Followers often sit between the camera and Krystal, so this applies to
+	# camera-ray hits too: a befriended companion wins only when nothing else is within reach.
+	if score != INF and (owner_node as Node).is_in_group("companion") and owner_node.has_method("is_befriended") and bool(owner_node.is_befriended()):
 		score += COMPANION_FOCUS_PENALTY
 	if score == INF or score >= _best_score:
 		return

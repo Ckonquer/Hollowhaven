@@ -1390,7 +1390,7 @@ func _notice(pos: Vector3, warn: bool) -> void:
 		visual.set_glow(_glow_target)
 		_voice("warn")
 		if warn and _notice_line_cd <= 0.0:
-			_notice_line_cd = 30.0
+			_notice_line_cd = 75.0   # the glance + dim still happen every time; the spoken line stays rare
 			_say("notice", 3.0, true)
 	else:
 		_voice("grunt" if companion_id == "pebble" else "scared")
@@ -1678,7 +1678,7 @@ func _idle_line(delta: float, d: float) -> void:
 	_idle_line_t -= delta
 	if _idle_line_t <= 0.0:
 		_idle_line_t = _rng.randf_range(120.0, 220.0)
-		_say("idle", 3.0, false)
+		_say("idle_below" if Game.area_id == "below" else "idle", 3.0, false)
 
 
 func _say(context: String, duration: float = 3.0, priority: bool = false) -> void:

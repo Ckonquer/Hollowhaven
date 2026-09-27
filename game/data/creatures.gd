@@ -64,6 +64,7 @@ const LINES := {
 		"tend": ["Mochi pats the soil around the sprouts."],
 		"celebrate": ["Mochi spins in circles, spores sparkling!"],
 		"idle": ["Mochi sniffs a flower.", "Mochi hums a little mushroom tune."],
+		"idle_below": ["Mochi stays very close to you."],
 	},
 	"pebble": {
 		"befriend": ["The boulder cracks apart and a little stone creature tumbles out. It salutes you with great seriousness. Pebble has joined you!"],
@@ -77,6 +78,7 @@ const LINES := {
 		"dizzy": ["Pebble is seeing stars, but insists it's fine."],
 		"celebrate": ["Pebble does a very dignified victory stomp."],
 		"idle": ["Pebble inspects a rock with deep respect.", "Pebble is polishing itself."],
+		"idle_below": ["Pebble taps the tunnel wall approvingly. Good rock.", "Pebble marches on, pretending not to be nervous."],
 	},
 	"lumi": {
 		"befriend": ["The little light creeps out of the ruin and settles beside you, glowing warmly. Lumi trusts you now."],
@@ -89,5 +91,6 @@ const LINES := {
 		"calm": ["Lumi's glow steadies.", "Lumi relaxes a little."],
 		"celebrate": ["Lumi sparkles like a tiny festival of lights!"],
 		"idle": ["Lumi chases a firefly.", "Lumi watches the leaves with great interest."],
+		"idle_below": ["Lumi's glow brushes the old stone walls.", "Lumi hums softly to keep the dark at bay."],
 	},
 }

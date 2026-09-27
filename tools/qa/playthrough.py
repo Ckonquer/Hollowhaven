@@ -191,6 +191,16 @@ class Play:
     def press_interact_on(self, e, words, check, tries=4, stop=1.3) -> bool:
         for attempt in range(tries):
             self.approach(e, stop=stop)
+            if not self.prompt_matches(words) and self.prompt().get("text"):
+                # a neighbouring interactable holds the focus: strafe toward our target's side
+                me = self.pos()
+                yaw = math.radians(self.bot.cam_yaw() or 0.0)
+                fwd = (-math.sin(yaw), -math.cos(yaw))
+                to = (e["pos"][0] - me[0], e["pos"][2] - me[2])
+                side = fwd[0] * to[1] - fwd[1] * to[0]      # <0: target is to the left on screen (x east, z south)
+                self.bot.hold("A" if side < 0 else "D", 0.18)
+                self.face(e["pos"])
+                time.sleep(0.3)
             if not self.prompt_matches(words):
                 # nudge: step closer if far, back off a little if we're standing on top of it
                 d = dist2(xz(e["pos"]), xz(self.pos()))
@@ -325,8 +335,21 @@ class Play:
         self.log(f"list button {prefix!r} not found")
         return False
 
+    def goto_station(self, word):
+        """Walk to the nearest crafting station whose prompt mentions `word` (e.g. Workbench, Campfire)."""
+        e = self.nearest(lambda n: word.lower() in (n.get("text", "") + " " + n.get("name", "")).lower() and n.get("g") in ("interactable", "crafting_station"), 90)
+        if not e:
+            self.travel_home()
+            e = self.nearest(lambda n: word.lower() in (n.get("text", "") + " " + n.get("name", "")).lower() and n.get("g") in ("interactable", "crafting_station"), 90)
+        if not e:
+            raise StepFailed(f"no {word} found")
+        self.approach(e, stop=2.2)
+        return True
+
     def craft(self, recipe_name, times=1, station_tab=None) -> bool:
         self.log(f"craft {recipe_name} x{times}")
+        if station_tab:
+            self.goto_station(station_tab)
         if not self.open_panel("C", "crafting"):
             raise StepFailed("crafting panel did not open")
         time.sleep(0.4)
@@ -338,6 +361,8 @@ class Play:
         res = self.st().get("inv", {})
         for _ in range(times):
             if not self.click("Craft", exact=True):
+                cb = [b for b in self.bot.buttons() if b["text"] == "Craft"]
+                self.log(f"Craft button unavailable (disabled={cb[0]['disabled'] if cb else 'missing'}); inv={self.st().get('inv')}")
                 break
             time.sleep(0.35)
         time.sleep(0.3)
@@ -475,12 +500,28 @@ def run(args):
                     f"quest step now {play.step()}; ok={ok}; {dur:.0f}s", "PASS" if ok else "FAIL", [ev])
         if not ok:
             raise StepFailed(name)
+        # snapshot the save folder after each passed step (lets QA resume a scenario via Continue)
+        try:
+            import shutil
+            if save_dir.exists() and any(save_dir.iterdir()):
+                dst = out / "checkpoints" / name
+                if dst.exists():
+                    shutil.rmtree(dst)
+                shutil.copytree(save_dir, dst)
+        except Exception as ex:  # noqa: BLE001
+            sess.bot.log(f"checkpoint copy failed: {ex}")
 
     steps = build_steps(play, args)
+    started = not args.from_step
     try:
         for name, fn in steps:
             if args.until and name == args.until:
                 break
+            if not started and name != "title_new_game":
+                if name == args.from_step:
+                    started = True
+                else:
+                    continue
             check(name, fn)
     except StepFailed as ex:
         sess.bot.log(f"PLAYTHROUGH STOPPED at {ex}")
@@ -589,9 +630,6 @@ def build_steps(p: Play, args):
             p.goto(HAVEN, tol=2.5)
         if p.inv("fiber") < 6 + 3 + 2 + 2:
             p.gather_hand(["Grass", "Fiber"], "fiber", 13)
-        wb = p.nearest(lambda n: "workbench" in n.get("name", "").lower() or "workbench" in n.get("text", "").lower(), 40)
-        if wb:
-            p.approach(wb, stop=2.5)
         p.craft("Cozy Bed", station_tab="Workbench")
         p.craft("Crop Plot")
         p.place("bed", near=(-9.0, -2.0))
@@ -604,9 +642,6 @@ def build_steps(p: Play, args):
         return p.wait(lambda s: s.get("step") not in ("home",), 6) is not None
 
     def lumi():
-        wb = p.nearest(lambda n: "workbench" in (n.get("name", "") + n.get("text", "")).lower(), 40)
-        if wb:
-            p.approach(wb, stop=2.5)
         if p.inv("copper_sword") < 1:
             p.craft("Copper Sword", station_tab="Workbench")
         if p.inv("lantern") < 1:
@@ -637,9 +672,6 @@ def build_steps(p: Play, args):
         p.press_interact_on(e, ["Ward Stone", "Listen", "Read"], lambda: "read_ward_warning" in p.flags(), stop=2.2)
         time.sleep(5)
         if p.inv("lantern") < 1:
-            wb = p.nearest(lambda n: "workbench" in (n.get("name", "") + n.get("text", "")).lower(), 40)
-            if wb:
-                p.approach(wb, stop=2.5)
             p.craft("Lantern", station_tab="Workbench")
         if p.inv("berry_snack") + p.inv("hearty_stew") < 2:
             if p.inv("berries") < 8:
@@ -674,7 +706,11 @@ def build_steps(p: Play, args):
             if p.find_btn(label):
                 p.click(label)
                 break
-        return p.wait(lambda s: s.get("area") == "below" and s.get("mode") == "playing", 30) is not None
+        ok = p.wait(lambda s: s.get("area") == "below" and s.get("mode") == "playing", 30) is not None
+        # the area change autosaves right after the fade-in: wait for the "Journey saved" toast
+        p.wait(lambda s: any("saved" in m.get("text", "").lower() for m in s.get("messages", [])), 10)
+        time.sleep(1.0)
+        return ok
 
     p.find_btn = lambda label: b.find_button(label)
 
@@ -687,8 +723,8 @@ def build_steps(p: Play, args):
 
     def below_walk(points, fight=True):
         for pt in points:
-            if fight and p.nearby(lambda n: n.get("g") == "enemy" and n.get("threat"), 12):
-                p.fight(timeout=60)
+            if fight and p.nearby(lambda n: n.get("g") == "enemy" and n.get("hp", 1) > 0 and n.get("state") not in ("dead", "dying"), 11):
+                p.fight(timeout=90)
             if not p.goto((pt[0], pt[2]), tol=1.2, sprint=True, timeout=40):
                 # try fighting / retry once
                 p.fight(timeout=20)
@@ -701,26 +737,44 @@ def build_steps(p: Play, args):
         if not p.st().get("player", {}).get("lantern"):
             b.tap("F")
         light_cp((-5.6, -1.6))
-        below_walk(CP)
-        # office detour: rubble at x=10
-        p.goto((6.0, -43.75), tol=1.0)
-        e = p.nearest(lambda n: n.get("g") == "harvestable" and n.get("tool") == "pickaxe", 12)
-        if e:
-            p.approach(e, stop=1.6)
-            for _ in range(16):
-                if "gallery_cleared" in p.flags():
-                    break
-                if p.prompt().get("action") == "attack":
-                    b.tap("LMB", 0.06)
-                    time.sleep(0.7)
-                else:
-                    p.approach(e, stop=1.3)
+        below_walk(CP[:5])
+        # the Collapsed Gallery's Gloomlings: go in with the lantern raised and deal with them
+        p.goto((0.0, -41.0), tol=1.2)
+        p.fight(timeout=150)
+        # office detour: rubble fills the passage at x = 8..12
+        p.goto((6.6, -43.75), tol=0.8, sprint=False)
+        for _ in range(24):
+            if "gallery_cleared" in p.flags():
+                break
+            p.face((10.0, 0.0, -43.75), tol=3)
+            pr = p.prompt()
+            if "rubble" in str(pr.get("text", "")).lower() and pr.get("action") == "attack":
+                b.tap("LMB", 0.06)
+                time.sleep(0.7)
+            else:
+                if p.nearby(lambda n: n.get("g") == "enemy" and n.get("hp", 1) > 0, 8):
+                    p.fight(timeout=40)
+                b.hold("W", 0.2)
+                time.sleep(0.3)
+        if "gallery_cleared" not in p.flags():
+            raise StepFailed("gallery rubble not cleared")
         p.goto((12.5, -43.75), tol=1.0)
         p.goto((15.0, -43.5), tol=1.0)
         light_cp((13.2, -40.0))
-        desk = p.nearest(lambda n: "key" in n.get("text", "").lower(), 15)
-        if desk:
-            p.press_interact_on(desk, ["key", "Key"], lambda: p.inv("foreman_key") > 0, stop=1.4)
+        # authored standing spot in front of the key board (left end of the foreman's desk)
+        for spot in [(18.35, -44.6), (18.3, -44.9), (18.5, -44.3)]:
+            if p.inv("foreman_key") > 0:
+                break
+            p.goto(spot, tol=0.35, sprint=False)
+            p.face((19.6, 1.5, -44.55), tol=3)
+            time.sleep(0.4)
+            if p.prompt_matches(["Foreman's Key"]):
+                b.tap("E")
+                p.wait(lambda s: int(s.get("keys", {}).get("foreman_key", 0)) > 0, 3)
+        if p.inv("foreman_key") < 1:
+            desk = p.nearest(lambda n: "key" in n.get("text", "").lower(), 15)
+            if desk:
+                p.press_interact_on(desk, ["Foreman's Key"], lambda: p.inv("foreman_key") > 0, stop=1.4)
         note = p.nearest(lambda n: "read" in n.get("text", "").lower() or "note" in n.get("text", "").lower(), 10)
         if note:
             p.press_interact_on(note, ["Read", "note"], lambda: True, stop=1.4)
@@ -767,17 +821,27 @@ def build_steps(p: Play, args):
                     p.press_interact_on(seed, ["Heartseed", "Take"], lambda: p.inv("heartseed") > 0, stop=1.4)
                 time.sleep(1)
                 continue
-            if p.hp() < 45:
+            if p.hp() < 45 and (not boss or boss.get("state") not in ("telegraph", "drop")):
                 p.eat_best()
             boss = p.nearest(lambda n: n.get("g") == "enemy" and "boss" in (n.get("name", "") + n.get("state", "")).lower() or n.get("g") == "enemy" and n.get("hp", 0) > 60, 40)
             bstate = (boss or {}).get("state", "")
-            # dodge drops aimed at us
-            if boss and bstate in ("telegraph", "drop_telegraph", "aim") and boss["dist"] < 6:
+            me = p.pos()
+            if (not boss or bstate == "dormant") and dist2(xz(me), (105.0, -137.5)) > 9.0:
+                # after a respawn at the arena lantern: walk back down into the chamber to resume the fight
+                p.log("re-entering the Heartseed Chamber")
+                below_walk([(105.0, -10.0, -119.0), (105.0, -12.0, -125.0), (105.0, -12.0, -133.0)], fight=False)
+                continue
+            # the drop is aimed at where Krystal stands when the shadow appears: sprint sideways out of it
+            if boss and bstate == "telegraph":
+                side = "D" if int(time.time() * 10) % 2 else "A"
                 b.win.focus()
-                b.down("D")
+                b.down(side)
+                b.down("SHIFT")
+                time.sleep(0.75)
                 b.tap("CTRL")
-                time.sleep(0.35)
-                b.up("D")
+                b.up("SHIFT")
+                b.up(side)
+                time.sleep(0.2)
                 continue
             if boss and bstate in ("stunned", "stuck", "scorched", "fallen", "vulnerable") and boss["dist"] < 12:
                 p.face(boss["pos"], tol=8)
@@ -865,6 +929,7 @@ if __name__ == "__main__":
     ap.add_argument("--name", default="play")
     ap.add_argument("--until", default="")
     ap.add_argument("--continue-save", action="store_true")
+    ap.add_argument("--from-step", default="", help="with --continue-save: skip to this step after the title")
     ap.add_argument("--keep-open", action="store_true")
     ap.add_argument("--dev", action="store_true", help="run the project with the editor binary (for developing the bot)")
     a = ap.parse_args()
