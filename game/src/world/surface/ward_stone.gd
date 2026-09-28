@@ -260,7 +260,10 @@ func interact(_player: Node = null) -> void:
 	if lumi_ready and not GameState.get_flag("read_ward_warning"):
 		GameState.set_flag("read_ward_warning", true)
 		_pulse_once()
-		_say(["Its heart was taken to the deep. What took it still weaves in the dark.",
+		# Arachnophobia mode drops the web-spinning wording (as lore.gd's alt text does). Read at the
+		# moment the inscription is spoken, so no live-toggle listener is needed.
+		var took: String = "What took it still waits in the dark." if bool(Settings.get_value("arachnophobia")) else "What took it still weaves in the dark."
+		_say(["Its heart was taken to the deep. " + took,
 			"Carry light. Carry friends. Come home."])
 		return
 	if GameState.get_flag("read_ward_warning"):

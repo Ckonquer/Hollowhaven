@@ -118,6 +118,7 @@ var _progress: Dictionary = {}
 var _los_track: Dictionary = {}
 var _plast := Vector3.INF
 var _blocked_t: float = 0.0
+var _bag_full_noted: bool = false
 
 static var _last_any_say_ms: int = -100000
 static var _enemy_cache: Array = []
@@ -395,9 +396,13 @@ func on_player_respawned() -> void:
 
 
 ## Places the companion safely near `pos` (behind Krystal / out of view if possible) with a poof.
+## Only the follower is carried along (lift rides, "unstuck", stuck recovery): a companion told to
+## wait, at home or still wild stays where Krystal left it, whoever asks.
 func teleport_near(pos: Vector3) -> void:
 	if not is_inside_tree():
 		position = pos + Vector3(0.8, 0.05, 0.8)
+		return
+	if mode != "follow":
 		return
 	_refresh_player(true)
 	var from := global_position
@@ -742,7 +747,7 @@ func _pick_goal_choice(cands: Array, ppos: Vector3, cam: Camera3D) -> int:
 func _state_wait(delta: float) -> void:
 	var dw := global_position.distance_to(wait_pos)
 	if dw > 1.2:
-		# Far from the spot (moved along by a lift / teleport, or stuck walking back): slip back
+		# Far from the spot (knocked off it, or stuck walking back): slip back
 		# there once nobody is watching, like going home. There's no navmesh for long walks.
 		_home_far_t = _home_far_t + delta if dw > 14.0 else 0.0
 		if _home_far_t > 1.0 and (_player == null or (_dist_player() > 10.0 and not _visible_to_camera(global_position))):
@@ -1111,6 +1116,11 @@ func _start_forage() -> bool:
 		best = n3
 	if best == null:
 		return false
+	# A stuffed backpack: no foraging (it would only spill a new pickup + "Backpack full!" every time).
+	if GameState.inventory.space_for("berries") <= 0 and GameState.inventory.space_for("fiber") <= 0:
+		_note_bag_full()
+		return false
+	_bag_full_noted = false
 	var info2: Dictionary = best.get_harvest_info()
 	var label := (String(info2.get("kind", "")) + " " + String(info2.get("item", "")) + " " + String(info2.get("name", ""))).to_lower()
 	var item := "fiber"
@@ -1118,6 +1128,8 @@ func _start_forage() -> bool:
 		item = "berries"
 	elif not (label.contains("grass") or label.contains("fiber")):
 		item = "berries" if _rng.randf() < 0.5 else "fiber"
+	if GameState.inventory.space_for(item) <= 0:
+		item = "fiber" if item == "berries" else "berries"      # bring whatever still fits
 	_start_work({"kind": "gather", "anim": "gather", "pos": best.global_position, "item": item, "reach": 0.9, "speed": 0.95})
 	visual.show_emote("exclaim", 1.0)
 	_voice("chirp")
@@ -1151,6 +1163,16 @@ func _start_tend() -> void:
 		return
 	var pick: Array = plots[_rng.randi() % plots.size()]
 	_start_work({"kind": "tend", "anim": "pat", "pos": pick[1], "uid": pick[0], "reach": 1.1, "speed": 0.6})
+
+
+## Something to forage but no room in the backpack: tell Krystal once (until there's room again).
+func _note_bag_full(with_emote: bool = true) -> void:
+	if _bag_full_noted:
+		return
+	_bag_full_noted = true
+	if with_emote:
+		visual.show_emote("question", 1.4)
+	_say_text("%s wants to forage, but your backpack is full." % get_display_name(), 3.0, false)
 
 
 static func _farming() -> Script:
@@ -1197,7 +1219,14 @@ func _on_visual_action(action_name: String) -> void:
 			if action_name != "gather":
 				return
 			var item := String(_work.get("item", "berries"))
-			var n := _rng.randi_range(1, 2)
+			# The backpack may have filled up on the way: only hand over what fits (never a spill).
+			if GameState.inventory.space_for(item) <= 0:
+				item = "fiber" if item == "berries" else "berries"
+			var n: int = mini(_rng.randi_range(1, 2), GameState.inventory.space_for(item))
+			if n <= 0:
+				visual.show_emote("dots", 1.2)
+				_note_bag_full(false)
+				return
 			GameState.give_item(item, n, pos)
 			_add_work_bond(rec)
 			Fx.sparkles(get_parent(), pos + Vector3.UP * 0.4, 0.25, 6)

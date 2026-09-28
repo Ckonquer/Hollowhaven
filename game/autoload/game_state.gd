@@ -80,7 +80,8 @@ func reset() -> void:
 	hotbar_index = 0
 	player = {"hp": 100.0, "max_hp": 100.0, "stamina": 100.0, "max_stamina": 100.0,
 		"area": "surface", "pos": null, "yaw": 0.0, "spawn": "haven_start",
-		"respawn_area": "surface", "respawn_spawn": "haven_respawn", "lantern_on": false}
+		"respawn_area": "surface", "respawn_spawn": "haven_respawn", "lantern_on": false,
+		"below_respawn": ""}   # last Below return point (lantern); restored on re-entering the Below
 	flags = {}
 	counters = {}
 	quests = QuestLog.new()

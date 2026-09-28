@@ -916,14 +916,19 @@ def build_steps(p: Play, args):
         return ok is not None and "chapter_one_complete" in p.flags()
 
     def free_play_save():
-        # continue playing a moment, then save from the pause menu
+        # continue playing a moment, then save from the pause menu - and PROVE the save happened
         b.hold("W", 1.0)
+        n_before = sum(1 for m in p.st().get("messages", []) if m.get("k") == "saved")
         p.bot.tap("ESC")
-        time.sleep(0.8)
-        p.click("Save Game", timeout=3)
-        time.sleep(1.5)
+        if not p.wait(lambda s: "pause" in s.get("ui_stack", []), 3.0):
+            p.log("pause menu did not open")
+            return False
+        if not p.click("Save Game", timeout=4):
+            p.close_panels()
+            return False
+        ok = p.wait(lambda s: sum(1 for m in s.get("messages", []) if m.get("k") == "saved") > n_before, 5.0) is not None
         p.close_panels()
-        return True
+        return ok
 
     return [("title_new_game", title_new_game), ("read_ward", read_ward), ("gather_basics", gather_basics),
             ("craft_axe", craft_axe), ("chop", chop), ("workbench", workbench), ("mochi", mochi), ("pebble", pebble),

@@ -8,6 +8,9 @@ const HINT_TOKENS := {"interact": "interact", "attack": "attack", "inventory": "
 	"build": "build", "sprint": "sprint", "jump": "jump", "dodge": "dodge", "lantern": "lantern",
 	"journal": "journal", "map": "map", "use": "use_item"}
 const OBJECTIVE_TYPES := ["flag", "item", "item_any", "placed", "befriended", "counter"]
+## {move} stands for the four movement actions (UiUtil.fill_tokens / move_label).
+const MOVE_TOKEN := "move"
+const MOVE_ACTIONS := ["move_forward", "move_left", "move_back", "move_right"]
 
 
 func setup() -> void:
@@ -394,6 +397,85 @@ func test_hint_tokens_are_documented_and_bound() -> void:
 	for s in QuestsData.STEPS:
 		for m in rx.search_all(String(s.get("hint", ""))):
 			var tok := m.get_string(1)
+			if tok == MOVE_TOKEN:
+				for a in MOVE_ACTIONS:
+					assert_true(Settings.DEFAULT_BINDINGS.has(a), "{move} needs the bound action %s" % a)
+				continue
 			assert_true(HINT_TOKENS.has(tok), "%s hint token {%s} is documented" % [s["id"], tok])
 			if HINT_TOKENS.has(tok):
 				assert_true(Settings.DEFAULT_BINDINGS.has(HINT_TOKENS[tok]), "{%s} maps to a bound action" % tok)
+
+
+## Hints must name keys through tokens so rebinding / other keyboard layouts stay correct.
+func test_hints_do_not_hard_code_key_names() -> void:
+	var rx := RegEx.new()
+	rx.compile("\\b(WASD|[Pp]ress [A-Z0-9])\\b")
+	for s in QuestsData.STEPS:
+		for field in ["hint", "alt_hint"]:
+			var h := String(s.get(field, ""))
+			assert_null(rx.search(h), "%s %s hard-codes a key: %s" % [s["id"], field, h])
+
+
+# --- steps that stop applying (skip_if_flag) -------------------------------------------------------------------
+
+## Bug: the Heartseed returned while an earlier step was still open (nothing gates the mine on quest
+## progress) left the chain stuck on "prepare" (Ward Stone warning unreadable once restored) or "silk"
+## (hold the seed the stone consumed): no Haven Banner, no chapter_one_complete. The dungeon steps now
+## drop out silently once "ward_restored" is set.
+func test_dungeon_steps_are_skipped_silently_once_the_ward_is_restored() -> void:
+	_advance_to("lumi")
+	GameState.set_flag("ward_restored", true)   # the seed went back early (Game.complete_chapter)
+	var notes := record(Events.notify, 2)
+	var hints := record(Events.hint, 2)
+	GameState.set_flag("ruin_cleared", true)
+	GameState.befriend("lumi")
+	_q().evaluate()
+	assert_eq(_q().current_id(), "free_play", "the chain reaches free play")
+	assert_true(_q().is_chapter_complete(), "'return' completed")
+	assert_eq(GameState.count_item("haven_banner"), 1, "Haven Banner granted")
+	assert_eq(GameState.get_flag("chapter_one_complete"), true, "chapter_one_complete set")
+	for id in ["prepare", "descend", "old_mine", "deeper", "silk"]:
+		assert_true(_q().is_completed(id), id + " counts as done")
+		var title := String(_q().step_by_id(id)["title"])
+		assert_false(notes.has(["Goal complete: " + title, "quest"]), "no toast for skipped " + id)
+		assert_false(notes.has(["New goal: " + title, "quest"]), "no 'New goal' for skipped " + id)
+		for h in hints:
+			assert_ne(String(h[0]), "quest_" + id, "no hint card for skipped " + id)
+	assert_true(notes.has(["Goal complete: Lights in the Ruin", "quest"]), "the real step still toasts: " + str(notes))
+	assert_true(notes.has(["Goal complete: Bring Back the Light", "quest"]), "'return' still toasts")
+
+
+func test_surface_steps_are_not_skipped_by_the_ward() -> void:
+	_advance_to("lumi")
+	GameState.set_flag("ward_restored", true)
+	_q().evaluate()
+	assert_eq(_q().current_id(), "lumi", "Lumi is still a real goal after an early return")
+	assert_false(_q().is_skipped(_q().step_by_id("lumi")))
+	assert_false(_q().is_skipped(_q().step_by_id("return")), "'return' completes through its own objective")
+	assert_false(_q().is_skipped(_q().step_by_id("free_play")))
+
+
+## A save written while the chain was stuck (ward restored, current step "silk") loads with no signal
+## announcing anything; the once-a-second poll alone must finish the chapter.
+func test_a_save_stuck_on_a_dungeon_step_repairs_itself_through_the_poll() -> void:
+	await wait_frames(2)                           # flush anything queued by fresh_state()
+	_q().from_dict({"index": _step_index("silk")})
+	GameState.flags["ward_restored"] = true        # restored from the save: no flag_set signal
+	assert_eq(_q().current_id(), "silk", "precondition: loaded stuck on 'silk'")
+	assert_false(GameState._eval_pending, "precondition: nothing queued an evaluation")
+	GameState._quest_poll = 0.0
+	GameState._process(1.0)                        # the once-a-second safety poll
+	assert_true(GameState._eval_pending, "poll noticed the skipped step")
+	await wait_frames(3)
+	assert_eq(_q().current_id(), "free_play", "poll repaired the stuck chain")
+	assert_eq(GameState.count_item("haven_banner"), 1, "banner granted by the repair")
+	assert_eq(GameState.get_flag("chapter_one_complete"), true)
+
+
+func test_skip_flags_only_on_steps_without_rewards() -> void:
+	for s in QuestsData.STEPS:
+		if String(s.get("skip_if_flag", "")) == "":
+			continue
+		var oc: Dictionary = s.get("on_complete", {})
+		assert_true((oc.get("give", {}) as Dictionary).is_empty() and (oc.get("flags", []) as Array).is_empty() and String(oc.get("message", "")) == "",
+			"%s: a silently skipped step must not carry rewards" % s["id"])

@@ -2,7 +2,8 @@ extends Node3D
 ## The Hollow Mine entrance in the north-east cliff: timber frame, a dark tunnel mouth, old rails,
 ## a tipped cart, lantern hooks and a RUBBLE pile sealing it (resource_node, pickaxe, 4 hits,
 ## node id "mine_rubble", never respawns, sets flag "mine_opened"). Once open, an interactable
-## "Enter the Hollow Mine" (first time: Game.ui.show_comfort(false)) -> Game.change_area("below", "mine_entry").
+## "Enter the Hollow Mine" (first time: Game.ui.show_comfort(false); closing it with Esc / X instead of
+## Done stays on the surface) -> Game.change_area("below", "mine_entry").
 ## Place with its origin on the apron floor at the frame, -Z pointing INTO the mountain.
 
 const Palette := preload("res://src/art/palette.gd")
@@ -242,8 +243,11 @@ func interact(_player: Node = null) -> void:
 		return
 	_entering = true
 	if not GameState.get_flag(COMFORT_FLAG):
-		if Game.ui != null and is_instance_valid(Game.ui) and Game.ui.has_method("show_comfort"):
-			await Game.ui.show_comfort(false)
+		var accepted: bool = await _ask_comfort()
+		if not accepted:
+			# Closed with Esc / X: "not now" (as on the title screen). Stay up here; ask again next time.
+			_entering = false
+			return
 		GameState.set_flag(COMFORT_FLAG, true)
 	if not is_inside_tree():
 		return
@@ -254,3 +258,26 @@ func interact(_player: Node = null) -> void:
 	# leaving the mine unenterable until the next load. The tween dies with the node.
 	create_tween().tween_callback(func() -> void: _entering = false).set_delay(4.0)
 	Game.change_area("below", "mine_entry")
+
+
+## Shows the comfort screen before the first descent (awaitable). True when it was closed with its
+## Done button; false when it was closed with Esc / X. Fails open (true) without a UI or comfort panel,
+## so the mine can never become unenterable. Reads the panel's `accepted` itself, so it works whether
+## or not ui_root.show_comfort() reports how the screen was closed.
+func _ask_comfort() -> bool:
+	var ui: Node = Game.ui
+	if ui == null or not is_instance_valid(ui) or not ui.has_method("show_comfort"):
+		return true
+	ui.call("show_comfort", false)          # opens the panel (or finds the open one); its own await ends on close
+	var panels: Variant = ui.get("panels")
+	var p: Variant = (panels as Dictionary).get("comfort") if panels is Dictionary else null
+	if not is_instance_valid(p) or not (p as Object).has_signal("confirmed"):
+		return true
+	var panel: Object = p
+	await Signal(panel, "confirmed")         # emitted from on_close() on every close path
+	if not is_instance_valid(panel):
+		return true
+	var acc: Variant = panel.get("accepted")
+	if acc is bool:
+		return bool(acc)
+	return true

@@ -24,6 +24,11 @@ known crash, save-corruption or progression blocker (those are release blockers 
 * The wall-placement rule that prevents shutting Krystal in only considers built pieces, not trees or
   rocks at the edge of the build area. Pause → "Return to the Haven" always gets you out.
 * Sleeping in a bed works at any hour and skips to the next morning (which also ripens crops).
+* Nothing stops Krystal from running the dungeon early. If the Heartseed goes back before the surface goals
+  are done, the dungeon goals are skipped and the Haven Banner arrives once the remaining surface goals
+  (e.g. befriending Lumi) are finished.
+* Closing the window saves on the surface (like Pause > Save). Underground it doesn't: Continue starts at
+  the last underground save (a lantern she rested at, or the mine landing on arrival).
 
 ## Interface
 * Moving items in the backpack/chest needs the mouse (menus themselves work with the keyboard).

@@ -32,7 +32,7 @@ const ITEMS := {
 	"stone_axe": {"name": "Stone Axe", "desc": "Fells trees. Can also defend you in a pinch.", "cat": "tool", "stack": 1, "icon": "axe", "color": Color("a9a39a"), "tool": "axe", "power": 1.0, "damage": 9.0, "reach": 2.2},
 	"stone_pickaxe": {"name": "Stone Pickaxe", "desc": "Breaks rocks and ore veins.", "cat": "tool", "stack": 1, "icon": "pickaxe", "color": Color("a9a39a"), "tool": "pickaxe", "power": 1.0, "damage": 9.0, "reach": 2.2},
 	"copper_sword": {"name": "Copper Sword", "desc": "A bright little blade. Swift and reliable.", "cat": "weapon", "stack": 1, "icon": "sword", "color": Color("e39a5a"), "damage": 18.0, "reach": 2.5},
-	"lantern": {"name": "Lantern", "desc": "A warm light for dark places. Press F to raise or lower it. Some things below dislike its glow.", "cat": "equipment", "stack": 1, "icon": "lantern", "color": Color("f7c35c")},
+	"lantern": {"name": "Lantern", "desc": "A warm light for dark places. Some things below dislike its glow.", "cat": "equipment", "stack": 1, "icon": "lantern", "color": Color("f7c35c")},
 	# --- Food --------------------------------------------------------------------
 	"berry_snack": {"name": "Berry Snack", "desc": "Mashed berries pressed into a chewy bar. Restores 30 health.", "cat": "food", "stack": 20, "icon": "snack", "color": Color("d9546a"), "heal": 30.0},
 	"hearty_stew": {"name": "Hearty Stew", "desc": "Sweetroot and berry stew. Restores 60 health and speeds stamina recovery for a while.", "cat": "food", "stack": 20, "icon": "stew", "color": Color("d98b4e"), "heal": 60.0, "buff": {"stamina_regen": 1.6, "seconds": 120.0}},

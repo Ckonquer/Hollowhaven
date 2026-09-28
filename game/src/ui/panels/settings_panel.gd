@@ -8,6 +8,9 @@ const Rows := preload("res://src/ui/widgets/setting_rows.gd")
 const Schema := preload("res://src/ui/settings_schema.gd")
 
 const ROW_W := 1200.0
+## Settings "Reset to defaults" leaves alone: the key bindings (they have their own reset) and every
+## comfort choice, which a player may depend on (e.g. arachnophobia mode).
+const RESET_KEEPS := ["bindings", "comfort_confirmed", "arachnophobia", "reduce_shake", "reduce_flashing", "captions", "horror_intensity"]
 
 var tabs: TabContainer
 var _capturing := ""
@@ -88,7 +91,7 @@ func _build_comfort(v: VBoxContainer) -> void:
 
 func _build_controls(v: VBoxContainer) -> void:
 	v.add_theme_constant_override("separation", 8)
-	var intro := Kit.wrap_label("Click a key, then press the new key (or mouse button). Esc cancels.", "Small", ROW_W)
+	var intro := Kit.wrap_label("Click a key, then press the new key or mouse button. Esc or clicking elsewhere cancels.", "Small", ROW_W)
 	v.add_child(intro)
 	for pair in Settings.REBINDABLE:
 		var action := String(pair[0])
@@ -194,8 +197,23 @@ func _input(event: InputEvent) -> void:
 			return
 		_apply_capture(event)
 	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var mb: InputEventMouseButton = event
+		if mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
+			return   # never a binding: let the Controls list scroll
+		if mb.button_index == MOUSE_BUTTON_LEFT and not _click_on_capture_button(mb):
+			# Clicking elsewhere (Done, a tab, another row) backs out and the click goes through.
+			_cancel_capture()
+			return
 		get_viewport().set_input_as_handled()
 		_apply_capture(event)
+
+
+## True if the mouse event is over the box that shows "Press a key..." (a left click there binds Left Mouse).
+func _click_on_capture_button(mb: InputEventMouseButton) -> bool:
+	if _capture_btn == null or not is_instance_valid(_capture_btn) or not _capture_btn.is_inside_tree():
+		return false
+	var local: InputEventMouseButton = _capture_btn.make_input_local(mb)
+	return Rect2(Vector2.ZERO, _capture_btn.size).has_point(local.position)
 
 
 func _apply_capture(event: InputEvent) -> void:
@@ -219,13 +237,16 @@ func _reset_hints() -> void:
 
 func _reset_defaults() -> void:
 	if ui_root != null and ui_root.has_method("confirm"):
-		var choice: String = await ui_root.confirm("Reset settings?", "Put every setting back to how it started? Your key bindings stay as they are.",
+		var choice: String = await ui_root.confirm("Reset settings?", "Put every setting back to how it started? Your key bindings and comfort options stay as they are.",
 			[["reset", "Reset", "AccentButton"], ["cancel", "Cancel", ""]])
 		if choice != "reset":
 			return
-	var confirmed := bool(Settings.get_value("comfort_confirmed"))
-	Settings.reset_to_defaults(true)
-	Settings.set_value("comfort_confirmed", confirmed)
+	# Key by key through set_value: only settings that actually change are announced (no needless live
+	# rebuilds), and the bindings and comfort choices (arachnophobia, shake, flashing...) are never touched.
+	for key in Settings.DEFAULTS:
+		if RESET_KEEPS.has(String(key)):
+			continue
+		Settings.set_value(String(key), Settings.DEFAULTS[key])
 	_refresh_bindings()
 
 

@@ -1,7 +1,9 @@
 extends Node3D
 ## A light fixture in The Below: miner's lantern (hanging / wall / post / floor / dropped), a ruin
 ## fire-bowl, or a bare glow. Group "flicker_light": flicker(seconds) makes it stutter for a while
-## (horror director), then it recovers. A gentle idle shimmer keeps flames alive.
+## (horror director), then it recovers. The lamp applies the "reduce_flashing" setting itself: with it
+## on, the stutter becomes one slow dip to ~55 % and back (like the runner's gentle dim for plain
+## lights). A gentle idle shimmer keeps flames alive.
 ##   var l = Lamp.new(); l.setup({"style": "hanging", "color": Palette.MINE_LIGHT, "energy": 1.6, "range": 7.0})
 
 const Palette := preload("res://src/art/palette.gd")
@@ -9,6 +11,9 @@ const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 
 const IRON := Color("3b3238")
+const GENTLE_DEPTH := 0.45         # reduce_flashing: the flicker dims to 55 % at most
+const GENTLE_IN := 0.5             # seconds to ease down into the dip
+const GENTLE_OUT := 0.8            # seconds to ease back up (finishes as the flicker ends)
 
 var style: String = "hanging"      # hanging | wall | post | floor | dropped | bowl | none
 var color: Color = Palette.MINE_LIGHT
@@ -24,6 +29,7 @@ var dim_mult: float = 1.0          # set by the area (darkness / story state)
 
 var _flame: Node3D
 var _flicker_left: float = 0.0
+var _dip: float = 0.0              # 0..1 depth of the reduce_flashing dip (rate-limited: never jumps)
 var _t: float = 0.0
 var _flame_base: Vector3 = Vector3.ONE
 
@@ -134,15 +140,25 @@ func _process(delta: float) -> void:
 	var e := energy
 	if idle_flicker > 0.0:
 		e *= 1.0 + (sin(_t * 7.3) * 0.5 + sin(_t * 12.7 + 1.3) * 0.3 + sin(_t * 23.1 + 0.4) * 0.2) * idle_flicker
+	var gentle := false
 	if _flicker_left > 0.0:
 		_flicker_left -= delta
-		var ph := fmod(_t * 9.0 + sin(_t * 3.1) * 2.0, 1.0)
-		if ph < 0.3:
-			e *= 0.08
-		elif ph < 0.55:
-			e *= 0.5
-		elif ph < 0.62:
-			e *= 0.02
+		# Read live so turning the option on mid-flicker calms it at once.
+		gentle = bool(Settings.get_value("reduce_flashing"))
+		if not gentle:
+			var ph := fmod(_t * 9.0 + sin(_t * 3.1) * 2.0, 1.0)
+			if ph < 0.3:
+				e *= 0.08
+			elif ph < 0.55:
+				e *= 0.5
+			elif ph < 0.62:
+				e *= 0.02
+	# Reduce flashing: one slow dip instead of the stutter (eases down, holds, eases back up by the end).
+	var want := 1.0 if gentle and _flicker_left > GENTLE_OUT else 0.0
+	if _dip != want:
+		_dip = move_toward(_dip, want, delta / (GENTLE_IN if want > _dip else GENTLE_OUT))
+	if _dip > 0.0:
+		e *= 1.0 - GENTLE_DEPTH * smoothstep(0.0, 1.0, _dip)
 	light.light_energy = e * dim_mult
 	if _flame != null:
 		var k := clampf(e / maxf(energy, 0.001), 0.05, 1.3)
@@ -150,7 +166,7 @@ func _process(delta: float) -> void:
 		_flame.visible = dim_mult > 0.05
 
 
-## Horror director hook: stutter for `seconds`, then recover.
+## Horror director hook: stutter for `seconds`, then recover (one slow dip with reduce_flashing on).
 func flicker(seconds: float) -> void:
 	_flicker_left = maxf(_flicker_left, seconds)
 

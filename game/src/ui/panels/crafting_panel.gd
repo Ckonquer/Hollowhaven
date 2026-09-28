@@ -53,6 +53,7 @@ func _build() -> void:
 	var sc := ScrollContainer.new()
 	sc.custom_minimum_size = Vector2(640, 640)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.follow_focus = true   # arrowing through a long list keeps the focused recipe in view
 	cols.add_child(sc)
 	list_box = Kit.vbox(8)
 	list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -143,6 +144,11 @@ func _make_row(rid: String) -> Button:
 	b.pressed.connect(func() -> void:
 		_selected = rid
 		_refresh_status())
+	# Keyboard browsing: the selection follows focus, so Enter crafts the recipe the player arrowed to.
+	b.focus_entered.connect(func() -> void:
+		if _selected != rid:
+			_selected = rid
+			_refresh_status())
 	Kit.hook_sounds(b)
 	var mc := Kit.margin([12, 6, 16, 6])
 	mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -275,12 +281,28 @@ func _craft() -> void:
 	_refresh_status()
 
 
+## The Craft button when something can be made, otherwise the selected (or first) recipe row, otherwise
+## the station tab, so the arrow keys can always reach the list.
 func default_focus() -> Control:
-	return craft_btn if not craft_btn.disabled else null
+	if not craft_btn.disabled:
+		return craft_btn
+	var row: Variant = _rows.get(_selected, null)
+	if row is Control and is_instance_valid(row) and not (row as Control).is_queued_for_deletion():
+		return row
+	for rid in _rows:
+		var r: Variant = _rows[rid]
+		if r is Control and is_instance_valid(r) and not (r as Control).is_queued_for_deletion():
+			return r
+	return _tab_buttons.get(filter, null)
 
 
+## Enter crafts the selected recipe while the Craft button or a recipe row has focus (or nothing in this
+## panel does). On any other focused control (the station tabs) Enter is left to the GUI (ui_accept).
 func handle_key(event: InputEvent) -> bool:
 	if event is InputEventKey and (event as InputEventKey).pressed and ((event as InputEventKey).keycode == KEY_ENTER or (event as InputEventKey).keycode == KEY_KP_ENTER):
+		var fo: Control = get_viewport().gui_get_focus_owner() if is_inside_tree() else null
+		if fo != null and fo != craft_btn and is_ancestor_of(fo) and not _rows.values().has(fo):
+			return false
 		if not craft_btn.disabled:
 			_craft()
 			return true

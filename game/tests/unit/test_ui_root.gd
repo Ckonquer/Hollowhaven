@@ -313,3 +313,106 @@ func test_ending_is_awaitable_and_skippable() -> void:
 	await wait_seconds(1.0)
 	assert_true(bool(state["done"]), "show_ending returns after Continue")
 	assert_null(ui._ending)
+
+
+## Presses and releases a key through the real input pipeline (ui_root._input, then the GUI).
+func _push_key(code: int) -> void:
+	for down in [true, false]:
+		var ev := InputEventKey.new()
+		ev.keycode = code
+		ev.physical_keycode = code
+		ev.pressed = down
+		get_viewport().push_input(ev)
+
+
+## Keyboard crafting: the selection follows the focused recipe row, so Enter on a row the player arrowed
+## to crafts THAT recipe, never the one selected before (Enter used to craft the old selection).
+func test_crafting_enter_crafts_the_recipe_row_with_keyboard_focus() -> void:
+	GameState.give_item("wood", 20)
+	GameState.give_item("stone", 10)
+	GameState.give_item("fiber", 10)
+	ui.open("crafting", {"station": "hand"})
+	await wait_frames(3)
+	var panel: Control = ui.panels["crafting"]
+	assert_eq(String(panel._selected), "stone_axe", "first craftable recipe selected at open")
+	var axe_row: Button = panel._rows["stone_axe"]
+	var pick_row: Button = panel._rows["stone_pickaxe"]
+	axe_row.grab_focus()
+	await wait_frames(1)
+	_push_key(KEY_DOWN)
+	await wait_frames(1)
+	assert_true(pick_row.has_focus(), "Down moves to the next recipe")
+	assert_eq(String(panel._selected), "stone_pickaxe", "the selection follows keyboard focus")
+	_push_key(KEY_ENTER)
+	await wait_frames(2)
+	assert_eq(GameState.count_item("stone_pickaxe"), 1, "Enter crafted the focused recipe")
+	assert_eq(GameState.count_item("stone_axe"), 0, "and not the recipe selected before")
+	assert_true(pick_row.has_focus(), "focus stays on the recipe after crafting")
+
+
+## Enter on a focused station tab switches to that tab (the panel no longer swallows it to craft).
+func test_crafting_enter_on_a_station_tab_switches_tab() -> void:
+	GameState.give_item("wood", 20)
+	GameState.give_item("stone", 10)
+	GameState.give_item("fiber", 10)
+	ui.open("crafting", {"station": "hand"})
+	await wait_frames(3)
+	var panel: Control = ui.panels["crafting"]
+	var tab: Button = panel._tab_buttons["workbench"]
+	tab.grab_focus()
+	await wait_frames(1)
+	_push_key(KEY_ENTER)
+	await wait_frames(2)
+	assert_eq(String(panel.filter), "workbench", "Enter on a station tab switches to it")
+	assert_eq(GameState.count_item("stone_axe"), 0, "and crafts nothing")
+
+
+## With nothing craftable the keyboard still lands in the recipe list and can browse it.
+func test_crafting_keyboard_reaches_the_list_when_nothing_is_craftable() -> void:
+	ui.open("crafting", {"station": "hand"})
+	await wait_frames(3)
+	var panel: Control = ui.panels["crafting"]
+	assert_true(panel.craft_btn.disabled, "nothing can be crafted")
+	var rows: Array = (panel._rows as Dictionary).values()
+	var fo := get_viewport().gui_get_focus_owner()
+	assert_true(fo != null and rows.has(fo), "a recipe row has focus when the panel opens")
+	_push_key(KEY_DOWN)
+	await wait_frames(1)
+	var fo2 := get_viewport().gui_get_focus_owner()
+	assert_true(fo2 != null and fo2 != fo and rows.has(fo2), "Down moves through the recipes")
+	assert_true(fo2 != null and panel._rows.get(String(panel._selected)) == fo2, "the detail card follows the focused recipe")
+
+
+## Menus never open while a fade runs: the bed's sleep, a fall recovery and "Return to the Haven" fade
+## with mode still "playing", and the fade is drawn above the panels (a menu would sit hidden under it).
+func test_menus_stay_shut_during_any_fade() -> void:
+	ui.fade_out(0.6)
+	await wait_seconds(0.1)
+	assert_true(ui.fade_rect.color.a < 0.5, "early in the fade (a=%.2f)" % ui.fade_rect.color.a)
+	ui._input(_key("pause"))
+	assert_false(ui.is_open("pause"), "Esc early in a fade opens nothing")
+	ui._input(_key("inventory"))
+	assert_false(ui.is_open("inventory"), "a menu hotkey early in a fade opens nothing")
+	await ui.fade_in(0.0)
+	ui._input(_key("pause"))
+	assert_true(ui.is_open("pause"), "Esc works again once the fade is over")
+	ui.close_all()
+	# Closing is still allowed mid-fade.
+	ui.open("inventory")
+	ui.fade_out(0.6)
+	await wait_seconds(0.1)
+	ui._input(_key("inventory"))
+	assert_false(ui.is_open("inventory"), "a menu's own hotkey still closes it during a fade")
+	await ui.fade_in(0.0)
+
+
+## The companion menu doesn't pause the world but holds Krystal still, so it closes when she is hurt.
+func test_companion_menu_closes_when_krystal_is_hurt() -> void:
+	GameState.befriend("lumi")
+	ui.open("companion", {"id": "lumi"})
+	await wait_frames(2)
+	assert_true(ui.is_open("companion"), "menu open")
+	Events.player_damaged.emit(8.0, null)
+	await wait_frames(1)
+	assert_false(ui.is_open("companion"), "a hit closes the companion menu")
+	assert_false(Game.is_ui_open(), "and gives Krystal her controls back")

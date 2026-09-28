@@ -9,6 +9,9 @@ extends Node
 const SAVE_VERSION := 1
 const DEFAULT_DIR := "user://saves"
 const SLOT := "slot1"
+## Shown when load_game() had to fall back to slot1.bak.json (also repeated by Game.continue_game()
+## once the gameplay UI exists, because the title screen has no toasts).
+const BACKUP_NOTICE := "Your latest save was damaged, so your previous save was restored."
 
 var save_dir: String = DEFAULT_DIR
 var last_error: String = ""
@@ -63,14 +66,17 @@ func _step_title() -> String:
 
 
 ## Saves the current GameState. Returns true on success.
-func save_game() -> bool:
+## quiet: background saves (surface autosave, New Game, closing the window) skip Events.game_saved
+## on success, so no "Journey saved" toast/sound appears; a failure is still announced.
+func save_game(quiet: bool = false) -> bool:
 	last_error = ""
 	if Game.player != null and is_instance_valid(Game.player) and Game.player.has_method("write_to_state"):
 		Game.player.write_to_state()
 	var data := build_save_data()
 	var text := JSON.stringify(data, "\t")
 	var ok := _atomic_write(text)
-	Events.game_saved.emit(ok)
+	if not ok or not quiet:
+		Events.game_saved.emit(ok)
 	if not ok:
 		push_error("SaveSystem: save failed: " + last_error)
 	return ok
@@ -203,7 +209,7 @@ func load_game() -> bool:
 	GameState.from_dict(d["state"])
 	Events.game_loaded.emit()
 	if recovered_from_backup:
-		Events.notify.emit("Your latest save was damaged, so your previous save was restored.", "warn")
+		Events.notify.emit(BACKUP_NOTICE, "warn")
 	return true
 
 

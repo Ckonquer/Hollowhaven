@@ -297,6 +297,40 @@ func test_stream_crossings_are_walkable() -> void:
 				assert_true(end.y > w.height_at(end.x, end.z) - 0.3, "did not fall through the bridge")
 
 
+## A save / recovery point on a bridge deck or stepping stone is dry footing even though the stream
+## below it is deeper than 0.6 m; the open stream right beside the crossing is still refused.
+func test_positions_on_stream_crossings_are_valid() -> void:
+	var w: Node3D = await _world()
+	var space := w.get_world_3d().direct_space_state
+	for c in w.water.crossings:
+		var center: Vector3 = c["pos"]
+		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(center + Vector3.UP * 6.0, center + Vector3.DOWN * 6.0, 1))
+		assert_false(hit.is_empty(), "walkway under the %s at %s" % [c["style"], center])
+		if hit.is_empty():
+			continue
+		var top: Vector3 = (hit["position"] as Vector3) + Vector3.UP * 0.02
+		var ok: Variant = w.validate_position(top)
+		assert_true(ok is Vector3 and (ok as Vector3).distance_to(top) < 0.5, "standing on the %s at %s is a valid position (got %s)" % [c["style"], str(top), str(ok)])
+		var bed := float(w.height_at(top.x, top.z))
+		assert_true(float(w.water_level_at(top.x, top.z)) - bed > 0.6, "the %s spans deep water (the case that used to be refused)" % c["style"])
+	# Deep open stream (bed samples far from every crossing) stays invalid.
+	var pts: PackedVector3Array = w.terrain.stream_pts
+	var refused := 0
+	for i in range(0, pts.size(), 3):
+		var sp: Vector3 = pts[i]
+		var near := false
+		for c in w.water.crossings:
+			var cp: Vector3 = c["pos"]
+			if Vector2(sp.x, sp.z).distance_to(Vector2(cp.x, cp.z)) < 6.0:
+				near = true
+		var h := float(w.height_at(sp.x, sp.z))
+		if near or not w.is_inside_bounds(sp, 4.0) or not w.terrain.is_water(sp.x, sp.z) or float(w.water_level_at(sp.x, sp.z)) - h <= 0.6:
+			continue
+		assert_null(w.validate_position(Vector3(sp.x, h + 0.02, sp.z)), "deep open stream at (%.1f, %.1f) is refused" % [sp.x, sp.z])
+		refused += 1
+	assert_true(refused > 10, "checked deep open-stream samples (%d)" % refused)
+
+
 func test_music_rests_between_plays() -> void:
 	var w: Node3D = await _world()
 	if not Audio.has_sound(SurfaceWorld.MUSIC_DAY) or not Audio.has_sound(SurfaceWorld.MUSIC_NIGHT):

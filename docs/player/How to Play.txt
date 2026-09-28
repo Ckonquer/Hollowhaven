@@ -35,6 +35,8 @@ COMFORT SETTINGS (Pause > Settings > Comfort)
 TIPS
   - Sleeping in a bed saves your game and sets where you wake up.
   - Underground, light the lanterns on the walls to save your progress.
+  - Above ground the game also saves by itself every few minutes, and when you close the
+    window. Underground it is the lanterns that count.
   - Enemies always wiggle, flare or rattle before they attack - that's your cue to dodge.
   - If you ever get stuck, open the pause menu and choose "Return to the Haven".
   - Nothing you build or befriend can be lost. Take your time.

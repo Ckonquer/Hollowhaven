@@ -2,6 +2,8 @@ extends Node3D
 ## A pale, unsettling shape glimpsed at a distance (authored moments only; it never attacks).
 ## variant "spider": long-legged pale weaver silhouette.   variant "shade" (arachnophobia mode):
 ## a tall, hunched, faceless drifting figure. Readable from ~25 m: pale, slightly self-lit, no light cast.
+## Like the stalker, it swaps body live when the arachnophobia setting changes while it is on screen
+## (Events.settings_changed "arachnophobia"), keeping its position, pose and any cross/recoil tween.
 ##   var s = PaleShape.new(); s.setup({"variant": "shade"}); add_child(s)
 ##   await s.cross(from, to, 2.2)            walks/drifts across then vanishes
 ##   s.cling(pos)  /  await s.recoil(to, 0.6) ceiling cling + retreat into a crack
@@ -32,10 +34,35 @@ func _ready() -> void:
 	_rig = Node3D.new()
 	_rig.name = "Rig"
 	add_child(_rig)
+	_build_rig()
+	Events.settings_changed.connect(_on_settings_changed)
+
+
+func _build_rig() -> void:
 	if variant == "shade":
 		_build_shade()
 	else:
 		_build_spider()
+
+
+## Arachnophobia switched while the shape is on screen: rebuild the body as the other variant. Only
+## the rig is replaced; the node's own transform/scale (tweened by cross()/recoil()) is left alone.
+func _on_settings_changed(key: String) -> void:
+	if key != "arachnophobia" or _rig == null:
+		return
+	var want: String = "shade" if bool(Settings.get_value("arachnophobia")) else "spider"
+	if want == variant:
+		return
+	variant = want
+	for c: Node in _rig.get_children():
+		_rig.remove_child(c)
+		c.queue_free()
+	_legs.clear()
+	_arms.clear()
+	_rig.transform = Transform3D.IDENTITY     # drops the shade's head-down cling flip when swapping back
+	_build_rig()
+	if upside_down:
+		_apply_cling_pose()
 
 
 func _body_mat(c: Color = PALE) -> Material:
@@ -159,6 +186,10 @@ func cling(pos: Vector3, facing: Vector3 = Vector3.FORWARD) -> void:
 	upside_down = true
 	global_position = pos
 	_face(facing)
+	_apply_cling_pose()
+
+
+func _apply_cling_pose() -> void:
 	_rig.rotation.z = PI if variant == "spider" else 0.0
 	if variant == "shade":
 		# hangs head-down from the ceiling like a draped sheet

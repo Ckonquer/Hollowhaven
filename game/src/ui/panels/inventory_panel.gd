@@ -246,6 +246,14 @@ func _eat(id: String) -> void:
 	var pl: Node = Game.player
 	# Prefer the player's own eating logic (src/player/player.gd eat(id) -> bool; it gives its own feedback).
 	if pl != null and is_instance_valid(pl) and pl.has_method("eat"):
+		# The player's own "not hungry" toast sits under this menu, so explain it here.
+		var hv0: Variant = pl.get("health")
+		var buff0: Variant = ItemDB.item(id).get("buff", null)
+		var has_buff: bool = buff0 is Dictionary and not (buff0 as Dictionary).is_empty()
+		if hv0 is Node and float((hv0 as Node).get("hp")) >= float((hv0 as Node).get("max_hp")) - 0.01 and not has_buff:
+			_say("Krystal is already at full health. Save it for when she's hurt.", false)
+			Audio.play_ui("ui_error", -4.0)
+			return
 		var ok: Variant = pl.call("eat", id)
 		if ok is bool and not ok:
 			_say("Krystal can't eat that right now.", false)
@@ -262,7 +270,7 @@ func _eat(id: String) -> void:
 			h = hv
 	var buff: Variant = ItemDB.item(id).get("buff", null)
 	if h != null and float(h.get("hp")) >= float(h.get("max_hp")) - 0.01 and not (buff is Dictionary):
-		_say("Krystal isn't hungry right now. Save it for when you're hurt.", false)
+		_say("Krystal is already at full health. Save it for when she's hurt.", false)
 		Audio.play_ui("ui_error", -4.0)
 		return
 	if not GameState.take_item(id, 1):

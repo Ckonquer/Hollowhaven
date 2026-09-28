@@ -568,15 +568,17 @@ func nearest_route_index(pos: Vector3) -> int:
 	return best
 
 
-## +1 / -1: the connected neighbour of route[i] that leads away from `ref` (0 = nowhere to go).
+## +1 / -1: the connected neighbour of route[i] that leads away from `ref` (0 = nowhere farther to go).
+## Never returns a neighbour that is closer to `ref`: at a chain end it fades in place instead of
+## "fleeing" toward Krystal.
 func _away_step(i: int, ref: Vector3) -> int:
 	var best := 0
-	var best_d: float = 0.0
+	var best_d: float = route[i].distance_to(ref)
 	for s in [-1, 1]:
 		var j: int = i + int(s)
 		if j >= 0 and j < route.size() and segment_ok(mini(i, j)):
 			var d: float = route[j].distance_to(ref)
-			if best == 0 or d > best_d:
+			if d > best_d:
 				best = int(s)
 				best_d = d
 	return best
@@ -636,8 +638,10 @@ func _light(pos: Vector3) -> float:
 func _repelled_by_light() -> bool:
 	if _light(global_position) >= LIGHT_REPEL:
 		return true
+	# Krystal's own light only counts while it hangs right above her (the rattle). A director pass emerges
+	# 20+ m away: it shrinks back only if it crawls into a lit pool itself.
 	var p := _player()
-	if p != null and state in ["rattle", "emerge"] and _light(p.global_position + Vector3.UP) >= LIGHT_REPEL:
+	if p != null and state == "rattle" and _light(p.global_position + Vector3.UP) >= LIGHT_REPEL:
 		return true
 	return false
 

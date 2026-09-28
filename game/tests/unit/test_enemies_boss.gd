@@ -297,6 +297,64 @@ func test_brazier_needs_lantern_and_kindles() -> void:
 	assert_almost(float(br.light_radius), 7.0, 0.001)
 
 
+## Krystal goes down mid-kindle: the kindle fizzles (like walking away) instead of finishing on the
+## death screen, whether the game's death flow runs or only her health hits zero.
+func test_kindling_fizzles_when_krystal_goes_down() -> void:
+	GameState.give_item("lantern", 1)
+	var brs := _braziers()
+	var br: Node = brs[0]
+	br.set_process(false)
+	var d := _dummy((br as Node3D).global_position + Vector3(0, 0, 1.4))
+	br.interact(d)
+	br._process(0.5)
+	assert_true(float(br.kindle_progress) > 0.2, "kindling")
+	Events.player_died.emit()
+	assert_almost(float(br.kindle_progress), 0.0, 0.001, "her death snuffs the spark")
+	for i in 40:
+		br._process(0.05)
+	assert_false(br.is_lit(), "the kindle does not finish during the death screen")
+	assert_true(bool(br.get_interaction(d)["enabled"]), "and can be started again")
+	br.interact(d)
+	br._process(0.3)
+	d.health.apply_damage(999.0)                     # down without the death flow (e.g. mid-cutscene)
+	for i in 40:
+		br._process(0.05)
+	assert_false(br.is_lit(), "a fallen kindler cannot finish it either")
+	var d2 := _dummy((br as Node3D).global_position + Vector3(0, 0, -1.4))
+	br.interact(d2)
+	for i in 32:
+		br._process(0.05)
+	assert_true(br.is_lit(), "control: a kindle by someone still standing completes")
+
+
+## A brazier that lights while Krystal is down (a kindle that slipped through, a scripted or debug
+## light) burns its anchor, but must not restart the fight: no scorch fall, bar or music while she
+## is on the death screen. It no longer hangs from the burned anchor either.
+func test_brazier_lit_while_krystal_is_down_keeps_the_boss_dormant() -> void:
+	var d := _dummy(Vector3(0, 0, 3))
+	var brs := _braziers()
+	var b := _boss(d, brs)
+	_tick_until(b, "cling", 6.0)
+	assert_true(b.fight_started, "fight on")
+	var clung: Vector3 = b.get("_anchor")
+	d.health.apply_damage(999.0)
+	Events.player_died.emit()
+	assert_eq(b.state, "dormant", "death reset")
+	assert_true((b.get("_anchor") as Vector3).distance_to(clung) < 0.01, "back on the anchor it clung to")
+	_bar.clear()
+	(brs[0] as Node).call("light")                   # the brazier right below that anchor
+	assert_eq(b.state, "dormant", "no scorch fall while she is down")
+	assert_false(b.fight_started, "the fight stays reset")
+	assert_false(b.is_threatening())
+	assert_eq(_bar.size(), 0, "no boss bar re-shown")
+	assert_eq((b.anchors as Array).size(), 2, "the anchor still burns (kinder retry)")
+	assert_false((b.burned as Array).has(b.get("_anchor")), "it moved off the burned anchor")
+	assert_true((b as Node3D).global_position.y > 5.0, "still up on the ceiling")
+	for i in 40:
+		b.tick(DT)
+	assert_eq(b.state, "dormant", "and waits while she is down")
+
+
 func test_arachnophobia_swap_keeps_fight_state() -> void:
 	var d := _dummy(Vector3(0, 0, 3))
 	var b := _boss(d, _braziers())

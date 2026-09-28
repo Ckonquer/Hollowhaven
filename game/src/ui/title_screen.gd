@@ -173,7 +173,14 @@ static func continue_text(save_data: Dictionary) -> String:
 	var parts: Array = []
 	if meta.has("day"):
 		parts.append("Day %d" % int(meta["day"]))
+	# The saved step id is resolved now, so the title follows the arachnophobia option as it is set today;
+	# the title text baked into the save is only a fallback (e.g. "Chapter complete", unknown steps).
 	var st := String(meta.get("step_title", ""))
+	var step_id := String(meta.get("step", ""))
+	if step_id != "" and GameState.quests != null:
+		var step: Dictionary = GameState.quests.step_by_id(step_id)
+		if not step.is_empty():
+			st = String(GameState.quests.step_string(step, "title"))
 	if st != "":
 		parts.append(st)
 	var secs := float(meta.get("play_seconds", 0.0))
@@ -234,6 +241,7 @@ func _close_panel() -> void:
 	# Persist settings however the panel was closed (Esc skips the Done button's close_requested hook,
 	# and closing the window never reaches Game.quit_game()).
 	UiUtil.save_settings()
+	_refresh_continue()   # the Continue line may read differently now (e.g. arachnophobia toggled)
 	if p.has_method("animate_out_and_free"):
 		p.animate_out_and_free()
 	else:
@@ -287,7 +295,7 @@ func _on_new_game() -> void:
 	if _busy:
 		return
 	if SaveSystem.has_save():
-		var choice := await _confirm("Start a new journey?", "Your current save will be replaced when you next save.",
+		var choice := await _confirm("Start a new journey?", "Your current save will be replaced.",
 			[["new", "Start fresh", "AccentButton"], ["cancel", "Keep my save", ""]])
 		if choice != "new":
 			return
@@ -355,4 +363,4 @@ func _debug_show(what: String) -> void:
 				_panel.set("accepted", true)
 				_panel.request_close()
 		"confirm":
-			_confirm("Start a new journey?", "Your current save will be replaced when you next save.", [["new", "Start fresh", "AccentButton"], ["cancel", "Keep my save", ""]])
+			_confirm("Start a new journey?", "Your current save will be replaced.", [["new", "Start fresh", "AccentButton"], ["cancel", "Keep my save", ""]])

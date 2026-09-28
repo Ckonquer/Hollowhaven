@@ -10,13 +10,18 @@ extends RefCounted
 ##   {"type": "counter", "counter": "trees_felled", "count": 2, "since_start": true}
 ## target: landmark id (data/world_layout.gd) used for the map marker; "" = none.
 ## hint: onboarding hint shown once when the step starts (key names are filled by the UI:
-##       {interact} {attack} {inventory} {craft} {build} {sprint} {jump} {dodge} {lantern} {journal} {map} {use})
+##       {interact} {attack} {inventory} {craft} {build} {sprint} {jump} {dodge} {lantern} {journal} {map} {use}
+##       and {move}, the four movement keys)
 ## on_complete: {"give": {item: count}, "flags": [...], "message": "..."}
+## skip_if_flag: optional flag; once it is set the step counts as done and passes silently (no toasts or
+##       hint). Used by the story steps that stop making sense once the Heartseed is back ("ward_restored"),
+##       because nothing stops Krystal from running the dungeon before the tracker sends her there.
+##       Only use it on steps without on_complete rewards the player should notice.
 
 const STEPS := [
-	{"id": "wake", "title": "A Dim Haven", "target": "haven",
+	{"id": "wake", "title": "A Dim Haven", "target": "haven", "skip_if_flag": "ward_restored",
 		"text": "You've arrived at the old clearing. At its heart stands a mossy Ward Stone, its light barely flickering.",
-		"hint": "Move with WASD and look with the mouse. Walk up to the Ward Stone and press {interact} to read it.",
+		"hint": "Move with {move} and look with the mouse. Walk up to the Ward Stone and press {interact} to read it.",
 		"objectives": [{"type": "flag", "flag": "read_ward_intro", "label": "Read the Ward Stone"}],
 		"on_complete": {}},
 	{"id": "gather_basics", "title": "Gather Supplies", "target": "haven",
@@ -71,7 +76,7 @@ const STEPS := [
 			{"type": "flag", "flag": "ruin_cleared", "label": "Drive the Bramblings from the ruin"},
 			{"type": "befriended", "creature": "lumi", "label": "Reach the little light"}],
 		"on_complete": {}},
-	{"id": "prepare", "title": "The Ward Remembers", "target": "haven",
+	{"id": "prepare", "title": "The Ward Remembers", "target": "haven", "skip_if_flag": "ward_restored",
 		"text": "The Ward Stone's light is failing. Its heart, the Heartseed, was carried into the old mine long ago. Something down there must not be allowed out. You'll need light and supplies.",
 		"hint": "Craft a Lantern at the Workbench and press {lantern} to raise it. Cook or craft healing food.",
 		"objectives": [
@@ -79,24 +84,24 @@ const STEPS := [
 			{"type": "item", "item": "lantern", "count": 1, "label": "Craft a Lantern"},
 			{"type": "item_any", "items": ["berry_snack", "hearty_stew", "glowcap_skewer"], "count": 2, "label": "Prepare 2 healing meals"}],
 		"on_complete": {}},
-	{"id": "descend", "title": "The Hollow Mine", "target": "mine_mouth",
+	{"id": "descend", "title": "The Hollow Mine", "target": "mine_mouth", "skip_if_flag": "ward_restored",
 		"text": "The old mine lies north-east, where the stream begins. Its entrance was sealed with rubble long ago.",
 		"hint": "Clear the rubble with your pickaxe. You can adjust horror comfort settings any time from the pause menu.",
 		"objectives": [
 			{"type": "flag", "flag": "mine_opened", "label": "Clear the mine entrance"},
 			{"type": "flag", "flag": "entered_below", "label": "Enter the mine"}],
 		"on_complete": {}},
-	{"id": "old_mine", "title": "The Old Mine", "target": "",
+	{"id": "old_mine", "title": "The Old Mine", "target": "", "skip_if_flag": "ward_restored",
 		"text": "The miners left in a hurry. The lower gate is locked; the foreman kept the key.",
 		"hint": "Light lanterns on the walls with {interact} to save and set your return point.",
 		"objectives": [{"type": "item", "item": "foreman_key", "count": 1, "label": "Find the Foreman's Key"}],
 		"on_complete": {}},
-	{"id": "deeper", "title": "Deeper Still", "target": "",
+	{"id": "deeper", "title": "Deeper Still", "target": "", "skip_if_flag": "ward_restored",
 		"text": "Below the mine lie ruins far older than the miners. Something has been walking here.",
 		"hint": "",
 		"objectives": [{"type": "flag", "flag": "reached_silk_hollows", "label": "Find a way deeper"}],
 		"on_complete": {}},
-	{"id": "silk", "title": "The Silk Hollows", "target": "",
+	{"id": "silk", "title": "The Silk Hollows", "target": "", "skip_if_flag": "ward_restored",
 		"text": "The Heartseed is somewhere in the webbed hollows. Keep your light close.",
 		"alt_title": "The Pale Hollows",
 		"alt_text": "The Heartseed is somewhere in the pale, root-choked hollows. Keep your light close.",

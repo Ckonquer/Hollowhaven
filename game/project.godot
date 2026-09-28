@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Hollowhaven"
 config/description="Hollowhaven - For Krystal"
-config/version="0.9.0"
+config/version="0.9.1"
 run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/use_custom_user_dir=true
@@ -33,6 +33,7 @@ Debug="*res://autoload/debug.gd"
 
 window/size/viewport_width=1920
 window/size/viewport_height=1080
+window/size/mode=3
 window/size/window_width_override=1600
 window/size/window_height_override=900
 window/stretch/mode="canvas_items"

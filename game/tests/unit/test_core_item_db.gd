@@ -295,3 +295,14 @@ func test_no_spider_words_leak_into_alt_texts() -> void:
 		var txt := (ItemDB.display_name(id) + " " + ItemDB.display_desc(id)).to_lower()
 		for w in ["spider", "weaver", "web", "silk"]:
 			assert_false(txt.contains(w), "%s shows '%s' with arachnophobia on" % [id, w])
+
+
+## Item texts are shown next to the live key label (UiUtil stat lines, e.g. "Press <lantern key> to raise
+## it"), so a hard-coded key in a description contradicts rebinding (the Lantern once said "Press F").
+func test_item_descriptions_do_not_hard_code_keys() -> void:
+	var rx := RegEx.new()
+	rx.compile("\b(WASD|[Pp]ress [A-Z0-9])\b")
+	for id in ItemsData.ITEMS:
+		for field in ["desc", "alt_desc"]:
+			var d := String((ItemsData.ITEMS[id] as Dictionary).get(field, ""))
+			assert_null(rx.search(d), "%s %s hard-codes a key: %s" % [id, field, d])

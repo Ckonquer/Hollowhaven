@@ -78,3 +78,33 @@ func test_keep_my_save_cancels_new_game() -> void:
 	await wait_frames(3)
 	assert_null(title._panel, "nothing else opens after 'Keep my save'")
 	assert_false(bool(title._busy))
+
+
+## The Continue line resolves the saved step when shown, so it follows the arachnophobia option (a save
+## made in "The Silk Hollows" reads "The Pale Hollows" with the option on), and it is refreshed when a
+## panel (Settings) closes on the title.
+func test_continue_line_follows_arachnophobia() -> void:
+	var was := bool(Settings.get_value("arachnophobia"))
+	Settings.set_value("arachnophobia", false)
+	var steps: Array = GameState.quests.steps()
+	for i in steps.size():
+		if String(steps[i]["id"]) == "silk":
+			GameState.quests.index = i
+	assert_true(SaveSystem.save_game(), "test save written")
+	title._refresh_continue()
+	var off_text := String(title.continue_sub.text)
+	title._on_settings()
+	await wait_frames(2)
+	Settings.set_value("arachnophobia", true)
+	title._close_panel()
+	await wait_frames(1)
+	var on_text := String(title.continue_sub.text)
+	var pure := TitleScreen.continue_text(SaveSystem.peek())
+	Settings.set_value("arachnophobia", was)
+	assert_true(off_text.contains("The Silk Hollows"), "option off: '%s'" % off_text)
+	assert_true(on_text.contains("The Pale Hollows"), "option on after closing Settings: '%s'" % on_text)
+	assert_false(on_text.contains("Silk"), "no spider wording with the option on: '%s'" % on_text)
+	assert_true(pure.contains("The Pale Hollows"), "continue_text uses the live step title: '%s'" % pure)
+	# Past the last step (or an unknown step) the stored title is used.
+	assert_eq(TitleScreen.continue_text({"meta": {"day": 9, "step": "", "step_title": "Chapter complete"}}), "Day 9  ·  Chapter complete")
+	assert_eq(TitleScreen.continue_text({"meta": {"day": 2, "step": "no_such_step", "step_title": "Old Title"}}), "Day 2  ·  Old Title")

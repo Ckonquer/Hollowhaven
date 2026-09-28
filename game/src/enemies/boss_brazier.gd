@@ -1,7 +1,7 @@
 extends Node3D
 ## A stone brazier in the Heartseed Chamber. Interactable: "Light the brazier" (needs the Lantern).
 ## Pressing interact starts a 1.5 s kindling (a spark grows into flame while Krystal stays near;
-## walking far away lets it fizzle). Once lit it joins group "light_source" (light_radius 7),
+## walking far away or going down lets it fizzle). Once lit it joins group "light_source" (light_radius 7),
 ## burns with flame particles + a warm OmniLight3D, plays brazier_light and emits `lit`.
 ##   var B = load("res://src/enemies/boss_brazier.gd"); var b: Node3D = B.new()
 ##   b.setup({"id": "brazier_1"}); area.add_child(b); b.global_position = ...
@@ -58,6 +58,24 @@ func _ready() -> void:
 		_lit = true
 	if _lit:
 		_apply_lit(true)
+	if not Events.player_died.is_connected(_on_player_died):
+		Events.player_died.connect(_on_player_died)
+
+
+## Krystal went down mid-kindle: the spark dies with her (like walking away), so the brazier never
+## finishes on the death screen and restarts the boss fight behind it.
+func _on_player_died() -> void:
+	if _kindling:
+		_fizzle()
+
+
+func _kindler_down() -> bool:
+	if _kindler == null or not is_instance_valid(_kindler):
+		return false
+	if _kindler == Game.player and Game.mode == "dead":
+		return true
+	var kh: Node = Combat.find_health(_kindler)
+	return kh != null and Combat.truthy(kh.get("dead"))
 
 
 # --- Interaction contract -------------------------------------------------------------------------
@@ -108,7 +126,9 @@ func light() -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	if _kindling:
-		if _kindler != null and is_instance_valid(_kindler) and _kindler.global_position.distance_to(global_position) > KINDLE_MAX_DIST:
+		if _kindler_down():
+			_fizzle()
+		elif _kindler != null and is_instance_valid(_kindler) and _kindler.global_position.distance_to(global_position) > KINDLE_MAX_DIST:
 			_fizzle()
 		else:
 			kindle_progress = minf(kindle_progress + delta / KINDLE_TIME, 1.0)

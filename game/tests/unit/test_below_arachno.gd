@@ -89,3 +89,39 @@ func test_authored_shapes_respect_arachnophobia() -> void:
 	area.moments.start_silk_intro()
 	assert_eq(String(area.moments.silk_shape.variant), "shade", "silk intro uses the shade too")
 	assert_eq(String(area.lift_chamber.get_interaction(null)["text"]), "The winch is choked with pale roots", "lift wording")
+
+
+## Regression: a pale shape already on screen follows the setting live, both ways, keeping its place
+## and pose (clinging shade hangs head-down, clinging spider is flipped; switching back drops the flip).
+func test_pale_shape_swaps_live_and_keeps_its_pose() -> void:
+	Settings.set_value("arachnophobia", false)
+	var holder := Node3D.new()
+	area = holder
+	add_child(holder)
+	var s: Node3D = load("res://src/world/below/pale_shape.gd").new()
+	s.setup({"variant": "spider"})
+	holder.add_child(s)
+	s.cling(Vector3(3.0, 4.0, -2.0), Vector3(-1, 0, 0))
+	var rig: Node3D = s.get_node("Rig")
+	assert_almost(rig.rotation.z, PI, 0.001, "clinging spider is flipped")
+	var yaw := s.rotation.y
+	Settings.set_value("arachnophobia", true)
+	await wait_frames(2)
+	assert_eq(String(s.variant), "shade", "swapped to the shade")
+	assert_true((s.get("_legs") as Array).is_empty(), "no spider legs left")
+	assert_eq((s.get("_arms") as Array).size(), 2, "shade arms built")
+	assert_almost(rig.rotation.x, PI, 0.001, "clinging shade hangs head-down")
+	assert_true(s.global_position.is_equal_approx(Vector3(3.0, 4.0, -2.0)), "stays where it clung")
+	assert_almost(s.rotation.y, yaw, 0.0001, "keeps facing")
+	var live := 0
+	for c in rig.get_children():
+		if not c.is_queued_for_deletion():
+			live += 1
+	assert_eq(live, 1, "only the shade body remains under the rig")
+	Settings.set_value("arachnophobia", false)
+	await wait_frames(2)
+	assert_eq(String(s.variant), "spider", "swapped back to the spider")
+	assert_eq((s.get("_legs") as Array).size(), 8, "spider legs rebuilt")
+	assert_true((s.get("_arms") as Array).is_empty(), "shade arms dropped")
+	assert_almost(rig.rotation.x, 0.0, 0.001, "shade flip cleared")
+	assert_almost(rig.rotation.z, PI, 0.001, "clinging spider flipped again")

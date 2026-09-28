@@ -25,19 +25,36 @@ var zone_id: String = ""
 var in_safe_zone: bool = true
 var director: Node = null          # horror director in the Below (src/horror/director.gd)
 
+## Quiet surface autosave: every AUTOSAVE_SECONDS of unpaused play on the surface (bed, lantern, mine
+## and manual saves restart the countdown). Retries every AUTOSAVE_RETRY s while saving isn't allowed.
+const AUTOSAVE_SECONDS := 300.0
+const AUTOSAVE_RETRY := 5.0
+
 var _ui_stack: Array = []
 var _transitioning := false
 var _zone_timer := 0.0
+var autosave_enabled: bool = true   # off in headless runs (tests drive _tick_autosave() directly)
+var _autosave_t := 0.0
+var _focus_lost := false            # the window lost focus and no pause menu has covered it yet
+var _closing := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Closing the window (title-bar X, Alt+F4, OS shutdown) goes through _on_close_requested() so the
+	# journey is saved first instead of the engine quitting on the spot.
+	get_tree().set_auto_accept_quit(false)
+	autosave_enabled = DisplayServer.get_name() != "headless"
+	Events.game_saved.connect(_on_game_saved)
+	Events.area_loaded.connect(_on_area_loaded_focus_check)
 
 
 func _process(delta: float) -> void:
 	if mode != "playing" or get_tree().paused:
 		return
 	GameState.advance_clock(delta)
+	if autosave_enabled:
+		_tick_autosave(delta)
 	_zone_timer += delta
 	if _zone_timer >= 0.4 and player != null and is_instance_valid(player) and area != null:
 		_zone_timer = 0.0
@@ -52,10 +69,83 @@ func _process(delta: float) -> void:
 
 
 func _notification(what: int) -> void:
-	# Alt-tab / focus loss: pause so nothing happens while Krystal isn't looking.
+	# Alt-tab / focus loss: pause so nothing happens while Krystal isn't looking. Focus lost while
+	# the game can't pause (loading, death screen, lift ride, ending) is remembered and the pause menu
+	# opens as soon as play resumes (_pause_if_focus_lost).
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
-		if mode == "playing" and not get_tree().paused and ui != null and not Debug.keep_running_unfocused:
-			open_panel("pause")
+		_focus_lost = true
+		_pause_if_focus_lost()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_focus_lost = false
+	elif what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_on_close_requested()
+
+
+## Opens the pause menu if the window lost focus and nothing has paused the game since.
+func _pause_if_focus_lost() -> void:
+	if not _focus_lost or mode != "playing" or _transitioning or ui == null or Debug.keep_running_unfocused:
+		return
+	if get_tree().paused:
+		return
+	open_panel("pause")
+	if get_tree().paused:
+		_focus_lost = false
+
+
+## area_loaded is emitted just before load_area's fade-in; check once the UI root has reset its
+## panels for the new area (deferred), so the pause menu is not closed again straight away.
+func _on_area_loaded_focus_check(_area_id: String) -> void:
+	if _focus_lost:
+		_pause_if_focus_lost.call_deferred()
+
+
+# --- Saving on close & autosave --------------------------------------------------------------------
+
+## Saves the journey before the window closes, when a manual save would be allowed (on the surface,
+## nothing chasing Krystal). Underground the lantern saves stand. Returns true when a save was written.
+func save_before_close() -> bool:
+	if not GameState.active or mode != "playing":
+		return false
+	if not bool(can_manual_save().get("ok", false)):
+		return false
+	return SaveSystem.save_game(true)
+
+
+## The OS asked the window to close: save what can be saved, keep the settings, then always quit
+## (a refused save never keeps the window open).
+func _on_close_requested() -> void:
+	if _closing:
+		return
+	_closing = true
+	save_before_close()
+	Settings.save()
+	if Audio.has_method("stop_all"):
+		Audio.stop_all()
+	get_tree().quit()
+
+
+## Advances the surface autosave countdown; saves quietly when it runs out and saving is allowed
+## (no menu open, not in build mode, nothing chasing Krystal). Returns true when it saved.
+func _tick_autosave(delta: float) -> bool:
+	if mode != "playing" or area_id != "surface" or not GameState.active:
+		return false
+	_autosave_t += delta
+	if _autosave_t < AUTOSAVE_SECONDS:
+		return false
+	var building := false
+	if player != null and is_instance_valid(player):
+		var bm: Variant = player.get("build_mode_active")
+		building = bm is bool and bm
+	if _transitioning or is_ui_open() or building or not bool(can_manual_save().get("ok", false)):
+		_autosave_t = AUTOSAVE_SECONDS - AUTOSAVE_RETRY
+		return false
+	_autosave_t = 0.0
+	return SaveSystem.save_game(true)
+
+
+func _on_game_saved(ok: bool) -> void:
+	if ok:
+		_autosave_t = 0.0
 
 
 # --- Title / new game / continue ---------------------------------------------------
@@ -85,6 +175,9 @@ func goto_title() -> void:
 func new_game() -> void:
 	GameState.new_game()
 	await load_area("surface", "haven_start", false)
+	# Save straight away (quietly) so Continue exists from the first minute.
+	if GameState.active and area_id == "surface":
+		SaveSystem.save_game(true)
 	Events.hint.emit("intro_move", "Move with {move}. Hold {sprint} to sprint. Press {help} any time to see all controls.")
 	if ui != null and ui.has_method("show_chapter_card"):
 		ui.show_chapter_card("Chapter One", "The Dimming Ward")
@@ -97,6 +190,10 @@ func continue_game() -> bool:
 	if not AREAS.has(a):
 		a = "surface"
 	await load_area(a, String(GameState.player.get("spawn", "haven_respawn")), true)
+	# load_game() announces a backup restore from the title, where no toast widget exists yet:
+	# repeat it now that the gameplay UI is up so Krystal is actually told.
+	if SaveSystem.recovered_from_backup:
+		Events.notify.emit(SaveSystem.BACKUP_NOTICE, "warn")
 	return true
 
 
@@ -108,6 +205,7 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	if _transitioning:
 		return
 	_transitioning = true
+	_autosave_t = 0.0
 	var prev_mode := mode
 	mode = "loading"
 	if ui != null and ui.has_method("fade_out"):
@@ -183,6 +281,7 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 		await ui.fade_in(0.6)
 	if prev_mode == "title":
 		pass
+	_pause_if_focus_lost()
 
 
 ## Loads a script, returning null (with an error) instead of crashing if it is missing or broken.
@@ -228,9 +327,39 @@ func change_area(target_area: String, spawn_id: String) -> void:
 	if player != null and is_instance_valid(player) and player.has_method("write_to_state"):
 		player.write_to_state()
 	await load_area(target_area, spawn_id, false)
-	# Back on the surface, Krystal still wakes in her bed if she has slept in one.
-	set_respawn(target_area, _bed_spawn_or(spawn_id) if target_area == "surface" else spawn_id)
+	# spawn_id is only where she arrives (the mine mouth / the landing). Her return point stays the
+	# bed or the Haven on the surface, and the last lantern she rested at in the Below.
+	var rs: String = spawn_id
+	if target_area == "surface":
+		rs = _bed_spawn_or("haven_respawn")
+	elif target_area == "below":
+		rs = _below_return_point(spawn_id)
+	set_respawn(target_area, rs)
 	SaveSystem.save_game()
+
+
+## The Below return point on (re-)entering: the lantern last used (GameState.player["below_respawn"]),
+## or for saves made before that was remembered, the deepest lit lantern (area.checkpoints lists them
+## from the entrance inwards). Falls back to `default_spawn`.
+func _below_return_point(default_spawn: String) -> String:
+	if area == null or not (area.get("spawns") is Dictionary):
+		return default_spawn
+	var spawns: Dictionary = area.get("spawns")
+	var last: String = String(GameState.player.get("below_respawn", ""))
+	if last != "":
+		return last if spawns.has(last) else default_spawn
+	var best: String = default_spawn
+	var cps: Variant = area.get("checkpoints")
+	if cps is Dictionary:
+		for id in cps:
+			var cp: Variant = cps[id]
+			if not (cp is Node) or not is_instance_valid(cp):
+				continue
+			var lit: Variant = cp.get("lit")
+			var sp: Variant = cp.get("spawn_id")
+			if lit is bool and lit and sp is String and spawns.has(sp):
+				best = String(sp)
+	return best
 
 
 func _bed_spawn_or(default_spawn: String) -> String:
@@ -246,6 +375,10 @@ func _bed_spawn_or(default_spawn: String) -> String:
 func set_respawn(target_area: String, spawn_id: String) -> void:
 	GameState.player["respawn_area"] = target_area
 	GameState.player["respawn_spawn"] = spawn_id
+	if target_area == "below":
+		# Remembered separately so a trip to the surface (whose respawn is the bed/Haven) doesn't
+		# forget the lantern: change_area restores it when she comes back down.
+		GameState.player["below_respawn"] = spawn_id
 
 
 func _free_gameplay_nodes() -> void:
@@ -306,6 +439,7 @@ func respawn_player() -> void:
 			await ui.fade_in(0.6)
 	Events.player_respawned.emit()
 	Events.notify.emit("Krystal wakes up, a little shaken but safe.", "info")
+	_pause_if_focus_lost()
 
 
 # --- Menus, pause & mouse --------------------------------------------------------------------
@@ -363,6 +497,8 @@ func set_cutscene(active: bool) -> void:
 	mode = "cutscene" if active else "playing"
 	_update_mouse()
 	Events.cutscene_changed.emit(active)
+	if not active:
+		_pause_if_focus_lost()
 
 
 # --- Saving rules ------------------------------------------------------------------------------

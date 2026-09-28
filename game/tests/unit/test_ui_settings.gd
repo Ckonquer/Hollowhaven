@@ -137,3 +137,99 @@ func test_rebindable_actions_are_all_defined() -> void:
 	for pair in Settings.REBINDABLE:
 		assert_true(Settings.DEFAULT_BINDINGS.has(String(pair[0])), String(pair[0]))
 		assert_true(String(pair[1]) != "", "friendly name for " + String(pair[0]))
+
+
+func _mouse(button: int, at: Vector2 = Vector2.ZERO) -> InputEventMouseButton:
+	var mb := InputEventMouseButton.new()
+	mb.button_index = button as MouseButton
+	mb.pressed = true
+	mb.position = at
+	mb.global_position = at
+	return mb
+
+
+## While "Press a key..." shows: the wheel never binds (it scrolls), a left click elsewhere backs out
+## without binding, a left click on the capturing box binds Left Mouse, other buttons bind as before.
+func test_rebind_capture_ignores_the_wheel_and_clicks_elsewhere() -> void:
+	var p: Control = SettingsPanel.new()
+	p.setup({"tab": "controls"})
+	add_child(p)
+	await wait_frames(3)
+	var before := Settings.action_label("jump")
+	p._begin_capture("jump")
+	for wb in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
+		p._input(_mouse(int(wb)))
+	assert_true(p.is_capturing_input(), "the wheel doesn't end the capture")
+	assert_eq(Settings.action_label("jump"), before, "the wheel is never bound")
+	p._input(_mouse(MOUSE_BUTTON_LEFT, (p._done_btn as Control).get_global_rect().get_center()))
+	assert_false(p.is_capturing_input(), "clicking elsewhere (Done) cancels the capture")
+	assert_eq(Settings.action_label("jump"), before, "and binds nothing")
+	var box: Button = p._bind_rows["use_item"]["btn"]
+	p._begin_capture("use_item")
+	p._input(_mouse(MOUSE_BUTTON_LEFT, box.get_global_rect().get_center()))
+	assert_false(p.is_capturing_input())
+	assert_eq(UiUtil.action_codes("use_item")[0], "mouse:%d" % MOUSE_BUTTON_LEFT, "a click on the capturing box binds Left Mouse")
+	p._begin_capture("jump")
+	p._input(_mouse(MOUSE_BUTTON_MIDDLE))
+	assert_eq(UiUtil.action_codes("jump")[0], "mouse:%d" % MOUSE_BUTTON_MIDDLE, "other mouse buttons still bind")
+	p.queue_free()
+	await wait_frames(1)
+
+
+## Real input pipeline: the wheel over the (scrolling) Controls list scrolls it while capturing.
+func test_wheel_scrolls_the_controls_list_while_capturing() -> void:
+	var p: Control = SettingsPanel.new()
+	p.setup({"tab": "controls"})
+	add_child(p)
+	await wait_frames(3)
+	var sc: ScrollContainer = p.tabs.get_child(1)
+	var need: float = (sc.get_child(0) as Control).get_combined_minimum_size().y
+	p._begin_capture("craft")
+	var before: int = sc.scroll_vertical
+	# push_input takes window coordinates (the headless window is tiny and stretched to the 1920x1080 canvas).
+	var at: Vector2 = get_viewport().get_final_transform() * sc.get_global_rect().get_center()
+	get_viewport().push_input(_mouse(MOUSE_BUTTON_WHEEL_DOWN, at))
+	await wait_frames(2)
+	assert_true(p.is_capturing_input(), "still waiting for a key")
+	assert_ne(Settings.action_label("craft"), "Wheel Down", "the wheel was not bound")
+	if need > sc.size.y + 1.0:
+		assert_true(sc.scroll_vertical > before, "the list scrolled (%d -> %d)" % [before, sc.scroll_vertical])
+	p.queue_free()
+	await wait_frames(1)
+
+
+## "Reset to defaults" restores the other settings but keeps the key bindings and every comfort choice,
+## and announces only the settings that actually changed (no live arachnophobia rebuild).
+func test_reset_to_defaults_keeps_bindings_and_comfort_options() -> void:
+	Settings.set_value("arachnophobia", true)
+	Settings.set_value("reduce_flashing", true)
+	Settings.set_value("reduce_shake", true)
+	Settings.set_value("captions", false)
+	Settings.set_value("horror_intensity", 0)
+	Settings.set_value("comfort_confirmed", true)
+	Settings.set_value("invert_y", false)
+	Settings.set_value("fov", 90.0)
+	var k := InputEventKey.new()
+	k.physical_keycode = KEY_K
+	k.pressed = true
+	Settings.rebind("jump", k)
+	var p: Control = SettingsPanel.new()
+	p.setup({"tab": "video"})
+	add_child(p)
+	await wait_frames(2)
+	Events.settings_changed.connect(_on_changed)
+	await p._reset_defaults()
+	assert_true(bool(Settings.get_value("arachnophobia")), "arachnophobia mode kept")
+	assert_true(bool(Settings.get_value("reduce_flashing")), "reduce flashing kept")
+	assert_true(bool(Settings.get_value("reduce_shake")), "reduce shake kept")
+	assert_false(bool(Settings.get_value("captions")), "captions choice kept")
+	assert_eq(int(Settings.get_value("horror_intensity")), 0, "horror intensity kept")
+	assert_true(bool(Settings.get_value("comfort_confirmed")), "comfort screen stays confirmed")
+	assert_eq(UiUtil.action_codes("jump")[0], "key:%d" % KEY_K, "key bindings kept")
+	assert_almost(float(Settings.get_value("fov")), float(Settings.DEFAULTS["fov"]), 0.001, "other settings reset")
+	assert_true(_changes.has("fov"), "changed settings are announced")
+	assert_false(_changes.has("arachnophobia"), "no arachnophobia change announced")
+	assert_false(_changes.has("invert_y"), "unchanged settings are not announced")
+	assert_false(_changes.has("bindings"), "bindings not touched")
+	p.queue_free()
+	await wait_frames(1)

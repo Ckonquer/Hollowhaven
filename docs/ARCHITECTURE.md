@@ -261,3 +261,36 @@ Always use `timeout` and `--max-seconds` / `--quit-at` so no process is left run
   windowed also pass the user arg: `... --resolution 1600x900 -- --windowed ...`.
 * **QA telemetry** (`src/qa/qa_telemetry.gd`, `--qa-telemetry=<file>`): read-only JSON lines used by the
   external real-input bot (`tools/qa/`).
+* **Quest skips**: a step in `data/quests.gd` may carry `"skip_if_flag"`; once that flag is set
+  `QuestLog.is_skipped(step)` is true, `step_done()` returns true and the step passes silently (no toasts or
+  hint). The dungeon steps (wake, prepare, descend, old_mine, deeper, silk) skip on `ward_restored`, so a
+  Heartseed returned before the tracker reached them never stalls the chain (the poll repairs old saves).
+* **Respawn points**: `Game.change_area()` sets the surface return point to the slept-in bed or
+  `haven_respawn` (never the arrival spawn `mine_exit`), and the Below one to the last lantern used, kept in
+  `GameState.player["below_respawn"]` by `Game.set_respawn("below", ...)` (old saves: deepest lit lantern).
+* **Saving**: `SaveSystem.save_game(quiet := false)`: quiet saves skip `Events.game_saved` on success (no
+  toast). `Game.new_game()` saves once the Haven has loaded; the surface autosaves quietly every
+  `Game.AUTOSAVE_SECONDS` of unpaused play when `can_manual_save()` allows it (no menu open, not building).
+  `auto_accept_quit` is off: a window close request runs `Game.save_before_close()` (same rules as a manual
+  save), saves the settings and always quits. `SaveSystem.BACKUP_NOTICE` is re-announced by
+  `continue_game()` once the gameplay UI exists.
+* **Focus loss**: remembered in `Game._focus_lost`; if the pause menu couldn't open (loading, death screen,
+  lift ride, ending) it opens when play resumes (after `area_loaded`, a respawn or `set_cutscene(false)`).
+* **Window**: the engine window starts fullscreen (`display/window/size/mode=3`, matching the default
+  setting). `Settings.apply_video()` leaves fullscreen for a centred 1600x900 window when the setting is off
+  or a debug/QA run passes `-- --windowed`.
+
+## Conventions added by the post-release audit
+* **Flicker lights**: any `flicker_light` implementing `flicker(seconds)` must honour Settings
+  `reduce_flashing` itself (one slow dip, no strobe) - the director's runner does not pass the setting.
+* **Companions**: `teleport_near(pos)` only moves a companion in follow mode (waiting/home/wild ones stay put).
+* **Bed spawn**: the respawn bed re-registers the `bed` spawn one physics frame after every
+  `Events.structure_placed/structure_removed`; if its wake spot is walled in, the target falls back to
+  `haven_respawn` (else `haven_start`) with a toast.
+* **Saving**: `SaveSystem.save_game(quiet := false)`; quiet saves (New Game, the 5-minute surface autosave,
+  window close on the surface) don't emit `Events.game_saved` on success. Closing the window runs
+  `Game.save_before_close()` (surface only). `GameState.player["below_respawn"]` remembers the last lit lantern.
+* **Quests**: steps may carry `"skip_if_flag": "<flag>"` - a skipped step counts as done (used so returning
+  the Heartseed early never stalls the chain). `QuestLog.is_skipped(step)`.
+* **Stalker**: Krystal's own light only repels it during the rattle directly above her; director passes
+  recoil only from light at the stalker's own position. Retreats never step toward Krystal.

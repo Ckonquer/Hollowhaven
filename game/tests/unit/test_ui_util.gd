@@ -205,6 +205,12 @@ func test_bindable_events() -> void:
 	mb.pressed = true
 	assert_true(UiUtil.is_bindable(mb))
 	assert_eq(UiUtil.event_code(mb), "mouse:%d" % MOUSE_BUTTON_MIDDLE)
+	# The wheel scrolls menus and zooms the camera: never a binding.
+	for wb in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
+		var w := InputEventMouseButton.new()
+		w.button_index = wb
+		w.pressed = true
+		assert_false(UiUtil.is_bindable(w), "wheel button %d is not bindable" % int(wb))
 
 
 func test_default_bindings_have_no_conflicts() -> void:

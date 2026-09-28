@@ -66,6 +66,13 @@ func _build() -> void:
 		fb.icon = IconFactory.item_icon(food, 48)
 	fb.disabled = have <= 0
 	fb.tooltip_text = "" if have > 0 else "You don't have any %s." % ItemDB.display_name(food)
+	# The menu doesn't pause the world but does hold Krystal still: step out of it the moment she's hurt.
+	# (A bound-method connection is dropped automatically when the panel is freed.)
+	Events.player_damaged.connect(_on_player_damaged)
+
+
+func _on_player_damaged(_amount: float, _source: Node) -> void:
+	request_close()
 
 
 func _cmd_button(parent: Control, text: String, cmd: String, variation: String = "") -> Button:

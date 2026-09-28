@@ -256,15 +256,24 @@ func is_inside_bounds(pos: Vector3, margin: float = 0.0) -> bool:
 	return absf(pos.x) < lim and absf(pos.z) < lim and Vector2(pos.x, pos.z).length() < lim / 0.86
 
 
-## Saved positions must be on solid ground, inside the boundary and not under water.
+## Saved positions must be on solid ground, inside the boundary and not under water. A bridge deck or
+## stepping stone standing clearly above the stream bed is dry footing, even over deep water. Open-water
+## depth is still measured to height_at() at the saved x/z (NOT to the ray hit: the stream is ~0.60 m
+## deep almost everywhere and the terrain collider differs from height_at() by a few cm).
 func validate_position(pos: Vector3) -> Variant:
 	if not is_inside_bounds(pos, 2.0):
 		return null
+	var g: Variant = super.validate_position(pos)
+	if not (g is Vector3):
+		return null
+	var gp: Vector3 = g
 	if terrain != null and terrain.is_water(pos.x, pos.z):
+		# super returns the hit + 0.1 m; a crossing's walkway is well above the bed it spans.
+		var on_crossing: bool = gp.y - 0.1 > float(terrain.height_at(gp.x, gp.z)) + 0.25
 		var wl: float = terrain.water_level_at(pos.x, pos.z)
-		if wl - terrain.height_at(pos.x, pos.z) > 0.6:
+		if not on_crossing and wl - float(terrain.height_at(pos.x, pos.z)) > 0.6:
 			return null
-	return super.validate_position(pos)
+	return gp
 
 
 # --- Spawns, zones, boundary ------------------------------------------------------------------------------

@@ -68,10 +68,13 @@ func _begin_step(announce: bool = true) -> void:
 			b[o["counter"]] = GameState.get_counter(o["counter"])
 	baselines[s["id"]] = b
 	Events.quest_step_started.emit(s["id"])
+	# A step that is already skipped (see is_skipped) is passed straight through by the running
+	# evaluate() cascade: no hint card and no "New goal" toast for it.
+	var silent := is_skipped(s)
 	var hint: String = step_string(s, "hint")
-	if hint != "":
+	if hint != "" and not silent:
 		Events.hint.emit("quest_" + String(s["id"]), hint)
-	if announce:
+	if announce and not silent:
 		Events.notify.emit("New goal: " + step_string(s, "title"), "quest")
 	Events.objectives_changed.emit()
 
@@ -116,7 +119,21 @@ func _check(step: Dictionary, o: Dictionary) -> Dictionary:
 	return {"label": String(o.get("label", "")), "done": progress >= target, "progress": min(progress, target), "target": target}
 
 
+## True when the step's optional "skip_if_flag" is set: the step no longer applies (e.g. the dungeon
+## steps once the Heartseed is back in the Ward Stone) and counts as done without its objectives.
+## State-based like everything else, so a save that was stuck on such a step repairs itself on load.
+func is_skipped(step: Dictionary) -> bool:
+	var f: String = String(step.get("skip_if_flag", ""))
+	if f == "":
+		return false
+	if GameState.get_flag(f):
+		return true
+	return false
+
+
 func step_done(step: Dictionary) -> bool:
+	if is_skipped(step):
+		return true
 	var objs: Array = step.get("objectives", [])
 	if objs.is_empty():
 		return false
@@ -153,7 +170,8 @@ func _complete(s: Dictionary) -> void:
 		for item_id in give:
 			GameState.give_item(item_id, int(give[item_id]))
 		Events.quest_step_completed.emit(id)
-		Events.notify.emit("Goal complete: " + step_string(s, "title"), "quest")
+		if not is_skipped(s):
+			Events.notify.emit("Goal complete: " + step_string(s, "title"), "quest")
 		if String(oc.get("message", "")) != "":
 			Events.notify.emit(oc["message"], "info")
 	if index < QuestsData.STEPS.size() - 1:

@@ -17,7 +17,8 @@ extends Node3D
 ## Gentle intensity: slower, lower damage (x0.6 via INTENSITY), longer stuns.
 ## Player death: the fight resets cleanly (boss back on the ceiling, dormant, bar hidden). By design
 ## lit braziers stay lit and burned anchors stay burned, and its wounds do not heal - a kinder
-## retry. Reloading the area starts a fresh fight unless it was already defeated.
+## retry. A brazier lit while she is down burns its anchor but does not restart the fight.
+## Reloading the area starts a fresh fight unless it was already defeated.
 
 signal defeated
 signal state_changed(new_state: String)
@@ -447,7 +448,15 @@ func _slam() -> void:
 					Events.hitstop.emit(0.06)
 	if _pending_scorch:
 		_pending_scorch = false
-		_land_scorched()
+		var land := scorch_landing(global_position)
+		if _flat(land, global_position) > 0.3:
+			# Scorched on the way down onto a brazier (or right beside the cocoon): it recoils clear
+			# before collapsing, like any other scorched fall.
+			_from = global_transform
+			_to = _ground_pose(_ground_at(land), _player_pos())
+			_enter("scorch_fall", T_SCORCH_FALL)
+		else:
+			_land_scorched()
 	elif hit:
 		_enter("rebound", T_REBOUND)
 	else:
@@ -465,7 +474,9 @@ func _begin_climb() -> void:
 
 
 func _land_scorched() -> void:
-	global_transform = _ground_pose(Vector3(global_position.x, _floor_y, global_position.z), _player_pos())
+	# Re-ground on the real floor under it (the same point scorch_fall aimed at), never a raw floor
+	# height that could sit inside a collider such as the Heartseed cocoon.
+	global_transform = _ground_pose(_ground_at(Vector3(global_position.x, _floor_y, global_position.z)), _player_pos())
 	HitFx.burst(global_position + Vector3.UP * 0.3, Color(0.72, 0.68, 0.76), 16, 3.5, 1.4, -9.0, 0.6)
 	Audio.play_3d(_snd("drop"), global_position, 0.0, 0.05, 50.0)
 	Events.camera_shake.emit(0.5, 0.3)
@@ -483,6 +494,15 @@ func _on_brazier_lit(brazier: Node) -> void:
 		bpos = (brazier as Node3D).global_position
 	_burn_anchor_near(bpos, true)
 	if not fight_started:
+		var p := _player()
+		if p != null and not _hunt_allowed(p):
+			# Lit while Krystal is down, loading or in a cutscene (e.g. a kindle finishing on the death
+			# screen): the anchor stays burned (the kinder retry), but nothing re-engages - no shriek,
+			# scorch fall, boss bar or music - until she walks back in. Never hang from a burned anchor.
+			if state == "dormant" and burned.has(_anchor):
+				_anchor = _nearest_anchor(global_position)
+				global_transform = _ceiling_pose(_anchor, _player_pos())
+			return
 		start_fight()
 	Audio.play_3d(_snd("shriek"), global_position, -3.0, 0.05, 60.0)
 	Events.caption.emit(_caption("scorch"))
@@ -504,9 +524,22 @@ func _on_brazier_lit(brazier: Node) -> void:
 ## Where the scorched boss lands: below where it clung, but never on top of a brazier (the dungeon
 ## places them right under the anchors, and Krystal is standing next to the one she just lit) -
 ## nudged toward the arena centre just until it is BRAZIER_CLEARANCE away from every brazier, and
-## never closer than CENTRE_CLEARANCE to the centre (the Heartseed cocoon sits there).
+## never closer than CENTRE_CLEARANCE to the centre (the Heartseed cocoon sits there: a fall from a
+## centre anchor or a ceiling route over it is pushed straight out, toward Krystal if dead centre).
 func scorch_landing(from: Vector3) -> Vector3:
 	var p := Vector3(from.x, _floor_y, from.z)
+	var off := Vector2(p.x - arena_center.x, p.z - arena_center.z)
+	if off.length() < CENTRE_CLEARANCE:
+		var dir := Vector2(0.0, 1.0)
+		if off.length() > 0.05:
+			dir = off / off.length()
+		else:
+			var pp := _player_pos()
+			var to_p := Vector2(pp.x - arena_center.x, pp.z - arena_center.z)
+			if to_p.length() > 0.05:
+				dir = to_p / to_p.length()
+		p.x = arena_center.x + dir.x * CENTRE_CLEARANCE
+		p.z = arena_center.z + dir.y * CENTRE_CLEARANCE
 	for step in 60:
 		if not _near_brazier(p):
 			break
@@ -517,6 +550,12 @@ func scorch_landing(from: Vector3) -> Vector3:
 		var d := to_c / l * minf(0.25, l - CENTRE_CLEARANCE)
 		p.x += d.x
 		p.z += d.y
+	var max_r := maxf(arena_radius - 1.5, CENTRE_CLEARANCE)
+	var r := Vector2(p.x - arena_center.x, p.z - arena_center.z)
+	if r.length() > max_r:
+		r = r / r.length() * max_r
+		p.x = arena_center.x + r.x
+		p.z = arena_center.z + r.y
 	return p
 
 

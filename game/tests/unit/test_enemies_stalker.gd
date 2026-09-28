@@ -201,3 +201,66 @@ func test_arachnophobia_swaps_visual_live() -> void:
 	Settings.set_value("arachnophobia", false)
 	await wait_frames(1)
 	assert_true(s.visual.get_script() == preload("res://src/enemies/weaver_visual.gd"), "and back")
+
+
+class LitDummy extends Dummy:
+	var light_radius: float = 6.0
+
+	func _init() -> void:
+		super._init()
+		add_to_group("light_source")
+
+	func is_light_active() -> bool:
+		return true
+
+
+func _lit_dummy(pos: Vector3) -> Node3D:
+	var d := LitDummy.new()
+	add_child(d)
+	d.global_position = pos
+	_nodes.append(d)
+	Combat.invalidate_light_cache()
+	return d
+
+
+func test_pass_plays_out_while_krystal_carries_a_lantern() -> void:
+	# Audit regression: a director pass 12 m away used to recoil at once because Krystal's OWN lantern
+	# counted as if it lit the stalker. It must crawl, and only shrink back from light at its own position.
+	var d := _lit_dummy(Vector3(0, 0, 12))
+	var s := _stalker(d)
+	s.light_override = -1.0
+	assert_true(s.pass_overhead(), "director pass accepted")
+	_tick_until(s, "pass", 2.0)
+	assert_eq(s.state, "pass", "reaches the crawl instead of recoiling from a lantern 12 m away")
+	var start: Vector3 = (s as Node3D).global_position
+	for i in 30:
+		s.tick(DT)
+	assert_true((s as Node3D).global_position.distance_to(start) > 0.5, "it crawls along the route")
+
+
+func test_real_lantern_still_repels_a_rattle_overhead() -> void:
+	var d := _lit_dummy(Vector3(0, 0, 0.5))
+	var s := _stalker(d)
+	s.light_override = -1.0
+	assert_true(s.start_ambush(), "ambush starts")
+	var t := _tick_until(s, "recoil", 1.0)
+	assert_eq(s.state, "recoil", "a raised lantern right below it still drives it back")
+	assert_true(t < 1.0, "before the rattle ends")
+
+
+func test_retreat_never_steps_toward_krystal() -> void:
+	var d := _dummy(Vector3(-9.0, 0, 0))                    # just past the route's west end
+	var s := _stalker(d)
+	var ref: Vector3 = d.global_position
+	s.stretch_around(0)                                   # builds the (lazy) crawlable-segment data
+	assert_true(s.segment_ok(0), "route segments are crawlable in this test (otherwise the check is vacuous)")
+	var moves := 0
+	for i in (s.route as Array).size():
+		var step: int = s._away_step(i, ref)
+		if step != 0:
+			moves += 1
+			var here: float = (s.route[i] as Vector3).distance_to(ref)
+			var there: float = (s.route[i + step] as Vector3).distance_to(ref)
+			assert_true(there > here, "node %d: the retreat step leads away (%.2f -> %.2f)" % [i, here, there])
+	assert_true(moves > 0, "some nodes do have a way to back off")
+	assert_eq(s._away_step((s.route as Array).size() - 1, ref), 0, "the far end has nowhere farther to go: fade in place")

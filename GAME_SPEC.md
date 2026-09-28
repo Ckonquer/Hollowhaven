@@ -26,7 +26,7 @@ on screen, no gore.
 
 Ward Stone inscriptions (examples; keep short, a little old-fashioned):
 * Intro: "Light kept, home kept. The seed sleeps below; the stone remembers." then "Welcome, Krystal. This haven has waited a long time for someone to love it."
-* Warning (step "prepare"): "Its heart was taken to the deep. What took it still weaves in the dark. Carry light. Carry friends. Come home."
+* Warning (step "prepare"): "Its heart was taken to the deep. What took it still weaves in the dark. Carry light. Carry friends. Come home." (arachnophobia mode: "...still waits in the dark...")
 * Restored: "Light kept. Home kept. Thank you, Krystal."
 
 ## Surface: Hollowhaven Woods (~220 m square, see game/data/world_layout.gd)
@@ -63,8 +63,9 @@ Quest chain in game/data/quests.gd (state-checked objectives, contextual hints).
 * Comfort: horror intensity (Gentle/Standard/Intense), arachnophobia mode (Weaver → Hollow Mother, webs →
   pale roots, silk → pale thread, sounds/icons/names swapped), reduce shake, reduce flashing, captions,
   separate music/ambience/SFX/UI volumes. Shown on New Game and before the mine; editable any time.
-* Save: autosave on area change, sleeping, lantern checkpoints, chapter end; manual save from pause on the
-  surface (not while chased). Versioned JSON, atomic write, backup.
+* Save: autosave on area change, sleeping, lantern checkpoints, chapter end, New Game, a quiet surface
+  autosave every 5 minutes and on window close (surface); manual save from pause on the surface (not while
+  chased). Versioned JSON, atomic write, backup.
 
 ## The Below (one authored dungeon, 11 spaces, three moods)
 Old Mine (amber lantern light, timber, rails):

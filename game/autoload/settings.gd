@@ -219,16 +219,38 @@ func apply_video() -> void:
 		return
 	var args := OS.get_cmdline_args()
 	var cli_windowed := args.has("--windowed") or args.has("-w") or args.has("--resolution") or OS.get_cmdline_user_args().has("--windowed")
-	if not cli_windowed:
-		var want_fs: bool = get_value("fullscreen")
-		var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if want_fs else DisplayServer.WINDOW_MODE_WINDOWED
-		if DisplayServer.window_get_mode() != mode:
-			DisplayServer.window_set_mode(mode)
+	# The engine window starts fullscreen (project.godot display/window/size/mode, matching the default
+	# setting), so a windowed choice (setting off, or a debug/QA run with "-- --windowed") has to leave
+	# fullscreen here. A maximized/minimized window counts as windowed and is left alone.
+	var cur := DisplayServer.window_get_mode()
+	var is_fs := cur == DisplayServer.WINDOW_MODE_FULLSCREEN or cur == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+	var want_fs: bool = bool(get_value("fullscreen")) and not cli_windowed
+	if want_fs and not is_fs:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	elif not want_fs and is_fs:
+		_enter_windowed()
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if get_value("vsync") else DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = int(get_value("max_fps"))
 	var vp := get_viewport()
 	if vp:
 		vp.scaling_3d_scale = clampf(float(get_value("render_scale")), 0.5, 1.0)
+
+
+## Leaves fullscreen for a centred window of the project's window size (1600x900, shrunk to 90% of
+## small screens so the title bar stays reachable). Needed because a window that was created
+## fullscreen has no sensible size to restore to.
+func _enter_windowed() -> void:
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	var want := Vector2i(int(ProjectSettings.get_setting("display/window/size/window_width_override", 1600)),
+		int(ProjectSettings.get_setting("display/window/size/window_height_override", 900)))
+	if want.x <= 0 or want.y <= 0:
+		want = Vector2i(1600, 900)
+	var usable := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen())
+	if usable.size.x > 0 and usable.size.y > 0:
+		want = Vector2i(mini(want.x, int(usable.size.x * 0.9)), mini(want.y, int(usable.size.y * 0.9)))
+	DisplayServer.window_set_size(want)
+	if usable.size.x > 0 and usable.size.y > 0:
+		DisplayServer.window_set_position(usable.position + (usable.size - want) / 2)
 
 
 # --- Input map ---------------------------------------------------------------------

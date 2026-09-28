@@ -401,6 +401,79 @@ func test_mochi_forages_nearby_bush() -> void:
 	assert_true(got >= 1 and got <= 2, "found 1-2 berries (%d)" % got)
 
 
+func _fill_backpack() -> void:
+	for i in GameState.INVENTORY_SIZE:
+		GameState.inventory.set_slot(i, {"id": "wood", "count": 99})
+
+
+func _forage_bush() -> Node3D:
+	var bush := FakeBush.new()
+	add_child(bush)
+	nodes.append(bush)
+	bush.global_position = Vector3(1.5, 0.0, 4.5)
+	return bush
+
+
+func test_mochi_does_not_forage_into_a_full_backpack() -> void:
+	# Regression: every forage used to spill a new persistent pickup + a "Backpack full!" toast & sound.
+	_fill_backpack()
+	var m := _make("mochi", "follow", Vector3(0, 0.05, 4))
+	_befriend("mochi", "follow")
+	_forage_bush()
+	var toasts: Array = []
+	var cb := func(text: String, _kind: String) -> void: toasts.append(text)
+	Events.notify.connect(cb)
+	await wait_physics(2)
+	var trips := 0
+	for r in 3:
+		m.set("_ability_t", 0.0)
+		await wait_physics(2)
+		if m.get_state() == "working":
+			trips += 1
+		await wait_seconds(0.4)
+	Events.notify.disconnect(cb)
+	assert_eq(trips, 0, "no trips to the bush with no room to carry anything")
+	assert_eq(GameState.dropped.size(), 0, "no pickups spilled on the ground")
+	var full := toasts.filter(func(t: Variant) -> bool: return String(t).begins_with("Backpack full"))
+	assert_eq(full.size(), 0, "no 'Backpack full!' toasts")
+	var lines := said.filter(func(s: Variant) -> bool: return String(s[1]).contains("backpack is full"))
+	assert_true(lines.size() <= 1, "mentions the full backpack at most once (%d)" % lines.size())
+
+
+func test_mochi_brings_fiber_when_only_fiber_fits() -> void:
+	_fill_backpack()
+	GameState.inventory.set_slot(0, {"id": "berries", "count": ItemDB.stack_max("berries")})
+	GameState.inventory.set_slot(1, {"id": "fiber", "count": 10})
+	assert_eq(GameState.inventory.space_for("berries"), 0, "no room for berries")
+	var m := _make("mochi", "follow", Vector3(0, 0.05, 4))
+	_befriend("mochi", "follow")
+	_forage_bush()
+	await wait_physics(2)
+	m.set("_ability_t", 0.0)
+	await wait_physics(2)
+	assert_eq(m.get_state(), "working", "still trots to the bush")
+	await wait_seconds(3.0)
+	assert_eq(GameState.count_item("berries"), ItemDB.stack_max("berries"), "no berries forced in")
+	var f := GameState.count_item("fiber")
+	assert_true(f >= 11 and f <= 12, "brought 1-2 fiber instead (%d)" % f)
+	assert_eq(GameState.dropped.size(), 0, "nothing spilled")
+
+
+func test_mochi_forage_backpack_filled_on_the_way() -> void:
+	var m := _make("mochi", "follow", Vector3(0, 0.05, 4))
+	_befriend("mochi", "follow")
+	_forage_bush()
+	await wait_physics(2)
+	m.set("_ability_t", 0.0)
+	await wait_physics(2)
+	assert_eq(m.get_state(), "working", "trots to the bush")
+	_fill_backpack()                       # Krystal stuffs the backpack meanwhile
+	await wait_seconds(3.0)
+	assert_eq(GameState.count_item("berries"), 0, "nothing to hand over")
+	assert_eq(GameState.dropped.size(), 0, "and nothing spilled on the ground")
+	assert_ne(m.get_state(), "working", "back to following")
+
+
 func test_mochi_tends_crops_at_home() -> void:
 	var m := _make("mochi", "home", Vector3(0, 0.05, 9))
 	_befriend("mochi")
@@ -541,9 +614,30 @@ func test_spawner_below_keeps_a_waiting_companion() -> void:
 	assert_false(out.has("mochi"), "Mochi never appears below")
 
 
+func test_teleport_near_carries_only_the_follower() -> void:
+	# Regression: the Below's lift calls teleport_near() on every companion node. The one told to
+	# wait used to pop out beside Krystal and trudge back toward a spot 170 m away through rock.
+	var spot := Vector3(-12, 0.05, -10)
+	var p := _make("pebble", "wait", spot, {"wait": spot})
+	_befriend("pebble")
+	GameState.set_companion_assignment("pebble", "wait", "", spot)
+	var m := _make("mochi", "follow", Vector3(2, 0.05, 6))
+	_befriend("mochi", "follow")
+	await wait_physics(2)
+	var target := Vector3(30, 0.05, 20)
+	player.global_position = target
+	p.teleport_near(target)
+	m.teleport_near(target)
+	var dp: float = p.global_position.distance_to(spot)
+	assert_true(dp < 0.5, "the waiting companion stays at its spot (%.1f m away)" % dp)
+	assert_eq(p.get_state(), "wait", "still waiting")
+	var dm: float = m.global_position.distance_to(target)
+	assert_true(dm < 4.0, "the follower rides along (%.1f m from Krystal)" % dm)
+
+
 func test_waiting_companion_slips_back_to_its_spot() -> void:
-	# e.g. the Below's lift calls teleport_near() on every companion node: the one told to wait
-	# must end up back at its spot, not wander off or get stuck walking back.
+	# Knocked far off its spot (e.g. by a physics push): the one told to wait must end up back at
+	# its spot, not wander off or get stuck walking back.
 	var spot := Vector3(0, 0.05, -10)
 	var p := _make("pebble", "wait", spot, {"wait": spot})
 	_befriend("pebble")

@@ -297,14 +297,16 @@ static func find_conflicts(action: String, code: String, actions: Array, codes_f
 	return out
 
 
-## True if a captured event may be used as a binding (not Escape, which always cancels capture).
+## True if a captured event may be used as a binding (not Escape, which always cancels capture, and not
+## the mouse wheel, which scrolls menus and zooms the camera).
 static func is_bindable(ev: InputEvent) -> bool:
 	if ev is InputEventKey:
 		var k: InputEventKey = ev
 		var code: int = k.physical_keycode if k.physical_keycode != 0 else k.keycode
 		return k.pressed and not k.echo and code != KEY_ESCAPE and code != 0
 	if ev is InputEventMouseButton:
-		return (ev as InputEventMouseButton).pressed
+		var mb: InputEventMouseButton = ev
+		return mb.pressed and not (mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT])
 	return false
 
 

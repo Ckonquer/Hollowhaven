@@ -303,3 +303,32 @@ func test_ward_stone_inscriptions() -> void:
 	ws.interact(null)
 	assert_true(said.size() == 1 and String(said[0][1]).begins_with("Light kept. Home kept. Thank you,"), "restored line")
 	Events.say.disconnect(cb)
+
+
+## Golden rule 9: the warning inscription drops the web-spinning wording in arachnophobia mode.
+func test_ward_stone_warning_follows_arachnophobia() -> void:
+	var saved: bool = bool(Settings.get_value("arachnophobia"))
+	var said: Array = []
+	var cb := func(_speaker: String, text: String, _d: float) -> void:
+		said.append(text)
+	Events.say.connect(cb)
+	for arachno in [true, false]:
+		fresh_state()
+		Settings.set_value("arachnophobia", arachno)
+		GameState.set_flag("read_ward_intro", true)
+		GameState.befriend("lumi")
+		var ws: Node3D = WardStone.new()
+		_holder.add_child(ws)
+		said.clear()
+		ws.interact(null)
+		assert_true(bool(GameState.get_flag("read_ward_warning")), "warning read (arachnophobia %s)" % str(arachno))
+		assert_eq(said.size(), 1, "first warning line spoken (arachnophobia %s)" % str(arachno))
+		var line: String = String(said[0]) if said.size() > 0 else ""
+		assert_true(line.begins_with("Its heart was taken to the deep."), "warning line: '%s'" % line)
+		if arachno:
+			assert_false(line.to_lower().contains("weav"), "no weaving with arachnophobia on: '%s'" % line)
+		else:
+			assert_true(line.contains("still weaves in the dark"), "original wording with arachnophobia off: '%s'" % line)
+		ws.queue_free()
+	Events.say.disconnect(cb)
+	Settings.set_value("arachnophobia", saved)

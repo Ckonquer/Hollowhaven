@@ -206,6 +206,60 @@ func test_scorched_fall_lands_clear_of_the_brazier() -> void:
 	assert_eq(boss.state, "scorched", "and is stunned there as before")
 
 
+## The arena centre holds the Heartseed cocoon: a scorched landing that starts near it (a centre
+## anchor, a ceiling route over it) is pushed straight out to CENTRE_CLEARANCE; dead centre falls
+## toward Krystal; landings already clear are left alone.
+func test_scorch_landing_keeps_clear_of_the_centrepiece() -> void:
+	var d := _dummy(Vector3(0, 0, 6))
+	var boss: Node = Factory.create("weaver_matron", {"arena_center": Vector3.ZERO, "anchors": [Vector3(6, 8, 0), Vector3(0, 8, 1)], "braziers": []})
+	add_child(boss)
+	boss.set_process(false)
+	boss.target_override = d
+	_nodes.append(boss)
+	for from in [Vector3(0.0, 8.0, -1.0), Vector3(0.3, 8.0, 0.4), Vector3(-2.0, 8.0, 0.5)]:
+		var p: Vector3 = boss.scorch_landing(from)
+		var off := Vector2(p.x, p.z)
+		assert_true(off.length() >= Boss.CENTRE_CLEARANCE - 0.01, "%s lands clear of the centre (%.2f m)" % [str(from), off.length()])
+		assert_true(off.normalized().dot(Vector2(from.x, from.z).normalized()) > 0.99, "pushed straight out, on the side it fell from")
+		assert_almost(p.y, 0.0, 0.001, "on the floor")
+	var p0: Vector3 = boss.scorch_landing(Vector3(0.0, 8.0, 0.0))
+	assert_almost(Vector2(p0.x, p0.z).length(), Boss.CENTRE_CLEARANCE, 0.01, "dead centre still lands clear")
+	assert_true(p0.z > 0.0, "toward Krystal")
+	var far: Vector3 = boss.scorch_landing(Vector3(5.0, 8.0, 1.0))
+	assert_true(far.distance_to(Vector3(5.0, 0.0, 1.0)) < 0.001, "already clear: straight down (%s)" % str(far))
+
+
+## Scorched while it drops onto Krystal kindling a brazier: it recoils clear of the brazier before it
+## collapses, like any other scorched fall (it used to collapse on top of the bowl).
+func test_scorch_during_a_drop_recoils_clear_of_the_brazier() -> void:
+	var anchors := [Vector3(6.1, 7.5, 3.5), Vector3(-6.1, 7.5, 3.5), Vector3(0.0, 7.7, -7.0)]
+	var brs: Array = []
+	for i in 3:
+		var b: Node3D = Brazier.new()
+		b.setup({"id": "db%d" % i})
+		add_child(b)
+		b.global_position = Vector3(anchors[i].x, 0.0, anchors[i].z)
+		brs.append(b)
+		_nodes.append(b)
+	var bz: Vector3 = (brs[0] as Node3D).global_position
+	var d := _dummy(bz + (Vector3.ZERO - bz).normalized() * 0.9)     # kindling it, right beside the bowl
+	var boss: Node = Factory.create("weaver_matron", {"arena_center": Vector3.ZERO, "anchors": anchors, "braziers": brs})
+	add_child(boss)
+	boss.set_process(false)
+	boss.target_override = d
+	boss.intensity_override = 1
+	_nodes.append(boss)
+	_tick_until(boss, "drop", 15.0)
+	assert_eq(boss.state, "drop", "it drops on Krystal's spot")
+	(brs[0] as Node).call("light")                                   # the kindle completes mid-drop
+	_tick_until(boss, "scorched", 2.0)
+	assert_eq(boss.state, "scorched")
+	var bp: Vector3 = (boss as Node3D).global_position
+	var flat := Vector2(bp.x - bz.x, bp.z - bz.z).length()
+	assert_true(flat >= Boss.BRAZIER_CLEARANCE - 0.01, "never collapses right beside a brazier (%.2f m)" % flat)
+	assert_almost(bp.y, 0.0, 0.01, "on the floor")
+
+
 # --- Stalker turn-over -----------------------------------------------------------------------------------
 
 func test_stalker_turns_over_smoothly_when_leaping_back_up() -> void:

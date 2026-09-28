@@ -22,7 +22,7 @@ two 1920×1080 displays · Godot 4.7.2-stable official (Forward+, Vulkan, Jolt p
 ## 2. Automated tests — [auto]
 `tools/test.sh` runs every `game/tests/unit/test_*.gd` headless; the runner **fails a test on any runtime
 SCRIPT ERROR** (added after core QA showed errors could otherwise pass silently; verified with a probe test).
-Result at v0.9.0: **653 tests, 0 failed, 300 s** (`qa/evidence/test_results_v0.9.0.json`).
+Result recorded 2026-09-27 20:06 (just before commit 0dde10e): **653 tests, 0 failed, 300 s** (`qa/evidence/test_results_v0.9.0.json`). Commit 0dde10e added one more regression test (654); the latest full-suite result is recorded in section 8.
 
 | Area | Tests | Covers (examples) |
 |---|---|---|
@@ -57,13 +57,12 @@ knows the route, so it is much faster than a first-time human.
   warning → mine the rubble, enter the mine (comfort reminder) → light lanterns, fight Gloomlings, mine the
   gallery rubble, take the Foreman's Key → unlock the gate, stair, Hall of Faces, Drowned Shrine, Silk Hollows
   → light 3 braziers, fight and defeat the Weaver Matron, take the Heartseed → lift up, climb out, walk home →
-  return the Heartseed → restoration cutscene, "Chapter One Complete", credits → free play → save from the
-  pause menu.
+  return the Heartseed → restoration cutscene, "Chapter One Complete", credits → free play (the attempted pause-menu save failed, see below).
 * Observed in the run (from the game's own events): the authored moments fired in order — THE THRESHOLD
   ("timbers creak…" + Lumi noticing), THE DISTANT CROSSING ("something skitters past the far doorway"),
   THE IMITATION ("a familiar chime… played backwards", "[Lumi whimpers]"), SILK HOLLOWS INTRO ("it slips away
   into the dark above" / "It shrinks from your light"), boss braziers, the Weaver's retreat, the lift, the
-  Ward Stone restoration. 0 deaths, lowest health 36/100. 6 autosaves/lantern saves + 1 manual save.
+  Ward Stone restoration. 0 deaths, lowest health 36/100. 6 automatic saves (area changes, lantern checkpoints, chapter end). **Correction (found by an independent verification pass):** the scenario's last step, a manual Save from the pause menu, did *not* happen - the bot could not find the button and the step wrongly reported success (bot bug). The final save on disk is the automatic chapter-completion save.
 * Evidence: `qa/evidence/e2e_release_v0.9.0/` (31 screenshots, bot log, per-step results, observed_events.txt).
 
 ### 3.2 Earlier runs (the bugs they found are in section 5)
@@ -122,3 +121,6 @@ numbers come from one very powerful GPU and say nothing about minimum requiremen
 ## 7. Not verified (honest list)
 Human listening; human subjective fun/pacing; weaker GPUs; the scripted release persistence run (3.3);
 arachnophobia visuals on the final build; 1080p fullscreen perf profile; gamepad (not supported).
+
+## 8. Later changes (after the release playthrough)
+The credits text changed to "For Krystal / from Ali" (commit 9512a0d) and a headless code audit produced further fixes. These later builds were verified by the automated test suite (headless) only, not by a new real-input playthrough (the owner needed the PC). Details and the final suite result: `docs/Hollowhaven_Technical_Handoff.md` section 9 and the git log.

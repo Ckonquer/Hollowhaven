@@ -177,6 +177,31 @@ func test_eating_rules() -> void:
 	assert_almost(GameState.buff_mult("stamina_regen"), 1.6, 0.001, "buff applied from item data")
 
 
+## Regression: the backpack is a full-screen menu that pauses the tree, which freezes the player's
+## _physics_process and with it the eat-lock countdown. Menu eats (tree paused) must not be rate limited
+## (several foods per visit) and must not leave a sprint/dodge/jump lock behind for when the menu closes.
+func test_menu_eats_while_paused_are_not_rate_limited() -> void:
+	GameState.give_item("berries", 3)
+	player.health.apply_damage(40.0)
+	var hp0 := float(player.health.hp)
+	var heal := float(ItemDB.item("berries")["heal"])
+	get_tree().paused = true
+	var ok1: bool = player.eat("berries")
+	var ok2: bool = player.eat("berries")
+	var lock_after: float = float(player.get("_eat_lock"))
+	var hp_after := float(player.health.hp)
+	player.health.reset()
+	var ok_full: bool = player.eat("berries")
+	get_tree().paused = false
+	assert_true(ok1, "first menu eat succeeds")
+	assert_true(ok2, "second menu eat in the same (paused) visit succeeds")
+	assert_almost(hp_after, minf(hp0 + 2.0 * heal, float(player.health.max_hp)), 0.001, "both foods healed")
+	assert_eq(GameState.count_item("berries"), 1, "two berries eaten, one left")
+	assert_almost(lock_after, 0.0, 0.0001, "menu eats leave no eat lock behind")
+	assert_false(ok_full, "still refused at full health in the menu")
+	assert_eq(GameState.count_item("berries"), 1, "nothing consumed when refused")
+
+
 func test_lantern_contract() -> void:
 	player.set_lantern(true)
 	assert_true(player.is_light_active(), "light active")

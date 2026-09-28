@@ -877,8 +877,13 @@ func _use_item() -> void:
 
 
 ## Eats one of `id` from the backpack. Returns true when eaten.
+## In gameplay a 1 s eat lock rate-limits eating (and slows Krystal / blocks sprint, dodge and jump).
+## While the tree is paused the only caller is the backpack (the hotbar path needs _can_act()), and the
+## lock can't count down there (it ticks in _physics_process), so menu eats skip the lock entirely:
+## several foods can be eaten per visit and no surprise lock is left behind when the menu closes.
 func eat(id: String) -> bool:
-	if _eat_lock > 0.0 or _dead:
+	var from_menu: bool = is_inside_tree() and get_tree().paused
+	if _dead or (_eat_lock > 0.0 and not from_menu):
 		return false
 	var d: Dictionary = ItemDB.item(id)
 	var heal := float(d.get("heal", 0.0))
@@ -889,7 +894,8 @@ func eat(id: String) -> bool:
 		return false
 	if not GameState.take_item(id, 1):
 		return false
-	_eat_lock = EAT_TIME
+	if not from_menu:
+		_eat_lock = EAT_TIME
 	var healed: float = float(health.heal(heal))
 	if has_buff:
 		var bd: Dictionary = buff

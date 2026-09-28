@@ -6,6 +6,8 @@ free-play in your own little haven.
 
 ## Just want to play?
 1. Open `dist/` and extract `Hollowhaven-<version>-Windows.zip` anywhere (e.g. your Desktop).
+   If there is more than one zip, use the **newest version** (the one named in `dist/SHA256SUMS.txt`);
+   older zips are superseded builds.
 2. Open the extracted `Hollowhaven` folder and **double-click `Hollowhaven.exe`**.
 3. If Windows SmartScreen says "Windows protected your PC", click **More info → Run anyway**
    (the game isn't code-signed; this is normal for a homemade game).
@@ -17,7 +19,7 @@ Controls and comfort settings: see `How to Play.txt` next to the game (or press 
 | Path | What it is |
 |---|---|
 | `builds/Hollowhaven/` | The playable game (after building) |
-| `dist/` | The ZIP of the playable game + SHA-256 checksum |
+| `dist/` | The ZIP of the playable game + SHA-256 checksum (the build script moves older zips to `builds/superseded/`) |
 | `game/` | Editable Godot 4.7.2 project (source code, shaders, data, audio) |
 | `tools/` | Build, test, toolchain and asset-generation scripts |
 | `docs/` | Architecture contract, player guide, install log |

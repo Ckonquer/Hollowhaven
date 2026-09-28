@@ -133,6 +133,14 @@ func fade_in(t: float = 0.6) -> void:
 		fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+## True while any fade is under way or the screen is (partly) black. Menus must not open then: the fade
+## is drawn above the panels, so a menu opened under it (e.g. Esc early in the bed's sleep fade, a fall
+## recovery or "Return to the Haven", all with mode still "playing") would sit hidden. fade_out() blocks
+## clicks at once; only the newest fade_in() lets them through again when it ends.
+func _fade_busy() -> bool:
+	return fade_rect.color.a > 0.01 or fade_rect.mouse_filter == Control.MOUSE_FILTER_STOP
+
+
 ## Waits until `tw` has finished OR was killed by a newer fade. A killed tween never emits `finished`,
 ## so awaiting that signal could leave a caller (Game.load_area, the bed, the mine lift...) hanging
 ## forever when two fades overlap.
@@ -299,7 +307,7 @@ func _input(event: InputEvent) -> void:
 		if top != "":
 			close(top)
 			get_viewport().set_input_as_handled()
-		elif Game.mode == "playing" and fade_rect.color.a < 0.5:
+		elif Game.mode == "playing" and not _fade_busy():
 			if not _exit_build_mode():
 				open("pause")
 			get_viewport().set_input_as_handled()
@@ -317,7 +325,7 @@ func _hotkey(target: String) -> bool:
 	if top == target:
 		close(target)
 		return true
-	if Game.mode != "playing" or fade_rect.color.a > 0.5:
+	if Game.mode != "playing" or _fade_busy():
 		return false
 	if top == "":
 		open(target)
