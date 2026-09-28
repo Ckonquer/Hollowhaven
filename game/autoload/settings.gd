@@ -25,6 +25,13 @@ const DEFAULTS := {
 	"reduce_flashing": false,
 	"captions": true,               # show text captions for important sounds
 	"comfort_confirmed": false,     # player has seen the comfort screen
+	"high_visibility_cues": false,  # extra-bold outlines/markers on puzzle & boss cues (never colour alone)
+	"timing_assist": false,         # removes tight timing windows from puzzles and boss mechanics
+	# Companions (Chapter Two)
+	"companion_auto_attack": true,  # the follower attacks enemies Krystal fights (support always works)
+	"companion_autocast": true,     # the follower uses its signature skill by itself when it helps
+	# World
+	"seasonal_decor": false,        # optional autumn touches along Hollowhaven Woods paths (never in the house)
 	# Video
 	"fullscreen": true,
 	"vsync": true,
@@ -55,6 +62,7 @@ const DEFAULT_BINDINGS := {
 	"journal": ["key:%d" % KEY_J],
 	"map": ["key:%d" % KEY_M],
 	"companion_command": ["key:%d" % KEY_G],
+	"companion_skill": ["key:%d" % KEY_T],
 	"pause": ["key:%d" % KEY_ESCAPE],
 	"help": ["key:%d" % KEY_F1],
 	"screenshot": ["key:%d" % KEY_F12],
@@ -71,7 +79,7 @@ const REBINDABLE := [
 	["move_forward", "Move Forward"], ["move_back", "Move Back"], ["move_left", "Move Left"], ["move_right", "Move Right"],
 	["jump", "Jump"], ["sprint", "Sprint"], ["dodge", "Dodge Roll"], ["attack", "Attack / Gather"], ["use_item", "Use / Eat Item"],
 	["interact", "Interact"], ["lantern", "Lantern"], ["inventory", "Inventory"], ["craft", "Crafting"], ["build", "Build Mode"],
-	["journal", "Journal"], ["map", "Map"], ["companion_command", "Companion: Follow / Wait"],
+	["journal", "Journal"], ["map", "Map"], ["companion_command", "Companion: Follow / Wait"], ["companion_skill", "Companion Skill"],
 ]
 
 ## Valid ranges of numeric settings; set_value() and load_settings() clamp into them.

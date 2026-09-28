@@ -78,3 +78,34 @@ signal hitstop(duration: float)
 # --- Build mode UI ---------------------------------------------------------------------
 signal build_selection_changed(item_id: String)                  # "" = nothing selected
 signal build_placement_state(valid: bool, reason: String)       # live validity of the ghost preview
+
+# --- Chapter Two & progression (docs/CHAPTER_TWO_SPEC.md) -----------------------------------------
+signal chapter2_step_started(step_id: String)
+signal chapter2_step_completed(step_id: String)
+signal chapter2_completed
+signal optional_goal_completed(goal_id: String)
+signal reward_granted(reward_id: String)
+signal mastery_changed(track: String, xp: int, rank: int)
+signal appearance_changed
+signal equipment_changed(slot: String, item_id: String)
+signal stats_changed
+signal capacity_changed(kind: String, size: int)
+signal station_queue_changed(uid: String)
+signal choice_made(choice_id: String, option: String)
+signal landmark_discovered(area_id: String, landmark_id: String)
+signal arch_lit(arch_id: String)
+signal trial_started(trial_id: String)
+signal trial_ended(trial_id: String, won: bool)
+
+# --- Companion combat -----------------------------------------------------------------------------
+signal companion_skill_used(companion_id: String, skill_id: String)
+signal companion_skill_ready(companion_id: String)
+signal companion_attacked(companion_id: String, target: Node)
+signal player_shield_changed(amount: float)
+
+# --- Combat state & music -------------------------------------------------------------------------
+signal combat_state_changed(in_combat: bool)                 # ordinary fights (threat nearby & engaged)
+signal boss_phase_changed(boss_id: String, phase: int)
+signal boss_encounter_changed(boss_id: String, active: bool)  # arena engaged / ended (music, saving)
+signal music_cue_changed(cue_id: String)
+signal music_context_changed(context: String)                 # optional hint from areas (e.g. "pond")
