@@ -460,6 +460,29 @@ static func in_camera_corridor(point: Vector3, player_pos: Vector3, cam_pos: Vec
 	return camera_safe(point, player_pos, cam_pos, 1.0, clearance).distance_to(point) > 0.01
 
 
+## Camera clearance (2.0.3): where no side step exists (a narrow stair or trench: the follower walks Krystal's own
+## trail, and the camera hangs right on it) the creature can pass through the camera. While the camera is this close
+## to its body it hides its body (companion.gd update_camera_clearance), like Krystal's avatar in camera_rig.gd.
+## Distances are from the camera to the body axis, a vertical segment above the feet (the bodies are ~0.3 m in radius
+## and ~0.7 m tall in the world); SHOW > HIDE is hysteresis, so it never flickers at the threshold.
+const CAM_HIDE_DIST := 0.85
+const CAM_SHOW_DIST := 1.0
+const CAM_AXIS_LOW := 0.15
+const CAM_AXIS_HIGH := 0.55
+
+
+## Distance from `cam_pos` to the body axis of a creature standing at `feet`.
+static func camera_body_distance(cam_pos: Vector3, feet: Vector3) -> float:
+	var a := feet + Vector3(0.0, CAM_AXIS_LOW, 0.0)
+	var b := feet + Vector3(0.0, CAM_AXIS_HIGH, 0.0)
+	return cam_pos.distance_to(Geometry3D.get_closest_point_to_segment(cam_pos, a, b))
+
+
+## True while a creature at `feet` should stay hidden from a camera at `cam_pos`; `hidden` is its current state.
+static func camera_hides(cam_pos: Vector3, feet: Vector3, hidden: bool) -> bool:
+	return camera_body_distance(cam_pos, feet) < (CAM_SHOW_DIST if hidden else CAM_HIDE_DIST)
+
+
 ## Speed toward the follow goal: matches Krystal while she moves (never slower than her when
 ## lagging), sprints to catch up when far, and eases in on arrival when she stands still.
 static func follow_speed(dist_to_goal: float, move_speed: float, player_speed: float) -> float:

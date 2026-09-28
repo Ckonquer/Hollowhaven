@@ -152,6 +152,7 @@ var _safe_floor := Vector3.INF        # last spot it stood on while following (a
 var _safe_floor_t: float = 0.0
 var _ribbon_node: Node3D = null
 var _default_home := Vector3.ZERO     # companion_home_<id> (used again when its nook is taken away)
+var _cam_hidden: bool = false         # body hidden because the gameplay camera is inside / right at it
 
 static var _last_any_say_ms: int = -100000
 static var _enemy_cache: Array = []
@@ -711,6 +712,45 @@ func _physics_process(delta: float) -> void:
 	if _safe_floor_t <= 0.0 and mode == "follow" and is_on_floor():
 		_safe_floor_t = 0.5
 		_safe_floor = global_position
+
+
+## Every rendered frame: never fill the view by passing through the camera (see update_camera_clearance).
+func _process(_delta: float) -> void:
+	update_camera_clearance(_gameplay_camera())
+
+
+## Hides the body (visual rig + emote bubble) while `cam` is inside or right at it - on a narrow stair the
+## follower walks Krystal's trail straight through the camera (2.0.2 QA: Mochi's cap filled the whole frame at
+## the Sunken Bellhouse service stair) - and shows it again once the camera is clear (Logic.camera_hides,
+## with hysteresis). Visual only: collision, interaction, AI, saving and Lumi's light are untouched.
+## `cam` null (no gameplay camera rendering) always shows it.
+func update_camera_clearance(cam: Camera3D) -> void:
+	var want := false
+	if cam != null and is_instance_valid(cam) and cam.is_inside_tree() and is_inside_tree():
+		want = Logic.camera_hides(cam.global_position, global_position, _cam_hidden)
+	if want == _cam_hidden:
+		return
+	_cam_hidden = want
+	if visual == null:
+		return
+	for part in ["rig", "emote_anchor"]:
+		var n: Variant = visual.get(part)
+		if n is Node3D:
+			(n as Node3D).visible = not want
+
+
+func is_camera_hidden() -> bool:
+	return _cam_hidden
+
+
+## Krystal's follow camera while it is the one rendering (a cutscene or preview camera never hides anyone).
+func _gameplay_camera() -> Camera3D:
+	if _player == null or not is_instance_valid(_player) or not _player.has_method("get_camera"):
+		return null
+	var c: Variant = _player.get_camera()
+	if c is Camera3D and is_instance_valid(c) and (c as Camera3D).is_inside_tree() and (c as Camera3D).current:
+		return c
+	return null
 
 
 func _tick_timers(delta: float) -> void:
