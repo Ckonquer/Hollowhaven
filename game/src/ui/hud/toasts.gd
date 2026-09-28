@@ -5,6 +5,10 @@ extends VBoxContainer
 ## held (set by the UI root's hush, visual QA T4): while a chapter card, a full-screen menu / modal or the ending is
 ## up, toasts still queue (and merge) but their timers pause; they play out once it ends. A notify chime is not
 ## played for a toast that nobody can see yet.
+## room (set by the UI root, 2.0.3): how tall the column may grow - from above the hotbar / dialogue box up to just
+## under the goal card, the day dial and a wide quest banner. The oldest toasts that fit are shown; later ones wait
+## in order, hidden, with their time paused, and appear as the ones above them go (fit_views). The column still keeps
+## at most ToastModel.max_entries toasts.
 
 const Kit := preload("res://src/ui/ui_kit.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -22,6 +26,7 @@ var model: RefCounted = UiUtil.ToastModel.new()
 var views: Dictionary = {}          # entry id -> {panel, label, icon}
 var quest_banner: Node = null        # set by the UI root; receives "quest" notifications
 var held := false                    # UI root hush: queue, but pause the timers (see set_held)
+var room := INF                      # column height the UI root leaves the toasts (set_room); INF = no limit
 
 
 func _ready() -> void:
@@ -117,11 +122,11 @@ func _sync(e: Dictionary) -> void:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size.x = MAX_TEXT_W
 	h.add_child(l)
+	panel.visible = false          # fit_views() shows it (fading in) as soon as it fits the room
 	add_child(panel)
 	views[id] = {"panel": panel, "label": l}
-	panel.modulate.a = 0.0
-	var tw2 := panel.create_tween()
-	tw2.tween_property(panel, "modulate:a", 1.0, 0.18)
+	if not held:
+		fit_views()
 
 
 static func _kind_icon(kind: String) -> Texture2D:
@@ -146,17 +151,62 @@ func set_held(on: bool) -> void:
 	held = on
 
 
+## The column height the UI root leaves the toasts (see the header). Applied on the next fit_views().
+func set_room(h: float) -> void:
+	room = maxf(h, 0.0)
+
+
+## Shows the oldest toasts that fit the room, in order (a later one never jumps the queue), and hides the rest; an
+## entry's "shown" says which. Toasts still fading out keep their place until they are gone. Returns how many show.
+func fit_views() -> int:
+	var sep := float(get_theme_constant("separation"))
+	var current := {}
+	for id in views:
+		current[views[id]["panel"]] = true
+	var used := 0.0
+	var n := 0
+	for c in get_children():
+		var fading := c as Control
+		if fading != null and fading.visible and not current.has(fading) and not fading.is_queued_for_deletion():
+			used += fading.get_combined_minimum_size().y + (sep if n > 0 else 0.0)
+			n += 1
+	var shown := 0
+	var full := false
+	for e in model.entries:
+		var v: Variant = views.get(int(e["id"]))
+		if not (v is Dictionary):
+			continue
+		var p: Control = (v as Dictionary)["panel"]
+		var need := p.get_combined_minimum_size().y + (sep if n > 0 else 0.0)
+		if not full and used + need <= room + 0.5:
+			used += need
+			n += 1
+			shown += 1
+			e["shown"] = true
+			if not p.visible:
+				p.visible = true
+				p.modulate.a = 0.0
+				var tw := p.create_tween()
+				tw.tween_property(p, "modulate:a", 1.0, 0.18)
+		else:
+			full = true
+			e["shown"] = false
+			p.visible = false
+	return shown
+
+
+## Toasts waiting for room (queued, not on screen yet; also the ones queued during a hold, not fitted yet).
+func waiting_count() -> int:
+	var n := 0
+	for e in model.entries:
+		if not bool(e.get("shown", false)):
+			n += 1
+	return n
+
+
 func _process(delta: float) -> void:
 	if views.is_empty() or held:
 		return
-	var gone: Array = model.tick(delta)
-	for id in gone:
-		if views.has(id):
-			var p: Control = views[id]["panel"]
-			views.erase(id)
-			var tw := p.create_tween()
-			tw.tween_property(p, "modulate:a", 0.0, 0.35)
-			tw.tween_callback(p.queue_free)
 	# keep the view list in sync if the model dropped old entries (overflow)
 	if views.size() > model.entries.size():
 		var alive := {}
@@ -167,3 +217,27 @@ func _process(delta: float) -> void:
 				var p2: Control = views[id2]["panel"]
 				views.erase(id2)
 				p2.queue_free()
+	fit_views()
+	for id in _tick_shown(delta):
+		if views.has(id):
+			var p: Control = views[id]["panel"]
+			views.erase(id)
+			var tw := p.create_tween()
+			tw.tween_property(p, "modulate:a", 0.0, 0.35)
+			tw.tween_callback(p.queue_free)
+
+
+## ToastModel.tick() for the toasts on screen only: they age and expire; waiting ones keep their whole time.
+## Returns the expired ids.
+func _tick_shown(delta: float) -> Array:
+	var gone: Array = []
+	var entries: Array = model.entries
+	for i in range(entries.size() - 1, -1, -1):
+		var e: Dictionary = entries[i]
+		if not bool(e.get("shown", true)):
+			continue
+		e["age"] = float(e["age"]) + delta
+		if float(e["age"]) >= float(e["life"]):
+			gone.append(e["id"])
+			entries.remove_at(i)
+	return gone

@@ -15,6 +15,7 @@ const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const MAX_LABEL_W := 600.0        # title / detail text wrap width (the whole card stays under ~780 px)
 const TITLE_MAX_CHARS := 44       # a first sentence longer than this is not split off as a title
 const REQUEUE_BEFORE_MS := 1600   # a line held within this long of appearing plays again after the hold
+const REST_Y := 132.0             # the card's top edge once it has dropped in (from 30 px higher)
 
 var panel: PanelContainer
 var label: Label
@@ -115,7 +116,7 @@ func _next() -> void:
 	panel.reset_size()
 	var ms := panel.get_combined_minimum_size()
 	panel.size = ms
-	var y := 132.0
+	var y := REST_Y
 	panel.position = Vector2(round((size.x - ms.x) * 0.5), y - 30.0)
 	panel.modulate.a = 0.0
 	Audio.play_ui("ui_quest")
@@ -129,6 +130,14 @@ func _next() -> void:
 	tw.chain().tween_callback(_next)
 
 
+## Where the card rests while a line shows, in canvas coordinates (Rect2() when none): the UI root keeps the toast
+## column clear of it (ui_root.toast_top_limit).
+func resting_rect() -> Rect2:
+	if not _busy or panel == null or not panel.visible:
+		return Rect2()
+	return Rect2(get_global_rect().position + Vector2(panel.position.x, REST_Y), panel.size)
+
+
 ## Sets a label's text, wrapping it at MAX_LABEL_W only when it is wider than that.
 static func _fit(l: Label, text: String, variation: String) -> void:
 	l.text = text
@@ -138,6 +147,11 @@ static func _fit(l: Label, text: String, variation: String) -> void:
 	if w > MAX_LABEL_W:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size.x = MAX_LABEL_W
+		# Measure the wrapped height at the wrap width: the label still has the last (shorter) line's width, or none
+		# before the first banner, and _next() sized the card for that many lines (2.0.3: the festival-map card came
+		# out ~250 px tall with its two lines at the top; as a session's first banner, headless, 2410 px).
+		l.size = Vector2(MAX_LABEL_W, l.size.y)
+		l.update_minimum_size()
 	else:
 		l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		l.custom_minimum_size.x = 0.0

@@ -18,7 +18,9 @@ extends CanvasLayer
 ## and re-checks that its tip still applies before it comes back, and during a chapter card the gameplay HUD steps
 ## aside like a cutscene. hush_reason() / is_hushed(); _sync_hush() applies it (on every change and polled). While an
 ## area loads behind Game's loading card (src/ui/screens/loading_card.gd, a layer above this one) the hush is "loading".
-## Toasts also climb above the dialogue box whenever it would share their corner (_layout_toasts, IN-09).
+## Toasts also climb above the dialogue box whenever it would share their corner (_layout_toasts, IN-09), and never
+## reach up over the goal card, the day dial or a wide quest banner (toast_top_limit, 2.0.3): the ones that don't fit
+## the room left between wait their turn (Toasts.set_room).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -70,6 +72,10 @@ const NOTICE_OFF_ARGS := ["cams", "shot-dir", "shots", "area", "preview", "playe
 const TOAST_MARGINS := [34, 34, 34, 150]
 const TOAST_DIALOG_GAP := 18.0     # clearance between the toasts and the dialogue box (its speaker tab included)
 const TOAST_LAYOUT_POLL := 0.1
+const TOAST_CLEAR_GAP := 14.0      # clearance between the toasts and the goal card / day dial / quest banner above them
+## The toasts' top limit never goes lower than this share of the canvas height, so the column always keeps room for a
+## few toasts (only a goal card far taller than any real one would reach it).
+const TOAST_TOP_CAP := 0.6
 
 var root: Control
 var hud: Control
@@ -644,10 +650,44 @@ func toasts_max_width() -> float:
 	return Toasts.MAX_CARD_W
 
 
+## The canvas y the toast column must stay below: the bottom of the top-right HUD column (the day dial and, while it
+## shows, the goal card at its live height) and of a quest banner wide enough to reach the column, plus
+## TOAST_CLEAR_GAP; never lower than TOAST_TOP_CAP of the canvas height. The goal card counts while the gameplay HUD
+## fades for a cutscene too, so the column does not jump when it comes back.
+func toast_top_limit() -> float:
+	var vs := root.size
+	var column_left := vs.x - float(TOAST_MARGINS[2]) - toasts_max_width()
+	var top := float(TOAST_MARGINS[1])
+	var blocks: Array = []
+	if hud != null:
+		for n in ["dial", "tracker"]:
+			var c: Variant = hud.get(n)
+			if c is Control and is_instance_valid(c) and (c as Control).is_visible_in_tree():
+				blocks.append((c as Control).get_global_rect())
+	if quest_banner != null and quest_banner.has_method("resting_rect"):
+		blocks.append(quest_banner.call("resting_rect"))
+	for b in blocks:
+		var r: Rect2 = b
+		if r.size.y > 0.0 and r.end.x > column_left:
+			top = maxf(top, r.end.y + TOAST_CLEAR_GAP)
+	return minf(top, vs.y * TOAST_TOP_CAP)
+
+
+## Height the toast column may use: from its bottom margin (the larger of the target and the one on screen while it
+## slides) up to toast_top_limit().
+func toast_room() -> float:
+	var bottom := toast_bottom_margin()
+	if toast_margin != null:
+		bottom = maxf(bottom, float(toast_margin.get_theme_constant("margin_bottom")))
+	return maxf(0.0, root.size.y - bottom - toast_top_limit())
+
+
 func _layout_toasts() -> void:
 	if toast_margin == null:
 		return
 	var want := toast_bottom_margin()
+	if toasts.has_method("set_room"):
+		toasts.set_room(toast_room())
 	if is_equal_approx(want, _toast_bottom):
 		return
 	var first := _toast_bottom < 0.0

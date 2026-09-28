@@ -27,6 +27,10 @@ const CH2_TITLE := "Chapter Two"
 const CH2_SUBTITLE := "The Lanterns of Hallowmere"
 const TRACK_ICONS := {"gathering": "axe", "hearthcraft": "workbench", "wayfinding": "lantern"}
 const MASTERY_NOTE := "Masteries grow with ordinary play: gathering, crafting and exploring. No rank is ever needed for the story."
+## Small note under the two legacy free_play goals ("legacy": true in data/optional_goals.gd: max bond, the Heartbloom
+## Lamp). They are listed from a new journey's first minute, so it says what they are for someone who has never
+## played (slow goals with no rush), not where they came from (was "From Chapter One's free play").
+const LEGACY_TAG := "A goal for the long run"
 
 var tabs: TabContainer
 var goals_box: HBoxContainer      # the Story tab
@@ -483,7 +487,7 @@ func _goal_card(e: Dictionary) -> Control:
 			rh.add_child(Kit.label("%d / %d" % [int(r["progress"]), int(r["target"])], "GoodText" if rd else "Small"))
 		v.add_child(rh)
 	if bool(e["legacy"]):
-		var lg := Kit.label("From Chapter One's free play", "Tiny")
+		var lg := Kit.label(LEGACY_TAG, "Tiny")
 		lg.add_theme_color_override("font_color", ThemeFactory.INK_SOFT)
 		v.add_child(lg)
 	return card
