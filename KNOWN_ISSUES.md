@@ -1,9 +1,30 @@
-# Known issues — Hollowhaven 2.0.0 (Chapter One + Chapter Two)
+# Known issues — Hollowhaven 2.0.1 (Chapter One + Chapter Two)
 
-Honest list of what is imperfect or unverified in the 2.0.0 release (`dist/Hollowhaven-2.0.0-Windows.zip`, git `36e2e8a`).
+Honest list of what is imperfect or unverified in the 2.0.1 release (`dist/Hollowhaven-2.0.1-Windows.zip`, git `da94714`).
 Severity is **minor** unless stated. No crash, save corruption or progression blocker is known to be open - but Chapter Two has
-**not been played by a human**, so that statement rests on automated tests, headless QA-bot runs and still frames only
-(`QA_REPORT.md` §9). Fixed bugs are not listed here; they are in `QA_REPORT.md` §9.6.
+**not been played by a human**, so that statement rests on automated tests, QA-bot runs with virtual input (headless, and visible on
+the second monitor) and still frames only (`QA_REPORT.md` §9, §11). Fixed bugs are not listed here, except the short list below;
+the details are in `QA_REPORT.md` §9.6 and §11.
+
+## Fixed in 2.0.1 (open or unnoticed in 2.0.0)
+Checked by new unit / regression tests in the full suite (2672 tests, 0 failed) and, where noted, by bot runs; none by a human.
+* **CHAIN-001** Quarry Warden frozen at its arena edge: it now fights only on its arena floor, never attacks across levels, and gives
+  up + resets cleanly 5 s after Krystal leaves that level (not reproduced in the bot runs since; the 5 s give-up itself is unit-tested only).
+* **CHAIN-002** Warden beatable without the pillars: until its first pillar exposure (while a pillar stands) blows stop at 50 % health
+  (bot fights since: 2-3 exposures every time).
+* **COV-001** Arriving on a lit checkpoint through its own entrance (Works refuge hatch, Bellhouse stair) makes it the return point,
+  and Return to safety prefers the safe point of the room Krystal stands in (e.g. the manor cloakroom) instead of a rest point far
+  away. A defeat after entering by the manor's front door still wakes her at the last rest candle (by design).
+* **COV-002** A companion's hit no longer flinches an ordinary enemy out of its tell (Tobin's Hollow Drudge shows both tells).
+* **COV-003** Entering an Echo Trial is no longer a map landmark discovery (no Wayfinding XP / bond from inside the echo).
+* **COV-004** Arachnophobia: the Weaver's "banked scorch" and trip-line hints now use the comfort wording (also when toggled mid-fight).
+* **COV-005** "A House With an Upstairs": the walk-upstairs objective needs the walk, not just the floor tile.
+* **COV-006** Plurals in the furnace prompt / toast ("Collect 3 Copper Bars").
+* **COV-007** Sparkseed Wand: a cast cancelled by a hit during its wind-up refunds its stamina and cooldown.
+* **R3-03** The HUD tracker drops the three "Find the ... lamp" rows once all lamps are found (journal and map keep them).
+* Perf finding "Continue freezes the screen": a loading card (area name, lantern glow) and fade now show before an area builds.
+* The zip's player docs and `Licenses/THIRD_PARTY_NOTICES.txt` are now the corrected ones (checked byte for byte against
+  `docs/player/` and `THIRD_PARTY_NOTICES.md`).
 
 ## 1. Not verified yet (read this first)
 * **PERSONAL-SAVE VERIFICATION BLOCKED.** Krystal's own save is not on the development PC. Migration was verified on synthetic
@@ -11,48 +32,48 @@ Severity is **minor** unless stated. No crash, save corruption or progression bl
   gate in that report (§7) on a copy of her save before calling it safe for her world.
 * **No human has played Chapter Two** (nor the enriched Chapter One): fun, difficulty, pacing, first-time playtime and whether the
   hints are enough are unknown. The QA bot knows the route and reads telemetry; its times are not human times.
-* **No OS-level real-input run of 2.0.0.** Every Chapter Two bot run injected input through the game's QA port (bypasses Windows
-  focus, raw input and cursor capture) into a headless engine. Keyboard / mouse feel, camera responsiveness and focus problems are
-  untested for Chapter Two.
+* **No OS-level real-input run of 2.0.x.** Every Chapter Two bot run injected input through the game's QA port (bypasses Windows
+  focus, raw input and cursor capture), headless or in a never-focused window on the second monitor. Keyboard / mouse feel, camera
+  responsiveness and focus problems are untested for Chapter Two.
 * **Nobody has listened** to the 22 new compositions, their layers, the Music Box, any Chapter Two sound, or any in-game mix. All
-  audio was checked by numbers only (`docs/ch2/MUSIC_MANIFEST.md`). The Chapter One audio was not listened to either.
-* **Nothing has been judged in motion.** The 110 visual findings were found and their fixes checked on rendered STILL frames.
+  audio was checked by numbers only (`docs/ch2/MUSIC_MANIFEST.md`). The Chapter One audio was not listened to either. (The visible
+  bot runs played with sound on; nobody listened.)
+* **Nothing has been judged in motion.** The 110 visual findings were found and their fixes checked on rendered STILL frames; the
+  visible bot runs also left only screenshots.
 * **Performance** was measured only on the development PC (RTX 4090): the packaged exe per area at High / Low 1080p and High
   720p, uncapped (`QA_REPORT.md` §9.8: 398-709 average FPS, loads 0.9-2.9 s). Minimum requirements are unknown; no weaker or
   integrated GPU was tried. Settings > Video > Graphics quality (Low / Medium) and Render scale help weaker GPUs; first launch picks
-  Medium + 85 % on an integrated GPU. Lantern Road round trips keep node / object counts flat, but process memory still rises about
-  9-15 MB per Reach <-> Haven cycle (judged "stable" by the harness; a long session was not measured).
-* The packaged 2.0.0 exe itself has only been launched by the performance runs (virtual input, second monitor); the natural
-  end-to-end bot chain ran on a pre-release source snapshot (`QA_REPORT.md` §9.4).
+  Medium + 85 % on an integrated GPU. Lantern Road round trips keep node / object counts flat, but process memory still rises:
+  9.9-15.7 MB per Reach <-> Haven cycle in the 3-cycle runs, 8.5 MB per cycle over 10 cycles (harness verdict "slow growth",
+  `qa/evidence/ch2_v2.0.0/perf/leak10_summary.md`); a long session was not measured. All of this was the **2.0.0** exe; 2.0.1
+  (loading card, Continue prefetch) was not re-profiled.
+* **Packaged-build runs are bot runs.** The packaged exe has now been driven end to end, always with virtual input: 2.0.0 - a
+  visible natural Chapter Two chain on the second monitor (1488 s, completes); 2.0.1 - Run B, a fresh New Game through Chapter One,
+  the ending and accepting Chapter Two, visible with sound (21/21 steps, 658 s), and Run A, the natural Chapter Two chain, headless
+  (completes: 20/20 steps + relaunch, 1534.8 s, 0 deaths, 0 script errors) (`QA_REPORT.md` §11). On 2.0.1 no Chapter Two area was rendered by any run (Run A is headless).
 
-## 2. Open bugs (found after the release code was frozen, not fixed in 2.0.0)
-From the natural chain runs (`qa/tmp/bot/chain/bugs.json`; headless bot on a source snapshot whose `quarry_warden.gd` is identical
-to 2.0.0):
-* **CHAIN-001 Quarry Warden can stand frozen** in "chase" at its arena edge when Krystal drops onto the terrace just below the bench
-  (1.4 m lower, ~7 m away): no attack, no approach, no reset; the combat music has already gone back to exploration. Not a softlock:
-  walking back up the haul ramp restarts the fight (`qa/tmp/bot/chain/run1`, `diag_warden_climb`).
-* **CHAIN-002 Quarry Warden can be beaten without a single pillar exposure** by staying close, side-stepping slams and striking
-  during their recovery / poise-break stuns (bot: 0 exposures in 68.5 s and in 41 s; other runs used 1-2). The pillar bait, meant as
-  the fight's core, is optional in practice. Design call pending.
-* **CHAIN-003 = CH2-011 (developer logs only)**: quitting prints "WARNING: N ObjectDB instances were leaked at exit" (N 3-9). See §6.
+## 2. Open bugs in 2.0.1
+CHAIN-001 / 002 and COV-001..007 are fixed (list above). Still open:
+* **Boss-fight tips can linger after the fight.** Run B's `play_038_ending.png` (2.0.1, `qa/evidence/ch2_v2.0.1/run_b_fresh/`)
+  shows the Weaver's "It is smothering a brazier!" tip on the HUD back in the Haven after the Chapter One ending. Cosmetic; a HUD
+  fix for the next build was in progress (uncommitted) when this was written - not in 2.0.1.
+* **CHAIN-003 = CH2-011 = COV-008 (developer logs only)**: quitting prints "WARNING: N ObjectDB instances were leaked at exit"
+  (N 3-9 in the chain runs, 8-24 in the coverage runs; 8 at the end of the 2.0.1 suite); 3 coverage-run exits also logged
+  "ERROR: N resources still in use at exit" (N 1, 2, 7; `qa/tmp/bot/COVERAGE_BUGS.md`). See §6.
 
 ## 3. Open work and small player-visible gaps
 * **Shared creature voices (D10).** Every Chapter Two enemy and boss (and the Chapter One additions) uses existing, test-verified
   sound names: safe, arachnophobia swaps work, but many creatures share voices. Planned as ONE audio pass (new `tools/audio` sfx +
   Audio aliases, arachnophobia variants for the Crossing) followed by a human listening check; the requested voice list is in
   `docs/ch2/INTEGRATION_WAVE_D.md` §2 (D10).
-* The lamp-stage tracker card can list up to 8 rows (3 "Find the ... lamp" rows + the lamp roads) (R3-03, not changed).
 * The HUD day dial shows a day sky inside Moonveil Manor, where it is always night (R3-43; the balcony backdrop half of IN-13 was fixed).
 * Onboarding tip pacing (2.5 s calm, 25 s between tips, 30 s after a horror moment) is untuned: a Chapter One save can see about
   five tips in its first minutes (P50).
 * The Bell Throat echo stone stands at (153.6, -28, 27.6) next to the checkpoint; if the wall rocks touch it on screen it should move
   to about (153.4, -28, 24.75) (L10, not checked on screen).
 * The optional fourth friend Pipkin (a stretch goal in the design) is not implemented.
-* The release ZIP's player docs predate three small corrections now in `docs/player/` (the upgrade backup is made on the first
-  Continue, "most" keys - not all - can be rebound, the volume sliders are on the Audio tab), and its `Licenses/THIRD_PARTY_NOTICES.txt`
-  lacks the build-time audio-encoder note. The next `tools/build_release.ps1` run ships the corrected files.
-* Developer-only: the test runner's isolation guard still repairs leftovers on every full run (21 `ISOLATION` lines in the final run:
-  stray projectiles / particles, `Game._bosses`, zone flags, Reach world items; F04). No test fails because of it.
+* Developer-only: the test runner's isolation guard still repairs leftovers on every full run (21 `ISOLATION` lines in the 2.0.0 and
+  the 2.0.1 final runs: stray projectiles / particles, `Game._bosses`, zone flags, Reach world items; F04). No test fails because of it.
 
 ## 4. Avatar clipping limits (reviewed and kept)
 Checked on still frames only (`qa/tmp/visual/fix_avatar/sheets/`, `qa/tmp/visual/g1_pass3/`):
@@ -70,7 +91,7 @@ Checked on still frames only (`qa/tmp/visual/fix_avatar/sheets/`, `qa/tmp/visual
 
 ## 5. Kept by design (Chapter Two)
 * Fight pacing rules from bug-fix round 1: the Quarry Warden takes at most 35 % per pillar exposure and always plays its three
-  pulses first in phase 2 (but see CHAIN-002); the Crossing Matron takes three exposures, one per phase, and a brazier lit before she
+  pulses first in phase 2 (2.0.1, CHAIN-002: blows stop at 50 % until its first pillar exposure); the Crossing Matron takes three exposures, one per phase, and a brazier lit before she
   has attacked only "primes" her anchor (her next pounce exposes her) - without a Lantern her HP floor is off so blows alone can
   finish her; the Weaver Matron needs at least two openings in each of phases 2 and 3, and a scorch before a phase's first action is
   banked until that action ends. A blow that would finish the Weaver in her last phase or Count Velour now always lands (their window
@@ -103,23 +124,29 @@ Checked on still frames only (`qa/tmp/visual/fix_avatar/sheets/`, `qa/tmp/visual
 * Expeditions: setting a run aside mid-fight (only possible from the Commons outpost board) makes the group vanish; a dye keepsake
   unlocks the Loom colour directly, without its crafting cost.
 
-## 6. Developer-log leak note (CH2-011 / CHAIN-003)
-Quitting can print "WARNING: N ObjectDB instances were leaked at exit" (N varies, 3-9; also at the end of the full test suite).
+## 6. Developer-log leak note (CH2-011 / CHAIN-003 / COV-008)
+Quitting can print "WARNING: N ObjectDB instances were leaked at exit" (N varies, 3-9 in the chain runs, up to 24 in the coverage
+runs; also at the end of the full test suite: 8 in the 2.0.1 run). Three coverage-run exits also printed "ERROR: N resources still in
+use at exit" (N 1, 2, 7), one of them from the title screen with no gameplay; their owners were not identified (no `--verbose` re-run
+yet, `qa/tmp/bot/COVERAGE_BUGS.md` COV-008).
 Our own source - background loads never claimed at quit - is fixed (`Game.release_prefetches()`, `test_flow_quit_prefetch.gd`); a
 `--verbose` probe (`qa/tmp/bot/s1/vfix_verbose`) shows only bare RefCounted objects with a reference count of 0, from engine
-background compiles and headless WAV playback. Accepted as engine-internal (decision R3-16). No player-visible effect; revisit if a
-Godot update changes it.
+background compiles and headless WAV playback. Accepted as engine-internal (decision R3-16; that probe predates the ERROR lines,
+which are not yet explained). No player-visible effect; revisit if a Godot update changes it.
 
 ## 7. Still to check with real play (keyboard / mouse, on screen)
 Commands for the debug views are in `AGENTS.md`; the list is what no human or OS-level run has exercised yet.
 * **Controls and panels:** wardrobe grid (arrows / Enter, drag to turn, typing a preset name, every Esc path), the O key (also over
   the pause menu), rebinding Z / P / N and the hints naming the new key, dragging onto equipment slots, map toggle, Q/E journal tabs,
   scroll wheels, mouse capture after Continue.
-* **Companions:** the T key (with UI focused, after rebinding, with no follower); navigation in real Below / Works corridors, on
+* **Companions:** tying the Comfort Ribbon on Mochi while Lumi follows close by (in Run B the bot pressed E at a "Talk to Mochi"
+  prompt but Lumi's Friends panel opened, so Brave Little Steps was not finished; cause not investigated, possibly the bot's timing);
+  the T key (with UI focused, after rebinding, with no follower); navigation in real Below / Works corridors, on
   stairs, upper floors, the quarry gangway and the brook (the local path search is unit-tested only; changing storey relies on the
   4 s stuck recovery).
 * **Building:** walking stairs to an upper floor, Continue while upstairs, a bed upstairs.
-* **Fights (human first attempts vs the design targets):** Quarry Warden (incl. CHAIN-001 / 002), Count Velour (target 2-4 min; bot
+* **Fights (human first attempts vs the design targets):** Quarry Warden (incl. the 2.0.1 CHAIN-001 / 002 rules: leaving its
+  level, the 50 % shell floor), Count Velour (target 2-4 min; bot
   78 s), Weaver Matron after CH2-003 (bot 45-71 s), Crossing Matron (~2-4 min target; bot ~65 s), Borrowed Choir (4-6 min target;
   bot 229-301 s); Brambleback / Elder charges, moth rest window, Drudge in the narrow hall, mimic pocket, Patchwalker, Bellcaps,
   Velvet Wing drain rule, wisp dazzle; every ground telegraph with the new dark contrast band on grass, stone and the ballroom floor.
@@ -137,7 +164,7 @@ Commands for the debug views are in `AGENTS.md`; the list is what no human or OS
   by day and night, boss tells (Velour's dash lane on the crimson rug, the Crossing's rings with sound muted, the Choir's genuine vs
   false tells), both ending screens, menus at 1080p and 720p on the packaged build.
 
-## 8. Chapter One (still true in 2.0.0)
+## 8. Chapter One (still true in 2.0.1)
 ### Gameplay / feel
 * No navmesh: companions follow breadcrumbs, use a small local path search around walls (added for Chapter Two) and whisker
   steering, with stuck detection that safely teleports a companion back beside Krystal; enemies steer directly. On tricky terrain they

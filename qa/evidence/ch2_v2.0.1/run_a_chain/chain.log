@@ -1,0 +1,41 @@
+[13:34:06] CHAIN out=C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\bot\chain\final_201 headless=True exe=C:\Users\Ali\Desktop\Hollowhaven\builds\Hollowhaven\Hollowhaven.exe project=C:\Users\Ali\Desktop\Hollowhaven\game start_save=C:\Users\Ali\Desktop\Hollowhaven\game\tests\fixtures\saves\16_real_handoff_c1_complete.json from=S1 until=
+[13:34:07] CHAIN ################ S1: Continuation start (migration, wardrobe, Ward Stone, waygate, Commons, relaunch) ################
+[13:35:08] CHAIN relaunched as g2 (port 9301)
+[13:35:13] CHAIN ################ S1: OK in 65.8s - completes (script errors 0, music cues 9, shots 28)
+[13:35:13] CHAIN ################ S2: Hallowmere west + east (orchard, quarry, Quarry Warden) ################
+[13:39:08] CHAIN ################ S2: OK in 234.7s - completes (script errors 0, music cues 11, shots 25)
+[13:39:08] CHAIN ################ T23: Home to rest and cook, then the road to the manor ################
+[13:39:08] CHAIN === T23 step quarry_to_arch ===
+[13:39:21] CHAIN === T23 step quarry_to_arch: OK in 13.4s 
+[13:39:21] CHAIN === T23 step lantern_road_home ===
+[13:39:22] CHAIN Lantern Road list at the quarry arch: ['The Haven (home)', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Stay here', 'Close']
+[13:39:26] CHAIN === T23 step lantern_road_home: OK in 4.7s 
+[13:39:26] CHAIN === T23 step home_rest ===
+[13:40:08] CHAIN home rest T23: {'hp_before': 91.0, 'food_before': {'berries': 4}, 'slept': True, 'hp_after_sleep': 100.0, 'sleep_msgs': ['journey saved'], 'harvest': {'prompt': 'Harvest Sweetroot', 'ok': True, 'sweetroot': 2}, 'berries_picked': 14, 'hp_after': 100.0, 'food_after': {'hearty_stew': 1, 'berry_snack': 3, 'berries': 3}}
+[13:40:08] CHAIN === T23 step home_rest: OK in 41.8s 
+[13:40:08] CHAIN === T23 step lantern_road_commons ===
+[13:40:10] CHAIN Lantern Road list at the Ward Stone: ['Read the inscription', 'Change your look', 'Travel the Lantern Road', 'Close', 'Close', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Stay here', 'Close']
+[13:40:14] CHAIN === T23 step lantern_road_commons: OK in 6.0s 
+[13:40:14] CHAIN === T23 step road_to_manor_arch ===
+[13:40:35] CHAIN === T23 step road_to_manor_arch: OK in 21.1s 
+[13:40:35] CHAIN ################ T23: OK in 87.1s - completes (script errors 0, music cues 3, shots 9)
+[13:40:35] CHAIN ################ S3: Moonveil Manor (Count Velour) ################
+[13:43:54] CHAIN ################ S3: OK in 198.4s - completes (script errors 0, music cues 8, shots 18)
+[13:43:54] CHAIN ################ T34: Home to rest and cook before the Hushed Works ################
+[13:43:54] CHAIN === T34 step grounds_to_manor_arch ===
+[13:43:59] CHAIN === T34 step grounds_to_manor_arch: OK in 5.4s 
+[13:43:59] CHAIN === T34 step lantern_road_home ===
+[13:44:00] CHAIN Lantern Road list at the manor arch: ['The Haven (home)', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Stay here', 'Close']
+[13:44:03] CHAIN === T34 step lantern_road_home: OK in 4.4s 
+[13:44:03] CHAIN === T34 step home_rest ===
+[13:44:28] CHAIN home rest T34: {'hp_before': 86.0, 'food_before': {'hearty_stew': 1, 'berry_snack': 3, 'berries': 2}, 'slept': True, 'hp_after_sleep': 100.0, 'sleep_msgs': ['journey saved'], 'berries_picked': 15, 'hp_after': 100.0, 'food_after': {'hearty_stew': 1, 'berry_snack': 7, 'berries': 1}}
+[13:44:28] CHAIN === T34 step home_rest: OK in 24.7s 
+[13:44:28] CHAIN === T34 step lantern_road_commons ===
+[13:44:40] CHAIN Lantern Road list at the Ward Stone: ['Read the inscription', 'Change your look', 'Travel the Lantern Road', 'Close', 'Close', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Moonveil Manor', 'Stay here', 'Close']
+[13:44:44] CHAIN === T34 step lantern_road_commons: OK in 15.9s 
+[13:44:44] CHAIN ################ T34: OK in 50.4s - completes (script errors 0, music cues 3, shots 7)
+[13:44:44] CHAIN ################ S4: Link the lanterns, the Hushed Works, the Crossing, the Choir, the Lanternwake, free play ################
+[13:59:31] CHAIN ################ S4: OK in 887.1s - completes (script errors 0, music cues 26, shots 35)
+[13:59:31] CHAIN ################ END: Relaunch + Continue check (free play resumes in the same save) ################
+[13:59:34] CHAIN relaunched as g3 (port 9302)
+[13:59:40] CHAIN ################ END: OK in 8.8s - completes (script errors 0, music cues 3, shots 1)

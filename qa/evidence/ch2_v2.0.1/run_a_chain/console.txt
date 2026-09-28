@@ -1,0 +1,1142 @@
+[13:34:06] CHAIN out=C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\bot\chain\final_201 headless=True exe=C:\Users\Ali\Desktop\Hollowhaven\builds\Hollowhaven\Hollowhaven.exe project=C:\Users\Ali\Desktop\Hollowhaven\game start_save=C:\Users\Ali\Desktop\Hollowhaven\game\tests\fixtures\saves\16_real_handoff_c1_complete.json from=S1 until=
+[13:34:07] launched g1 (headless, packaged) pid=20448 port=9300 cmd=['C:\\Users\\Ali\\Desktop\\Hollowhaven\\builds\\Hollowhaven\\Hollowhaven.exe', '--headless', '--max-fps', '60', '--log-file', 'C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_201\\g1_godot.log', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/g1_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/saves', '--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/qa_settings.cfg', '--qa-input-port=9300', '--qa-no-focus', '--no-focus-pause', '--max-seconds=4800']
+[13:34:07] CHAIN ################ S1: Continuation start (migration, wardrobe, Ward Stone, waygate, Commons, relaunch) ################
+[13:34:07] === S1 STEP title_continue ===
+[13:34:13] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:34:13] === S1 STEP title_continue: OK in 5.3s 
+[13:34:13] === S1 STEP migration_checks ===
+[13:34:13] NOTE: the real Chapter-One-complete save has no chests (storages {}); chest migration is only covered by the save_integrity diff here
+[13:34:13] === S1 STEP migration_checks: OK in 0.0s 
+[13:34:13] === S1 STEP migration_save ===
+[13:34:14] === S1 STEP migration_save: OK in 1.1s 
+[13:34:14] === S1 STEP wardrobe ===
+[13:34:14] NOTE: wardrobe notice: headless builds switch the automatic notice off (ui_root.gd: wardrobe_notice_enabled = DisplayServer.get_name() != 'headless'); opened the wardrobe from the pause menu instead
+[13:34:23] === S1 STEP wardrobe: OK in 9.5s 
+[13:34:24] === S1 STEP equipment ===
+[13:34:24] NOTE: equipment: skipped - no armor or charm is owned (the save predates equipment) and none is cheap to craft here: every armor recipe needs Woven Cloth (Loom, recipe unlocked by the optional Tailor's Cache flag c1x_tailor_cache, plus 3 Sunflax per 2 cloth) and the cheapest charm (Gatherer's Charm) needs 2 Resin + 2 Copper Bars (Furnace)
+[13:34:24] === S1 STEP equipment: OK in 0.0s 
+[13:34:24] === S1 STEP ward_stone ===
+[13:34:25] === S1 STEP ward_stone: OK in 1.2s 
+[13:34:25] === S1 STEP materials ===
+[13:34:25] NOTE: waygate materials: nothing missing (the save carries {'wood': 8, 'stone': 10, 'copper_ore': 4})
+[13:34:25] === S1 STEP materials: OK in 0.0s 
+[13:34:25] === S1 STEP waygate ===
+[13:34:41] === S1 STEP waygate: OK in 16.3s 
+[13:34:41] === S1 STEP travel_reach ===
+[13:34:45] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:34:45] === S1 STEP travel_reach: OK in 4.4s 
+[13:34:45] === S1 STEP commons_arch ===
+[13:34:48] === S1 STEP commons_arch: OK in 2.8s 
+[13:34:48] === S1 STEP festival_map ===
+[13:34:51] === S1 STEP festival_map: OK in 2.7s 
+[13:34:51] === S1 STEP lantern_road_home ===
+[13:34:56] === S1 STEP lantern_road_home: OK in 5.2s 
+[13:34:56] === S1 STEP lantern_road_back ===
+[13:34:57] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:35:03] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:35:03] === S1 STEP lantern_road_back: OK in 6.7s 
+[13:35:03] === S1 STEP save_and_quit ===
+[13:35:07] === S1 STEP save_and_quit: OK in 4.0s 
+[13:35:07] === S1 STEP relaunch_continue ===
+[13:35:08] launched g2 (headless, packaged) pid=65944 port=9301 cmd=['C:\\Users\\Ali\\Desktop\\Hollowhaven\\builds\\Hollowhaven\\Hollowhaven.exe', '--headless', '--max-fps', '60', '--log-file', 'C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_201\\g2_godot.log', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/g2_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/saves', '--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/qa_settings.cfg', '--qa-input-port=9301', '--qa-no-focus', '--no-focus-pause', '--max-seconds=4800']
+[13:35:08] CHAIN relaunched as g2 (port 9301)
+[13:35:13] === S1 STEP relaunch_continue: OK in 6.4s 
+[13:35:13] CHAIN ################ S1: OK in 65.8s - completes (script errors 0, music cues 9, shots 28)
+[13:35:13] CHAIN ################ S2: Hallowmere west + east (orchard, quarry, Quarry Warden) ################
+[13:35:13] MSG [music] m01
+[13:35:13] MSG [music] 
+[13:35:13] MSG [music] m16
+[13:35:14] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:35:14] CHECKPOINT OK  s2_start t=0.8s inv={'berries': 7, 'copper_ore': 2, 'copper_sword': 1, 'echo_shard': 1, 'fiber': 6, 'haven_banner': 1, 'lantern': 1, 'pumpkin_seeds': 3, 'roseberry_seeds': 2, 'shiny_pebble': 1, 'stone': 6, 'stone_axe': 1, 'stone_pickaxe': 1, 'sunflax_seeds': 2, 'sweetroot_seeds': 3} flags_ch2=['ch2_read_festival_map', 'ch2_waygate_repaired', 'ch2_arch_commons', 'ch2_accepted']
+[13:35:14] === STEP to_orchard ===
+[13:35:29] MSG [notify] quest: Found: the orchard's garden lamp. Its bed is dry and its wick is cold.
+[13:35:29] MSG [hint] quest_ch2_orchard: Send the irrigation water back to the beds. Pumpkins in the marked pockets are not all pumpkins.
+[13:35:29] MSG [notify] bond: Lumi's bond grew! (2/5)
+[13:35:29] MSG [notify] success: Wayfinding mastery rank 2! The map remembers where you gathered special materials.
+[13:35:29] MSG [discover] hallowmere_reach:hr_orchard
+[13:35:29] CHECKPOINT OK  to_orchard t=15.2s 14.4s
+[13:35:29] === STEP light_orchard_arch ===
+[13:35:29] MSG [notify] success: Lantern arch lit: Pumpkintide Orchard. The Lantern Road can bring you here.
+[13:35:30] CHECKPOINT OK  light_orchard_arch t=16.7s 1.5s
+[13:35:30] === STEP find_orchard_lamp ===
+[13:35:30] garden lamp prompt before repairs: Light the garden lamp enabled=False
+[13:35:30] CHECKPOINT OK  find_orchard_lamp t=16.7s 0.0s
+[13:35:30] === STEP seed_box_note ===
+[13:35:33] MSG [say] A Note in the Seed Box: Plant the round ones for supper. Carve the crooked ones for company. Do not feed the one that feeds itself.
+[13:35:33] MSG [hint] hr_festival_seed: One plump festival seed waits in the box. Plant it once water reaches the festival bed.
+[13:35:33] CHECKPOINT OK  seed_box_note t=19.3s 2.5s
+[13:35:33] === STEP irrigation ===
+[13:35:37] MSG [caption] [The sluice creaks. Water runs off into the drain pond.]
+[13:35:40] MSG [caption] [The sluice creaks. Water runs all the way to the festival garden.]
+[13:35:40] MSG [notify] success: Water reaches the festival garden!
+[13:35:40] MSG [hint] hr_garden_watered: The festival bed is damp now: plant the festival seed, then see to the garden lamp.
+[13:35:40] irrigation: latched=True gate='Lower the garden sluice gate' junction='Turn the junction sluice: send the water to the drain pond'
+[13:35:40] CHECKPOINT OK  irrigation t=26.8s 7.5s
+[13:35:40] === STEP plant_festival_seed ===
+[13:35:46] MSG [music] m17
+[13:35:46] MSG [caption] [Soft rustling as the festival vine unfurls]
+[13:35:49] MSG [notify] success: The festival pumpkin grew in a heartbeat. It glows like a little lantern.
+[13:35:49] CHECKPOINT OK  plant_festival_seed t=35.8s 9.0s
+[13:35:49] === STEP mimic_pocket ===
+[13:35:49] MSG [notify] success: Yum! Berries restored 8 health.
+[13:35:49] ate berries (hotbar 5); hp 66.0 -> 74.0
+[13:35:55] twitching pumpkin: {'dist': 11.9, 'enabled': True, 'g': 'interactable', 'name': 'Interact_mimic_0', 'pos': [-104.5, -0.14, 31.9], 'text': 'Inspect twitching pumpkin'}
+[13:35:56] MSG [caption] [Both crooked pumpkins' stems twitch twice - they're waking up!]
+[13:35:56] MSG [hint] hr_mimic_fight: Pumpkin Mimics wind up before they bite. Step aside, then strike.
+[13:35:57] MSG [say] Lumi: Lumi goes very still.
+[13:35:58] MSG [hint] tell_pumpkin_mimic_bite: Its stem twitches twice before it wakes; its carved mouth gapes wide before a bite.
+[13:35:58] MSG [caption] [a carved mouth creaks open]
+[13:35:59] MSG [music] m22
+[13:36:02] MSG [hint] tell_pumpkin_mimic_roll: Tucks in its vine feet and a lane is marked on the ground before it rolls. It gets stuck briefly at the end.
+[13:36:09] MSG [notify] success: The crooked patch is quiet now.
+[13:36:12] CHECKPOINT OK  mimic_pocket t=59.1s 23.3s
+[13:36:12] === STEP light_garden_lamp ===
+[13:36:16] walk_to stuck at [-97.44, -0.13, 31.82] (dist 5.7); unstick #1
+[13:36:20] MSG [music] m17
+[13:36:21] MSG [caption] [The garden lamp catches with a warm, soft whump]
+[13:36:21] MSG [say] : Lumi's light answers the lantern, warm and gold.
+[13:36:21] MSG [notify] item: Obtained: Garden Seal
+[13:36:21] MSG [quest] ch2 completed ch2_orchard
+[13:36:21] MSG [notify] quest: Goal complete: Pumpkins With Opinions
+[13:36:21] MSG [notify] info: The Garden Seal glows warm in your pouch. New recipes: carved pumpkins and pumpkin cooking.
+[13:36:23] CHECKPOINT OK  light_garden_lamp t=69.6s 10.5s
+[13:36:23] === STEP garden_seal ===
+[13:36:23] after garden lamp: garden_seal=1 ch2.done=['ch2_light_beyond', 'ch2_waygate', 'ch2_commons', 'ch2_orchard'] current=['ch2_outer_lamps', 'ch2_quarry', 'ch2_manor'] tracker={'kind': 'chapter2', 'step': 'ch2_outer_lamps', 'targets': [{'area': 'hallowmere_reach', 'id': 'hr_conservatory'}, {'area': 'hallowmere_reach', 'id': 'hr_quarry'}, {'area': 'hallowmere_reach', 'id': 'hr_manor_grounds'}], 'title': 'Three Roads, Three Lamps'}
+[13:36:23] CHECKPOINT OK  garden_seal t=69.6s 0.0s
+[13:36:25] MSG [saved] journey saved
+[13:36:25] save_game orchard_done: clicked=True saved_msg=True
+[13:36:25] === STEP patchwalkers_optional ===
+[13:36:26] MSG [notify] success: Yum! Pumpkin restored 12 health.
+[13:36:26] pop-up open: ['inventory']; buttons=['Sort', 'slot:bag:0', 'slot:bag:1', 'slot:bag:2', 'slot:bag:3', 'slot:bag:4', 'slot:bag:5', 'slot:bag:6', 'slot:bag:7', 'slot:bag:8', 'slot:bag:9', 'slot:bag:10']
+[13:36:27] ate pumpkin (backpack); hp 59.0 -> 71.0
+[13:36:28] MSG [notify] success: Yum! Berries restored 8 health.
+[13:36:28] ate berries (hotbar 5); hp 71.0 -> 79.0
+[13:36:29] MSG [notify] success: Yum! Berries restored 8 health.
+[13:36:29] ate berries (hotbar 5); hp 79.0 -> 87.0
+[13:36:33] MSG [music] 
+[13:36:33] MSG [hint] tell_patchwalker_mud_clod: Scoops up mud with a long wind-up, then throws a clod that briefly slows. The slow never chains.
+[13:36:33] MSG [caption] [a wet scoop of mud]
+[13:36:35] MSG [caption] [mud splatters - your steps feel heavy]
+[13:36:38] MSG [hint] tell_patchwalker_rake: Raises its rake high; a visible arc marks the sweep. Dodge outside the arc or hit it during the wind-up.
+[13:36:43] MSG [caption] [a rake creaks up overhead]
+[13:36:49] CHECKPOINT OK  patchwalkers_optional t=96.1s 24.6s
+[13:36:49] === STEP gather_food ===
+[13:36:54] CHECKPOINT OK  gather_food t=100.6s 4.5s
+[13:36:54] === STEP to_quarry ===
+[13:37:17] MSG [music] m16
+[13:37:17] CHECKPOINT OK  to_quarry t=123.8s 23.2s
+[13:37:17] === STEP light_quarry_arch ===
+[13:37:18] MSG [notify] success: Lantern arch lit: Ashbell Quarry. The Lantern Road can bring you here.
+[13:37:19] CHECKPOINT OK  light_quarry_arch t=125.5s 1.6s
+[13:37:19] === STEP gather_wood ===
+[13:37:19] harvest Pine Tree hr_tree_847 at [67.22, 0.6, 47.2] for wood (0/6)
+[13:37:25] harvest Ember Maple hr_tree_885 at [57.67, -0.98, 54.49] for wood (4/6)
+[13:37:31] CHECKPOINT OK  gather_wood t=137.1s 11.7s
+[13:37:31] === STEP mine_iron ===
+[13:37:35] MSG [discover] hallowmere_reach:hr_quarry
+[13:37:35] harvest Iron Vein hr_iron_0 at [69.16, 0.37, 32.17] for iron_ore (0/4)
+[13:37:39] MSG [notify] success: Gathering mastery rank 2! 5% chance of an extra material.
+[13:37:40] iron vein at (69.1604105, 32.16599850000001): no ['iron'] to harvest near [68.44, 0.38, 33.19]
+[13:37:43] harvest Iron Vein hr_iron_1 at [87.6, 0.31, 35.96] for iron_ore (2/4)
+[13:37:45] MSG [say] Lumi: Lumi's light dims. It has noticed something.
+[13:37:49] CHECKPOINT OK  mine_iron t=155.2s 18.1s
+[13:37:49] === STEP to_winch_find_lamp ===
+[13:38:00] MSG [music] m18
+[13:38:00] MSG [say] : High on the upper shelf, a festival lamp sleeps under the quarry's slow pulse.
+[13:38:00] MSG [hint] quest_ch2_quarry: The Quarry Warden guards the lamp. Mend the old winch to reach the upper terraces.
+[13:38:00] CHECKPOINT OK  to_winch_find_lamp t=166.3s 11.0s
+[13:38:00] === STEP quarry_lamp_found ===
+[13:38:00] CHECKPOINT OK  quarry_lamp_found t=166.3s 0.0s
+[13:38:00] === STEP repair_winch ===
+[13:38:00] winch interactable: {'dist': 3.2, 'enabled': True, 'g': 'interactable', 'name': 'MineralWinch', 'pos': [79.3, 3.11, -2.29], 'text': 'Repair the mineral winch (6 Wood, 6 Stone, 4 Iron Ore)'}
+[13:38:00] MSG [hint] hr_quarry_winch: A cracked gear, a jammed pawl and a slack chain. With a little wood, stone and iron ore the old winch could lower its gangway again.
+[13:38:01] MSG [notify] success: The winch clanks, the chain runs, and the gangway lowers to the terrace.
+[13:38:01] MSG [caption] A winch clanks; a gangway lowers.
+[13:38:04] CHECKPOINT OK  repair_winch t=170.7s 4.4s
+[13:38:06] MSG [saved] journey saved
+[13:38:06] save_game winch_done: clicked=True saved_msg=True
+[13:38:06] === STEP quarry_warden ===
+[13:38:07] MSG [notify] success: Yum! Pumpkin restored 12 health.
+[13:38:07] pop-up open: ['inventory']; buttons=['Sort', 'slot:bag:0', 'slot:bag:1', 'slot:bag:2', 'slot:bag:3', 'slot:bag:4', 'slot:bag:5', 'slot:bag:6', 'slot:bag:7', 'slot:bag:8', 'slot:bag:9', 'slot:bag:10']
+[13:38:08] ate pumpkin (backpack); hp 55.0 -> 67.0
+[13:38:10] MSG [notify] success: Yum! Pumpkin restored 12 health.
+[13:38:10] pop-up open: ['inventory']; buttons=['Sort', 'slot:bag:0', 'slot:bag:1', 'slot:bag:2', 'slot:bag:3', 'slot:bag:4', 'slot:bag:5', 'slot:bag:6', 'slot:bag:7', 'slot:bag:8', 'slot:bag:9', 'slot:bag:10']
+[13:38:11] ate pumpkin (backpack); hp 67.0 -> 79.0
+[13:38:13] MSG [notify] success: Yum! Pumpkin restored 12 health.
+[13:38:13] pop-up open: ['inventory']; buttons=['Sort', 'slot:bag:0', 'slot:bag:1', 'slot:bag:2', 'slot:bag:3', 'slot:bag:4', 'slot:bag:5', 'slot:bag:6', 'slot:bag:7', 'slot:bag:8', 'slot:bag:9', 'slot:bag:10']
+[13:38:14] ate pumpkin (backpack); hp 79.0 -> 91.0
+[13:38:16] warden 182.8 chase d=7.3 whp=300.0 ph=1 exp=0 owed=True pulses_owed=False hp=91
+[13:38:17] MSG [hint] tell_quarry_warden_slam: Rears up and its cracked bell glows before a heavy slam. Side-step and punish.
+[13:38:17] MSG [caption] [stone grinds; the cracked bell glows]
+[13:38:17] warden 183.3 telegraph/slam d=3.2 whp=300.0 ph=1 exp=0 owed=True pulses_owed=False hp=91
+[13:38:17] MSG [music] m22
+[13:38:18] warden 184.7 slam d=5.5 whp=300.0 ph=1 exp=0 owed=True pulses_owed=False hp=91
+[13:38:19] warden 185.3 recover d=5.5 whp=300.0 ph=1 exp=0 owed=True pulses_owed=False hp=91
+[13:38:19] warden: 1.1s of recover left - to the bait spot of hr_pillar_2 at (86.9, 12.7)
+[13:38:19] warden: bait pillar hr_pillar_2 - stand at (86.9, 12.7) (Warden 1.8 m off, recover)
+[13:38:20] warden 187.1 chase d=6.2 whp=293.4 ph=1 exp=0 owed=True pulses_owed=False hp=91
+[13:38:22] MSG [hint] tell_quarry_warden_charge: Scrapes the ground and aims at you before charging. Bait it into a mineral pillar to crack its shell open.
+[13:38:22] warden 188.3 telegraph/charge d=5.9 whp=293.4 ph=1 exp=0 owed=True pulses_owed=False hp=91
+[13:38:23] warden charge locked: lane (86.0, 7.0)->(87.0, 13.1) (6.2 m) ends at pillar hr_pillar_2; she is +0.00 m off its line, 5.9 m along: side-step roll to (89.6, 12.3) (bench ok=True)
+[13:38:23] warden 189.9 charge d=6.8 whp=293.4 ph=1 exp=0 owed=True pulses_owed=False hp=91
+[13:38:24] MSG [caption] A mineral pillar cracks!
+[13:38:24] MSG [caption] [the Warden's shell cracks open around its glowing bell]
+[13:38:24] MSG [hint] hint_quarry_warden_exposed: The Warden's shell is open! Strike the glowing bell before it closes.
+[13:38:24] warden: charge ended 'pillar' (locked lane ended at pillar hr_pillar_2)
+[13:38:24] warden 190.6 exposed d=2.6 whp=293.4 ph=1 exp=1 owed=False pulses_owed=False hp=91
+[13:38:26] MSG [caption] [the cracked bell begins to hum]
+[13:38:26] MSG [caption] [the Warden's shell grinds shut over its bell]
+[13:38:26] warden 193.0 chase d=1.8 whp=188.4 ph=2 exp=1 owed=False pulses_owed=True hp=91
+[13:38:29] MSG [hint] tell_quarry_warden_pulses: Three rings are drawn one after another before three spaced ground pulses.
+[13:38:29] MSG [caption] [the cracked bell hums three times]
+[13:38:29] warden 196.0 telegraph/pulses d=1.9 whp=188.4 ph=2 exp=1 owed=False pulses_owed=True hp=91
+[13:38:31] warden 197.6 pulses d=6.9 whp=188.4 ph=2 exp=1 owed=False pulses_owed=True hp=91
+[13:38:33] warden 199.8 recover d=6.9 whp=188.4 ph=2 exp=1 owed=False pulses_owed=False hp=91
+[13:38:34] warden: 1.2s of recover left - to the bait spot of hr_pillar_1 at (95.3, 10.8)
+[13:38:34] warden: bait pillar hr_pillar_1 - stand at (95.3, 10.8) (Warden 3.2 m off, recover)
+[13:38:35] warden 201.8 chase d=8.5 whp=181.8 ph=2 exp=1 owed=False pulses_owed=False hp=91
+[13:38:36] MSG [caption] [heavy feet scrape the stone]
+[13:38:36] warden 202.9 telegraph/charge d=7.2 whp=181.8 ph=2 exp=1 owed=False pulses_owed=False hp=91
+[13:38:37] warden charge locked: lane (88.5, 12.8)->(95.7, 10.7) (7.5 m) ends at pillar hr_pillar_1; she is -0.00 m off its line, 7.2 m along: side-step roll to (94.6, 8.1) (bench ok=True)
+[13:38:38] warden 204.4 charge d=8.7 whp=181.8 ph=2 exp=1 owed=False pulses_owed=False hp=91
+[13:38:39] MSG [caption] A mineral pillar cracks!
+[13:38:39] MSG [caption] [the Warden's shell cracks open around its glowing bell]
+[13:38:39] MSG [hint] hint_quarry_warden_exposed: The Warden's shell is open! Strike the glowing bell before it closes.
+[13:38:39] warden: charge ended 'pillar' (locked lane ended at pillar hr_pillar_1)
+[13:38:39] warden 205.3 exposed d=2.8 whp=181.8 ph=2 exp=2 owed=False pulses_owed=False hp=91
+[13:38:41] MSG [caption] [the Warden's shell grinds shut over its bell]
+[13:38:41] warden 207.6 chase d=2.1 whp=76.8 ph=2 exp=2 owed=False pulses_owed=False hp=91
+[13:38:41] warden: bait pillar hr_pillar_0 - stand at (87.8, 5.0) (Warden 2.1 m off, chase)
+[13:38:44] MSG [caption] [heavy feet scrape the stone]
+[13:38:44] warden 210.7 telegraph/charge d=7.3 whp=76.8 ph=2 exp=2 owed=False pulses_owed=False hp=91
+[13:38:45] warden charge locked: lane (93.4, 9.0)->(87.4, 4.9) (7.3 m) ends at pillar hr_pillar_0; she is -0.00 m off its line, 7.3 m along: side-step roll to (85.8, 7.0) (bench ok=True)
+[13:38:46] warden 212.3 charge d=7.2 whp=76.8 ph=2 exp=2 owed=False pulses_owed=False hp=91
+[13:38:47] MSG [caption] A mineral pillar cracks!
+[13:38:47] MSG [caption] [the Warden's shell cracks open around its glowing bell]
+[13:38:47] MSG [hint] hint_quarry_warden_exposed: The Warden's shell is open! Strike the glowing bell before it closes.
+[13:38:47] warden: charge ended 'pillar' (locked lane ended at pillar hr_pillar_0)
+[13:38:47] warden 213.1 exposed d=3.0 whp=76.8 ph=2 exp=3 owed=False pulses_owed=False hp=91
+[13:38:49] MSG [caption] The quarry's slow pulse falls quiet.
+[13:38:49] MSG [notify] success: The Quarry Warden settles into stillness. The quarry's pulse falls quiet.
+[13:38:49] MSG [caption] [the cracked bell rings once, softly, and falls quiet]
+[13:38:49] warden fight end: ok=True {"exposures": 3, "slam_tells": 1, "charge_tells": 3, "pulse_tells": 1, "sidesteps": 3, "rolls": 3, "swings": 11, "hits_taken": 0, "damage_taken": 0.0, "deaths": 0, "climbs": 0, "eats": 0, "resets": 0, "charge_results": {"pillar": 3}, "fight_s": 32.5, "exposure_damage": [105.0, 105.0, 76.8], "game": {"exposures": 3, "exposures_capped": 2, "pulses_fired": 3, "charges_done": 3, "pillars_cracked": 3, "slams_done": 1, "give_ups": 0, "ledge_stops": 0, "edge_holds": 0, "last_charge_result": "pillar", "phase": 2, "hp": 8.6}}
+[13:38:49] CHECKPOINT OK  quarry_warden t=215.3s 42.7s
+[13:38:49] === STEP light_quarry_lamp ===
+[13:38:57] MSG [music] m15
+[13:38:57] quarry lamp: {'dist': 3.6, 'enabled': True, 'g': 'interactable', 'name': 'QuarryLamp', 'pos': [92.97, 7.71, -4.17], 'text': 'Light the quarry lamp'}
+[13:38:58] MSG [say] : The quarry lamp wakes, warm as a hearth. Far off, a bell answers.
+[13:38:58] MSG [caption] The quarry lamp catches with a soft, bright hum.
+[13:38:58] MSG [say] Lumi: Lumi sparkles like a tiny festival of lights!
+[13:38:58] MSG [notify] item: Obtained: Quarry Seal
+[13:38:58] MSG [quest] ch2 completed ch2_quarry
+[13:38:58] MSG [notify] quest: Goal complete: The Quarry's Pulse
+[13:38:58] MSG [notify] info: The Quarry Seal hums like a far-off bell. New recipes: Ironwood tools, sword and armor.
+[13:39:01] CHECKPOINT OK  light_quarry_lamp t=227.2s 11.9s
+[13:39:01] === STEP verify ===
+[13:39:01] VERIFY {"garden_seal": 1, "quarry_seal": 1, "flags": {"found_orchard": true, "irrigated": true, "gate": true, "junction": true, "note": true, "seed": true, "mimics": true, "garden_lit": true, "orchard_restored": true, "arch_orchard": true, "arch_quarry": true, "found_quarry": true, "winch": true, "warden": true, "quarry_lit": true, "quarry_restored": true, "patch_cleared": true}, "chapter2_done": ["ch2_light_beyond", "ch2_waygate", "ch2_commons", "ch2_orchard", "ch2_quarry"], "chapter2_current": ["ch2_outer_lamps", "ch2_manor"], "tracker": {"kind": "chapter2", "step": "ch2_outer_lamps", "targets": [{"area": "hallowmere_reach", "id": "hr_conservatory"}, {"area": "hallowmere_reach", "id": "hr_manor_grounds"}], "title": "Three Roads, Three Lamps"}, "objective": {"chapter": 2, "id": "ch2_outer_lamps", "source": "chapter2", "status": [{"done": true, "label": "Find the orchard lamp", "progress": 1, "step": "ch2_outer_lamps", "target": 1}, {"done": true, "label": "Find the quarry lamp", "progress": 1, "step": "ch2_outer_lamps", "target": 1}, {"done": false, "label": "Find the manor lamp", "progress": 0, "step": "ch2_outer_lamps", "target": 1}, {"done": false, "label": "Light the manor lamp", "progress": 0, "step": "ch2_manor", "target": 1}], "title": "Three Roads, Three Lamps"}, "optional": {"done": ["opt_look_of_your_own"], "done_count": 1, "pending": ["opt_brave_little_steps", "opt_copper_courage", "opt_tailors_cache", "opt_bramblewatch", "opt_gardeners_afternoon", "opt_tobins_shift", "o
+[13:39:01] CHECKPOINT OK  verify t=227.2s 0.0s
+[13:39:01] === STEP save_quit_continue ===
+[13:39:08] MSG [saved] journey saved
+[13:39:08] MSG [music] m01
+[13:39:08] MSG [say] : Lumi's light answers the lantern, warm and gold.
+[13:39:08] MSG [music] 
+[13:39:08] MSG [music] m16
+[13:39:08] reload: flags before={'irrigated': True, 'mimics': True, 'garden_lit': True, 'winch': True, 'warden': True, 'quarry_lit': True, 'found_orchard': True, 'found_quarry': True, 'arch_orchard': True, 'arch_quarry': True} after={'irrigated': True, 'mimics': True, 'garden_lit': True, 'winch': True, 'warden': True, 'quarry_lit': True, 'found_orchard': True, 'found_quarry': True, 'arch_orchard': True, 'arch_quarry': True}; inv before={'garden_seal': 1, 'quarry_seal': 1, 'iron_ore': 0, 'wood': 1, 'stone': 2} after={'garden_seal': 1, 'quarry_seal': 1, 'iron_ore': 0, 'wood': 1, 'stone': 2} pos=[93.58, 7.71, -3.11]
+[13:39:08] reload world checks: {'winch_prompt': 'Look over the mineral winch', 'quarry_lamp_prompt': 'The quarry lamp burns warm', 'warden_present': False}
+[13:39:08] CHECKPOINT OK  save_quit_continue t=234.6s 7.4s
+[13:39:08] CHAIN ################ S2: OK in 234.7s - completes (script errors 0, music cues 11, shots 25)
+[13:39:08] CHAIN ################ T23: Home to rest and cook, then the road to the manor ################
+[13:39:08] CHAIN === T23 step quarry_to_arch ===
+[13:39:08]   msg[say] : The quarry lamp wakes, warm as a hearth. Far off, a bell answers.
+[13:39:08]   msg[caption] The quarry lamp catches with a soft, bright hum.
+[13:39:08]   msg[say] Lumi: Lumi sparkles like a tiny festival of lights!
+[13:39:08]   msg[notify] item: Obtained: Quarry Seal
+[13:39:08]   msg[quest] ch2 completed ch2_quarry
+[13:39:08]   msg[notify] quest: Goal complete: The Quarry's Pulse
+[13:39:08]   msg[notify] info: The Quarry Seal hums like a far-off bell. New recipes: Ironwood tools, sword and armor.
+[13:39:08]   msg[saved] journey saved
+[13:39:08]   msg[music] m01
+[13:39:08]   msg[say] : Lumi's light answers the lantern, warm and gold.
+[13:39:08]   msg[music] 
+[13:39:08]   msg[music] m16
+[13:39:21] CHAIN === T23 step quarry_to_arch: OK in 13.4s 
+[13:39:21] CHAIN === T23 step lantern_road_home ===
+[13:39:22] CHAIN Lantern Road list at the quarry arch: ['The Haven (home)', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Stay here', 'Close']
+[13:39:26] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:39:26] CHAIN === T23 step lantern_road_home: OK in 4.7s 
+[13:39:26] CHAIN === T23 step home_rest ===
+[13:39:32] calibrated look: 0.2586 px/deg (motion 15.00 px -> dyaw=-58.0) invert=1.0 ok=True
+[13:39:47] craft Hearty Stew x1
+[13:39:56] walk_to stuck at [-10.28, 0.0, 2.18] (dist 10.4); unstick #1
+[13:40:04] crafted: {'hearty_stew': 1}
+[13:40:04] craft Berry Snack x3
+[13:40:08] crafted: {'berry_snack': 3}
+[13:40:08] CHAIN home rest T23: {'hp_before': 91.0, 'food_before': {'berries': 4}, 'slept': True, 'hp_after_sleep': 100.0, 'sleep_msgs': ['journey saved'], 'harvest': {'prompt': 'Harvest Sweetroot', 'ok': True, 'sweetroot': 2}, 'berries_picked': 14, 'hp_after': 100.0, 'food_after': {'hearty_stew': 1, 'berry_snack': 3, 'berries': 3}}
+[13:40:08] CHAIN === T23 step home_rest: OK in 41.8s 
+[13:40:08] CHAIN === T23 step lantern_road_commons ===
+[13:40:10] CHAIN Lantern Road list at the Ward Stone: ['Read the inscription', 'Change your look', 'Travel the Lantern Road', 'Close', 'Close', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Stay here', 'Close']
+[13:40:14] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:40:14] CHAIN === T23 step lantern_road_commons: OK in 6.0s 
+[13:40:14] CHAIN === T23 step road_to_manor_arch ===
+[13:40:14]   msg[music] m05
+[13:40:14]   msg[saved] journey saved
+[13:40:14]   msg[saved] journey saved
+[13:40:14]   msg[notify] success: Slept until morning. Journey saved.
+[13:40:14]   msg[hint] bed_respawn: Your bed is now where you'll wake up if something goes wrong.
+[13:40:14]   msg[notify] success: Harvested 2 Sweetroot, 2 Sweetroot Seeds!
+[13:40:14]   msg[discover] surface:glade
+[13:40:14]   msg[music] m02
+[13:40:14]   msg[music] m15
+[13:40:14]   msg[saved] journey saved
+[13:40:22]   msg[notify] bond: Lumi's bond grew! (3/5)
+[13:40:22]   msg[discover] hallowmere_reach:hr_conservatory
+[13:40:35]   msg[notify] success: Wayfinding mastery rank 3! Sprinting costs 10% less stamina.
+[13:40:35]   msg[discover] hallowmere_reach:hr_manor_grounds
+[13:40:35] CHAIN === T23 step road_to_manor_arch: OK in 21.1s 
+[13:40:35] CHAIN ################ T23: OK in 87.1s - completes (script errors 0, music cues 3, shots 9)
+[13:40:35] CHAIN ################ S3: Moonveil Manor (Count Velour) ################
+[13:40:35] === S3 step start_in_reach (t=0.0s) ===
+[13:40:39] calibrated: 0.2564 px/deg (motion 1.0 -> -3.9 deg) invert=1.0
+[13:40:39] objective: Three Roads, Three Lamps | current ['ch2_outer_lamps', 'ch2_manor'] | area hallowmere_reach
+[13:40:39] --- start_in_reach: OK in 3.7s 
+[13:40:39] === S3 step light_manor_arch (t=3.7s) ===
+[13:40:40] used manor arch
+[13:40:40] --- light_manor_arch: OK in 0.8s 
+[13:40:40] === S3 step enter_manor (t=4.5s) ===
+[13:40:46] used manor front door
+[13:40:48] --- enter_manor: OK in 8.6s 
+[13:40:48] === S3 step looking_glass_hall (t=13.1s) ===
+[13:40:52] used looking-glass card
+[13:40:56] used practice candle
+[13:41:03] --- looking_glass_hall: OK in 14.8s 
+[13:41:03] === S3 step velvet_scrap_1_powder_room (t=27.9s) ===
+[13:41:15] used velvet scrap 1
+[13:41:17] --- velvet_scrap_1_powder_room: OK in 13.6s 
+[13:41:17] === S3 step ballroom_puzzle (t=41.5s) ===
+[13:41:23] used dance card
+[13:41:27] used hearth candle
+[13:41:31] used candelabrum c3
+[13:41:35] used candelabrum c4
+[13:41:35] the ward-light reached the crescent lock
+[13:41:35] --- ballroom_puzzle: OK in 18.6s 
+[13:41:35] === S3 step ballroom_rest (t=60.1s) ===
+[13:41:40] used ballroom rest candles
+[13:41:40] --- ballroom_rest: OK in 4.7s 
+[13:41:40] === S3 step velvet_scrap_2_nook (t=64.8s) ===
+[13:41:49] used velvet scrap 2
+[13:41:54] --- velvet_scrap_2_nook: OK in 14.2s 
+[13:41:54] === S3 step velour_encounter_start (t=79.0s) ===
+[13:41:55] ate berries; hp 97.0
+[13:42:02] used teaching ward candle
+[13:42:02] --- velour_encounter_start: OK in 7.7s 
+[13:42:02] === S3 step velour_defeated (t=86.7s) ===
+[13:42:02] Velour phase 1 (hp 380.0)
+[13:42:02] velour intro hp=380.0 ph=1 vuln=False d=10.2 | me hp=97.0 at (-5.2, -60.19)
+[13:42:07] velour bow hp=380.0 ph=1 vuln=False d=7.6 | me hp=97.0 at (2.55, -60.02)
+[13:42:13] velour glide hp=319.4 ph=1 vuln=False d=7.2 | me hp=97.0 at (2.19, -62.35)
+[13:42:18] velour glide hp=258.8 ph=1 vuln=False d=2.2 | me hp=97.0 at (0.16, -66.18)
+[13:42:22] Velour phase 2 (hp 250.8)
+[13:42:24] velour transition hp=250.8 ph=2 vuln=False d=7.3 | me hp=97.0 at (4.31, -59.85)
+[13:42:29] velour bats hp=250.8 ph=2 vuln=False d=6.5 | me hp=97.0 at (4.31, -59.85)
+[13:42:34] velour bats hp=250.8 ph=2 vuln=False d=6.5 | me hp=97.0 at (4.31, -59.85)
+[13:42:40] velour glide hp=190.0 ph=2 vuln=False d=2.1 | me hp=97.0 at (3.1, -59.53)
+[13:42:47] velour glide hp=136.0 ph=2 vuln=False d=1.5 | me hp=86.0 at (5.6, -62.36)
+[13:42:52] velour bats hp=136.0 ph=2 vuln=False d=5.1 | me hp=86.0 at (4.29, -59.87)
+[13:42:57] velour bats hp=136.0 ph=2 vuln=False d=5.1 | me hp=86.0 at (4.29, -59.87)
+[13:43:01] Velour phase 3 (hp 125.4)
+[13:43:03] velour glide hp=125.4 ph=3 vuln=False d=3.2 | me hp=86.0 at (-4.4, -60.36)
+[13:43:09] velour glide hp=58.0 ph=3 vuln=False d=1.3 | me hp=86.0 at (-1.27, -71.73)
+[13:43:15] go (1.7643310062101147, -72.48045405662312) ended at (1.99, -69.99) (d 2.50)
+[13:43:15] velour glide hp=58.0 ph=3 vuln=False d=3.0 | me hp=86.0 at (1.13, -72.1)
+[13:43:23] Count Velour's enchantment is broken
+[13:43:23] --- velour_defeated: OK in 80.6s 
+[13:43:23] === S3 step velvet_scrap_3_dressing_room (t=167.3s) ===
+[13:43:29] used velvet scrap 3
+[13:43:32] --- velvet_scrap_3_dressing_room: OK in 9.2s 
+[13:43:32] === S3 step talk_to_the_count (t=176.6s) ===
+[13:43:36] used the freed Count
+[13:43:36] --- talk_to_the_count: OK in 4.0s 
+[13:43:36] === S3 step manor_lantern_lit (t=180.5s) ===
+[13:43:44] used Moonveil lantern
+[13:43:44] --- manor_lantern_lit: OK in 8.4s 
+[13:43:44] === S3 step balcony_rest (t=188.9s) ===
+[13:43:47] used balcony rest candles
+[13:43:47] --- balcony_rest: OK in 2.8s 
+[13:43:47] === S3 step shortcut_open (t=191.7s) ===
+[13:43:49] used shortcut gate
+[13:43:49] --- shortcut_open: OK in 2.6s 
+[13:43:50] === S3 step garden_stair_to_reach (t=194.3s) ===
+[13:43:51] used garden stair
+[13:43:54] back in the Reach at [18.0, 4.73, -82.0]
+[13:43:54] --- garden_stair_to_reach: OK in 4.1s 
+[13:43:54] CHAIN ################ S3: OK in 198.4s - completes (script errors 0, music cues 8, shots 18)
+[13:43:54] CHAIN ################ T34: Home to rest and cook before the Hushed Works ################
+[13:43:54] CHAIN === T34 step grounds_to_manor_arch ===
+[13:43:54]   msg[notify] quest: Goal complete: A Most Peculiar Invitation
+[13:43:54]   msg[notify] info: The Manor Seal is cool as moonlight. New tailoring patterns: Ribbon Witch and Velvet Vampire.
+[13:43:54]   msg[quest] ch2 started ch2_prepare
+[13:43:54]   msg[hint] quest_ch2_prepare: Better armor and tools help, but nothing here demands a full set. See what you can make with {craft}.
+[13:43:54]   msg[notify] quest: New goal: Made for the Journey
+[13:43:54]   msg[caption] [five little candles catch, one after another]
+[13:43:54]   msg[saved] journey saved
+[13:43:54]   msg[notify] success: Candles lit - progress saved
+[13:43:54]   msg[notify] success: Wayfinding mastery rank 4! The map hints at hidden caches in places you have found.
+[13:43:54]   msg[caption] [an iron bolt slides back with a clank]
+[13:43:54]   msg[notify] success: Shortcut open: the servants' stair to the Cloakroom and the garden stair outside.
+[13:43:54]   msg[saved] journey saved
+[13:43:59] CHAIN === T34 step grounds_to_manor_arch: OK in 5.4s 
+[13:43:59] CHAIN === T34 step lantern_road_home ===
+[13:44:00] CHAIN Lantern Road list at the manor arch: ['The Haven (home)', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Stay here', 'Close']
+[13:44:03] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:44:03] CHAIN === T34 step lantern_road_home: OK in 4.4s 
+[13:44:03] CHAIN === T34 step home_rest ===
+[13:44:09] calibrated look: 0.2586 px/deg (motion 15.00 px -> dyaw=-58.0) invert=1.0 ok=True
+[13:44:23] craft Berry Snack x4
+[13:44:28] crafted: {'berry_snack': 4}
+[13:44:28] CHAIN home rest T34: {'hp_before': 86.0, 'food_before': {'hearty_stew': 1, 'berry_snack': 3, 'berries': 2}, 'slept': True, 'hp_after_sleep': 100.0, 'sleep_msgs': ['journey saved'], 'berries_picked': 15, 'hp_after': 100.0, 'food_after': {'hearty_stew': 1, 'berry_snack': 7, 'berries': 1}}
+[13:44:28] CHAIN === T34 step home_rest: OK in 24.7s 
+[13:44:28] CHAIN === T34 step lantern_road_commons ===
+[13:44:34] walk_to stuck at [-17.09, -0.01, 9.64] (dist 18.0); unstick #1
+[13:44:40] CHAIN Lantern Road list at the Ward Stone: ['Read the inscription', 'Change your look', 'Travel the Lantern Road', 'Close', 'Close', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Moonveil Manor', 'Stay here', 'Close']
+[13:44:44] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:44:44] CHAIN === T34 step lantern_road_commons: OK in 15.9s 
+[13:44:44] CHAIN ################ T34: OK in 50.4s - completes (script errors 0, music cues 3, shots 7)
+[13:44:44] CHAIN ################ S4: Link the lanterns, the Hushed Works, the Crossing, the Choir, the Lanternwake, free play ################
+[13:44:44]   msg[caption] [an iron bolt slides back with a clank]
+[13:44:44]   msg[notify] success: Shortcut open: the servants' stair to the Cloakroom and the garden stair outside.
+[13:44:44]   msg[saved] journey saved
+[13:44:44]   msg[music] m04
+[13:44:44]   msg[saved] journey saved
+[13:44:44]   msg[saved] journey saved
+[13:44:44]   msg[notify] success: Slept until morning. Journey saved.
+[13:44:44]   msg[hint] bed_respawn: Your bed is now where you'll wake up if something goes wrong.
+[13:44:44]   msg[notify] success: Hearthcraft mastery rank 1! Recipe: Crescent Window.
+[13:44:44]   msg[music] m08
+[13:44:44]   msg[music] m16
+[13:44:44]   msg[saved] journey saved
+[13:44:44] === STEP start (area hallowmere_reach, zone hr_commons, ch2 current ['ch2_prepare']) ===
+[13:44:46] calibrated look: 0.2586 px/deg (motion 3.00 px -> dyaw=-11.6) invert=1.0 ok=True
+[13:44:47] === start: PASS in 2.4s 
+[13:44:47] === STEP read_preparations (area hallowmere_reach, zone hr_commons, ch2 current ['ch2_prepare']) ===
+[13:44:58]   msg[say] Made for the Journey: For whoever takes the Bellhouse stair: the deep works are old and patient, and they do not mind if you take your time. A little armour helps. A padded hood or a pair of copper boots is plenty to beg
+[13:44:58]   msg[hint] ch2_prepare_seam: A practice seam of iron waits just outside. A stone pickaxe will do; a better one is quicker.
+[13:44:58]   msg[quest] ch2 completed ch2_prepare
+[13:44:58]   msg[notify] quest: Goal complete: Made for the Journey
+[13:44:58]   msg[notify] info: One good upgrade goes a long way. Friends and a lantern go further.
+[13:44:58]   msg[quest] ch2 started ch2_lamps_linked
+[13:44:58]   msg[hint] quest_ch2_lamps_linked: Bring the three seals to the Conservatory pedestal and press {interact}.
+[13:44:58]   msg[notify] quest: New goal: A Thread of True Light
+[13:45:00] === read_preparations: PASS in 13.5s 
+[13:45:00] === STEP link_lanterns (area hallowmere_reach, zone hr_conservatory, ch2 current ['ch2_lamps_linked']) ===
+[13:45:03]   msg[caption] [The pedestal hums; three threads of light run out along the roads]
+[13:45:03]   msg[say] Linking Pedestal: The three lamps answer one another. Along every road, a light wakes.
+[13:45:03]   msg[quest] ch2 completed ch2_lamps_linked
+[13:45:03]   msg[notify] quest: Goal complete: A Thread of True Light
+[13:45:03]   msg[notify] info: True light runs along every road. A stair has appeared at the Sunken Bellhouse.
+[13:45:03]   msg[quest] ch2 started ch2_service_gate
+[13:45:03]   msg[hint] quest_ch2_service_gate: The Foreman's Key is in your key pouch ({inventory}). Opening the gate with it does not use it up.
+[13:45:03]   msg[notify] quest: New goal: The Key Still Fits
+[13:45:06] === link_lanterns: PASS in 5.9s 
+[13:45:06] === STEP service_gate (area hallowmere_reach, zone hr_conservatory, ch2 current ['ch2_service_gate']) ===
+[13:45:10]   msg[notify] quest: The lanterns are linked. A stair has opened at the Sunken Bellhouse.
+[13:45:23]   msg[discover] hallowmere_reach:hr_bellhouse
+[13:45:28]   msg[caption] [the lock turns with a heavy clunk]
+[13:45:28]   msg[quest] ch2 completed ch2_service_gate
+[13:45:28]   msg[notify] quest: Goal complete: The Key Still Fits
+[13:45:28]   msg[notify] info: The Foreman's Key turns once, then goes back into your pouch.
+[13:45:28]   msg[quest] ch2 started ch2_true_signal
+[13:45:28]   msg[hint] quest_ch2_true_signal: Real lanterns burn steady and warm. Lights that flicker to your rhythm are not your friends.
+[13:45:28]   msg[notify] quest: New goal: Hask's Rail
+[13:45:33]   msg[hint] hw_real_light: Real lanterns light the ground around them. Down here, trust the lights that do.
+[13:45:33]   msg[music] m23
+[13:45:34]   msg[notify] bond: Lumi's bond grew! (4/5)
+[13:45:34]   msg[discover] hushed_works:hw_landing
+[13:45:34]   msg[saved] journey saved
+[13:45:34] === service_gate: PASS in 27.7s 
+[13:45:34] === STEP true_signal (area hushed_works, zone hw_landing, ch2 current ['ch2_true_signal']) ===
+[13:45:35]   msg[saved] journey saved
+[13:45:35]   msg[notify] success: Lantern lit - progress saved
+[13:45:41]   msg[hint] hw_drudge: An old coat raises its pick slowly and scrapes before it strikes again. Step aside, then strike while it is bent over.
+[13:45:41]   msg[discover] hushed_works:hw_lockers
+[13:45:42]   msg[music] 
+[13:45:42]   msg[hint] tell_hollow_drudge_scrape: Drags its pick back along the floor, sparks trailing, before a ground scrape. Jump back or roll through.
+[13:45:42]   msg[caption] [a pick scrapes along the stone]
+[13:45:44]   msg[say] Lumi: Lumi's light dims. It has noticed something.
+[13:45:47]   msg[hint] tell_hollow_drudge_pick_swing: Raises its pickaxe high for a long, narrow overhead swing. Step aside and punish the recovery.
+[13:45:50]   msg[notify] success: The empty coat slumps back into its locker.
+[13:45:54]   msg[music] m22
+[13:45:56]   msg[music] m23
+[13:45:57] walk_to stuck at [-53.82, -7.0, -4.31] -> (-54.04768956828751, 0.0, -2.6009479973426712) (d 1.7); unstick #1
+[13:46:00]   msg[saved] journey saved
+[13:46:00]   msg[notify] success: Lantern lit - progress saved
+[13:46:04]   msg[discover] hushed_works:hw_rails
+[13:46:09]   msg[say] : Hask's lamp still burns beside the rail, lighting the rail it stands on.
+[13:46:09]   msg[hint] hw_true_light: A true light lights what holds it. Glows that light nothing are not lanterns.
+[13:46:09]   msg[quest] ch2 completed ch2_true_signal
+[13:46:09]   msg[notify] quest: Goal complete: Hask's Rail
+[13:46:09]   msg[notify] info: A true light stays with what holds it.
+[13:46:09]   msg[quest] ch2 started ch2_refuge
+[13:46:09]   msg[hint] quest_ch2_refuge: The refuge is safe: rest, save, and open the shortcut home before going deeper.
+[13:46:09]   msg[notify] quest: New goal: A Pocket of Day
+[13:46:10] === true_signal: PASS in 36.1s 
+[13:46:10] === STEP refuge (area hushed_works, zone hw_rails, ch2 current ['ch2_refuge']) ===
+[13:46:13]   msg[say] : Warm air, green leaves, a shaft of real daylight. The miners' garden is real.
+[13:46:13]   msg[discover] hushed_works:hw_refuge
+[13:46:21]   msg[say] The Foreman's Refuge Record: Three of us made the garden. Tobin, Hask, and me. We left by the drainage stair at dawn. The voices stayed behind.
+[13:46:25]   msg[caption] [chains rattle as the bars lift from the drainage stair]
+[13:46:25]   msg[notify] success: The drainage stair is open: a way home, any time.
+[13:46:25]   msg[quest] ch2 completed ch2_refuge
+[13:46:25]   msg[notify] quest: Goal complete: A Pocket of Day
+[13:46:25]   msg[notify] info: A way home from the deep, any time you need it.
+[13:46:25]   msg[quest] ch2 started ch2_miners
+[13:46:25]   msg[quest] ch2 completed ch2_miners
+[13:46:25]   msg[notify] quest: Goal complete: What They Left
+[13:46:25]   msg[notify] info: They made it here, and they left by the drainage route. Together.
+[13:46:25]   msg[quest] ch2 started ch2_three_lines
+[13:46:25]   msg[hint] quest_ch2_three_lines: Each line works differently. Big symbols and captions show when a line wakes, even with the sound off.
+[13:46:25]   msg[notify] quest: New goal: Wake the Lines
+[13:46:29]   msg[saved] journey saved
+[13:46:29]   msg[notify] success: Lantern lit - progress saved
+[13:46:29] === refuge: PASS in 19.6s 
+[13:46:29] === STEP line_water (area hushed_works, zone hw_refuge, ch2 current ['ch2_three_lines']) ===
+[13:46:34]   msg[music] m24
+[13:46:37]   msg[discover] hushed_works:hw_sluice
+[13:46:40]   msg[say] Sluice Gallery: Water for the ward line runs along the middle channel and into the ward basin. Each wheel shows which way it sends the water. Wet boots are not a failure, only a lesson.
+[13:46:46]   msg[caption] [the valve groans round; water rushes toward the middle channel]
+[13:46:54]   msg[caption] [the valve groans round; water rushes toward the ward basin]
+[13:46:54]   msg[caption] [the ward basin fills, and the pipes in the walls begin to hum]
+[13:46:54]   msg[notify] success: The water line is restored.
+[13:46:54] === line_water: PASS in 24.2s 
+[13:46:54] === STEP line_bell (area hushed_works, zone hw_sluice, ch2 current ['ch2_three_lines']) ===
+[13:46:59]   msg[music] m23
+[13:47:03]   msg[discover] hushed_works:hw_bells
+[13:47:05]   msg[say] Lumi: Lumi's light dims. It has noticed something.
+[13:47:06]   msg[music] 
+[13:47:06]   msg[hint] tell_bellcap_sentry_pulse: Its bell cap swells and a ring is drawn on the ground before a radial pulse. Step outside the ring or roll through it.
+[13:47:06]   msg[caption] [a bell hums, swelling]
+[13:47:08]   msg[caption] [a deep bell tolls]
+[13:47:13]   msg[caption] [a deep bell tolls]
+[13:47:13]   msg[caption] [a bell hums, swelling]
+[13:47:18]   msg[caption] [a deep bell tolls]
+[13:47:21]   msg[caption] [a bell hums, swelling]
+[13:47:23]   msg[caption] [a deep bell tolls]
+[13:47:28]   msg[caption] [a deep bell tolls]
+[13:47:30]   msg[notify] success: Yum! Hearty Stew restored 60 health and warms you up: stamina recovers faster for a while.
+[13:47:31] eat hearty_stew: ok; hp 40.0 -> 100.0
+[13:47:33]   msg[caption] [a bell hums, swelling]
+[13:47:35]   msg[caption] [a deep bell tolls]
+[13:47:39]   msg[caption] [a deep bell tolls]
+[13:47:43]   msg[caption] [a bell hums, swelling]
+[13:47:44]   msg[caption] [a deep bell tolls]
+[13:47:48]   msg[caption] [a deep bell tolls]
+[13:47:52]   msg[caption] [a bell hums, swelling]
+[13:47:53]   msg[caption] [a deep bell tolls]
+[13:47:56]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:47:57] eat berry_snack: ok; hp 40.0 -> 70.0
+[13:47:59]   msg[caption] [a bell hums, swelling]
+[13:47:59] threats: [('BellcapSentry_53939', 'telegraph', 1.3)]
+[13:48:00]   msg[caption] [a deep bell tolls]
+[13:48:05]   msg[caption] [a deep bell tolls]
+[13:48:08]   msg[caption] [a bell hums, swelling]
+[13:48:10]   msg[caption] [a deep bell tolls]
+[13:48:14]   msg[caption] [a deep bell tolls]
+[13:48:18]   msg[caption] [a bell hums, swelling]
+[13:48:19]   msg[caption] [a deep bell tolls]
+[13:48:26]   msg[music] m22
+[13:48:26]   msg[say] The Bellmaker's Plaque: Our bells do not play tunes. They keep an order: the Leaf, the Moon, the Key, the Flame. Strike them so, and the line remembers what it carries. Strike wrong, and they simply fall quiet and wait f
+[13:48:27] bell order: ['leaf', 'moon', 'key', 'flame']
+[13:48:28]   msg[music] m23
+[13:48:33]   msg[caption] [the Leaf bell rings - 1 of 4]
+[13:48:39]   msg[caption] [the Moon bell rings - 2 of 4]
+[13:48:46]   msg[caption] [the Key bell rings - 3 of 4]
+[13:48:52]   msg[caption] [all four bells ring together, and the note runs away into the walls]
+[13:48:52]   msg[notify] success: The bell line is restored.
+[13:48:53] === line_bell: PASS in 119.0s 
+[13:48:53] === STEP line_light (area hushed_works, zone hw_bells, ch2 current ['ch2_three_lines']) ===
+[13:49:02]   msg[discover] hushed_works:hw_lightwell
+[13:49:06]   msg[say] The Light Well: Guide the well's daylight to the ward crystal. Each mirror turns a quarter at a time. Lost your way? The brass lever sets them back just as they were.
+[13:49:10]   msg[caption] [the mirror grinds a quarter turn; it now faces east]
+[13:49:17]   msg[caption] [the mirror grinds a quarter turn; it now faces north]
+[13:49:17]   msg[caption] [the mirror grinds a quarter turn; it now faces east]
+[13:49:18]   msg[caption] [the mirror grinds a quarter turn; it now faces south]
+[13:49:18]   msg[caption] [the ward crystal catches the daylight and rings like glass]
+[13:49:18]   msg[notify] success: The light line is restored.
+[13:49:18]   msg[quest] ch2 completed ch2_three_lines
+[13:49:18]   msg[notify] quest: Goal complete: Wake the Lines
+[13:49:18]   msg[notify] info: Three lines hum together. The lower gate is listening.
+[13:49:18]   msg[quest] ch2 started ch2_weaver_crossing
+[13:49:18]   msg[hint] quest_ch2_weaver_crossing: Light, patience and a clear path out worked once. They will work again. A checkpoint lantern waits just before the bridge.
+[13:49:18]   msg[notify] quest: New goal: Weaver's Crossing
+[13:49:22]   msg[notify] success: A keepsake from the miners' festival trunk.
+[13:49:22] === line_light: PASS in 29.3s 
+[13:49:22] === STEP winch (area hushed_works, zone hw_lightwell, ch2 current ['ch2_weaver_crossing']) ===
+[13:49:32]   msg[discover] hushed_works:hw_winch
+[13:49:34]   msg[caption] [scratching overhead - dust sifts from the gantry]
+[13:49:34]   msg[music] 
+[13:49:35]   msg[hint] hw_threads: Fresh threads block the way. Press {interact} to cut them - they grow back. Raise your lantern ({lantern}) first to burn them for good.
+[13:49:36]   msg[caption] [the threads crackle and burn away]
+[13:49:37]   msg[caption] [quick, light steps along the gantry]
+[13:49:40]   msg[saved] journey saved
+[13:49:40]   msg[notify] success: Lantern lit - progress saved
+[13:49:40] === winch: PASS in 17.7s 
+[13:49:40] === STEP crossing (area hushed_works, zone hw_winch, ch2 current ['ch2_weaver_crossing']) ===
+[13:49:41]   msg[notify] success: Wayfinding mastery rank 5! Sprinting costs 15% less stamina.
+[13:49:41]   msg[discover] hushed_works:hw_crossing
+[13:49:42]   msg[music] m25
+[13:49:42]   msg[caption] [a shriek echoes over the service bridge]
+[13:49:42]   msg[hint] boss_crossing_intro: She holds one ceiling anchor at a time and clings on until she pounces. Light the line-brazier UNDER HER ANCHOR with {interact}: once she has pounced, the light burns her off it.
+[13:49:42]   msg[say] Lumi: Lumi's light dims. It has noticed something.
+[13:49:42]   matron state  -> intro phase=1 hp=320.0 vuln=False at [98.0, -5.9, -3.9] me=[73.61, -18.0, 0.02] hp=55.0
+[13:49:42]   crossing: t=2s boss intro hp=320.0 phase=1 me hp=55.0
+[13:49:42]   msg[caption] [quick, light steps along the gantry]
+[13:49:45]   msg[caption] [threads whip across the bridge]
+[13:49:45]   msg[hint] boss_crossing_threads: Threads fall across her lane to guard the brazier. Cut them with {interact}, raise your lantern to burn them, or go round by the other lane.
+[13:49:46]   matron state intro -> cast phase=1 hp=320.0 vuln=False at [98.0, -5.9, -3.9] me=[98.41, -18.0, -1.81] hp=55.0
+[13:49:47]   kindling line 2 brazier (boss cast)
+[13:49:48]   msg[caption] [the brazier roars to life]
+[13:49:48]   msg[caption] [the threads crackle and burn away]
+[13:49:48]   msg[caption] [the light catches her anchor - she clings on]
+[13:49:48]   msg[hint] boss_crossing_primed: The light has caught her anchor, but she clings on until she pounces. Dodge her next pounce - she can't climb back to a burning anchor!
+[13:49:49]   matron state cast -> cling phase=1 hp=320.0 vuln=False at [98.0, -5.9, -3.9] me=[98.06, -18.0, -2.15] hp=55.0
+[13:49:50]   msg[caption] [a dry rattle overhead]
+[13:49:50]   msg[hint] boss_crossing_pounce: A ring marks where she will pounce. Step out of it - if she misses, she is stranded for a moment.
+[13:49:50]   matron state cling -> pounce_tele phase=1 hp=320.0 vuln=False at [98.0, -5.9, -3.9] me=[98.06, -18.0, -2.15] hp=55.0
+[13:49:52]   matron state pounce_tele -> drop phase=1 hp=320.0 vuln=False at [98.04, -13.22, -2.78] me=[92.32, -18.0, -2.17] hp=55.0
+[13:49:52]   msg[caption] [she shrieks as the light burns her off the anchor]
+[13:49:52]   msg[hint] boss_crossing_exposed: The light burned her off the anchor! Strike now with {attack}!
+[13:49:52]   matron state drop -> exposed phase=2 hp=288.0 vuln=True at [98.07, -18.0, -2.05] me=[92.32, -18.0, -2.17] hp=55.0
+[13:49:53]   msg[say] Lumi: Lumi flares bright and the path ahead feels lighter.
+[13:49:53]   msg[skill] lumi: glimmerstep
+[13:49:53]   crossing: t=13s boss exposed hp=279.8 phase=2 me hp=55.0
+[13:49:57]   msg[caption] [she scrambles across the ceiling to the far side]
+[13:49:57]   msg[hint] boss_crossing_phase2: She fled to the other side of the bridge. Her next pounce waits for a final rattle and flare.
+[13:49:58]   matron state exposed -> climb phase=2 hp=263.3 vuln=False at [98.07, -17.62, -2.05] me=[99.57, -18.0, -1.52] hp=55.0
+[13:50:01]   matron state climb -> cling phase=2 hp=263.3 vuln=False at [88.0, -5.9, 3.9] me=[99.57, -18.0, -1.52] hp=55.0
+[13:50:03]   msg[caption] [threads whip across the bridge]
+[13:50:03]   msg[hint] boss_crossing_threads: Threads fall across her lane to guard the brazier. Cut them with {interact}, raise your lantern to burn them, or go round by the other lane.
+[13:50:03]   matron state cling -> cast phase=2 hp=263.3 vuln=False at [88.0, -5.9, 3.9] me=[87.59, -18.0, 1.81] hp=55.0
+[13:50:03]   crossing: t=24s boss cast hp=263.3 phase=2 me hp=55.0
+[13:50:04]   kindling line 1 brazier (boss cast)
+[13:50:05]   msg[caption] [the brazier roars to life]
+[13:50:05]   msg[caption] [the threads crackle and burn away]
+[13:50:05]   msg[caption] [the light catches her anchor - she clings on]
+[13:50:05]   msg[hint] boss_crossing_primed: The light has caught her anchor, but she clings on until she pounces. Dodge her next pounce - she can't climb back to a burning anchor!
+[13:50:06]   matron state cast -> recover phase=2 hp=263.3 vuln=False at [88.0, -5.9, 3.9] me=[87.89, -18.0, 2.1] hp=55.0
+[13:50:06]   matron state recover -> cling phase=2 hp=263.3 vuln=False at [88.0, -5.9, 3.9] me=[87.89, -18.0, 2.1] hp=55.0
+[13:50:08]   msg[caption] [a slow, deliberate rattle overhead]
+[13:50:08]   msg[hint] boss_crossing_delayed: A slow-pulsing ring: she waits for a FINAL rattle and flare before she drops. Step out of the ring - rolling too early won't help.
+[13:50:09]   matron state cling -> pounce_tele phase=2 hp=263.3 vuln=False at [88.0, -5.9, 3.9] me=[87.89, -18.0, 2.1] hp=55.0
+[13:50:10]   msg[caption] [a sharp final rattle - she lets go!]
+[13:50:10]   matron state pounce_tele -> drop phase=2 hp=263.3 vuln=False at [87.99, -6.71, 3.78] me=[93.62, -18.0, 2.11] hp=55.0
+[13:50:11]   msg[caption] [she shrieks as the light burns her off the anchor]
+[13:50:11]   msg[hint] boss_crossing_exposed: The light burned her off the anchor! Strike now with {attack}!
+[13:50:11]   matron state drop -> exposed phase=3 hp=231.3 vuln=True at [87.88, -18.0, 2.05] me=[93.62, -18.0, 2.11] hp=55.0
+[13:50:14]   crossing: t=34s boss exposed hp=178.0 phase=3 me hp=55.0
+[13:50:15]   msg[caption] [she scrambles across the ceiling to the far side]
+[13:50:15]   msg[hint] boss_crossing_phase3: She's back on the first side, and she may call her brood instead of pouncing. One more burn!
+[13:50:16]   matron state exposed -> climb phase=3 hp=102.3 vuln=False at [87.88, -17.56, 2.05] me=[86.85, -18.0, 1.57] hp=55.0
+[13:50:19]   matron state climb -> cling phase=3 hp=102.3 vuln=False at [98.0, -5.9, -3.9] me=[86.85, -18.0, 1.57] hp=55.0
+[13:50:21]   msg[caption] [threads whip across the bridge]
+[13:50:21]   msg[hint] boss_crossing_threads: Threads fall across her lane to guard the brazier. Cut them with {interact}, raise your lantern to burn them, or go round by the other lane.
+[13:50:22]   kindling line 2 brazier (boss cling)
+[13:50:23]   msg[caption] [the brazier flares up]
+[13:50:23]   msg[caption] [the threads crackle and burn away]
+[13:50:23]   msg[caption] [the light catches her anchor - she clings on]
+[13:50:23]   msg[hint] boss_crossing_primed: The light has caught her anchor, but she clings on until she pounces. Dodge her next pounce - she can't climb back to a burning anchor!
+[13:50:23]   matron state cling -> recover phase=3 hp=102.3 vuln=False at [98.0, -5.9, -3.9] me=[97.93, -18.0, -2.31] hp=55.0
+[13:50:24]   crossing: t=44s boss recover hp=102.3 phase=3 me hp=55.0
+[13:50:24]   matron state recover -> cling phase=3 hp=102.3 vuln=False at [98.0, -5.9, -3.9] me=[97.93, -18.0, -2.31] hp=55.0
+[13:50:26]   msg[caption] [egg sacs on the bridge begin to shake]
+[13:50:26]   msg[hint] boss_crossing_release: Sacs are shaking on the bridge ahead. Pop them with {attack}, or get ready.
+[13:50:27]   matron state cling -> release phase=3 hp=102.3 vuln=False at [98.0, -5.9, -3.9] me=[97.93, -18.0, -2.31] hp=55.0
+[13:50:27]   matron state release -> recover phase=3 hp=102.3 vuln=False at [98.0, -5.9, -3.9] me=[97.93, -18.0, -2.31] hp=55.0
+[13:50:29]   matron state recover -> cling phase=3 hp=102.3 vuln=False at [98.0, -5.9, -3.9] me=[97.93, -18.0, -2.31] hp=55.0
+[13:50:31]   msg[hint] tell_brood_skitter_leap: Draws in tight and a small mark appears on the ground, then a short leap onto the mark.
+[13:50:31]   msg[caption] [something skitters and tenses]
+[13:50:32]   msg[caption] [threads whip across the bridge]
+[13:50:32]   msg[hint] boss_crossing_threads: Threads fall across her lane to guard the brazier. Cut them with {interact}, raise your lantern to burn them, or go round by the other lane.
+[13:50:37]   msg[caption] [something skitters and tenses]
+[13:50:44]   msg[caption] [something skitters and tenses]
+[13:50:46]   msg[caption] [a slow, deliberate rattle overhead]
+[13:50:46]   msg[hint] boss_crossing_delayed: A slow-pulsing ring: she waits for a FINAL rattle and flare before she drops. Step out of the ring - rolling too early won't help.
+[13:50:47]   matron state cling -> pounce_tele phase=3 hp=102.3 vuln=False at [98.0, -5.9, -3.9] me=[100.74, -18.0, -0.27] hp=55.0
+[13:50:47]   crossing: t=67s boss pounce_tele hp=102.3 phase=3 me hp=55.0
+[13:50:48]   msg[caption] [a sharp final rattle - she lets go!]
+[13:50:48]   matron state pounce_tele -> drop phase=3 hp=102.3 vuln=False at [98.0, -5.92, -3.9] me=[95.79, -18.0, 0.21] hp=55.0
+[13:50:49]   msg[caption] [she shrieks as the light burns her off the anchor]
+[13:50:49]   msg[hint] boss_crossing_exposed: The light burned her off the anchor! Strike now with {attack}!
+[13:50:49]   msg[say] Lumi: Lumi chimes and a ripple of light rolls out around you.
+[13:50:49]   msg[skill] lumi: glimmerstep
+[13:50:49]   matron state drop -> exposed phase=3 hp=70.3 vuln=True at [100.74, -18.0, -0.27] me=[95.03, -18.0, 0.29] hp=55.0
+[13:50:52]   msg[music] 
+[13:50:52]   msg[caption] [the threads crackle and burn away]
+[13:50:52]   msg[caption] [the brazier roars to life]
+[13:50:52]   msg[saved] journey saved
+[13:50:52]   msg[caption] [the Matron shrieks and flees for the old service gate]
+[13:50:52]   msg[quest] ch2 completed ch2_weaver_crossing
+[13:50:52]   msg[notify] quest: Goal complete: Weaver's Crossing
+[13:50:52]   msg[notify] info: The crossing is clear. A pale veil drape is yours to hang at home, and your Heartseed stays in its stone.
+[13:50:52]   msg[quest] ch2 started ch2_false_home
+[13:50:52]   msg[hint] quest_ch2_false_home: You can always step back. Look for what is missing: its lamps cast no light.
+[13:50:52]   msg[notify] quest: New goal: The House That Isn't
+[13:50:55] === crossing: PASS in 75.7s 
+[13:50:55] === STEP wrong_landing (area hushed_works, zone hw_crossing, ch2 current ['ch2_false_home']) ===
+[13:50:57]   msg[caption] [an old service gate grinds shut over the deeper route]
+[13:50:57]   msg[say] : The Matron retreats behind the old service gate. The way ahead is clear.
+[13:50:57]   msg[notify] bond: Lumi's bond grew! (5/5)
+[13:50:57]   msg[discover] hushed_works:hw_wrong_landing
+[13:50:57]   msg[quest] optional completed opt_legacy_bond
+[13:50:57]   msg[notify] quest: Optional goal complete: Best of Friends
+[13:51:02]   msg[caption] [the cage drops a foot, lurches sideways along a track and jams]
+[13:51:05]   msg[say] : The cage jammed in a siding. A short walk leads back to the landing.
+[13:51:08]   msg[music] m23
+[13:51:10] === wrong_landing: PASS in 15.1s 
+[13:51:10] === STEP false_home (area hushed_works, zone hw_wrong_landing, ch2 current ['ch2_false_home']) ===
+[13:51:10]   msg[discover] hushed_works:hw_porch
+[13:51:13]   msg[caption] [a porch lamp glows, warm and perfectly still]
+[13:51:13]   msg[music] 
+[13:51:15]   msg[say] : No one answers. The door is painted on.
+[13:51:20]   msg[say] : It glows warm, but the boards beneath it stay dark. It lights nothing.
+[13:51:24]   msg[caption] [the painted hedge folds away like paper; a real stair goes down]
+[13:51:24]   msg[say] : A true light stays with what holds it. The stair goes down beside it.
+[13:51:24]   msg[quest] ch2 completed ch2_false_home
+[13:51:24]   msg[notify] quest: Goal complete: The House That Isn't
+[13:51:24]   msg[notify] info: Only a facade. Your real home is exactly where you left it.
+[13:51:24]   msg[quest] ch2 started ch2_choir
+[13:51:24]   msg[hint] quest_ch2_choir: Rest at the Bell Throat first; you can still turn back from there. True light shows what the Choir hides.
+[13:51:24]   msg[notify] quest: New goal: No Welcome in That Voice
+[13:51:26] === false_home: PASS in 15.2s 
+[13:51:26] === STEP bell_throat (area hushed_works, zone hw_porch, ch2 current ['ch2_choir']) ===
+[13:51:29]   msg[discover] hushed_works:hw_throat
+[13:51:29]   msg[say] : A warm, quiet place under the bells. Rest by the lantern; the bell-rope lift climbs back to the refuge.
+[13:51:32]   msg[saved] journey saved
+[13:51:32]   msg[notify] success: Lantern lit - progress saved
+[13:51:36] interact attempt 1 for ["Open the miners' supply crate"] at (160.7, -28.0, 36.5): prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Lumi'} me=[159.35, -28.0, 36.71]
+[13:51:37]   msg[notify] success: The miners left supplies for whoever came next.
+[13:51:39]   msg[say] Miners' Note in the Bell Throat: Last supplies are here. Past this bell, the Choir sings with voices it took from us. It learned our signals and our welcomes, but it cannot make a light of its own. When three shapes come
+[13:51:43]   msg[say] : The bellmakers' order: Leaf, then Moon, then Key, then Flame. The vault's resonators still answer to it.
+[13:51:43] === bell_throat: PASS in 17.5s 
+[13:51:43] === STEP choir (area hushed_works, zone hw_throat, ch2 current ['ch2_choir']) ===
+[13:51:46] goto (157.0, 43.8) failed at [157.51, -28.0, 40.82]
+[13:51:46] dialog ['confirm']: choosing 'Go on to the Choir Vault' (buttons ['Go on to the Choir Vault', 'Return to the refuge', 'Close'])
+[13:51:47]   msg[say] : The vault stair waits below. Your lantern is ready.
+[13:51:47]   msg[music] m23
+[13:51:48]   msg[discover] hushed_works:hw_vault
+[13:51:49]   msg[music] m26
+[13:51:49]   msg[caption] [a hundred borrowed welcomes echo round the empty centre - none of them quite right]
+[13:51:49]   msg[say] Lumi: Lumi's light dims. It has noticed something.
+[13:51:50]   choir state  -> intro phase=1 hp=540.0 vuln=False me=[156.98, -32.0, 57.18] hp=55.0
+[13:51:50]   choir: t=1s intro phase 1 hp=540.0 me hp=55.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:51:52]   msg[caption] [three welcoming shapes drift out of the empty centre]
+[13:51:52]   msg[hint] choir_forms: Three forms, one true. Raise your lantern at an anchor ({interact}), then point out the form whose light falls on the floor.
+[13:51:52]   msg[caption] [your lantern flares on the anchor hook]
+[13:51:52]   msg[caption] [the anchor's light falls across the forms - one of them lights the floor at its feet]
+[13:51:52]   choir state intro -> a_gather phase=1 hp=540.0 vuln=False me=[149.63, -32.0, 61.09] hp=55.0
+[13:51:53]   choir state a_gather -> a_wait phase=1 hp=540.0 vuln=False me=[149.63, -32.0, 61.09] hp=55.0
+[13:51:53]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:51:54]   msg[caption] [the false form bursts into ribbons - the borrowed bells swing back in answer]
+[13:51:54]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:51:54]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:51:59]   choir state a_wait -> a_gather phase=1 hp=540.0 vuln=False me=[157.38, -32.0, 71.25] hp=55.0
+[13:52:00]   choir state a_gather -> a_wait phase=1 hp=540.0 vuln=False me=[157.38, -32.0, 71.25] hp=55.0
+[13:52:00]   choir: t=11s a_wait phase 1 hp=540.0 me hp=55.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:52:00]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:04]   msg[caption] [your lantern flares on the anchor hook]
+[13:52:04]   pointing out the form at [160.81, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:07] walk_to stuck at [156.78, -32.0, 72.43] -> (161.93579521752295, 0.0, 62.14993452006549) (d 11.5); unstick #1
+[13:52:10]   msg[caption] [the false form bursts into ribbons - the borrowed bells swing back in answer]
+[13:52:10]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:52:10]   choir: t=22s a_wait phase 1 hp=540.0 me hp=55.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:52:10]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:15]   choir state a_wait -> a_gather phase=1 hp=540.0 vuln=False me=[151.69, -32.0, 62.35] hp=55.0
+[13:52:18] walk_to stuck at [150.28, -32.0, 58.31] -> (149.85756550897295, 0.0, 60.87483156458835) (d 2.6); unstick #1
+[13:52:22]   msg[caption] [your lantern flares on the anchor hook]
+[13:52:22]   choir state a_gather -> a_wait phase=1 hp=540.0 vuln=False me=[148.8, -32.0, 61.92] hp=55.0
+[13:52:22]   choir: t=33s a_wait phase 1 hp=540.0 me hp=55.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:52:22]   pointing out the form at [160.81, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:25]   msg[caption] [the false form bursts into ribbons - the borrowed bells swing back in answer]
+[13:52:25]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:52:25]   choir state a_wait -> a_sweep_tele phase=1 hp=540.0 vuln=False me=[162.35, -32.0, 62.39] hp=55.0
+[13:52:27]   choir state a_sweep_tele -> a_recover phase=1 hp=540.0 vuln=False me=[167.51, -32.0, 59.96] hp=41.0
+[13:52:29]   msg[notify] success: Yum! Hearty Stew restored 59 health and warms you up: stamina recovers faster for a while.
+[13:52:30] eat hearty_stew: ok; hp 41.0 -> 100.0
+[13:52:31]   choir state a_recover -> a_gather phase=1 hp=540.0 vuln=False me=[167.0, -32.0, 60.35] hp=100.0
+[13:52:32]   choir: t=43s a_gather phase 1 hp=540.0 me hp=100.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:52:33]   msg[caption] [your lantern flares on the anchor hook]
+[13:52:33]   choir state a_gather -> a_wait phase=1 hp=540.0 vuln=False me=[162.83, -32.0, 61.06] hp=100.0
+[13:52:36]   pointing out the form at [160.81, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:37]   msg[caption] [the false form bursts into ribbons - the borrowed bells swing back in answer]
+[13:52:37]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:52:37]   pointing out the form at [160.81, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:41]   choir state a_wait -> a_gather phase=1 hp=540.0 vuln=False me=[160.73, -32.0, 62.68] hp=86.0
+[13:52:43]   msg[caption] [your lantern flares on the anchor hook]
+[13:52:43]   choir state a_gather -> a_wait phase=1 hp=540.0 vuln=False me=[164.47, -32.0, 59.54] hp=86.0
+[13:52:43]   choir: t=55s a_wait phase 1 hp=540.0 me hp=86.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:52:44]   pointing out the form at [160.81, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:45]   msg[caption] [the genuine form's mask slips - the Choir sinks, exposed]
+[13:52:45]   msg[hint] choir_exposed: It's exposed! Strike now with {attack}!
+[13:52:45]   pointing out the form at [160.81, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:52:50]   choir state a_wait -> a_exposed phase=1 hp=526.8 vuln=True me=[161.9, -32.0, 61.67] hp=86.0
+[13:52:52]   msg[caption] [your light holds - the borrowed shape frays]
+[13:52:52]   msg[hint] choir_glance_a: Your blow passes through a borrowed shape. Raise your lantern at an anchor, then point out the true form.
+[13:52:52]   choir state a_exposed -> a_recover phase=1 hp=480.0 vuln=False me=[161.9, -32.0, 61.67] hp=86.0
+[13:52:54]   choir: t=65s a_recover phase 1 hp=480.0 me hp=86.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:52:54]   choir state a_recover -> a_gather phase=1 hp=480.0 vuln=False me=[161.9, -32.0, 61.67] hp=86.0
+[13:52:56]   msg[caption] [your lantern flares on the anchor hook]
+[13:52:56]   choir state a_gather -> a_wait phase=1 hp=480.0 vuln=False me=[163.68, -32.0, 60.1] hp=86.0
+[13:52:58]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:03]   pointing out the form at [160.81, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:08]   choir: t=79s a_wait phase 1 hp=480.0 me hp=86.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:53:08]   msg[caption] [the borrowed bells swing back - a sweep is coming]
+[13:53:08]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:53:10] walk_to stuck at [165.39, -32.0, 62.49] -> (164.14243449102705, 0.0, 60.87483156458835) (d 2.0); unstick #1
+[13:53:14]   msg[caption] [your lantern flares on the anchor hook]
+[13:53:15]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:16]   msg[say] Lumi: Lumi stops, staring into the dark.
+[13:53:19]   choir: t=90s a_wait phase 1 hp=480.0 me hp=72.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:53:19]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:20]   msg[caption] [the false form bursts into ribbons - the borrowed bells swing back in answer]
+[13:53:20]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:53:20]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:25]   choir state a_wait -> a_gather phase=1 hp=480.0 vuln=False me=[156.98, -32.0, 69.4] hp=58.0
+[13:53:27]   msg[caption] [your lantern flares on the anchor hook]
+[13:53:27]   choir state a_gather -> a_wait phase=1 hp=480.0 vuln=False me=[156.17, -32.0, 74.1] hp=58.0
+[13:53:28]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:31]   msg[caption] [the false form bursts into ribbons - the borrowed bells swing back in answer]
+[13:53:31]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:53:31]   choir: t=102s a_wait phase 1 hp=480.0 me hp=58.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:53:31]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:35]   choir state a_wait -> a_gather phase=1 hp=480.0 vuln=False me=[157.5, -32.0, 71.22] hp=58.0
+[13:53:37]   msg[caption] [your lantern flares on the anchor hook]
+[13:53:37]   choir state a_gather -> a_wait phase=1 hp=480.0 vuln=False me=[157.62, -32.0, 73.38] hp=58.0
+[13:53:39] walk_to stuck at [155.18, -32.0, 72.51] -> (157.0, 0.0, 73.25) (d 2.0); unstick #1
+[13:53:42] walk_to stuck at [159.33, -32.0, 73.75] -> (157.0, 0.0, 73.25) (d 2.4); unstick #2
+[13:53:43] goto (157.0, 73.25) failed at [154.55, -32.0, 72.36]
+[13:53:44]   choir: t=115s a_wait phase 1 hp=480.0 me hp=58.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:53:44]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:53:49]   msg[caption] [the borrowed bells swing back - a sweep is coming]
+[13:53:49]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:53:52]   msg[caption] [your lantern flares on the anchor hook]
+[13:53:52]   choir state a_wait -> a_recover phase=1 hp=480.0 vuln=False me=[149.68, -32.0, 62.04] hp=44.0
+[13:53:53]   msg[notify] success: Yum! Hearty Stew restored 56 health and warms you up: stamina recovers faster for a while.
+[13:53:54] eat hearty_stew: ok; hp 44.0 -> 100.0
+[13:53:54]   choir: t=126s a_recover phase 1 hp=480.0 me hp=100.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:53:55]   choir state a_recover -> a_gather phase=1 hp=480.0 vuln=False me=[149.68, -32.0, 62.04] hp=100.0
+[13:53:57]   choir state a_gather -> a_wait phase=1 hp=480.0 vuln=False me=[149.68, -32.0, 62.04] hp=100.0
+[13:53:57]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:01]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:05]   choir: t=136s a_wait phase 1 hp=480.0 me hp=100.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:54:07]   msg[caption] [your lantern flares on the anchor hook]
+[13:54:07]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:08]   msg[caption] [the genuine form's mask slips - the Choir sinks, exposed]
+[13:54:08]   msg[hint] choir_exposed: It's exposed! Strike now with {attack}!
+[13:54:08]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:12]   choir state a_wait -> a_exposed phase=1 hp=473.4 vuln=True me=[151.75, -32.0, 61.24] hp=100.0
+[13:54:15]   msg[caption] [your light holds - the borrowed shape frays]
+[13:54:15]   choir state a_exposed -> a_recover phase=1 hp=420.0 vuln=False me=[158.12, -32.0, 70.44] hp=100.0
+[13:54:15]   choir: t=146s a_recover phase 1 hp=420.0 me hp=100.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:54:17]   choir state a_recover -> a_gather phase=1 hp=420.0 vuln=False me=[158.12, -32.0, 70.44] hp=100.0
+[13:54:19]   msg[caption] [your lantern flares on the anchor hook]
+[13:54:19]   choir state a_gather -> a_wait phase=1 hp=420.0 vuln=False me=[158.05, -32.0, 74.12] hp=100.0
+[13:54:19]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:20]   msg[caption] [the false form bursts into ribbons - the borrowed bells swing back in answer]
+[13:54:20]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:54:20]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:24]   choir state a_wait -> a_gather phase=1 hp=420.0 vuln=False me=[157.76, -32.0, 72.31] hp=86.0
+[13:54:25]   choir: t=156s a_gather phase 1 hp=420.0 me hp=86.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:54:26]   choir state a_gather -> a_wait phase=1 hp=420.0 vuln=False me=[157.76, -32.0, 72.31] hp=86.0
+[13:54:26]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:32]   msg[caption] [your lantern flares on the anchor hook]
+[13:54:34]   pointing out the form at [157.0, -32.0, 69.4] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:35]   msg[say] Lumi: Lumi's light dims. It has noticed something.
+[13:54:39]   msg[caption] [the borrowed bells swing back - a sweep is coming]
+[13:54:39]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:54:39]   choir state a_wait -> a_sweep_tele phase=1 hp=420.0 vuln=False me=[157.54, -32.0, 71.1] hp=86.0
+[13:54:39]   choir: t=170s a_sweep_tele phase 1 hp=420.0 me hp=86.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:54:40]   choir state a_sweep_tele -> a_recover phase=1 hp=420.0 vuln=False me=[158.38, -32.0, 76.69] hp=72.0
+[13:54:42]   choir state a_recover -> a_gather phase=1 hp=420.0 vuln=False me=[158.94, -32.0, 76.27] hp=72.0
+[13:54:44]   msg[caption] [your lantern flares on the anchor hook]
+[13:54:47]   choir state a_gather -> a_wait phase=1 hp=420.0 vuln=False me=[156.58, -32.0, 73.88] hp=72.0
+[13:54:47]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:54:52]   choir: t=183s a_wait phase 1 hp=420.0 me hp=72.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:54:54]   msg[caption] [your lantern flares on the anchor hook]
+[13:54:56] walk_to stuck at [148.0, -32.0, 60.03] -> (149.85756550897295, 0.0, 60.87483156458835) (d 2.0); unstick #1
+[13:54:57]   msg[caption] [the borrowed bells swing back - a sweep is coming]
+[13:54:57]   msg[hint] choir_sweep: A sweep is marked on the floor. Step out of the wedge - the perimeter walk is always outside it.
+[13:54:59] walk_to stuck at [148.68, -32.0, 59.29] -> (149.85756550897295, 0.0, 60.87483156458835) (d 2.0); unstick #2
+[13:55:00] goto (149.85756550897295, 60.87483156458835) failed at [148.78, -32.0, 64.75]
+[13:55:01]   choir state a_wait -> a_gather phase=1 hp=420.0 vuln=False me=[149.05, -32.0, 64.46] hp=58.0
+[13:55:02]   choir: t=193s a_gather phase 1 hp=420.0 me hp=58.0 res={'west': 0, 'east': 0} done={'west': False, 'east': False}
+[13:55:03]   msg[caption] [your lantern flares on the anchor hook]
+[13:55:03]   choir state a_gather -> a_wait phase=1 hp=420.0 vuln=False me=[150.1, -32.0, 60.19] hp=58.0
+[13:55:05]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:55:06]   msg[caption] [the genuine form's mask slips - the Choir sinks, exposed]
+[13:55:06]   msg[hint] choir_exposed: It's exposed! Strike now with {attack}!
+[13:55:06]   pointing out the form at [153.19, -32.0, 62.8] (a guess among 3: which plate is lit is not in telemetry)
+[13:55:10]   choir state a_wait -> a_exposed phase=1 hp=413.4 vuln=True me=[152.83, -32.0, 61.6] hp=58.0
+[13:55:12]   msg[caption] [the borrowed voices tangle and change their song]
+[13:55:12]   choir state a_exposed -> phase_shriek phase=2 hp=360.0 vuln=False me=[152.83, -32.0, 61.6] hp=58.0
+[13:55:14]   msg[caption] [small masked lights slip out to guard the resonators]
+[13:55:14]   msg[caption] [the Choir wraps itself in borrowed bells; two resonators wait at the edges of the vault]
+[13:55:14]   msg[hint] choir_resonators: Wake both resonators: strike their plates in the Bellmaker's order (Leaf, Moon, Key, Flame). Each one drops a ring of bells.
+[13:55:14]   msg[caption] [the warm light gutters - something small and masked is inside]
+[13:55:14]   msg[hint] hint_borrowed_wisp_reveal: Your lantern shows a Borrowed Wisp's true form. Strike it now, before it casts.
+[13:55:14]   msg[caption] [the Leaf plate rings softly] (1 of 4)
+[13:55:14]   resonator order from the hint: ['leaf', 'moon', 'key', 'flame']
+[13:55:14]   choir state phase_shriek -> b_gather phase=2 hp=360.0 vuln=False me=[147.82, -32.0, 68.18] hp=58.0
+[13:55:14]   choir: t=205s b_gather phase 2 hp=360.0 me hp=58.0 res={'west': 1, 'east': 0} done={'west': False, 'east': False}
+[13:55:15]   msg[hint] tell_borrowed_wisp_sweep: Its false light shines on nothing. Raise your lantern to reveal it; it marks a sweep on the ground, which lands after a short delay.
+[13:55:15]   msg[caption] [a hollow, borrowed hum]
+[13:55:16]   msg[caption] [the Moon plate hums low and round] (2 of 4)
+[13:55:16]   choir state b_gather -> b_idle phase=2 hp=360.0 vuln=False me=[149.09, -32.0, 64.87] hp=58.0
+[13:55:17]   msg[hint] hint_borrowed_wisp_reveal: Your lantern shows a Borrowed Wisp's true form. Strike it now, before it casts.
+[13:55:19]   msg[caption] [a ring of stolen rhythm gathers - find its lit opening, or keep to the edge]
+[13:55:19]   msg[hint] choir_rings: Rings roll outward from the Choir. Stand in the lit opening, keep to the perimeter walk, or dodge through.
+[13:55:19]   msg[caption] [the Key plate clinks bright and small] (3 of 4)
+[13:55:21]   msg[say] Lumi: Lumi flares bright and the path ahead feels lighter.
+[13:55:21]   msg[skill] lumi: glimmerstep
+[13:55:21]   msg[caption] [the Flame plate rings warm] (4 of 4)
+[13:55:21]   msg[caption] [the resonator rings true and holds its note]
+[13:55:21]   msg[caption] [one ring of borrowed bells falls silent - one more resonator to wake]
+[13:55:21]   resonator west awake
+[13:55:21]   choir state b_idle -> b_rings phase=2 hp=360.0 vuln=False me=[148.07, -32.0, 61.92] hp=26.0
+[13:55:24]   msg[caption] [a hollow, borrowed hum]
+[13:55:25] walk_to stuck at [162.58, -32.0, 61.5] -> (167.16499227118757, 0.0, 61.06516428212094) (d 4.6); unstick #1
+[13:55:26] goto (167.16499227118757, 61.06516428212094) failed at [162.36, -32.0, 58.8]
+[13:55:26]   msg[caption] [bells toll overhead - the marked spots will be struck]
+[13:55:26]   choir state b_rings -> b_idle phase=2 hp=360.0 vuln=False me=[162.36, -32.0, 58.8] hp=26.0
+[13:55:26]   choir: t=217s b_idle phase 2 hp=360.0 me hp=26.0 res={'west': 4, 'east': 0} done={'west': True, 'east': False}
+[13:55:27]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:55:28] eat berry_snack: ok; hp 26.0 -> 56.0
+[13:55:29]   msg[caption] [the warm light gutters - something small and masked is inside]
+[13:55:29]   msg[hint] hint_borrowed_wisp_reveal: Your lantern shows a Borrowed Wisp's true form. Strike it now, before it casts.
+[13:55:31]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:55:32] eat berry_snack: ok; hp 40.0 -> 70.0
+[13:55:32]   msg[caption] [a hollow, borrowed hum]
+[13:55:32]   msg[hint] hint_borrowed_wisp_reveal: Your lantern shows a Borrowed Wisp's true form. Strike it now, before it casts.
+[13:55:35]   msg[caption] [a ring of stolen rhythm gathers - find its lit opening, or keep to the edge]
+[13:55:35]   msg[hint] choir_rings: Rings roll outward from the Choir. Stand in the lit opening, keep to the perimeter walk, or dodge through.
+[13:55:41]   msg[caption] [a hollow, borrowed hum]
+[13:55:41]   choir: t=233s b_idle phase 2 hp=360.0 me hp=38.0 res={'west': 4, 'east': 0} done={'west': True, 'east': False}
+[13:55:43]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:55:44] eat berry_snack: ok; hp 38.0 -> 52.0
+[13:55:45]   msg[caption] [bells toll overhead - the marked spots will be struck]
+[13:55:47]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:55:48]   msg[caption] [a hollow, borrowed hum]
+[13:55:48] eat berry_snack: ok; hp 36.0 -> 66.0
+[13:55:50]   msg[caption] [a ring of stolen rhythm gathers - find its lit opening, or keep to the edge]
+[13:55:50]   msg[hint] choir_rings: Rings roll outward from the Choir. Stand in the lit opening, keep to the perimeter walk, or dodge through.
+[13:55:53]   choir state b_idle -> b_rings phase=2 hp=360.0 vuln=False me=[157.68, -32.0, 69.16] hp=66.0
+[13:55:53]   choir: t=244s b_rings phase 2 hp=360.0 me hp=66.0 res={'west': 4, 'east': 0} done={'west': True, 'east': False}
+[13:55:54]   msg[caption] [the warm light gutters - something small and masked is inside]
+[13:55:54]   msg[hint] hint_borrowed_wisp_reveal: Your lantern shows a Borrowed Wisp's true form. Strike it now, before it casts.
+[13:55:55]   choir state b_rings -> b_idle phase=2 hp=360.0 vuln=False me=[168.33, -32.0, 69.05] hp=66.0
+[13:55:56]   msg[caption] [a hollow, borrowed hum]
+[13:55:57]   msg[caption] [bells toll overhead - the marked spots will be struck]
+[13:55:59]   msg[caption] [the Leaf plate rings softly] (1 of 4)
+[13:55:59]   choir state b_idle -> b_strike phase=2 hp=360.0 vuln=False me=[165.38, -32.0, 62.2] hp=66.0
+[13:56:00]   msg[caption] [the Moon plate hums low and round] (2 of 4)
+[13:56:00]   choir state b_strike -> b_idle phase=2 hp=360.0 vuln=False me=[165.23, -32.0, 64.25] hp=66.0
+[13:56:02]   msg[say] Lumi: Lumi stops, staring into the dark.
+[13:56:02]   msg[caption] [a ring of stolen rhythm gathers - find its lit opening, or keep to the edge]
+[13:56:02]   msg[hint] choir_rings: Rings roll outward from the Choir. Stand in the lit opening, keep to the perimeter walk, or dodge through.
+[13:56:02]   msg[caption] [the Key plate clinks bright and small] (3 of 4)
+[13:56:02]   choir state b_idle -> b_ring_tele phase=2 hp=360.0 vuln=False me=[165.16, -32.0, 65.79] hp=66.0
+[13:56:05] walk_to stuck at [164.9, -32.0, 65.71] -> (165.0, 0.0, 66.875) (d 1.2); unstick #1
+[13:56:07]   msg[caption] [the Flame plate rings warm] (4 of 4)
+[13:56:07]   msg[caption] [the resonator rings true and holds its note]
+[13:56:07]   resonator east awake
+[13:56:07]   choir state b_ring_tele -> b_idle phase=2 hp=360.0 vuln=False me=[165.21, -32.0, 67.33] hp=66.0
+[13:56:07]   choir: t=258s b_idle phase 2 hp=360.0 me hp=66.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:56:07]   msg[caption] [both resonators ring true - the borrowed bells fall silent and the Choir sinks, exposed]
+[13:56:07]   msg[hint] choir_exposed: It's exposed! Strike now with {attack}!
+[13:56:07]   choir state b_idle -> b_exposed phase=2 hp=360.0 vuln=True me=[165.21, -32.0, 67.33] hp=66.0
+[13:56:14]   msg[caption] [the borrowed voices tangle and change their song]
+[13:56:14]   choir state b_exposed -> phase_shriek phase=3 hp=180.0 vuln=False me=[157.74, -32.0, 64.27] hp=66.0
+[13:56:16]   msg[caption] [warm, cozy lights bloom around the vault - only one flame hangs from a hook]
+[13:56:16]   msg[hint] choir_flame: Only the true flame lights the floor around its anchor. Stand in its light when the hush comes, then raise your lantern at that anchor.
+[13:56:16]   choir state phase_shriek -> c_gather phase=3 hp=180.0 vuln=False me=[157.74, -32.0, 64.27] hp=66.0
+[13:56:17]   choir: t=269s c_gather phase 3 hp=180.0 me hp=66.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:56:18]   choir state c_gather -> c_settle phase=3 hp=180.0 vuln=False me=[157.74, -32.0, 64.27] hp=66.0
+[13:56:20]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:56:20]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:56:21]   msg[caption] [your lantern flares on the anchor hook]
+[13:56:23]   choir state c_settle -> c_open phase=3 hp=180.0 vuln=False me=[166.21, -32.0, 58.87] hp=48.0
+[13:56:30]   choir: t=281s c_open phase 3 hp=180.0 me hp=48.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:56:31]   msg[caption] [your lantern flares on the anchor hook]
+[13:56:31]   msg[caption] [your lantern burns alone on this hook - the true flame hangs elsewhere]
+[13:56:33]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:56:33]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:56:34] walk_to stuck at [151.24, -32.0, 63.29] -> (149.85756550897295, 0.0, 60.87483156458835) (d 2.8); unstick #1
+[13:56:36]   msg[caption] [your lantern flares on the anchor hook]
+[13:56:36]   msg[caption] [your lantern and the kept flame burn together - the Choir is drawn down, exposed]
+[13:56:36]   msg[hint] choir_exposed: It's exposed! Strike now with {attack}!
+[13:56:40]   msg[caption] [your lantern flares on the anchor hook]
+[13:56:41]   choir state c_open -> c_exposed phase=3 hp=173.4 vuln=True me=[157.21, -32.0, 73.4] hp=48.0
+[13:56:41]   choir: t=292s c_exposed phase 3 hp=173.4 me hp=48.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:56:42]   msg[caption] [your light holds - the borrowed shape frays]
+[13:56:43]   choir state c_exposed -> c_recover phase=3 hp=120.0 vuln=False me=[153.67, -32.0, 63.78] hp=48.0
+[13:56:44]   choir state c_recover -> c_settle phase=3 hp=120.0 vuln=False me=[153.23, -32.0, 62.45] hp=48.0
+[13:56:46]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:56:46]   msg[caption] [the kept flame settles on the hook you lit - raise your lantern there again]
+[13:56:46]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:56:47]   msg[caption] [your lantern flares on the anchor hook]
+[13:56:49]   choir state c_settle -> c_open phase=3 hp=120.0 vuln=False me=[166.66, -32.0, 60.09] hp=30.0
+[13:56:50]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:56:51] eat berry_snack: ok; hp 30.0 -> 60.0
+[13:56:51]   choir: t=303s c_open phase 3 hp=120.0 me hp=60.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:56:59]   msg[caption] [your lantern flares on the anchor hook]
+[13:56:59]   msg[caption] [your lantern burns alone on this hook - the true flame hangs elsewhere]
+[13:57:01]   choir state c_open -> c_settle phase=3 hp=120.0 vuln=False me=[163.99, -32.0, 61.67] hp=60.0
+[13:57:01]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:57:01]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:57:01]   choir: t=313s c_settle phase 3 hp=120.0 me hp=60.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:57:02]   choir state c_settle -> c_hush_tele phase=3 hp=120.0 vuln=False me=[163.99, -32.0, 61.68] hp=60.0
+[13:57:04]   choir state c_hush_tele -> c_open phase=3 hp=120.0 vuln=False me=[167.66, -32.0, 59.93] hp=42.0
+[13:57:05]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:57:06] eat berry_snack: ok; hp 42.0 -> 72.0
+[13:57:11]   msg[caption] [your lantern flares on the anchor hook]
+[13:57:11]   msg[caption] [your lantern burns alone on this hook - the true flame hangs elsewhere]
+[13:57:12]   choir: t=324s c_open phase 3 hp=120.0 me hp=72.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:57:15]   choir state c_open -> c_settle phase=3 hp=120.0 vuln=False me=[164.65, -32.0, 60.19] hp=72.0
+[13:57:17]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:57:17]   msg[caption] [the kept flame settles on the hook you lit - raise your lantern there again]
+[13:57:17]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:57:17]   choir state c_settle -> c_hush_tele phase=3 hp=120.0 vuln=False me=[164.65, -32.0, 60.19] hp=72.0
+[13:57:18]   choir state c_hush_tele -> c_hush phase=3 hp=120.0 vuln=False me=[164.65, -32.0, 60.19] hp=72.0
+[13:57:18]   choir state c_hush -> c_open phase=3 hp=120.0 vuln=False me=[164.65, -32.0, 60.19] hp=72.0
+[13:57:22]   choir: t=334s c_open phase 3 hp=120.0 me hp=72.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:57:28]   choir state c_open -> c_settle phase=3 hp=120.0 vuln=False me=[164.65, -32.0, 60.19] hp=72.0
+[13:57:30]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:57:30]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:57:30]   choir state c_settle -> c_hush_tele phase=3 hp=120.0 vuln=False me=[164.65, -32.0, 60.19] hp=72.0
+[13:57:31]   choir state c_hush_tele -> c_hush phase=3 hp=120.0 vuln=False me=[165.29, -31.9, 59.78] hp=54.0
+[13:57:32]   choir state c_hush -> c_open phase=3 hp=120.0 vuln=False me=[167.26, -32.0, 58.62] hp=54.0
+[13:57:33]   msg[caption] [your lantern flares on the anchor hook]
+[13:57:33]   msg[caption] [your lantern burns alone on this hook - the true flame hangs elsewhere]
+[13:57:33]   choir: t=345s c_open phase 3 hp=120.0 me hp=54.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:57:42]   msg[say] Lumi: Lumi stops, staring into the dark.
+[13:57:43]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:57:43]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:57:43]   msg[caption] [your lantern flares on the anchor hook]
+[13:57:43]   msg[caption] [the kept flame answers your lantern - hold on until the hush passes]
+[13:57:43]   choir state c_open -> c_hush_tele phase=3 hp=120.0 vuln=False me=[163.95, -32.0, 61.76] hp=54.0
+[13:57:43]   choir: t=355s c_hush_tele phase 3 hp=120.0 me hp=54.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:57:45]   msg[caption] [your lantern and the kept flame burn together - the Choir is drawn down, exposed]
+[13:57:45]   msg[hint] choir_exposed: It's exposed! Strike now with {attack}!
+[13:57:45]   choir state c_hush_tele -> c_hush phase=3 hp=120.0 vuln=False me=[163.95, -32.0, 61.76] hp=54.0
+[13:57:46]   choir state c_hush -> c_exposed phase=3 hp=113.4 vuln=True me=[167.33, -32.0, 60.11] hp=54.0
+[13:57:51]   msg[caption] [your light holds - the borrowed shape frays]
+[13:57:51]   choir state c_exposed -> c_recover phase=3 hp=60.0 vuln=False me=[163.49, -32.0, 61.29] hp=54.0
+[13:57:53]   choir state c_recover -> c_settle phase=3 hp=60.0 vuln=False me=[163.49, -32.0, 61.29] hp=54.0
+[13:57:54]   msg[caption] [one flame settles on an anchor hook - its light pools on the floor]
+[13:57:54]   msg[caption] [the false lights hush - every unlit place inside the ring will be struck]
+[13:57:56]   msg[caption] [your lantern flares on the anchor hook]
+[13:57:56]   msg[caption] [your lantern burns alone on this hook - the true flame hangs elsewhere]
+[13:57:56]   choir state c_settle -> c_open phase=3 hp=60.0 vuln=False me=[156.54, -32.0, 75.81] hp=36.0
+[13:57:56]   choir: t=367s c_open phase 3 hp=60.0 me hp=36.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:57:58]   msg[notify] success: Yum! Berry Snack restored 30 health.
+[13:57:59] eat berry_snack: ok; hp 36.0 -> 66.0
+[13:58:02]   msg[caption] [your lantern flares on the anchor hook]
+[13:58:02]   msg[caption] [your lantern and the kept flame burn together - the Choir is drawn down, exposed]
+[13:58:02]   msg[hint] choir_exposed: It's exposed! Strike now with {attack}!
+[13:58:05]   msg[caption] [your lantern flares on the anchor hook]
+[13:58:07]   choir state c_open -> c_exposed phase=3 hp=53.4 vuln=True me=[164.79, -32.0, 61.06] hp=66.0
+[13:58:07]   choir: t=378s c_exposed phase 3 hp=53.4 me hp=66.0 res={'west': 4, 'east': 4} done={'west': True, 'east': True}
+[13:58:08]   msg[caption] [your light holds - the borrowed shape frays]
+[13:58:08]   msg[music] 
+[13:58:08]   msg[caption] [the stolen echoes drift upward as soft chimes; the old bell-lift rattles free]
+[13:58:08]   msg[saved] journey saved
+[13:58:08]   msg[caption] [the trapped echoes rise as gentle chimes; masks and ribbons drift harmlessly down]
+[13:58:08]   msg[quest] ch2 completed ch2_choir
+[13:58:08]   msg[notify] quest: Goal complete: No Welcome in That Voice
+[13:58:08]   msg[notify] info: The stolen echoes drift upward, free. The outer ward shines again.
+[13:58:08]   msg[quest] ch2 started ch2_routes_restored
+[13:58:08]   msg[hint] quest_ch2_routes_restored: Ride the vault's bell-lift up to the Sunken Bellhouse, back in Hallowmere Reach. The refuge shortcut works too.
+[13:58:08]   msg[notify] quest: New goal: Lanterns on Every Road
+[13:58:08]   form picks: [{'t': 1003.8, 'pressed': True, 'result': 'wrong'}, {'t': 1008.2, 'pressed': False, 'result': 'none'}, {'t': 1012.1, 'pressed': False, 'result': 'none'}, {'t': 1020.0, 'pressed': True, 'result': 'wrong'}, {'t': 1024.7, 'pressed': False, 'result': 'none'}, {'t': 1034.8, 'pressed': True, 'result': 'wrong'}, {'t': 1046.2, 'pressed': True, 'result': 'wrong'}, {'t': 1051.0, 'pressed': False, 'result': 'none'}, {'t': 1054.7, 'pressed': True, 'result': 'correct'}, {'t': 1059.8, 'pressed': False, 'result': 'none'}, {'t': 1072.3, 'pressed': False, 'result': 'none'}, {'t': 1077.1, 'pressed': False, 'result': 'none'}, {'t': 1088.6, 'pressed': False, 'result': 'none'}, {'t': 1089.5, 'pressed': True, 'result': 'wrong'}, {'t': 1094.6, 'pressed': False, 'result': 'none'}, {'t': 1100.4, 'pressed': True, 'result': 'wrong'}, {'t': 1105.1, 'pressed': False, 'result': 'none'}, {'t': 1118.0, 'pressed': False, 'result': 'none'}, {'t': 1130.9, 'pressed': False, 'result': 'none'}, {'t': 1134.1, 'pressed': False, 'result': 'none'}, {'t': 1137.5, 'pressed': True, 'result': 'correct'}, {'t': 1141.9, 'pressed': False, 'result': 'none'}, {'t': 1149.9, 'pressed': True, 'result': 'wrong'}, {'t': 1153.7, 'pressed': False, 'result': 'none'}, {'t': 1159.9, 'pressed': False, 'result': 'none'}, {'t': 1168.3, 'pressed': False, 'result': 'none'}, {'t': 1181.5, 'pressed': False, 'result': 'none'}, {'t': 1195.3, 'pressed': True, 'result': 'correct'}, {'t': 1199.6, 'pressed': False, 'result': 'none'}]
+[13:58:13] === choir: PASS in 390.1s 
+[13:58:13] === STEP return_reach (area hushed_works, zone hw_vault, ch2 current ['ch2_routes_restored']) ===
+[13:58:14]   msg[music] m23
+[13:58:17]   msg[caption] [the bell-lift climbs toward the night air]
+[13:58:18]   msg[notify] info: Every festival lamp along the roads is lit again.
+[13:58:18]   msg[quest] ch2 completed ch2_routes_restored
+[13:58:18]   msg[notify] quest: Goal complete: Lanterns on Every Road
+[13:58:18]   msg[notify] info: The festival roads are bright again. Old echoes stir, should you ever want a trial.
+[13:58:18]   msg[quest] ch2 started ch2_homecoming
+[13:58:18]   msg[hint] quest_ch2_homecoming: Any lit arch takes you home on the Lantern Road ({interact}). Then speak to the Ward Stone.
+[13:58:18]   msg[notify] quest: New goal: Bring the Celebration Home
+[13:58:18]   msg[music] m15
+[13:58:19]   msg[saved] journey saved
+[13:58:19] === return_reach: PASS in 5.6s 
+[13:58:19] === STEP travel_home (area hallowmere_reach, zone hr_bellhouse, ch2 current ['ch2_homecoming']) ===
+[13:58:36]   msg[music] m06
+[13:58:37]   msg[saved] journey saved
+[13:58:37] === travel_home: PASS in 18.7s 
+[13:58:37] === STEP homecoming (area surface, zone haven, ch2 current ['ch2_homecoming']) ===
+[13:58:40]   msg[say] Ward Stone: Light kept. Roads found. Welcome home, Krystal.
+[13:58:40]   msg[hint] ch2_celebrate: The Ward Stone will celebrate the Lanternwake with you: press {interact} and choose Celebrate. The festival lantern at the Commons works too.
+[13:58:40]   msg[quest] ch2 completed ch2_homecoming
+[13:58:40]   msg[notify] quest: Goal complete: Bring the Celebration Home
+[13:58:40]   msg[notify] info: The Ward Stone gives you a Wardlight for your home, and the pattern to make more.
+[13:58:40]   msg[quest] ch2 started ch2_feast
+[13:58:40]   msg[hint] quest_ch2_feast: Choose Celebrate at the Ward Stone or at the Commons festival lantern ({interact}). Nothing is placed in your house.
+[13:58:40]   msg[notify] quest: New goal: The Lanternwake
+[13:58:43] === homecoming: PASS in 5.6s 
+[13:58:43] === STEP lanternwake (area surface, zone haven, ch2 current ['ch2_feast']) ===
+[13:58:44]   msg[quest] ch2 completed ch2_feast
+[13:58:44]   msg[notify] quest: Goal complete: The Lanternwake
+[13:58:44]   msg[notify] info: The Lanternwake's gifts are yours: a festival outfit, new furniture finishes and a few supplies.
+[13:58:44]   msg[say] Mochi: Mochi spins in circles, spores sparkling!
+[13:58:44]   msg[music] m27
+[13:58:55] === lanternwake: PASS in 11.8s 
+[13:58:55] === STEP free_play (area surface, zone haven, ch2 current []) ===
+[13:58:56]   msg[saved] journey saved
+[13:59:00]   msg[music] 
+[13:59:00]   msg[music] m16
+[13:59:01]   msg[saved] journey saved
+[13:59:16]   msg[hint] hw_real_light: Real lanterns light the ground around them. Down here, trust the lights that do.
+[13:59:16]   msg[music] m24
+[13:59:17]   msg[saved] journey saved
+[13:59:20]   msg[music] m15
+[13:59:21]   msg[saved] journey saved
+[13:59:27]   msg[notify] success: Lantern arch lit: Ward-Keeper's Conservatory. The Lantern Road can bring you here.
+[13:59:30]   msg[music] m05
+[13:59:31]   msg[saved] journey saved
+[13:59:31] === free_play: PASS in 36.4s 
+[13:59:31] CHAIN ################ S4: OK in 887.1s - completes (script errors 0, music cues 26, shots 35)
+[13:59:31] CHAIN ################ END: Relaunch + Continue check (free play resumes in the same save) ################
+[13:59:34] launched g3 (headless, packaged) pid=63252 port=9302 cmd=['C:\\Users\\Ali\\Desktop\\Hollowhaven\\builds\\Hollowhaven\\Hollowhaven.exe', '--headless', '--max-fps', '60', '--log-file', 'C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_201\\g3_godot.log', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/g3_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/saves', '--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_201/qa_settings.cfg', '--qa-input-port=9302', '--qa-no-focus', '--no-focus-pause', '--max-seconds=4800']
+[13:59:34] CHAIN relaunched as g3 (port 9302)
+[13:59:40] CHAIN ################ END: OK in 8.8s - completes (script errors 0, music cues 3, shots 1)
+
+seg  ok     seconds deaths hp min errors  cues shots  hp/food at the end
+S1   True      65.8      0   66.0      0     9    28  66.0 {'berries': 7}
+S2   True     234.7      0   55.0      0    11    25  91.0 {'berries': 4}
+T23  True      87.1      0   91.0      0     3     9  100.0 {'hearty_stew': 1, 'berry_snack': 3, 'berries': 3}
+S3   True     198.4      0   86.0      0     8    18  86.0 {'hearty_stew': 1, 'berry_snack': 3, 'berries': 2}
+T34  True      50.4      0   86.0      0     3     7  100.0 {'hearty_stew': 1, 'berry_snack': 7, 'berries': 1}
+S4   True     887.1      0   26.0      0    26    35  66.0 {'berry_snack': 1, 'pumpkin': 4, 'berries': 1, 'candy': 6}
+END  True       8.8      0   66.0      0     3     1  66.0 {'berry_snack': 1, 'pumpkin': 4, 'berries': 1, 'candy': 6}
+{
+ "status": "completes",
+ "total_seconds": 1534.8,
+ "durations": {
+  "S1": 65.8,
+  "S2": 234.7,
+  "T23": 87.1,
+  "S3": 198.4,
+  "T34": 50.4,
+  "S4": 887.1,
+  "END": 8.8
+ },
+ "script_errors": 0,
+ "music_cue_changes": 63,
+ "screenshot_requests": {
+  "total": 123,
+  "ok": 0,
+  "failed": 123
+ },
+ "out": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_201"
+}
+EXIT=0

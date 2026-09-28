@@ -1,8 +1,9 @@
-# QA report — Hollowhaven v0.9.0 (Chapter One) and v2.0.0 (Chapter Two)
+# QA report — Hollowhaven v0.9.0 (Chapter One) and v2.0.0 / v2.0.1 (Chapter Two)
 
 Sections 1-8: Chapter One (v0.9.0 / v0.9.1). **Section 9: the Chapter Two release 2.0.0** (executed-test matrix, save integrity,
 bot runs, visual inspection, bugs, music, performance, the natural chain, and the NOT YET DONE list). Section 10: Chapter Two
-development records.
+development records. **Section 11: the bug-fix release 2.0.1** (what changed, full suite, Run A / Run B on the packaged 2.0.1 exe,
+focus protection, the updated NOT YET DONE list); it supersedes §9 where they differ.
 
 Every entry says what KIND of check it was:
 **[code]** source review · **[auto]** automated tests (headless engine) · **[visual]** launched and inspected
@@ -133,6 +134,8 @@ arachnophobia visuals on the final build; 1080p fullscreen perf profile; gamepad
 The credits text changed to "For Krystal / from Ali" (commit 9512a0d) and a headless code audit produced further fixes. These later builds were verified by the automated test suite (headless) only, not by a new real-input playthrough (the owner needed the PC). Details and the final suite result: `docs/Hollowhaven_Technical_Handoff.md` section 9 and the git log.
 
 ## 9. Chapter Two — v2.0.0 release QA (2026-09-28)
+_As written for 2.0.0. Later runs and the 2.0.1 fixes (CHAIN-001 / 002 and more) are in §11, which supersedes the open-bug table
+in §9.6 and the list in §9.10 where they differ._
 
 **Build under test.** `dist/Hollowhaven-2.0.0-Windows.zip` (111.1 MB, SHA-256 `9F3FD0D2E3216B861E470158B881A10ED2CEBBC30FC3C07D3BC61D93652856CC`,
 `dist/SHA256SUMS.txt`), exe `builds/Hollowhaven/Hollowhaven.exe` (184.7 MB, 10:20), git `36e2e8a` = `9e8765f` + version bump
@@ -382,3 +385,143 @@ Items pass 3 left open and their state at 2.0.0: the clean full-suite run (R3-50
 in `36e2e8a` (705 of 705 scripts have one); `game/override.cfg` (R3-23) - **gone**; the UI group's findings - **addressed** (§9.5);
 the tracker's lamp rows (R3-03) and the day dial in the manor (R3-43) - **open** (`KNOWN_ISSUES.md` §3); real-play checks (R3-49) and
 the S4 bot's dodge near braziers (R3-07) - **open**.
+
+## 11. Release 2.0.1 — bug fixes, packaged-exe bot runs A and B (2026-09-28)
+
+**Build under test.** `dist/Hollowhaven-2.0.1-Windows.zip` (111.1 MB, SHA-256 `8017AF7123204BA303EE9E08D8B61A47DBB01CAD87EBAB6E5F311465175857FE`,
+`dist/SHA256SUMS.txt`), exe `builds/Hollowhaven/Hollowhaven.exe` (184.8 MB, 13:33; byte-identical to the exe in the zip - checked),
+git `da94714` = `c709db8` + version bump (`project.godot` / `export_presets.cfg` 2.0.1) + 2 `.uid` files. Export log
+`qa/tmp/build_v201.log` (EXIT=0). The build script moved the 2.0.0 zip to `builds/superseded/`. Same PC as above. Committed evidence
+copies: `qa/evidence/ch2_v2.0.1/` (its `README.md` lists each file).
+
+**Zip contents (checked with Python `zipfile` against the repo at `da94714`).** 7 files: `Hollowhaven.exe`, `How to Play.txt`,
+`Chapter Two - What's New.txt`, `Licenses/` (`Godot_Engine_Licenses.txt`, `OFL-Fredoka.txt`, `OFL-Nunito.txt`,
+`THIRD_PARTY_NOTICES.txt`). `How to Play.txt` and `Chapter Two - What's New.txt` are byte-identical to `docs/player/`, and
+`Licenses/THIRD_PARTY_NOTICES.txt` is byte-identical to `THIRD_PARTY_NOTICES.md` (with the build-time audio-encoder note). The 2.0.0
+zip's three files differ (older text: "The first time this version saves", "change them any time", no Audio-tab line, no encoder
+note). So 2.0.1 is the first zip with the corrected player docs and licence notice.
+
+### 11.1 What changed since 2.0.0 (`git log 36e2e8a..da94714`)
+| Commit | What | Tests |
+|---|---|---|
+| `ec00374` | **Quarry Warden** (`quarry_warden.gd`): CHAIN-001 - it fights only on its arena floor (within 1.2 m of the arena height), never starts an attack at Krystal off it, never walks off its level, and gives up + resets cleanly after 5 s of chase with her off the floor; CHAIN-002 - until its shell has been cracked once in the attempt (while an intact pillar stands) blows stop at 50 % health and it charges to show the pillars | new `test_enemies_ch2_warden_chain.gd`; `test_enemies_ch2_warden`, `test_reach_east_encounter` updated |
+| `8c50a61`, `a3f31e1` | QA harness only: focus protection `tools/qa/fglock.py` (§11.5) in `session.py`, `perf_profile.py` and the chain's visible launcher; perf harness | - |
+| `75008fc` | evidence only: `qa/evidence/ch2_v2.0.0/` (visible packaged 2.0.0 chain, perf summaries, `full_final1.log`; §11.4) | - |
+| `1fcae5a` | QA bot: telemetry-driven Warden fight in `s2_orchard_quarry.py`, five coverage scripts `tools/qa/ch2/cov_*.py`; game side only a read-only `elite` entry in the QA telemetry (`game/src/qa/qa_telemetry.gd`) | - |
+| `c709db8` | **COV-001** a lit checkpoint reached through its own entrance (Works refuge hatch, Bellhouse stair) becomes the return point, and Return to safety prefers the safe point of the room Krystal stands in (e.g. the manor cloakroom) - `game.gd`, `pause_panel.gd`; **COV-002** a companion's hit never cancels an ordinary enemy's tell (`enemy_base.gd holds_tell_against`); **COV-003** the Echo Trial is not a landmark (`echo_trial.gd`); **COV-004** arachnophobia wording of the Weaver's banked-scorch and trip-line hints (`weaver_boss.gd`, `hazard_field.gd`); **COV-005** the upstairs goal needs the walk (`build_ops.gd`, `building_system.gd`, `optional_goals.gd`); **COV-006** plurals ("Collect 3 Copper Bars", `item_db.gd display_count`, `crafting.gd`); **COV-007** the wand refunds stamina and cooldown when a hit cancels the wind-up (`player.gd`); **R3-03** the HUD tracker drops the done lamp-search rows (`tracker.gd hud_rows`); **loading card** (`loading_card.gd`, new) shown before an area builds, and the title prefetches Continue's area (`Game.continue_target()` / `prefetch_continue()`) | +33 tests (2639 -> 2672), incl. new `test_flow_loading_card.gd`, `test_trials_helper_zone.gd`; new tests in `test_enemies_ch1x_drudge`, `test_enemies_boss_pacing`, `test_enemies_boss_hazards`, `test_building_storeys`, `test_building_stairs_walk`, `test_station_furnace`, `test_crafting_rules`, `test_wand_player`, `test_works_deep_vault_exit`, `test_flow_ch2_rules`, `test_ui_journal_tracker`, `test_ui_appearance_wardrobe` |
+| `da94714` | version 2.0.1; release built | - |
+
+Not changed in 2.0.1: `save_system.gd` (save schema v2, the v1 -> v2 migration and the upgrade backup - the only file with that
+code - are as in 2.0.0, so `docs/ch2/SAVE_INTEGRITY_REPORT.md` still applies); `crossing_matron.gd`. **No finishing-blow rule changed in 2.0.1**: "a blow that
+would finish the Weaver in her last phase (or Count Velour) always lands" is from `9e8765f` (2.0.0, §9.2, `KNOWN_ISSUES.md` §5); in
+2.0.1 `weaver_boss.gd` only changed its two hint texts (COV-004, `test_enemies_boss_pacing.test_banked_and_tripline_hints_follow_arachnophobia_live`).
+COV-008 (exit-time leak lines) was not changed (accepted with CH2-011).
+
+Where the COV bugs came from: five bot coverage runs (`tools/qa/ch2/cov_*.py`; **source tree, headless**, virtual input, before
+`c709db8`) - equipment / companions, Echo Trials / Expeditions, lamp orders + Chapter One optionals, arachnophobia / comfort,
+persistence / failure: 8 unique bugs, 0 blockers, 0 majors (`qa/tmp/bot/COVERAGE_BUGS.md`, with a per-system coverage table). They
+were the first bot runs of the Echo Trials (Velour, Choir, Matron entry / leave / lose), Expeditions (Orchard Patrol, Quarry
+Circuit), the manor-first and orchard-first lamp orders, and armour / wand / companion skills (diagnostic starts with injected gear);
+that is still bot evidence on the source tree, not on the packaged exe and not play.
+
+### 11.2 Automated tests — [auto]
+| When | Tree | Result | Log |
+|---|---|---|---|
+| ~13:18-13:32 | the working tree committed right after as `c709db8`; `da94714` adds only the version bump and 2 `.uid` files (not re-run after it) | **2672 tests, 0 failed, 888.5 s**; `parse_all` passes; 21 `ISOLATION` repairs; ends with "8 ObjectDB instances were leaked at exit" (CH2-011) | `qa/tmp/full_final2.log` (copy: `qa/evidence/ch2_v2.0.1/full_final2.log`) |
+
+### 11.3 Run B — fresh New Game on the packaged 2.0.1 exe, visible — [bot]
+`python tools/qa/playthrough.py --second-monitor --exe builds/Hollowhaven/Hollowhaven.exe --out qa/tmp/e2e/final_201_fresh`
+(13:34:11-13:45:09; console `qa/tmp/e2e/final_201_fresh.console.txt`). The packaged 2.0.1 exe (hard-linked copy with the no-focus
+override) in a 1920×1080 window on the second monitor, **sound on** (not muted; nobody listened), virtual input through the QA port,
+empty scratch save folder and settings file (`%APPDATA%\Hollowhaven\saves` untouched). Not OS input, not a human.
+
+| Step | s | Step | s | Step | s |
+|---|---|---|---|---|---|
+| title_new_game (Meet Krystal + New Game) | 17.2 | tailor_cache | 14.5 | descend | 28.7 |
+| read_ward | 6.3 | mochi | 25.5 | old_mine | 35.8 |
+| gather_basics | 42.0 | pebble | 44.7 | deeper | 37.6 |
+| craft_axe | 3.4 | home | 72.9 | silk_and_boss | 75.8 |
+| chop | 30.1 | lumi | 47.1 | return_home | 26.1 |
+| workbench | 13.9 | prepare | 20.9 | ending | 57.6 |
+| | | brave_steps | 51.3 | accept_ch2 + free_play_save | 4.3 + 2.1 |
+
+* **Result: 21 of 21 steps ok, 0 failed, 658.3 s** (bot time); `game_log_errors: []` (no SCRIPT ERROR); 41 screenshots; exit 0.
+* The look chosen on "Meet Krystal" (Strawberry Picnic, braided crown) was kept; Tailor's Cache done; the three-phase Weaver Matron
+  won in 64.0 s (phases 1-2-3, 0 deaths, lowest HP 91, braziers 0 and 2); Chapter One ending -> Ward Stone -> Chapter Two accepted
+  (current step "The Hallowmere Way", `ch2_waygate`) -> free-play save. 20 music-director changes in `play_events.txt` (15 cue
+  starts, 5 silences).
+* Focus: the watchdog made 2523 checks; the game owned the OS foreground window in **0** of them (0 hand-backs). (The telemetry's
+  `frames_focused` 6410/6410 is Godot's own window flag, not the OS foreground.)
+* **Findings (not fixed in 2.0.1):** (1) `play_038_ending.png`: the Weaver's fight tip "It is smothering a brazier!..." is still on
+  the HUD in the Haven after the Chapter One ending (stale boss-fight tip; a HUD fix for the next build was in progress, uncommitted,
+  when this was written). (2) The bot filed one minor problem: the optional Brave Little Steps stopped at `tie_ribbon` - the bot
+  pressed E at a "Talk to Mochi" prompt, but the Friends panel that opened was Lumi's (its buttons: "Feed Sweetroot", "Use
+  Glimmerstep (T)"), which offers no ribbon; the Comfort Ribbon stayed in the backpack. Not investigated; possibly the bot's timing
+  (Lumi follows close by). The step is still reported ok: the harness files a failed optional goal as a problem, not a failure.
+* Harness labels: `results.jsonl` tags each step `"kind": "interactive"` / "real-input scenario step" but also `"input": "virtual
+  (qa_input, second monitor)"` - the input was virtual; these runs are [bot], not [interactive] in the §1 sense.
+* Not covered by Run B: anything in Chapter Two past accepting it, a relaunch / Continue, OS input.
+
+### 11.4 Run A — natural Chapter Two chain on the packaged 2.0.1 exe, headless — [bot]
+`python tools/qa/ch2/chain.py --headless --exe builds/Hollowhaven/Hollowhaven.exe --out qa/tmp/bot/chain/final_201` (13:34:06 -
+13:59:40; console `qa/tmp/bot/chain/final_201.console.txt`, log `qa/tmp/bot/chain/final_201/chain.log`). Start: a copy of the real
+v0.9.0 Chapter-One-complete save (fixture 16); S1 -> S2 -> T23 -> S3 -> T34 -> S4 -> END (relaunch + Continue), no fixtures, no
+cheats, virtual input, headless (nothing rendered, so no screenshots and nothing seen).
+
+| Segment | Result | Seconds | Deaths | Lowest HP | SCRIPT ERRORs | Music cue changes |
+|---|---|---|---|---|---|---|
+| S1 Continue (v1 -> v2 migration), wardrobe, Ward Stone, waygate, Commons, relaunch | completes | 65.8 | 0 | 66 | 0 | 9 |
+| S2 orchard + quarry, Quarry Warden | completes | 234.7 | 0 | 55 | 0 | 11 |
+| T23 home to rest and cook, road to the manor | completes | 87.1 | 0 | 91 | 0 | 3 |
+| S3 Moonveil Manor, Count Velour | completes | 198.4 | 0 | 86 | 0 | 8 |
+| T34 home to rest and cook | completes | 50.4 | 0 | 86 | 0 | 3 |
+| S4 lanterns linked, Hushed Works, Crossing Matron, Borrowed Choir, homecoming, Lanternwake, free play | completes | 887.1 | 0 | 26 | 0 | 26 |
+| END Save & Quit -> relaunch -> Continue | completes | 8.8 | 0 | 66 | 0 | 3 |
+| **Total** | **completes** (console `EXIT=0`) | **1534.8** | **0** | 26 | **0** | **63** |
+
+* Chapter Two complete, 20 of 20 steps; free play reached. END: Save & Quit from the pause menu, the process exited by itself,
+  relaunch, Continue loaded the same save in 2.8 s with the same items (`same_items: true`), tracker on the optional signpost.
+* Quarry Warden (with the 2.0.1 rules): 32.5 s, 3 pillar exposures [105, 105, 76.8], 3 pulses, 0 hits taken, 0 climbs; Count Velour:
+  phases 1-2-3, lowest HP 86, 1 snack, 0 deaths; S4 route steps: Weaver's Crossing 75.7 s, Borrowed Choir 390.1 s (the bot ate snacks at 36 HP
+  and 40 HP during it).
+* 0 bugs filed (`bugs.json` `[]`), 0 warnings; two quits logged "6" / "7 ObjectDB instances were leaked at exit" (CH2-011).
+* Screenshot requests 0 of 123 (headless: nothing is rendered - expected, not a failure of the game).
+* This is the first natural chain on the **packaged 2.0.1** exe; it is headless, so it shows that the bot's route, saves and relaunch
+  work in the release binary, not what anything looks or sounds like.
+
+Earlier chain runs for comparison (all [bot], virtual input):
+
+| Run | Code | Mode | Result | Total | S1 / S2 / T23 / S3 / T34 / S4 / END (s) | Notes |
+|---|---|---|---|---|---|---|
+| `chain/visible2` (`qa/evidence/ch2_v2.0.0/visible_run/`) | packaged **2.0.0** exe | visible, second monitor, sound on | **completes** | 1488.4 s | 100.1 / 232.1 / 92.3 / 212.0 / 53.9 / 782.5 / 10.4 | 0 deaths, 0 SCRIPT ERRORs, 62 music cue changes, lowest HP 26 (S4), 122 of 123 screenshots; watchdog 357 + 5287 + 30 checks, game in the foreground 0 times; Warden 1 exposure (before the CHAIN-002 fix) |
+| `chain/run6` | source after `ec00374` (before `c709db8`) | headless | **completes** | 1555.9 s | 69.8 / 237.0 / 87.5 / 214.4 / 38.6 / 893.9 / 11.3 | 0 deaths, 0 SCRIPT ERRORs, 64 music cue changes; Warden 32.0 s, 3 exposures [105, 105, 76.8], 0 hits taken (CHAIN-002 retest) |
+
+### 11.5 Focus protection for second-monitor runs — [QA harness]
+`tools/qa/fglock.py` (`8c50a61`, `a3f31e1`): a fresh helper process holds `LockSetForegroundWindow` while a QA game runs
+(ForegroundLock), and a watchdog checks every 0.25 s whether the game owns the foreground window and hands it straight back if so
+(FocusWatchdog). Reason: the packaged build's first window became the OS foreground window ~0.6 s after launch despite the
+`no_focus` override. Results: probes 0 of 81 (session launcher) and 0 of 184 (chain launcher) foreground samples; perf runs on 2.0.0
+0 of 3152 and 0 of 635 checks; the visible 2.0.0 chain 0 of 5674 checks; **Run B (2.0.1) 0 of 2523 checks, 0 hand-backs**. Run A
+is headless (no window). This protects the owner's desktop during QA; it is not a game feature and says nothing about how the game
+behaves with real focus / input.
+
+### 11.6 NOT YET DONE after 2.0.1 (honest list; replaces §9.10 where they differ)
+Done since §9.10 (all [bot], virtual input): the natural chain on the packaged exe (2.0.0 visible, 2.0.1 headless - Run A), a
+visible second-monitor chain (2.0.0), a fresh game through Chapter One on the packaged build (2.0.1 Run B), bot runs of the Echo
+Trials, Expeditions, other lamp orders and equipment (source tree, headless; §11.1). Still not done:
+* **PERSONAL-SAVE VERIFICATION BLOCKED**: Krystal's own save is not on this PC (gate: `docs/ch2/SAVE_INTEGRITY_REPORT.md` §7; the
+  save code is unchanged in 2.0.1, so the gate is the same with the 2.0.1 exe).
+* **Human listening**: none. The visible runs played with sound; nobody listened to the music, the Music Box or the mix.
+* **OS-level real-input run**: none for Chapter Two (every run above used the QA input port).
+* **Human play**: no first-time session; human playtime is unmeasured (bot: ~11 min for Chapter One in Run B, ~22-26 min for Chapter
+  Two in the chains - route-aware bot times, not human times).
+* **Performance**: only the 2.0.0 exe on the RTX 4090 (398-709 average FPS, §9.8); memory still creeps ~8.5 MB per Lantern Road
+  round trip over 10 cycles (`qa/evidence/ch2_v2.0.0/perf/leak10_summary.md`; 9.9-15.7 MB in the 3-cycle runs); 2.0.1 not
+  re-profiled; no weaker / integrated GPU, no V-Sync-on default, no long session.
+* **Chapter Two on screen in 2.0.1**: Run A is headless, so no Chapter Two area of the 2.0.1 build was rendered; the last rendered
+  Chapter Two run is the visible 2.0.0 chain. Nothing was judged in motion.
+* The Warden's 5 s give-up + reset (CHAIN-001) is unit-tested only; the bot never stayed off its floor long enough.
+* Echo Trials, Expeditions, other lamp orders and equipment: bot coverage runs on the source tree only (§11.1), not on the packaged exe.
+* Not implemented: the optional friend Pipkin; new creature voices (D10).
+* Accepted: CH2-011 / CHAIN-003 ObjectDB leak warning at exit (developer logs only); the "resources still in use" ERROR lines of
+  COV-008 are not yet explained (`KNOWN_ISSUES.md` §6).
