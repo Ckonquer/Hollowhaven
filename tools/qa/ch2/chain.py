@@ -30,9 +30,11 @@ where the route itself quits the game (S1's save / quit / relaunch + Continue, a
 
 The segment scripts were developed from diagnostic fixture starts; here they run from natural state. The
 adaptation lives in this file (segment modules untouched): the transitions T23 / T34 (see above), S3's backpack
-eating (its own eat() only uses hotbar food) and a look calibration that also works on a 1080p second-monitor
-window (the segment ones were tuned to the 64 px headless window), plus the preparation-notes step before S4 links
-the lanterns. Weapon upgrades: none of the fixtures handed any out; the Ironwood sword needs Woven Cloth (a Loom,
+eating (its own eat() only uses hotbar food), a look calibration that also works on a 1080p second-monitor window
+(the segment ones were tuned to the 64 px headless window), the preparation-notes step before S4 links the lanterns,
+and one player-level recovery in S2's Warden fight (walk back up the haul ramp when a roll drops Krystal off the
+arena bench - the Warden then waits at the edge forever, qa/tmp/bot/chain/bugs.json CHAIN-001).
+Weapon upgrades: none of the fixtures handed any out; the Ironwood sword needs Woven Cloth (a Loom,
 locked behind the optional Chapter One Tailor's Cache flag that the real save does not have), so the natural
 chain keeps the copper sword like every fixture did.
 
@@ -50,15 +52,17 @@ Modes
                         Sound stays ON (no --qa-mute) unless --mute is given.
   --dev (default)       run the SOURCE project (--project, default <repo>/game) with the Godot binary (--godot).
   --exe [PATH]          run a PACKAGED build (default builds/Hollowhaven/Hollowhaven.exe); visible runs start it
-                        from a hard-linked copy with a no-focus override.cfg (session.prepare_qa_exe).
-  --out DIR             run folder (default qa/tmp/bot/chain/run_<timestamp>).
+                        from a hard-linked copy with a no-focus override.cfg (session.prepare_qa_exe). The build must
+                        contain game/src/qa/qa_input.gd (the 0.9.1 build does not: rebuild with tools/build_release.ps1).
+  --out DIR             run folder (default qa/tmp/bot/chain/run_<timestamp>; an existing folder is replaced).
+  --dry-run             print the launch command for the chosen mode and exit (starts nothing).
 Diagnostics (not the natural route): --from SEG --start-save <save folder or slot1.json written by the game>
 resumes at a segment boundary (the checkpoints/<seg>_end/ folders of an earlier run); --until SEG stops after SEG.
 
 Examples
   headless (development):  python tools/qa/ch2/chain.py --headless --out qa/tmp/bot/chain/run1
   headless on a snapshot:  python tools/qa/ch2/chain.py --headless --project <snapshot>/game --out ...
-  visible, sound on, packaged build on the second monitor:
+  visible, sound on, packaged build on the second monitor (after tools/build_release.ps1):
       python tools/qa/ch2/chain.py --visible --exe builds/Hollowhaven/Hollowhaven.exe --out qa/tmp/bot/chain/visible1
 """
 from __future__ import annotations
@@ -66,7 +70,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import os
+
 import re
 import shutil
 import subprocess
@@ -289,7 +293,10 @@ class ChainGame:
         engine = ["--windowed", "--position", f"{x},{y}", "--resolution", f"{w}x{h}", "--log-file", str(self.godot_log)]
         user.append(f"--qa-window={x},{y},{w},{h}")
         if cfg.exe:
-            exe = prepare_qa_exe(cfg.exe, self.out / "qa_exe", cfg.rect)
+            if getattr(cfg, "dry_run", False):
+                exe = str(self.out / "qa_exe" / Path(cfg.exe).name)      # what prepare_qa_exe would place
+            else:
+                exe = prepare_qa_exe(cfg.exe, self.out / "qa_exe", cfg.rect)
             return [exe] + engine + ["--"] + user
         exe = str(cfg.godot or EDITOR_EXE)
         return [exe, "--path", str(cfg.project)] + engine + ["--"] + user
@@ -1258,7 +1265,8 @@ def main(argv=None) -> int:
         ap.error(f"packaged build {exe} not found")
     cfg = SimpleNamespace(out=out, headless=headless, exe=exe, project=project, godot=Path(a.godot) if a.godot else None,
                           port=a.port, seed=a.seed, max_minutes=a.max_minutes, mute=a.mute,
-                          rect=parse_rect(a.qa_window), start_save=start_save.resolve(), from_seg=a.from_seg, until=a.until)
+                          rect=parse_rect(a.qa_window), start_save=start_save.resolve(), from_seg=a.from_seg, until=a.until,
+                          dry_run=a.dry_run)
     if a.dry_run:
         g = ChainGame(cfg, 1, out / "saves", a.port)
         print(json.dumps({"mode": "headless" if headless else f"visible at {cfg.rect}, sound {'off' if a.mute else 'on'}",

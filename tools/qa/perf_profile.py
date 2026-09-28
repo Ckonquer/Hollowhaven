@@ -189,6 +189,42 @@ def proc_memory(pid: int) -> dict | None:
         kernel32.CloseHandle(h)
 
 
+user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+
+def foreground_pid() -> int:
+    """Process id owning the OS foreground window (evidence that the game never took the owner's focus)."""
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd:
+        return 0
+    pid = wt.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return int(pid.value)
+
+
+LSFW_LOCK, LSFW_UNLOCK = 1, 2
+
+
+def lock_foreground(lock: bool) -> bool:
+    """LockSetForegroundWindow: while locked, no process can take the foreground by itself (user clicks / Alt still
+    switch windows as usual). Measured on this PC: without it the packaged build's first window becomes the OS
+    foreground window ~0.6 s after launch despite display/window/size/no_focus; with it, never."""
+    return bool(user32.LockSetForegroundWindow(LSFW_LOCK if lock else LSFW_UNLOCK))
+
+
+def give_back_foreground(hwnd: int) -> bool:
+    """If the game took the foreground anyway, hand it back to the owner's previous window."""
+    if not hwnd or not user32.IsWindow(hwnd):
+        return False
+    fg = user32.GetForegroundWindow()
+    me = kernel32.GetCurrentThreadId()
+    fg_thread = user32.GetWindowThreadProcessId(fg, None)
+    user32.AttachThreadInput(me, fg_thread, True)
+    ok = bool(user32.SetForegroundWindow(hwnd))
+    user32.AttachThreadInput(me, fg_thread, False)
+    return ok
+
+
 def system_ram_gb() -> float:
     m = MEMSTATUSEX()
     m.dwLength = ctypes.sizeof(MEMSTATUSEX)
@@ -261,6 +297,10 @@ class MemSampler(threading.Thread):
         self.pid = pid
         self.interval = interval
         self.samples: list[tuple[float, dict]] = []
+        self.fg_checks = 0      # OS foreground-window checks (GetForegroundWindow) ...
+        self.fg_game = 0        # ... in which the foreground window belonged to the game (focus stolen)
+        self.fg_restored = 0
+        self.restore_hwnd = 0   # the owner's foreground window before the launch
         self._stop = threading.Event()
 
     def run(self):
@@ -268,6 +308,12 @@ class MemSampler(threading.Thread):
             m = proc_memory(self.pid)
             if m:
                 self.samples.append((time.time(), m))
+            fg = foreground_pid()
+            self.fg_checks += 1
+            if fg == self.pid:
+                self.fg_game += 1
+                if self.restore_hwnd:
+                    self.fg_restored += int(give_back_foreground(self.restore_hwnd))
             self._stop.wait(self.interval)
 
     def stop(self):
@@ -449,6 +495,8 @@ class Runner:
         (save_dir / "slot1.json").write_text(json.dumps(save, indent=1), encoding="utf-8")
         write_settings(run_dir / "qa_settings.cfg", preset, self.a.vsync == "on")
         extra = ["--qa-perf", "--qa-interval=0.2", "--no-wardrobe-notice", f"--perf-log={(run_dir / 'perf_log.jsonl').as_posix()}"]
+        self.prev_fg = user32.GetForegroundWindow()
+        self.fg_locked = lock_foreground(True) if not self.a.headless else False
         if self.a.headless:
             sess = headless_session(run_dir, name=name, save_dir=save_dir, extra=extra, max_seconds=self.a.watchdog)
             sess.mute = bool(self.a.mute)
@@ -471,6 +519,8 @@ class Runner:
             self.log(f"stop: {e}")
         if pid and self.a.headless:
             kill_tree(pid)      # the console wrapper's child
+        if not self.a.headless:
+            lock_foreground(False)
         time.sleep(1.0)
 
     # ---------------------------------------------------------------- helpers on the bot
@@ -583,6 +633,7 @@ class Runner:
             bot = sess.bot
             gpid = sess.proc.pid if (sess.proc and not self.a.headless) else None
             mem = MemSampler(gpid)
+            mem.restore_hwnd = self.prev_fg
             mem.start()
             if not self.wait_title(bot):
                 raise RuntimeError(f"no title / Continue (mode {bot.state().get('mode')})")
@@ -662,6 +713,8 @@ class Runner:
         finally:
             if mem is not None:
                 mem.stop()
+                rec["os_foreground"] = {"checks": mem.fg_checks, "game_in_foreground": mem.fg_game,
+                                        "given_back": mem.fg_restored, "foreground_lock": getattr(self, "fg_locked", None)}
             if sess is not None:
                 rec["game_log_errors"] = game_log_errors(sess.game_log)[:20] if self.a.headless else []
                 rec["focus_report"] = sess.focus_report()
@@ -704,6 +757,7 @@ class Runner:
             sess = self.launch(run_dir, f"{pid}_roundtrip", preset, build_fixture(ROUNDTRIP_STATE))
             bot = sess.bot
             mem = MemSampler(sess.proc.pid if (sess.proc and not self.a.headless) else None)
+            mem.restore_hwnd = self.prev_fg
             mem.start()
             if not self.wait_title(bot):
                 raise RuntimeError("no title / Continue")
@@ -773,6 +827,8 @@ class Runner:
         finally:
             if mem is not None:
                 mem.stop()
+                rec["os_foreground"] = {"checks": mem.fg_checks, "game_in_foreground": mem.fg_game,
+                                        "given_back": mem.fg_restored, "foreground_lock": getattr(self, "fg_locked", None)}
             if sess is not None:
                 rec["game_log_errors"] = game_log_errors(sess.game_log)[:20] if self.a.headless else []
                 rec["focus_report"] = sess.focus_report()
@@ -902,6 +958,13 @@ def write_reports(out: Path, res: dict) -> None:
     L.append(f"* Display: game window borderless on DISPLAY2 (x=1920), monitor refresh {e0.get('refresh_hz', '-')} Hz; "
              f"vsync {'ON' if res['args'].get('vsync') == 'on' else 'OFF'} and max_fps 0 (uncapped, so the numbers show headroom; "
              "the shipped default is vsync on = capped at the refresh rate); audio muted (--qa-mute); window never focused.")
+    fgc = sum((r.get("os_foreground") or {}).get("checks", 0) for r in runs + res.get("roundtrips", []))
+    fgg = sum((r.get("os_foreground") or {}).get("game_in_foreground", 0) for r in runs + res.get("roundtrips", []))
+    L.append(f"* Focus: the OS foreground window (GetForegroundWindow, every 0.5 s) belonged to the game in {fgg} of {fgc} checks. "
+             "The harness holds LockSetForegroundWindow while a game process runs: without it the packaged build's first window "
+             "became the OS foreground window ~0.6 s after launch despite override.cfg no_focus (measured before this run); "
+             "a check that still finds the game in front hands the foreground back to the owner's previous window. "
+             "(The telemetry's window_focused is Godot's own flag and stayed true even while the game was not in front.)")
     L.append(f"* Shader caches in %APPDATA%\\Hollowhaven before the run: {env.get('user_shader_cache', '-')} / vulkan {env.get('user_vulkan', '-')}.")
     L.append(f"* Sample per state: settle {res['args'].get('settle_seconds')} s after the load, 360-degree pan "
              f"{res['args'].get('pan_seconds')} s, walk W/A/S/D {res['args'].get('walk_seconds')} s, idle {res['args'].get('idle_seconds')} s"
@@ -911,20 +974,24 @@ def write_reports(out: Path, res: dict) -> None:
                                        f"{PRESETS[k]['render_scale']})" for k in res['args'].get('presets', '').split(",") if k in PRESETS))
     L.append("")
     L.append("## Area x preset\n")
-    L.append("| Area | Preset | Avg FPS | 1% low | 0.1% low | p99 ms | Worst ms | >33 ms | >50 ms | GPU ms avg | Load ms (in-game) | Click->play s | Post-load worst ms | Private MB | Video MB | Draw calls | Tele % |")
-    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    L.append("| Area | Preset | Avg FPS | 1% low | 0.1% low | p99 ms | Worst ms | >16.7 ms | >33 ms | >50 ms | GPU ms avg | Load ms (in-game) | Click->play s | Post-load worst ms | Private MB | Video MB | Draw calls | Tele % |")
+    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     for r in runs:
         st, mo, ld = r.get("stats") or {}, r.get("monitors") or {}, r.get("load") or {}
         if r.get("error"):
-            L.append(f"| {r['state']} | {r['preset']} | FAILED: {r['error'][:120]} |" + " |" * 15)
+            L.append(f"| {r['state']} | {r['preset']} | FAILED: {r['error'][:120]} |" + " |" * 16)
             continue
         L.append(f"| {r['state']} | {r['preset']} | {fmt(st.get('avg_fps'))} | {fmt(st.get('low1_fps'))} | {fmt(st.get('low01_fps'))} | "
-                 f"{fmt(st.get('p99_ms'), 2)} | {fmt(st.get('worst_ms'), 1)} | {fmt(st.get('over_33'))} | {fmt(st.get('over_50'))} | "
+                 f"{fmt(st.get('p99_ms'), 2)} | {fmt(st.get('worst_ms'), 1)} | {fmt(st.get('over_16_7'))} | {fmt(st.get('over_33'))} | {fmt(st.get('over_50'))} | "
                  f"{fmt(st.get('gpu_avg_ms'), 2)} | {fmt(ld.get('ms'), 0)} | {fmt(r.get('continue_to_playing_s'), 2)} | "
                  f"{fmt(ld.get('post_worst_ms'), 1)} | {fmt(r.get('private_mb_max'), 0)} | {fmt(mo.get('video_mb_max'), 0)} | "
                  f"{fmt(mo.get('draw_calls_avg'), 0)} | {fmt(st.get('tele_pct'), 2)} |")
     L.append("")
     L.append("## Loading\n")
+    L.append("In-game load ms = first frame seen in Game.mode 'loading' -> 'playing' (a Lantern Road trip includes its 0.45 s "
+             "fade-out; from the title there is no fade and the frame that parses the save and swaps the scene is counted as the "
+             "'worst frame during load'). Click->play s is the bot's wall clock (+ up to one 0.2 s telemetry line). The 0.6 s "
+             "fade-in after 'playing' is inside the 'first 3 s after' window.\n")
     L.append("| Area | Preset | In-game load ms (mode loading->playing, incl. 0.45 s fade-out) | Worst frame during load ms | Frames >50 ms in load | Worst frame first 3 s after ms | >50 ms after |")
     L.append("|---|---|---|---|---|---|---|")
     for r in runs:
