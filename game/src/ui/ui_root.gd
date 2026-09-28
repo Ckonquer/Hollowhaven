@@ -386,7 +386,9 @@ func show_ending() -> void:
 	overlay_layer.add_child(_ending)
 	await _ending.play()
 	_ending = null
-	if Game.area_id == "surface":
+	if Audio.music_director_active():
+		Audio.release_music("restoration", 3.0)     # the director returns to the Haven's day/night music
+	elif Game.area_id == "surface":
 		Audio.play_music("music_haven", 3.0)
 	if Game.mode == "playing" or Game.mode == "cutscene":
 		hud.set_cinematic(false)

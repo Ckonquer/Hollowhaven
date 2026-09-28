@@ -1,0 +1,506 @@
+{
+	"format": "hollowhaven-save",
+	"game_version": "0.9.1",
+	"meta": {
+		"area": "below",
+		"day": 5,
+		"play_seconds": 9120.0,
+		"step": "return",
+		"step_title": "Bring Back the Light"
+	},
+	"saved_unix": 1790000000.0,
+	"state": {
+		"active_companion": "lumi",
+		"buffs": {},
+		"companions": {
+			"lumi": {
+				"assignment": "follow",
+				"befriended": true,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			},
+			"mochi": {
+				"assignment": "wait",
+				"befriended": true,
+				"bond_xp": 30,
+				"last_fed_day": 2,
+				"last_gift_day": -1,
+				"last_pet_day": 3,
+				"wait_area": "surface",
+				"wait_pos": [
+					5.0,
+					0.25,
+					-3.0
+				]
+			},
+			"pebble": {
+				"assignment": "home",
+				"befriended": true,
+				"bond_xp": 12,
+				"last_fed_day": -1,
+				"last_gift_day": 3,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			}
+		},
+		"counters": {
+			"crops_planted": 1,
+			"max_bond": 2,
+			"structures_built": 15,
+			"trees_felled": 3
+		},
+		"crops": {
+			"s3": {
+				"crop": "sweetroot",
+				"planted_at": 1500.0,
+				"tended_minutes": 30.0
+			}
+		},
+		"depleted": {
+			"below_glowcap_4": 4632.25,
+			"pebble_boulder": -1.0,
+			"tree_3": 1080.0,
+			"tree_7": 1080.0
+		},
+		"dropped": [
+			{
+				"area": "below",
+				"count": 2,
+				"item": "glowcap",
+				"pos": [
+					-7.0,
+					-20.0,
+					5.0
+				],
+				"uid": "d17"
+			}
+		],
+		"flags": {
+			"cp_lit_arena": true,
+			"cp_lit_landing": true,
+			"cp_lit_office": true,
+			"cp_lit_shrine": true,
+			"entered_below": true,
+			"foreman_key_taken": true,
+			"gallery_cleared": true,
+			"heartseed_spawned_checked": true,
+			"lower_gate_open": true,
+			"mine_comfort_seen": true,
+			"mine_opened": true,
+			"moment_crossing": true,
+			"moment_nursery": true,
+			"moment_silk_intro": true,
+			"moment_threshold": true,
+			"reached_silk_hollows": true,
+			"read_ward_intro": true,
+			"read_ward_warning": true,
+			"ruin_cleared": true,
+			"spawner_cleared_ruin_bramblings": true,
+			"weaver_defeated": true
+		},
+		"hotbar_index": 2,
+		"inventory": [
+			{
+				"count": 1,
+				"id": "stone_axe"
+			},
+			{
+				"count": 1,
+				"id": "stone_pickaxe"
+			},
+			{
+				"count": 1,
+				"id": "copper_sword"
+			},
+			{
+				"count": 1,
+				"id": "lantern"
+			},
+			{
+				"count": 4,
+				"id": "berry_snack"
+			},
+			{
+				"count": 2,
+				"id": "hearty_stew"
+			},
+			{
+				"count": 3,
+				"id": "glowcap_skewer"
+			},
+			null,
+			{
+				"count": 30,
+				"id": "wood"
+			},
+			{
+				"count": 12,
+				"id": "stone"
+			},
+			{
+				"count": 9,
+				"id": "fiber"
+			},
+			{
+				"count": 5,
+				"id": "glowcap"
+			},
+			{
+				"count": 4,
+				"id": "silk"
+			},
+			{
+				"count": 2,
+				"id": "echo_shard"
+			},
+			{
+				"count": 3,
+				"id": "copper_ore"
+			},
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null
+		],
+		"key_items": {
+			"foreman_key": 1,
+			"heartseed": 1
+		},
+		"lore": [
+			"landing_notice",
+			"foreman_order",
+			"ward_keeper",
+			"hollows_page"
+		],
+		"next_uid": 18,
+		"player": {
+			"area": "below",
+			"below_respawn": "cp_arena",
+			"hp": 41.5,
+			"lantern_on": true,
+			"max_hp": 100.0,
+			"max_stamina": 100.0,
+			"pos": [
+				12.0,
+				-31.5,
+				-40.25
+			],
+			"respawn_area": "below",
+			"respawn_spawn": "cp_arena",
+			"spawn": "cp_arena",
+			"stamina": 40.0,
+			"yaw": 2.125
+		},
+		"player_name": "Krystal",
+		"quests": {
+			"baselines": {
+				"chop": {
+					"trees_felled": 0
+				},
+				"craft_axe": {},
+				"deeper": {},
+				"descend": {},
+				"gather_basics": {},
+				"home": {
+					"crops_planted": 0
+				},
+				"lumi": {},
+				"mochi": {},
+				"old_mine": {},
+				"pebble": {},
+				"prepare": {},
+				"return": {},
+				"silk": {},
+				"wake": {},
+				"workbench": {}
+			},
+			"completed": [
+				"wake",
+				"gather_basics",
+				"craft_axe",
+				"chop",
+				"workbench",
+				"mochi",
+				"pebble",
+				"home",
+				"lumi",
+				"prepare",
+				"descend",
+				"old_mine",
+				"deeper",
+				"silk"
+			],
+			"index": 14
+		},
+		"stats": {
+			"deaths": 3,
+			"enemies_defeated": 22,
+			"items_crafted": 41,
+			"play_seconds": 9120.0,
+			"started_version": "0.9.1"
+		},
+		"storages": {
+			"s4": [
+				{
+					"count": 40,
+					"id": "wood"
+				},
+				{
+					"count": 25,
+					"id": "stone"
+				},
+				null,
+				null,
+				null,
+				{
+					"count": 3,
+					"id": "glowcap"
+				},
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				{
+					"count": 12,
+					"id": "berries"
+				}
+			],
+			"s5": [
+				{
+					"count": 6,
+					"id": "copper_ore"
+				},
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			]
+		},
+		"structures": {
+			"s1": {
+				"area": "surface",
+				"data": {},
+				"id": "workbench",
+				"pos": [
+					3.0,
+					0.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s10": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					1.0,
+					0.0,
+					-1.0
+				],
+				"rot": 0.0
+			},
+			"s11": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					-1.0,
+					0.0,
+					1.0
+				],
+				"rot": 90.0
+			},
+			"s12": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_doorway",
+				"pos": [
+					3.0,
+					0.0,
+					1.0
+				],
+				"rot": 90.0
+			},
+			"s13": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					1.0,
+					2.5,
+					1.0
+				],
+				"rot": 180.0
+			},
+			"s14": {
+				"area": "surface",
+				"data": {},
+				"id": "fence",
+				"pos": [
+					6.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s15": {
+				"area": "surface",
+				"data": {},
+				"id": "lantern_post",
+				"pos": [
+					-2.0,
+					0.0,
+					6.0
+				],
+				"rot": 0.0
+			},
+			"s16": {
+				"area": "surface",
+				"data": {},
+				"id": "rug",
+				"pos": [
+					1.0,
+					0.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s2": {
+				"area": "surface",
+				"data": {
+					"respawn": true
+				},
+				"id": "bed",
+				"pos": [
+					-6.0,
+					0.0,
+					5.0
+				],
+				"rot": 270.0
+			},
+			"s3": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					-4.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s4": {
+				"area": "surface",
+				"data": {
+					"label": "Pantry"
+				},
+				"id": "storage_chest",
+				"pos": [
+					2.0,
+					0.0,
+					3.0
+				],
+				"rot": 90.0
+			},
+			"s5": {
+				"area": "surface",
+				"data": {},
+				"id": "storage_chest",
+				"pos": [
+					4.0,
+					0.0,
+					3.0
+				],
+				"rot": 0.0
+			},
+			"s6": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s7": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s8": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s9": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			}
+		},
+		"total_minutes": 7083.5
+	},
+	"version": 1
+}

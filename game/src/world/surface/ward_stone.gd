@@ -6,6 +6,18 @@ extends Node3D
 ##   Lumi befriended or quest step "prepare" -> warning inscription, flag "read_ward_warning"
 ##   holding the Heartseed -> "Return the Heartseed" -> Game.complete_chapter()
 ##   after "ward_restored" -> "Light kept. Home kept. Thank you, Krystal."
+## Chapter Two (docs/CHAPTER_TWO_SPEC.md §8, MP §2.4 / §11 / §17), all inside the ward_restored branch:
+##   chapter_one_complete, not ch2_accepted -> the new inscription, then a choice (Game.ui.confirm):
+##       "Follow the lantern road" -> flag ch2_accepted, reassurance line, the waygate hint;
+##       "Stay a little longer" (or Esc) -> a gentle line; the choice is offered again next time.
+##       No UI / no player (tests, headless) -> the inscription only, nothing is decided.
+##   ch2_accepted -> a small menu of the options that apply: Read the inscription / Change your look
+##       (Game.open_panel("wardrobe"), a toast until that panel exists) / Travel the Lantern Road (once
+##       any arch is lit) / Celebrate the Lanternwake (after ch2_homecoming) / Close.
+##   ch2_choir_defeated, first visit -> flag ch2_homecoming + "Light kept. Roads found. Welcome home."
+##   ch2_homecoming or chapter_two_complete -> reading gives that return line.
+## Nothing here auto-teleports; the new lines mention nothing spider-like (the legacy warning keeps its
+## arachnophobia wording).
 ## set_restored(t) blends the look from dim (0) to restored (1); play_glow_burst() for the ending.
 
 const Palette := preload("res://src/art/palette.gd")
@@ -18,6 +30,27 @@ const AudioUtil := preload("res://src/world/surface/audio_util.gd")
 const SPEAKER := "Ward Stone"
 const LINE_SECONDS := 5.5
 const RESTORED_RUNE := Color("ffbf4d")
+
+## Chapter Two flags and lines (MP §17, verbatim where quoted there).
+const CH2_AVAILABLE_FLAG := "chapter_one_complete"
+const CH2_ACCEPTED_FLAG := "ch2_accepted"
+const CH2_READ_FLAG := "read_ward_ch2"
+const CH2_HOMECOMING_FLAG := "ch2_homecoming"
+const CH2_COMPLETE_FLAG := "chapter_two_complete"
+const CH2_CHOIR_FLAG := "ch2_choir_defeated"
+const WAYGATE_REPAIRED_FLAG := "ch2_waygate_repaired"
+const CHOICE_ID := "ch2_lantern_road"
+const RESTORED_LINE := "Light kept. Home kept. Thank you, %s."
+const CH2_AVAILABLE_LINE := "A light well kept reaches farther than its keeper knows. There are lanterns beyond these woods. Tonight, one has answered."
+const CH2_REASSURANCE_LINE := "Your hearth is safe. No road you follow shall unmake it."
+const CH2_RETURN_LINE := "Light kept. Roads found. Welcome home, %s."
+const CH2_DECLINE_LINE := "Rest, then. The road will keep."
+const CH2_WAYGATE_LINE := "The old stones north of the Moonlit Ruin have woken."
+const CHOICE_FOLLOW := ["follow", "Follow the lantern road", "AccentButton"]
+const CHOICE_STAY := ["stay", "Stay a little longer", ""]
+
+## Tests / scripted runs: the answer to the next choice or menu instead of asking the UI (consumed once).
+var forced_choice: String = ""
 
 var restored_amount := 0.0
 var rune_material: StandardMaterial3D
@@ -242,7 +275,13 @@ func interact(_player: Node = null) -> void:
 		return
 	var who: String = GameState.player_name
 	if GameState.get_flag("ward_restored"):
-		_say(["Light kept. Home kept. Thank you, %s." % who])
+		if chapter_two_available() and not chapter_two_accepted():
+			await _offer_chapter_two(_player)
+			return
+		if chapter_two_accepted():
+			await _chapter_two_visit(_player)
+			return
+		_say([RESTORED_LINE % who])
 		return
 	if GameState.has_item("heartseed"):
 		_busy = true
@@ -270,6 +309,149 @@ func interact(_player: Node = null) -> void:
 		_say(["Carry light. Carry friends. Come home."])
 	else:
 		_say(["Light kept, home kept. The seed sleeps below; the stone remembers."])
+
+
+# --- Chapter Two ------------------------------------------------------------------------------------------
+
+func chapter_two_available() -> bool:
+	return bool(GameState.get_flag("ward_restored")) and bool(GameState.get_flag(CH2_AVAILABLE_FLAG))
+
+
+func chapter_two_accepted() -> bool:
+	return bool(GameState.get_flag(CH2_ACCEPTED_FLAG))
+
+
+## The new inscription and the acceptance choice (offered again after "stay").
+func _offer_chapter_two(who: Node) -> void:
+	GameState.set_flag(CH2_READ_FLAG, true)
+	_pulse_once()
+	_say([CH2_AVAILABLE_LINE])
+	var pick := await _ask("The Ward Stone", CH2_AVAILABLE_LINE, [CHOICE_FOLLOW, CHOICE_STAY], "", who)
+	if not is_instance_valid(self):
+		return
+	apply_chapter_two_choice(pick)
+
+
+## Applies an answer to the Chapter Two invitation: "follow" accepts, "stay"/"cancel" declines gently
+## (offered again next time), "" (no answer could be asked) changes nothing.
+func apply_chapter_two_choice(pick: String) -> void:
+	if not chapter_two_available() or chapter_two_accepted():
+		return
+	match pick:
+		"follow":
+			accept_chapter_two()
+		"stay", "cancel":
+			Events.choice_made.emit(CHOICE_ID, "stay")
+			_say([CH2_DECLINE_LINE])
+
+
+## Chapter Two starts: flag ch2_accepted (spec §8), the reassurance, and the old stones wake.
+func accept_chapter_two() -> void:
+	if chapter_two_accepted():
+		return
+	if GameState.has_method("accept_chapter_two"):
+		GameState.call("accept_chapter_two")
+	GameState.set_flag(CH2_ACCEPTED_FLAG, true)
+	Events.choice_made.emit(CHOICE_ID, "follow")
+	_pulse_once()
+	var lines: Array = [CH2_REASSURANCE_LINE]
+	if not bool(GameState.get_flag(WAYGATE_REPAIRED_FLAG)):
+		lines.append(CH2_WAYGATE_LINE)   # the pointer; the quest layer's ch2_waygate step shows the how-to hint
+	_say(lines)
+
+
+## After acceptance: the homecoming (once the Choir is gone), else the menu of options that apply.
+func _chapter_two_visit(who: Node) -> void:
+	if bool(GameState.get_flag(CH2_CHOIR_FLAG)) and not bool(GameState.get_flag(CH2_HOMECOMING_FLAG)):
+		GameState.set_flag(CH2_HOMECOMING_FLAG, true)
+		_pulse_once()
+		_say([CH2_RETURN_LINE % GameState.player_name])
+		return
+	var buttons: Array = []
+	for o in menu_options():
+		buttons.append([o[0], o[1], "AccentButton" if buttons.is_empty() else ""])
+	var pick := await _ask("The Ward Stone", "The runes glow warm and steady beneath your hand.", buttons, "read", who)
+	if not is_instance_valid(self):
+		return
+	await choose(pick)
+
+
+## The menu entries that apply right now: [[id, label], ...] (ids: read, look, road, celebrate, close).
+func menu_options() -> Array:
+	var out: Array = [["read", "Read the inscription"], ["look", "Change your look"]]
+	if Game.has_method("lantern_road_destinations") and not (Game.lantern_road_destinations() as Array).is_empty():
+		out.append(["road", "Travel the Lantern Road"])
+	if bool(GameState.get_flag(CH2_HOMECOMING_FLAG)) and not bool(GameState.get_flag(CH2_COMPLETE_FLAG)):
+		out.append(["celebrate", "Celebrate the Lanternwake"])
+	out.append(["close", "Close"])
+	return out
+
+
+## Runs one menu entry (unknown / "close" / "cancel" do nothing). Awaitable (travel, celebration).
+func choose(option: String) -> void:
+	match option:
+		"read":
+			read_inscription()
+		"look":
+			_open_wardrobe()
+		"road":
+			if Game.has_method("travel_lantern_road"):
+				await Game.travel_lantern_road()
+		"celebrate":
+			if bool(GameState.get_flag(CH2_HOMECOMING_FLAG)) and Game.has_method("complete_chapter_two"):
+				var rewards: Dictionary = Game.chapter_two_rewards() if Game.has_method("chapter_two_rewards") else {}
+				await Game.complete_chapter_two(rewards)
+
+
+## The Chapter Two reading: the return line once she is home for good, else thanks + reassurance
+## (+ the waygate reminder while it is still broken).
+func read_inscription() -> void:
+	var who: String = GameState.player_name
+	_pulse_once()
+	if bool(GameState.get_flag(CH2_COMPLETE_FLAG)) or bool(GameState.get_flag(CH2_HOMECOMING_FLAG)):
+		_say([CH2_RETURN_LINE % who])
+		return
+	var lines: Array = [RESTORED_LINE % who, CH2_REASSURANCE_LINE]
+	if not bool(GameState.get_flag(WAYGATE_REPAIRED_FLAG)):
+		lines.append(CH2_WAYGATE_LINE)
+	_say(lines)
+
+
+func _open_wardrobe() -> void:
+	if _ui_has_panel("wardrobe"):
+		Game.open_panel("wardrobe")
+	else:
+		Events.notify.emit("A mirror to change your look is on its way. Soon!", "info")
+
+
+static func _ui_has_panel(panel: String) -> bool:
+	var ui: Node = Game.ui
+	if ui == null or not is_instance_valid(ui):
+		return false
+	if ui.has_method("has_panel"):
+		return bool(ui.call("has_panel", panel))
+	var sc: Variant = ui.get_script()
+	if sc is Script:
+		var panels: Variant = (sc as Script).get_script_constant_map().get("PANELS")
+		return panels is Dictionary and (panels as Dictionary).has(panel)
+	return false
+
+
+## Asks through Game.ui.confirm (the world pauses while it is open). Returns `fallback` when no choice
+## can be shown (no UI, no interacting player, not playing) and `forced_choice` when a test set one.
+func _ask(title: String, text: String, buttons: Array, fallback: String, who: Node) -> String:
+	if forced_choice != "":
+		var f := forced_choice
+		forced_choice = ""
+		return f
+	var ui: Node = Game.ui
+	if who == null or ui == null or not is_instance_valid(ui) or not ui.has_method("confirm") or Game.mode != "playing":
+		return fallback
+	_busy = true
+	var pick: Variant = await ui.confirm(title, text, buttons)
+	if is_instance_valid(self):
+		_busy = false
+	return String(pick) if (pick is String or pick is StringName) else "cancel"
 
 
 ## Says the lines one after another (a tween owned by this node, so nothing fires after it is freed).

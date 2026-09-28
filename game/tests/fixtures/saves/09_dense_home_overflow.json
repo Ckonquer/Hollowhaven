@@ -1,0 +1,1690 @@
+{
+	"format": "hollowhaven-save",
+	"game_version": "0.9.1",
+	"meta": {
+		"area": "surface",
+		"day": 7,
+		"play_seconds": 14400.75,
+		"step": "free_play",
+		"step_title": "Krystal's Haven"
+	},
+	"saved_unix": 1790000000.0,
+	"state": {
+		"active_companion": "lumi",
+		"buffs": {},
+		"companions": {
+			"lumi": {
+				"assignment": "follow",
+				"befriended": true,
+				"bond_xp": 25,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			},
+			"mochi": {
+				"assignment": "wait",
+				"befriended": true,
+				"bond_xp": 30,
+				"last_fed_day": 2,
+				"last_gift_day": -1,
+				"last_pet_day": 3,
+				"wait_area": "surface",
+				"wait_pos": [
+					5.0,
+					0.25,
+					-3.0
+				]
+			},
+			"pebble": {
+				"assignment": "home",
+				"befriended": true,
+				"bond_xp": 12,
+				"last_fed_day": -1,
+				"last_gift_day": 3,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			}
+		},
+		"counters": {
+			"crops_harvested": 5,
+			"crops_planted": 4,
+			"max_bond": 2,
+			"structures_built": 75,
+			"trees_felled": 3
+		},
+		"crops": {
+			"s3": {
+				"crop": "sweetroot",
+				"planted_at": 1500.0,
+				"tended_minutes": 30.0
+			},
+			"s88": {
+				"crop": "sweetroot",
+				"planted_at": 7000.0,
+				"tended_minutes": 12.5
+			},
+			"s89": {
+				"crop": "",
+				"planted_at": 0.0,
+				"tended_minutes": 0.0
+			},
+			"s90": {
+				"crop": "sweetroot",
+				"planted_at": 9400.0,
+				"tended_minutes": 0.0
+			},
+			"s91": {
+				"crop": "sweetroot",
+				"planted_at": 8600.25,
+				"tended_minutes": 60.0
+			}
+		},
+		"depleted": {
+			"below_glowcap_4": 4632.25,
+			"pebble_boulder": -1.0,
+			"tree_20": 9540.0,
+			"tree_21": 9550.0,
+			"tree_22": 9560.0,
+			"tree_23": 9570.0,
+			"tree_24": 9580.0,
+			"tree_25": 9590.0,
+			"tree_26": 9600.0,
+			"tree_27": 9610.0,
+			"tree_3": 1080.0,
+			"tree_7": 1080.0
+		},
+		"dropped": [
+			{
+				"area": "below",
+				"count": 2,
+				"item": "glowcap",
+				"pos": [
+					-7.0,
+					-20.0,
+					5.0
+				],
+				"uid": "d17"
+			},
+			{
+				"area": "surface",
+				"count": 1,
+				"item": "haven_banner",
+				"pos": [
+					0.5,
+					0.25,
+					-2.5
+				],
+				"uid": "d98"
+			},
+			{
+				"area": "surface",
+				"count": 37,
+				"item": "wood",
+				"pos": [
+					1.0,
+					0.0,
+					1.0
+				],
+				"uid": "d99"
+			},
+			{
+				"area": "surface",
+				"count": 12,
+				"item": "stone",
+				"pos": [
+					-1.5,
+					3.09999990463257,
+					0.5
+				],
+				"uid": "d100"
+			}
+		],
+		"flags": {
+			"chapter_one_complete": true,
+			"cp_lit_arena": true,
+			"cp_lit_landing": true,
+			"cp_lit_office": true,
+			"cp_lit_shrine": true,
+			"entered_below": true,
+			"foreman_key_taken": true,
+			"gallery_cleared": true,
+			"heartseed_spawned_checked": true,
+			"lower_gate_open": true,
+			"mine_comfort_seen": true,
+			"mine_opened": true,
+			"moment_crossing": true,
+			"moment_nursery": true,
+			"moment_return": true,
+			"moment_silk_intro": true,
+			"moment_threshold": true,
+			"reached_silk_hollows": true,
+			"read_ward_intro": true,
+			"read_ward_warning": true,
+			"ruin_cleared": true,
+			"spawner_cleared_ruin_bramblings": true,
+			"ward_restored": true,
+			"weaver_defeated": true
+		},
+		"hotbar_index": 3,
+		"inventory": [
+			{
+				"count": 1,
+				"id": "stone_axe"
+			},
+			{
+				"count": 1,
+				"id": "stone_pickaxe"
+			},
+			{
+				"count": 1,
+				"id": "copper_sword"
+			},
+			{
+				"count": 1,
+				"id": "lantern"
+			},
+			{
+				"count": 46,
+				"id": "berries"
+			},
+			{
+				"count": 45,
+				"id": "sweetroot"
+			},
+			{
+				"count": 44,
+				"id": "glowcap"
+			},
+			{
+				"count": 43,
+				"id": "shiny_pebble"
+			},
+			{
+				"count": 42,
+				"id": "silk"
+			},
+			{
+				"count": 41,
+				"id": "echo_shard"
+			},
+			{
+				"count": 40,
+				"id": "wood"
+			},
+			{
+				"count": 39,
+				"id": "stone"
+			},
+			{
+				"count": 38,
+				"id": "fiber"
+			},
+			{
+				"count": 37,
+				"id": "copper_ore"
+			},
+			{
+				"count": 36,
+				"id": "berries"
+			},
+			{
+				"count": 35,
+				"id": "sweetroot"
+			},
+			{
+				"count": 34,
+				"id": "glowcap"
+			},
+			{
+				"count": 33,
+				"id": "shiny_pebble"
+			},
+			{
+				"count": 32,
+				"id": "silk"
+			},
+			{
+				"count": 31,
+				"id": "echo_shard"
+			},
+			{
+				"count": 30,
+				"id": "wood"
+			},
+			{
+				"count": 29,
+				"id": "stone"
+			},
+			{
+				"count": 28,
+				"id": "fiber"
+			},
+			{
+				"count": 27,
+				"id": "copper_ore"
+			},
+			{
+				"count": 26,
+				"id": "berries"
+			},
+			{
+				"count": 25,
+				"id": "sweetroot"
+			},
+			{
+				"count": 24,
+				"id": "glowcap"
+			},
+			{
+				"count": 23,
+				"id": "shiny_pebble"
+			},
+			{
+				"count": 22,
+				"id": "silk"
+			},
+			{
+				"count": 21,
+				"id": "echo_shard"
+			},
+			{
+				"count": 20,
+				"id": "wood"
+			},
+			{
+				"count": 19,
+				"id": "stone"
+			}
+		],
+		"key_items": {
+			"foreman_key": 1
+		},
+		"lore": [
+			"landing_notice",
+			"foreman_order",
+			"ward_keeper"
+		],
+		"next_uid": 101,
+		"player": {
+			"area": "surface",
+			"below_respawn": "cp_arena",
+			"hp": 64.0,
+			"lantern_on": false,
+			"max_hp": 100.0,
+			"max_stamina": 100.0,
+			"pos": [
+				0.5,
+				0.25,
+				-3.0
+			],
+			"respawn_area": "surface",
+			"respawn_spawn": "bed",
+			"spawn": "haven_respawn",
+			"stamina": 40.0,
+			"yaw": 2.125
+		},
+		"player_name": "Krystal",
+		"quests": {
+			"baselines": {
+				"chop": {
+					"trees_felled": 0
+				},
+				"craft_axe": {},
+				"deeper": {},
+				"descend": {},
+				"free_play": {
+					"max_bond": 2
+				},
+				"gather_basics": {},
+				"home": {
+					"crops_planted": 0
+				},
+				"lumi": {},
+				"mochi": {},
+				"old_mine": {},
+				"pebble": {},
+				"prepare": {},
+				"return": {},
+				"silk": {},
+				"wake": {},
+				"workbench": {}
+			},
+			"completed": [
+				"wake",
+				"gather_basics",
+				"craft_axe",
+				"chop",
+				"workbench",
+				"mochi",
+				"pebble",
+				"home",
+				"lumi",
+				"prepare",
+				"descend",
+				"old_mine",
+				"deeper",
+				"silk",
+				"return"
+			],
+			"index": 15
+		},
+		"stats": {
+			"deaths": 3,
+			"enemies_defeated": 14,
+			"items_crafted": 41,
+			"play_seconds": 14400.75,
+			"started_version": "0.9.1"
+		},
+		"storages": {
+			"s4": [
+				{
+					"count": 40,
+					"id": "wood"
+				},
+				{
+					"count": 25,
+					"id": "stone"
+				},
+				null,
+				null,
+				null,
+				{
+					"count": 3,
+					"id": "glowcap"
+				},
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				{
+					"count": 12,
+					"id": "berries"
+				}
+			],
+			"s5": [
+				{
+					"count": 6,
+					"id": "copper_ore"
+				},
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			"s84": [
+				{
+					"count": 7,
+					"id": "wood"
+				},
+				{
+					"count": 8,
+					"id": "stone"
+				},
+				{
+					"count": 9,
+					"id": "fiber"
+				},
+				{
+					"count": 10,
+					"id": "copper_ore"
+				},
+				{
+					"count": 11,
+					"id": "berries"
+				},
+				{
+					"count": 12,
+					"id": "sweetroot"
+				},
+				{
+					"count": 13,
+					"id": "glowcap"
+				},
+				{
+					"count": 14,
+					"id": "shiny_pebble"
+				},
+				{
+					"count": 15,
+					"id": "silk"
+				},
+				{
+					"count": 16,
+					"id": "echo_shard"
+				},
+				{
+					"count": 17,
+					"id": "wood"
+				},
+				{
+					"count": 18,
+					"id": "stone"
+				},
+				{
+					"count": 19,
+					"id": "fiber"
+				},
+				{
+					"count": 20,
+					"id": "copper_ore"
+				},
+				{
+					"count": 21,
+					"id": "berries"
+				},
+				{
+					"count": 22,
+					"id": "sweetroot"
+				},
+				{
+					"count": 23,
+					"id": "glowcap"
+				},
+				{
+					"count": 24,
+					"id": "shiny_pebble"
+				},
+				{
+					"count": 25,
+					"id": "silk"
+				},
+				{
+					"count": 26,
+					"id": "echo_shard"
+				}
+			],
+			"s85": [
+				{
+					"count": 1,
+					"id": "copper_ore"
+				},
+				null,
+				{
+					"count": 3,
+					"id": "sweetroot"
+				},
+				null,
+				{
+					"count": 5,
+					"id": "shiny_pebble"
+				},
+				null,
+				{
+					"count": 7,
+					"id": "echo_shard"
+				},
+				null,
+				{
+					"count": 9,
+					"id": "stone"
+				},
+				null,
+				{
+					"count": 11,
+					"id": "copper_ore"
+				},
+				null,
+				{
+					"count": 13,
+					"id": "sweetroot"
+				},
+				null,
+				{
+					"count": 15,
+					"id": "shiny_pebble"
+				},
+				null,
+				{
+					"count": 17,
+					"id": "echo_shard"
+				},
+				null,
+				{
+					"count": 19,
+					"id": "stone"
+				},
+				null
+			],
+			"s86": [
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				{
+					"count": 4,
+					"id": "hearty_stew"
+				},
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			"s87": [
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			]
+		},
+		"structures": {
+			"s1": {
+				"area": "surface",
+				"data": {},
+				"id": "workbench",
+				"pos": [
+					3.0,
+					0.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s10": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					1.0,
+					0.0,
+					-1.0
+				],
+				"rot": 0.0
+			},
+			"s11": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					-1.0,
+					0.0,
+					1.0
+				],
+				"rot": 90.0
+			},
+			"s12": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_doorway",
+				"pos": [
+					3.0,
+					0.0,
+					1.0
+				],
+				"rot": 90.0
+			},
+			"s13": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					1.0,
+					2.5,
+					1.0
+				],
+				"rot": 180.0
+			},
+			"s14": {
+				"area": "surface",
+				"data": {},
+				"id": "fence",
+				"pos": [
+					6.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s15": {
+				"area": "surface",
+				"data": {},
+				"id": "lantern_post",
+				"pos": [
+					-2.0,
+					0.0,
+					6.0
+				],
+				"rot": 0.0
+			},
+			"s16": {
+				"area": "surface",
+				"data": {},
+				"id": "rug",
+				"pos": [
+					1.0,
+					0.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s18": {
+				"area": "surface",
+				"data": {},
+				"id": "haven_banner",
+				"pos": [
+					-1.0,
+					0.0,
+					-9.0
+				],
+				"rot": 180.0
+			},
+			"s19": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s2": {
+				"area": "surface",
+				"data": {
+					"respawn": true
+				},
+				"id": "bed",
+				"pos": [
+					-6.0,
+					0.0,
+					5.0
+				],
+				"rot": 270.0
+			},
+			"s20": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					3.0,
+					-4.0
+				],
+				"rot": 90.0
+			},
+			"s21": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					0.0,
+					-2.0
+				],
+				"rot": 0.0
+			},
+			"s22": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					3.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s23": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s24": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					3.0,
+					0.0
+				],
+				"rot": 90.0
+			},
+			"s25": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s26": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					3.0,
+					2.0
+				],
+				"rot": 90.0
+			},
+			"s27": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					0.0,
+					4.0
+				],
+				"rot": 0.0
+			},
+			"s28": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-4.0,
+					3.0,
+					4.0
+				],
+				"rot": 90.0
+			},
+			"s29": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s3": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					-4.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s30": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					3.0,
+					-4.0
+				],
+				"rot": 90.0
+			},
+			"s31": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					0.0,
+					-2.0
+				],
+				"rot": 0.0
+			},
+			"s32": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					3.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s33": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s34": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					3.0,
+					0.0
+				],
+				"rot": 90.0
+			},
+			"s35": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s36": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					3.0,
+					2.0
+				],
+				"rot": 90.0
+			},
+			"s37": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					0.0,
+					4.0
+				],
+				"rot": 0.0
+			},
+			"s38": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					-2.0,
+					3.0,
+					4.0
+				],
+				"rot": 90.0
+			},
+			"s39": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s4": {
+				"area": "surface",
+				"data": {
+					"label": "Pantry"
+				},
+				"id": "storage_chest",
+				"pos": [
+					2.0,
+					0.0,
+					3.0
+				],
+				"rot": 90.0
+			},
+			"s40": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					3.0,
+					-4.0
+				],
+				"rot": 90.0
+			},
+			"s41": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					-2.0
+				],
+				"rot": 0.0
+			},
+			"s42": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					3.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s43": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s44": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					3.0,
+					0.0
+				],
+				"rot": 90.0
+			},
+			"s45": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s46": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					3.0,
+					2.0
+				],
+				"rot": 90.0
+			},
+			"s47": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					4.0
+				],
+				"rot": 0.0
+			},
+			"s48": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					3.0,
+					4.0
+				],
+				"rot": 90.0
+			},
+			"s49": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s5": {
+				"area": "surface",
+				"data": {},
+				"id": "storage_chest",
+				"pos": [
+					4.0,
+					0.0,
+					3.0
+				],
+				"rot": 0.0
+			},
+			"s50": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					3.0,
+					-4.0
+				],
+				"rot": 90.0
+			},
+			"s51": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					-2.0
+				],
+				"rot": 0.0
+			},
+			"s52": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					3.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s53": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s54": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					3.0,
+					0.0
+				],
+				"rot": 90.0
+			},
+			"s55": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s56": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					3.0,
+					2.0
+				],
+				"rot": 90.0
+			},
+			"s57": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					4.0
+				],
+				"rot": 0.0
+			},
+			"s58": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					3.0,
+					4.0
+				],
+				"rot": 90.0
+			},
+			"s59": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s6": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s60": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					3.0,
+					-4.0
+				],
+				"rot": 90.0
+			},
+			"s61": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					0.0,
+					-2.0
+				],
+				"rot": 0.0
+			},
+			"s62": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					3.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s63": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s64": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					3.0,
+					0.0
+				],
+				"rot": 90.0
+			},
+			"s65": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s66": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					3.0,
+					2.0
+				],
+				"rot": 90.0
+			},
+			"s67": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					0.0,
+					4.0
+				],
+				"rot": 0.0
+			},
+			"s68": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					4.0,
+					3.0,
+					4.0
+				],
+				"rot": 90.0
+			},
+			"s69": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					-4.0,
+					0.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s7": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s70": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_window",
+				"pos": [
+					-4.0,
+					3.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s71": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					-4.0,
+					6.0,
+					0.0
+				],
+				"rot": 180.0
+			},
+			"s72": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					-2.0,
+					0.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s73": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_window",
+				"pos": [
+					-2.0,
+					3.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s74": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					-2.0,
+					6.0,
+					0.0
+				],
+				"rot": 180.0
+			},
+			"s75": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					0.0,
+					0.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s76": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_window",
+				"pos": [
+					0.0,
+					3.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s77": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					0.0,
+					6.0,
+					0.0
+				],
+				"rot": 180.0
+			},
+			"s78": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					2.0,
+					0.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s79": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_window",
+				"pos": [
+					2.0,
+					3.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s8": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s80": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					2.0,
+					6.0,
+					0.0
+				],
+				"rot": 180.0
+			},
+			"s81": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					4.0,
+					0.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s82": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_window",
+				"pos": [
+					4.0,
+					3.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s83": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					4.0,
+					6.0,
+					0.0
+				],
+				"rot": 180.0
+			},
+			"s84": {
+				"area": "surface",
+				"data": {},
+				"id": "storage_chest",
+				"pos": [
+					-8.0,
+					0.0,
+					6.0
+				],
+				"rot": 90.0
+			},
+			"s85": {
+				"area": "surface",
+				"data": {},
+				"id": "storage_chest",
+				"pos": [
+					-8.0,
+					0.0,
+					8.0
+				],
+				"rot": 90.0
+			},
+			"s86": {
+				"area": "surface",
+				"data": {
+					"label": "Upstairs"
+				},
+				"id": "storage_chest",
+				"pos": [
+					-2.0,
+					3.0,
+					2.0
+				],
+				"rot": 270.0
+			},
+			"s87": {
+				"area": "surface",
+				"data": {},
+				"id": "storage_chest",
+				"pos": [
+					-8.0,
+					0.0,
+					10.0
+				],
+				"rot": 90.0
+			},
+			"s88": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					10.0,
+					0.0,
+					3.0
+				],
+				"rot": 0.0
+			},
+			"s89": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					12.0,
+					0.0,
+					3.0
+				],
+				"rot": 0.0
+			},
+			"s9": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s90": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					10.0,
+					0.0,
+					5.0
+				],
+				"rot": 0.0
+			},
+			"s91": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					12.0,
+					0.0,
+					5.0
+				],
+				"rot": 0.0
+			},
+			"s92": {
+				"area": "surface",
+				"data": {},
+				"id": "table",
+				"pos": [
+					5.0,
+					3.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s93": {
+				"area": "surface",
+				"data": {},
+				"id": "stool",
+				"pos": [
+					-1.0,
+					3.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s94": {
+				"area": "surface",
+				"data": {},
+				"id": "stool",
+				"pos": [
+					0.0,
+					3.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s95": {
+				"area": "surface",
+				"data": {},
+				"id": "flower_pot",
+				"pos": [
+					1.0,
+					3.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s96": {
+				"area": "surface",
+				"data": {},
+				"id": "pebble_cairn",
+				"pos": [
+					2.0,
+					3.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s97": {
+				"area": "surface",
+				"data": {},
+				"id": "echo_chime",
+				"pos": [
+					3.0,
+					3.0,
+					1.0
+				],
+				"rot": 0.0
+			}
+		},
+		"total_minutes": 9240.0
+	},
+	"version": 1
+}

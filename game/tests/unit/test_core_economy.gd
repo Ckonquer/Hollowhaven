@@ -13,6 +13,7 @@ const RecipesData := preload("res://data/recipes.gd")
 const StructuresData := preload("res://data/structures.gd")
 const CreaturesData := preload("res://data/creatures.gd")
 const EnemiesData := preload("res://data/enemies.gd")
+const SourcesData := preload("res://data/sources.gd")
 
 const HAND := ["wood", "stone", "fiber", "berries"]
 const BY_TOOL := {"axe": ["wood"], "pickaxe": ["stone", "copper_ore"]}
@@ -283,8 +284,15 @@ func test_every_item_has_a_source() -> void:
 	_walk_chain(sim)   # end of chapter: everything unlocked
 	sim["flags"]["entered_below"] = true
 	var quest_given := {"foreman_key": true, "heartseed": true}
+	for id in SourcesData.CHAPTER_ONE_ITEMS:
+		assert_true(ItemDB.has_item(id), id + " is still an item")
 	for id in ItemDB.all_item_ids():
-		assert_true(_can_obtain(id, sim) or quest_given.has(id), id + " can be obtained somehow")
+		if SourcesData.CHAPTER_ONE_ITEMS.has(id):
+			assert_true(_can_obtain(id, sim) or quest_given.has(id), id + " can be obtained somehow")
+		else:
+			# Chapter Two items: sources are declared in data/sources.gd and proven reachable (tiers, stations,
+			# unlocks, no cycles) by tests/unit/test_data_ch2_sources.gd.
+			assert_false(ItemDB.sources(id).is_empty(), id + " declares a source in data/sources.gd")
 
 
 func test_mandatory_crafting_budget_is_reasonable() -> void:

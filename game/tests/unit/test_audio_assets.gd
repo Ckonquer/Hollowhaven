@@ -161,8 +161,8 @@ func test_every_name_the_game_uses_resolves() -> void:
 			for m in key_re.search_all(line):
 				hits.append(m.get_string(1))
 			for m in loop_re.search_all(line):
-				if not m.get_string(1).ends_with("_volume"):
-					hits.append(m.get_string(1))
+				if not m.get_string(1).ends_with("_volume") and not ItemDB.has_item(m.get_string(1)) and ItemDB.structure(m.get_string(1)).is_empty():
+					hits.append(m.get_string(1))   # catalogue ids (e.g. the music_box item) are not sound names
 			if line.find("return") >= 0 and (line.find("weaver_") >= 0 or line.find("shade_") >= 0):
 				for m in snd_re.search_all(line):
 					hits.append(m.get_string(1))

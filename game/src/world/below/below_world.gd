@@ -551,7 +551,7 @@ func _start_fight() -> void:
 		if boss.has_method(m):
 			boss.call(m)
 			break
-	Audio.play_music("music_boss", 1.5)
+	Audio.request_music("boss_matron", "music_boss", 1.5)
 	Audio.play_ambience("amb_boss", 2.0)
 	Events.horror_event.emit("authored:boss", {})
 	if Game.director != null and is_instance_valid(Game.director) and Game.director.has_method("suppress"):
@@ -560,7 +560,7 @@ func _start_fight() -> void:
 
 func _stop_fight_music() -> void:
 	fight_active = false
-	Audio.stop_music(3.0)
+	Audio.release_music("boss_matron", 3.0)
 	_director_suppress(20.0)
 	resume_ambience()
 
@@ -580,7 +580,7 @@ func _on_boss_defeated(_boss_id: String) -> void:
 	var was_fighting := fight_active
 	if fight_active:
 		fight_active = false
-		Audio.stop_music(5.0)
+		Audio.release_music("boss_matron", 5.0)
 	Audio.play_ambience("amb_silk", 4.0)
 	_apply_after_boss_state(true)
 	if stalker != null and is_instance_valid(stalker):
@@ -593,7 +593,7 @@ func _on_boss_defeated(_boss_id: String) -> void:
 func _on_player_died() -> void:
 	if fight_active:
 		fight_active = false
-		Audio.stop_music(1.5)
+		Audio.release_music("boss_matron", 1.5)
 		_director_suppress(30.0)      # the fight hold must not outlive the fight (death recovery)
 
 
@@ -689,7 +689,7 @@ func on_player_spawned(player: Node3D) -> void:
 	GameState.set_flag("entered_below", true)
 	if bool(GameState.get_flag("weaver_defeated")):
 		GameState.set_flag("heartseed_spawned_checked", true)
-	Audio.stop_music(2.0)
+	Audio.release_music("", 2.0)     # the music director picks the Below's music (or silence)
 	var z := get_zone_at(player.global_position)
 	_set_mood(z, true)
 	_play_zone_ambience(z)

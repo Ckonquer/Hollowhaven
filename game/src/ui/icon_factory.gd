@@ -21,7 +21,16 @@ const BACKING := Color("fffaf0")
 const ITEM_ICONS := ["log", "stone", "fiber", "berries", "ore", "seeds", "root", "pebble", "mushroom",
 	"silk", "crystal", "axe", "pickaxe", "sword", "lantern", "snack", "stew", "skewer", "workbench",
 	"chest", "bed", "plot", "floor", "wall", "window", "doorway", "roof", "fence", "lamppost",
-	"flowerpot", "rug", "table", "stool", "cairn", "chime", "heartbloom", "banner", "key", "heartseed"]
+	"flowerpot", "rug", "table", "stool", "cairn", "chime", "heartbloom", "banner", "key", "heartseed",
+	# Chapter Two (data/items.gd section "Chapter Two")
+	"flax", "roseberries", "resin", "iron_ore", "cloth", "bar", "bar_moon", "moon_crystal", "pumpkin", "sugarcap",
+	"moonpetal", "wax", "candy", "seeds_sunflax", "seeds_roseberry", "seeds_pumpkin", "wand", "hood", "vest",
+	"armor_boots", "helm", "mail", "charm_leaf", "charm_feather", "charm_flame", "soup", "biscuit", "tart", "tea",
+	"platter", "ribbon", "seal", "scrap", "stairs", "upper_floor", "railing", "half_wall", "porch_post",
+	"arched_window", "gable_roof", "roof_corner", "flower_box", "curtain", "bookshelf", "wardrobe", "mirror",
+	"kitchen", "furnace", "loom", "pet_bed", "perch", "planter", "bench", "jack_lantern", "string_lights", "bunting",
+	"ghost_lantern", "crescent_window", "candy_bowl", "scarecrow", "gothic_trim", "music_box", "board", "wardlight",
+	"miner_lamp", "veil", "festival_table"]
 ## Additional drawings: the arachnophobia silk variant, the fallback and UI / map glyphs.
 const EXTRA_ICONS := ["spool", "unknown", "ui_heart", "ui_heart_empty", "ui_stamina", "ui_check", "ui_star",
 	"ui_info", "ui_warn", "ui_bag", "ui_sun", "ui_moon", "ui_lock", "ui_close", "ui_hint", "ui_quest",
@@ -257,7 +266,9 @@ static func _compose(r: Raster, id: String, c: Color) -> void:
 		"portrait_mochi": _portrait_mochi(r)
 		"portrait_pebble": _portrait_pebble(r)
 		"portrait_lumi": _portrait_lumi(r)
-		_: _unknown(r)
+		_:
+			if not _compose_ch2(r, id, c):
+				_unknown(r)
 
 
 # --- Item drawings ----------------------------------------------------------------------------
@@ -728,6 +739,883 @@ static func _unknown(r: Raster) -> void:
 	r.fill([C(48, 48, 32)], Palette.UI_PAPER_DARK)
 	r.fill([L([Vector2(37, 38), Vector2(40, 29), Vector2(48, 25), Vector2(57, 29), Vector2(59, 37), Vector2(53, 44), Vector2(48, 49), Vector2(48, 56)], 4.8)], Palette.UI_INK_SOFT, NO_LINE)
 	r.fill([C(48, 68, 5.2)], Palette.UI_INK_SOFT, NO_LINE)
+
+
+# --- Chapter Two item drawings -------------------------------------------------------------------------
+# Added for the Chapter Two catalogue; the drawings above are untouched (pixel-identical).
+
+## Draws a Chapter Two icon id; false when the id is not one of them (the caller shows the fallback).
+static func _compose_ch2(r: Raster, id: String, c: Color) -> bool:
+	match id:
+		"flax": _flax(r, c)
+		"roseberries": _roseberries(r, c)
+		"resin": _resin(r, c)
+		"iron_ore": _iron_ore(r, c)
+		"cloth": _cloth(r, c)
+		"bar": _bar(r, c, false)
+		"bar_moon": _bar(r, c, true)
+		"moon_crystal": _moon_crystal(r, c)
+		"pumpkin": _pumpkin(r, c)
+		"sugarcap": _sugarcap(r, c)
+		"moonpetal": _moonpetal(r, c)
+		"wax": _wax(r, c)
+		"candy": _candy(r, c)
+		"seeds_sunflax": _seed_packet(r, c, "flax")
+		"seeds_roseberry": _seed_packet(r, c, "rose")
+		"seeds_pumpkin": _seed_packet(r, c, "pumpkin")
+		"wand": _wand(r, c)
+		"hood": _hood(r, c)
+		"vest": _vest(r, c)
+		"armor_boots": _armor_boots(r, c)
+		"helm": _helm(r, c)
+		"mail": _mail(r, c)
+		"charm_leaf": _charm(r, c, "leaf")
+		"charm_feather": _charm(r, c, "feather")
+		"charm_flame": _charm(r, c, "flame")
+		"soup": _soup(r, c)
+		"biscuit": _biscuit(r, c)
+		"tart": _tart(r, c)
+		"tea": _tea(r, c)
+		"platter": _platter(r, c)
+		"ribbon": _ribbon(r, c)
+		"seal": _seal(r, c)
+		"scrap": _scrap(r, c)
+		"stairs": _stairs(r, c)
+		"upper_floor": _upper_floor(r, c)
+		"railing": _railing(r, c)
+		"half_wall": _half_wall(r, c)
+		"porch_post": _porch_post(r, c)
+		"arched_window": _arched_window(r, c)
+		"gable_roof": _gable_roof(r, c)
+		"roof_corner": _roof_corner(r, c)
+		"flower_box": _flower_box(r, c)
+		"curtain": _curtain(r, c)
+		"bookshelf": _bookshelf(r, c)
+		"wardrobe": _wardrobe(r, c)
+		"mirror": _mirror(r, c)
+		"kitchen": _kitchen(r, c)
+		"furnace": _furnace(r, c)
+		"loom": _loom(r, c)
+		"pet_bed": _pet_bed(r, c)
+		"perch": _perch(r, c)
+		"planter": _planter(r, c)
+		"bench": _bench(r, c)
+		"jack_lantern": _jack_lantern(r, c)
+		"string_lights": _string_lights(r, c)
+		"bunting": _bunting(r, c)
+		"ghost_lantern": _ghost_lantern(r, c)
+		"crescent_window": _crescent_window(r, c)
+		"candy_bowl": _candy_bowl(r, c)
+		"scarecrow": _scarecrow(r, c)
+		"gothic_trim": _gothic_trim(r, c)
+		"music_box": _music_box(r, c)
+		"board": _board(r, c)
+		"wardlight": _wardlight(r, c)
+		"miner_lamp": _miner_lamp(r, c)
+		"veil": _veil(r, c)
+		"festival_table": _festival_table(r, c)
+		_:
+			return false
+	return true
+
+
+# Resources ---------------------------------------------------------------------------------------------
+
+static func _flax(r: Raster, c: Color) -> void:
+	var stem := c.darkened(0.3)
+	var heads := [[28.0, 26.0, -24.0], [40.0, 16.0, -9.0], [56.0, 16.0, 9.0], [68.0, 26.0, 24.0]]
+	for h in heads:
+		r.fill([L([Vector2(48, 84), Vector2(48, 62), Vector2(float(h[0]), float(h[1]) + 10.0)], [2.4, 2.2, 1.4])], stem)
+	for h in heads:
+		r.fill([E(float(h[0]), float(h[1]), 6.0, 12.0, float(h[2]))], c)
+		r.fill([L([Vector2(float(h[0]), float(h[1]) - 8.0), Vector2(float(h[0]), float(h[1]) + 8.0)], 0.9)], c.darkened(0.28), DETAIL)
+		_gloss(r, E(float(h[0]) - 2.0, float(h[1]) - 4.0, 1.6, 4.0, float(h[2])), 0.6)
+	r.fill([B(48, 64, 10, 4.5, 2)], Palette.TEAL)
+	r.fill([E(58, 70, 5, 3, 30)], Palette.TEAL.darkened(0.1))
+
+
+static func _roseberries(r: Raster, c: Color) -> void:
+	r.fill([E(66, 22, 13, 6, -24)], Palette.FOLIAGE)
+	r.fill([E(30, 22, 11, 5, 24)], Palette.FOLIAGE_LIGHT)
+	r.fill([L([Vector2(48, 36), Vector2(50, 22), Vector2(58, 18)], 2.0)], Palette.FOLIAGE_DARK)
+	for b in [[33.0, 56.0, 15.0], [63.0, 58.0, 14.0], [48.0, 42.0, 11.0]]:
+		var bx := float(b[0])
+		var by := float(b[1])
+		var br := float(b[2])
+		r.fill([E(bx, by, br * 0.92, br)], c)
+		for d in [Vector2(-5, -4), Vector2(4, -3), Vector2(-1, 3), Vector2(6, 5), Vector2(-6, 6)]:
+			r.fill([C(bx + d.x * br / 14.0, by + d.y * br / 14.0, 1.6)], c.darkened(0.22), DETAIL)
+		_gloss(r, E(bx - br * 0.35, by - br * 0.4, br * 0.22, br * 0.14, -30), 0.7)
+		r.fill([_star(bx, by - br + 1.0, 6.0, 2.4, 5)], Palette.FOLIAGE_LIGHT, {"o": 2.0})
+
+
+static func _resin(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(14, 72), Vector2(30, 62), Vector2(70, 60), Vector2(84, 70), Vector2(72, 82), Vector2(24, 84)], 3.0)], Palette.BARK)
+	r.fill([L([Vector2(26, 74), Vector2(70, 72)], 1.2)], Palette.BARK_DARK, DETAIL)
+	r.fill([C(48, 56, 20), P([Vector2(31, 46), Vector2(48, 14), Vector2(65, 46)], 3.0)], c)
+	r.fill([C(48, 58, 13)], c.lightened(0.22), NO_LINE)
+	r.fill([C(68, 70, 6), P([Vector2(63, 68), Vector2(68, 58), Vector2(73, 68)], 1.0)], c.darkened(0.06))
+	_gloss(r, E(40, 44, 5, 8, 20), 0.7)
+	_gloss(r, C(56, 64, 2.5), 0.6)
+	_sparkle(r, 76, 26, 7)
+
+
+static func _iron_ore(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(16, 60), Vector2(26, 36), Vector2(50, 24), Vector2(74, 34), Vector2(80, 60), Vector2(62, 78), Vector2(28, 78)], 5.0)], Palette.STONE_DARK.darkened(0.1))
+	_gloss(r, E(34, 40, 8, 4, -30), 0.25)
+	var nug := c
+	r.fill([P([Vector2(30, 48), Vector2(38, 38), Vector2(48, 44), Vector2(44, 58), Vector2(32, 58)], 1.0)], nug)
+	r.fill([P([Vector2(52, 50), Vector2(62, 42), Vector2(70, 52), Vector2(64, 64), Vector2(54, 62)], 1.0)], nug.darkened(0.08))
+	r.fill([P([Vector2(38, 64), Vector2(46, 62), Vector2(48, 70), Vector2(40, 72)], 1.0)], nug.lightened(0.08))
+	for p in [Vector2(36, 44), Vector2(60, 48), Vector2(42, 65)]:
+		r.fill([L([p, p + Vector2(4, 4)], 1.0)], Color(1, 1, 1, 0.7), NO_LINE)
+	r.fill([L([Vector2(38, 40), Vector2(44, 56)], 0.9)], nug.darkened(0.3), DETAIL)
+
+
+static func _cloth(r: Raster, c: Color) -> void:
+	r.fill([B(46, 66, 32, 11, 5)], c.darkened(0.12))
+	r.fill([B(46, 46, 32, 11, 5)], c)
+	for y in [46.0, 66.0]:
+		r.fill([L([Vector2(18, y + 7.0), Vector2(74, y + 7.0)], 0.9)], c.darkened(0.3), DETAIL)
+	r.fill([L([Vector2(18, 41), Vector2(74, 41)], 0.9)], c.darkened(0.18), DETAIL)
+	r.fill([C(80, 56, 11)], c.lightened(0.04))
+	r.fill([R(80, 56, 5.5, 1.4)], c.darkened(0.2), DETAIL)
+	r.fill([B(40, 56, 5, 22, 1.5)], Palette.TEAL)
+	_gloss(r, B(30, 42, 10, 1.6, 1.5), 0.5)
+
+
+static func _bar(r: Raster, c: Color, moon: bool) -> void:
+	# a second bar peeking behind, then the front ingot (top face + front face)
+	r.fill([P([Vector2(40, 28), Vector2(72, 28), Vector2(80, 40), Vector2(34, 40)], 2.0)], c.darkened(0.2))
+	r.fill([P([Vector2(18, 58), Vector2(78, 58), Vector2(70, 76), Vector2(26, 76)], 2.0)], c.darkened(0.16))
+	r.fill([P([Vector2(28, 40), Vector2(68, 40), Vector2(78, 58), Vector2(18, 58)], 2.0)], c)
+	r.fill([B(48, 49, 11, 4.5, 1.5)], c.darkened(0.1), DETAIL)
+	_gloss(r, L([Vector2(30, 44), Vector2(56, 44)], 1.5), 0.6)
+	if moon:
+		r.fill([C(48, 49, 4.2), CUT(C(50.5, 47.5, 3.6))], Color("fffbe8"), NO_LINE)
+		_sparkle(r, 78, 22, 8)
+		_sparkle(r, 18, 36, 5)
+	else:
+		_sparkle(r, 80, 24, 6)
+
+
+static func _moon_crystal(r: Raster, c: Color) -> void:
+	_halo(r, 48, 48, 44, c, 0.5)
+	r.fill([P([Vector2(22, 70), Vector2(28, 54), Vector2(36, 70)], 1.0)], c.darkened(0.12))
+	r.fill([P([Vector2(62, 72), Vector2(70, 50), Vector2(78, 72)], 1.0)], c.darkened(0.08))
+	r.fill([C(48, 48, 26), CUT(C(60, 40, 22))], c)
+	r.fill([L([Vector2(30, 40), Vector2(40, 64)], 1.0), L([Vector2(26, 56), Vector2(46, 70)], 1.0)], c.darkened(0.2), DETAIL)
+	_gloss(r, E(30, 42, 3, 8, 20), 0.7)
+	r.fill([B(48, 78, 30, 5, 3)], Palette.STONE_DARK)
+	_sparkle(r, 70, 22, 8)
+	_sparkle(r, 78, 42, 5)
+
+
+static func _pumpkin(r: Raster, c: Color) -> void:
+	r.fill([E(48, 58, 34, 25)], c.darkened(0.14))
+	r.fill([E(33, 58, 15, 24)], c.darkened(0.04))
+	r.fill([E(63, 58, 15, 24)], c.darkened(0.04))
+	r.fill([E(48, 58, 14, 25.5)], c.lightened(0.06))
+	_gloss(r, E(42, 46, 4, 8, 10), 0.5)
+	r.fill([L([Vector2(48, 36), Vector2(50, 26), Vector2(56, 20)], [4.5, 4.0, 3.2])], Palette.BARK)
+	r.fill([E(66, 30, 10, 5, -20)], Palette.FOLIAGE)
+	r.fill([L([Vector2(40, 30), Vector2(34, 24), Vector2(38, 18), Vector2(44, 20)], 1.3)], Palette.FOLIAGE_DARK, {"o": 1.5})
+
+
+static func _sugarcap(r: Raster, c: Color) -> void:
+	var cream := Color("fff4e0")
+	r.fill([L([Vector2(48, 84), Vector2(48, 58)], [9.0, 7.5])], cream)
+	r.fill([E(48, 46, 30, 20), CUT(B(48, 72, 40, 12))], c)
+	for x in [34.0, 48.0, 62.0]:
+		r.fill([L([Vector2(x - 6.0, 34), Vector2(x, 44), Vector2(x - 4.0, 56)], 2.4)], Color(1, 1, 1, 0.9), NO_LINE)
+	r.fill([E(48, 58, 26, 4)], c.darkened(0.18), NO_LINE)
+	r.fill([C(48, 24, 4.0)], Palette.FLOWER_RED)
+	_gloss(r, E(34, 36, 6, 3, -20), 0.5)
+	_sparkle(r, 78, 26, 6)
+
+
+static func _moonpetal(r: Raster, c: Color) -> void:
+	r.fill([L([Vector2(48, 86), Vector2(46, 60)], 2.4)], Palette.FOLIAGE_DARK)
+	r.fill([E(36, 76, 10, 4, 30)], Palette.FOLIAGE)
+	var petals: Array = []
+	for i in 5:
+		var a := TAU * float(i) / 5.0 - PI * 0.5
+		petals.append(E(48.0 + cos(a) * 15.0, 42.0 + sin(a) * 15.0, 8.5, 15.0, rad_to_deg(a) + 90.0))
+	r.fill(petals, c)
+	for i in 5:
+		var a2 := TAU * float(i) / 5.0 - PI * 0.5
+		r.fill([L([Vector2(48, 42), Vector2(48.0 + cos(a2) * 22.0, 42.0 + sin(a2) * 22.0)], 0.9)], c.darkened(0.2), DETAIL)
+	r.fill([C(48, 42, 7.5), CUT(C(51, 39.5, 6.2))], Color("fffbe8"), {"o": 1.5, "back": false})
+	_sparkle(r, 78, 22, 7)
+
+
+static func _wax(r: Raster, c: Color) -> void:
+	r.fill([B(48, 64, 30, 16, 6)], c.darkened(0.08))
+	r.fill([E(48, 49, 30, 8)], c.lightened(0.1))
+	for x in [30.0, 46.0, 64.0]:
+		r.fill([L([Vector2(x, 52), Vector2(x, 60.0 + fmod(x, 7.0))], 3.0), C(x, 61.0 + fmod(x, 7.0), 3.4)], c.lightened(0.05), {"o": 2.0})
+	r.fill([L([Vector2(48, 44), Vector2(48, 30)], 3.2)], Palette.CLOTH_CREAM)
+	r.fill([E(48, 22, 4.5, 8)], Palette.LANTERN_GLOW, {"o": 2.0})
+	r.fill([E(48, 24, 2, 4)], Color("fff4c8"), NO_LINE)
+	_gloss(r, B(28, 66, 2, 8, 2), 0.4)
+
+
+static func _candy(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(30, 48), Vector2(12, 34), Vector2(16, 48), Vector2(12, 62)], 2.5)], c.lightened(0.15))
+	r.fill([P([Vector2(66, 48), Vector2(84, 34), Vector2(80, 48), Vector2(84, 62)], 2.5)], c.lightened(0.15))
+	r.fill([E(48, 48, 22, 16)], c)
+	for x in [40.0, 50.0, 60.0]:
+		r.fill([L([Vector2(x - 4.0, 34), Vector2(x + 2.0, 62)], 2.2)], Color(1, 1, 1, 0.85), NO_LINE)
+	_gloss(r, E(40, 40, 6, 3, -20), 0.6)
+
+
+static func _seed_packet(r: Raster, c: Color, kind: String) -> void:
+	var paper := Palette.UI_PAPER
+	r.fill([B(48, 50, 25, 32, 4)], paper)
+	r.fill([P([Vector2(23, 22), Vector2(73, 22), Vector2(66, 32), Vector2(30, 32)], 1.5)], paper.darkened(0.08))
+	r.fill([B(48, 56, 18, 18, 3)], c.lightened(0.35), NO_LINE)
+	match kind:
+		"flax":
+			for x in [40.0, 48.0, 56.0]:
+				r.fill([L([Vector2(48, 70), Vector2(x, 50)], 1.2)], Palette.FOLIAGE_DARK, DETAIL)
+				r.fill([E(x, 47, 3.5, 7)], Color("f2cf62"), {"o": 1.5, "back": false})
+		"rose":
+			r.fill([E(58, 46, 7, 3.5, -25)], Palette.FOLIAGE, {"o": 1.5, "back": false})
+			r.fill([C(42, 58, 7), C(54, 60, 6.5)], Color("e0607e"), {"o": 1.5, "back": false})
+		_:
+			r.fill([E(48, 60, 13, 10)], Color("f08a2e"), {"o": 1.5, "back": false})
+			r.fill([L([Vector2(48, 50), Vector2(50, 44)], 1.8)], Palette.BARK, {"o": 1.2, "back": false})
+	r.fill([L([Vector2(30, 80), Vector2(66, 80)], 1.0)], Palette.UI_INK_SOFT, DETAIL)
+	r.fill([E(76, 78, 5, 7.5, -20)], c)
+	r.fill([E(66, 84, 4.5, 7, 30)], c.darkened(0.08))
+
+
+# Equipment ---------------------------------------------------------------------------------------------
+
+static func _wand(r: Raster, c: Color) -> void:
+	_halo(r, 66, 30, 30, Palette.LANTERN_GLOW, 0.55)
+	r.fill([L([Vector2(22, 80), Vector2(60, 38)], [4.5, 3.4])], Palette.COPPER)
+	r.fill([L([Vector2(26, 76), Vector2(34, 67)], 5.2)], Palette.WOOD_DARK)
+	_gloss(r, L([Vector2(34, 64), Vector2(56, 40)], 1.2), 0.5)
+	r.fill([C(64, 32, 10)], Palette.GLOWCAP)
+	r.fill([C(64, 32, 5)], Color("fffbe8"), NO_LINE)
+	r.fill([B(58, 40, 5, 3, 1.5, -45)], Palette.MEADOW_GOLD)
+	_sparkle(r, 80, 16, 8)
+	_sparkle(r, 84, 42, 5)
+	r.fill([C(76, 28, 2.2)], c, NO_LINE)
+
+
+static func _hood(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(20, 80), Vector2(22, 44), Vector2(34, 22), Vector2(48, 16), Vector2(62, 22), Vector2(74, 44), Vector2(76, 80)], 10.0)], c)
+	r.fill([E(48, 54, 17, 20)], Palette.BARK_DARK.darkened(0.2), {"o": 2.0, "back": false})
+	r.fill([L([Vector2(31, 30), Vector2(48, 24), Vector2(65, 30)], 1.0)], c.darkened(0.25), DETAIL)
+	r.fill([L([Vector2(26, 60), Vector2(30, 76)], 1.0), L([Vector2(70, 60), Vector2(66, 76)], 1.0)], c.darkened(0.25), DETAIL)
+	r.fill([L([Vector2(38, 76), Vector2(34, 88)], 1.6), L([Vector2(58, 76), Vector2(62, 88)], 1.6)], Palette.CLOTH_CREAM, {"o": 1.5})
+	_gloss(r, E(32, 38, 4, 10, 25), 0.4)
+
+
+static func _vest(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(26, 22), Vector2(40, 18), Vector2(48, 40), Vector2(56, 18), Vector2(70, 22), Vector2(78, 40), Vector2(72, 48), Vector2(72, 82), Vector2(24, 82), Vector2(24, 48), Vector2(18, 40)], 4.0)], c)
+	r.fill([L([Vector2(48, 42), Vector2(48, 82)], 1.2)], c.darkened(0.3), DETAIL)
+	for y in [54.0, 66.0, 78.0]:
+		r.fill([L([Vector2(26, y), Vector2(46, y - 2.0)], 0.9), L([Vector2(50, y - 2.0), Vector2(70, y)], 0.9)], c.darkened(0.2), DETAIL)
+	for y in [50.0, 62.0, 74.0]:
+		r.fill([C(52, y, 2.2)], Palette.MEADOW_GOLD, {"o": 1.2, "back": false})
+	_gloss(r, B(30, 50, 2, 12, 2), 0.35)
+
+
+static func _armor_boots(r: Raster, c: Color) -> void:
+	for off in [[0.0, 0.0], [18.0, 6.0]]:
+		var dx := float(off[0])
+		var dy := float(off[1])
+		var col := c if dx > 0.0 else c.darkened(0.12)
+		r.fill([B(34.0 + dx, 44.0 + dy, 9, 20, 3), E(44.0 + dx, 64.0 + dy, 17, 9)], col)
+		r.fill([B(40.0 + dx, 73.0 + dy, 19, 3, 1.5)], Palette.BARK_DARK)
+		r.fill([B(34.0 + dx, 28.0 + dy, 11, 4, 2)], col.lightened(0.12))
+	_gloss(r, B(48, 44, 1.8, 12, 1.8), 0.4)
+
+
+static func _helm(r: Raster, c: Color) -> void:
+	r.fill([C(48, 50, 30), CUT(B(48, 86, 40, 12))], c)
+	r.fill([B(48, 70, 32, 5, 3)], c.darkened(0.14))
+	r.fill([B(48, 64, 5, 16, 2)], c.darkened(0.1))
+	r.fill([L([Vector2(48, 22), Vector2(48, 48)], 2.2)], c.darkened(0.2), DETAIL)
+	for x in [24.0, 36.0, 60.0, 72.0]:
+		r.fill([C(x, 70, 2.0)], Palette.MEADOW_GOLD, {"o": 1.2, "back": false})
+	r.fill([E(48, 20, 5, 7)], Palette.FLOWER_RED)
+	_gloss(r, E(36, 36, 6, 10, 25), 0.5)
+
+
+static func _mail(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(24, 24), Vector2(38, 18), Vector2(48, 26), Vector2(58, 18), Vector2(72, 24), Vector2(82, 42), Vector2(72, 48), Vector2(70, 82), Vector2(26, 82), Vector2(24, 48), Vector2(14, 42)], 4.0)], c)
+	var sc := c.darkened(0.22)
+	for row in 4:
+		var y := 40.0 + float(row) * 10.0
+		var shift := 5.0 if row % 2 == 1 else 0.0
+		for k in 5:
+			var x := 30.0 + shift + float(k) * 9.0
+			if x < 70.0:
+				r.fill([L([Vector2(x - 4.0, y), Vector2(x, y + 4.0), Vector2(x + 4.0, y)], 0.9)], sc, DETAIL)
+	r.fill([B(48, 78, 22, 3, 1.5)], Palette.BARK)
+	_gloss(r, B(30, 50, 2, 14, 2), 0.45)
+
+
+static func _charm(r: Raster, c: Color, kind: String) -> void:
+	r.fill([L([Vector2(30, 14), Vector2(40, 30), Vector2(48, 34), Vector2(56, 30), Vector2(66, 14)], 1.6)], Palette.BARK, {"o": 1.5})
+	r.fill([C(48, 36, 4.0)], Palette.MEADOW_GOLD)
+	match kind:
+		"leaf":
+			r.fill([E(48, 60, 15, 22, 18)], c)
+			r.fill([L([Vector2(44, 42), Vector2(52, 78)], 1.2)], c.darkened(0.3), DETAIL)
+			r.fill([L([Vector2(47, 54), Vector2(38, 50)], 0.9), L([Vector2(49, 64), Vector2(60, 58)], 0.9)], c.darkened(0.3), DETAIL)
+		"feather":
+			r.fill([E(48, 62, 11, 24, 12)], c)
+			r.fill([L([Vector2(44, 40), Vector2(52, 84)], 1.3)], c.darkened(0.3), DETAIL)
+			for t in [0.3, 0.5, 0.7]:
+				var p := Vector2(44, 40).lerp(Vector2(52, 84), t)
+				r.fill([L([p, p + Vector2(-9, -5)], 0.9), L([p, p + Vector2(9, -7)], 0.9)], c.darkened(0.2), DETAIL)
+		_:
+			_halo(r, 48, 62, 26, c, 0.5)
+			r.fill([P([Vector2(48, 38), Vector2(62, 58), Vector2(58, 76), Vector2(48, 82), Vector2(38, 76), Vector2(34, 58)], 6.0)], c)
+			r.fill([P([Vector2(48, 56), Vector2(55, 68), Vector2(48, 78), Vector2(41, 68)], 3.0)], Color("fff4c8"), NO_LINE)
+	_gloss(r, E(42, 52, 2.5, 6, 18), 0.6)
+	_sparkle(r, 74, 44, 6)
+
+
+# Food and companion gear --------------------------------------------------------------------------------
+
+static func _soup(r: Raster, c: Color) -> void:
+	var steam := Color(1, 1, 1, 0.92)
+	r.fill([L([Vector2(40, 32), Vector2(36, 22), Vector2(42, 12)], 3.0)], steam, {"o": 2.0, "shade": 0.0})
+	r.fill([L([Vector2(58, 30), Vector2(62, 20), Vector2(57, 12)], 3.0)], steam, {"o": 2.0, "shade": 0.0})
+	r.fill([E(48, 50, 34, 9), E(48, 54, 30, 24), CUT(B(48, 30, 40, 20))], Palette.CLOTH_CREAM)
+	r.fill([B(48, 80, 12, 3, 1.5)], Palette.CLOTH_CREAM.darkened(0.1))
+	r.fill([E(48, 50, 28, 6)], c)
+	r.fill([L([Vector2(38, 50), Vector2(46, 47), Vector2(54, 51), Vector2(60, 49)], 1.6)], Color(1, 1, 1, 0.85), NO_LINE)
+	r.fill([E(66, 49, 3, 1.8, 20)], Palette.CLOTH_CREAM, NO_LINE)
+	r.fill([L([Vector2(18, 64), Vector2(48, 74)], 0.9)], Palette.BERRY.lightened(0.2), DETAIL)
+	_gloss(r, L([Vector2(22, 60), Vector2(28, 70)], 1.8), 0.45)
+
+
+static func _biscuit(r: Raster, c: Color) -> void:
+	for pos in [[36.0, 60.0, 0.1], [58.0, 48.0, 0.0]]:
+		var x := float(pos[0])
+		var y := float(pos[1])
+		var col: Color = c.darkened(float(pos[2]))
+		var lobes: Array = []
+		for i in 6:
+			var a := TAU * float(i) / 6.0
+			lobes.append(C(x + cos(a) * 12.0, y + sin(a) * 10.0, 8.0))
+		lobes.append(C(x, y, 14.0))
+		r.fill(lobes, col)
+		r.fill([L([Vector2(x - 6.0, y - 1.0), Vector2(x - 3.0, y + 4.0)], 1.0), L([Vector2(x + 3.0, y - 2.0), Vector2(x + 6.0, y + 3.0)], 1.0)], col.darkened(0.3), DETAIL)
+		r.fill([L([Vector2(x, y - 12.0), Vector2(x + 1.0, y - 17.0)], 2.2)], Palette.FOLIAGE_DARK, {"o": 1.5})
+		_gloss(r, E(x - 5.0, y - 5.0, 4, 2, -20), 0.5)
+
+
+static func _tart(r: Raster, c: Color) -> void:
+	var crust := Color("e8b56a")
+	r.fill([E(48, 62, 34, 12)], crust.darkened(0.1))
+	var scallop: Array = [E(48, 54, 34, 14)]
+	for i in 10:
+		var a := TAU * float(i) / 10.0
+		scallop.append(C(48.0 + cos(a) * 32.0, 54.0 + sin(a) * 12.0, 4.5))
+	r.fill(scallop, crust)
+	r.fill([E(48, 53, 25, 8)], c)
+	for p in [Vector2(38, 51), Vector2(48, 55), Vector2(58, 51), Vector2(48, 48)]:
+		r.fill([C(p.x, p.y, 4.5)], c.darkened(0.12), {"o": 1.5, "back": false})
+		_gloss(r, C(p.x - 1.5, p.y - 1.5, 1.2), 0.8)
+	r.fill([E(64, 38, 8, 4, -25)], Palette.FOLIAGE)
+	_gloss(r, E(30, 60, 5, 2, -10), 0.4)
+
+
+static func _tea(r: Raster, c: Color) -> void:
+	var steam := Color(1, 1, 1, 0.9)
+	r.fill([L([Vector2(42, 30), Vector2(38, 20), Vector2(44, 12)], 2.6)], steam, {"o": 2.0, "shade": 0.0})
+	r.fill([E(48, 78, 34, 7)], Palette.CLOTH_CREAM.darkened(0.08))
+	r.fill([R(74, 54, 8, 4)], Palette.CLOTH_CREAM)
+	r.fill([E(46, 44, 24, 7), E(46, 54, 22, 20), CUT(B(46, 26, 30, 18))], Palette.CLOTH_CREAM)
+	r.fill([E(46, 44, 19, 4.5)], c)
+	r.fill([E(40, 43, 4, 2, -20)], Palette.BLOSSOM.lightened(0.2), NO_LINE)
+	r.fill([L([Vector2(30, 60), Vector2(62, 60)], 1.2)], c.darkened(0.1), DETAIL)
+	_gloss(r, L([Vector2(28, 50), Vector2(32, 62)], 1.6), 0.45)
+
+
+static func _platter(r: Raster, c: Color) -> void:
+	r.fill([E(48, 62, 40, 16)], Palette.CLOTH_CREAM)
+	r.fill([E(48, 60, 32, 11)], Palette.CLOTH_CREAM.darkened(0.06), NO_LINE)
+	r.fill([E(36, 54, 13, 10), E(30, 54, 7, 9.5), E(42, 54, 7, 9.5)], Color("f08a2e"))
+	r.fill([L([Vector2(36, 44), Vector2(38, 38)], 2.0)], Palette.BARK, {"o": 1.5})
+	r.fill([C(58, 60, 5.5), C(66, 56, 5.0), C(62, 50, 4.5)], Color("e0607e"))
+	r.fill([L([Vector2(70, 66), Vector2(80, 54)], [5.0, 2.0])], Color("f29a4a"))
+	r.fill([E(80, 50, 5, 2.5, -40)], Palette.FOLIAGE, {"o": 1.5})
+	r.fill([L([Vector2(24, 34), Vector2(26, 26)], 2.0)], c, {"o": 1.5})
+	_sparkle(r, 18, 28, 6)
+	_gloss(r, E(30, 66, 8, 2, -5), 0.4)
+
+
+static func _ribbon(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(44, 50), Vector2(30, 84), Vector2(38, 80), Vector2(42, 88)], 2.0)], c.darkened(0.12))
+	r.fill([P([Vector2(52, 50), Vector2(66, 84), Vector2(58, 80), Vector2(54, 88)], 2.0)], c.darkened(0.12))
+	r.fill([E(30, 40, 18, 12, -15)], c)
+	r.fill([E(66, 40, 18, 12, 15)], c)
+	r.fill([E(30, 40, 7, 4, -15)], c.darkened(0.25), DETAIL)
+	r.fill([E(66, 40, 7, 4, 15)], c.darkened(0.25), DETAIL)
+	r.fill([B(48, 44, 7, 8, 3)], c.lightened(0.08))
+	_gloss(r, E(24, 34, 5, 2.5, -15), 0.6)
+	r.fill(_heart(76, 18, 3.5), Palette.HEART_GLOW, {"o": 1.5})
+
+
+static func _seal(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(36, 60), Vector2(28, 90), Vector2(36, 84), Vector2(42, 90), Vector2(46, 62)], 1.5)], Palette.CLOTH_RED)
+	r.fill([P([Vector2(50, 62), Vector2(54, 90), Vector2(60, 84), Vector2(68, 90), Vector2(60, 60)], 1.5)], Palette.CLOTH_RED.darkened(0.1))
+	var rim: Array = [C(48, 44, 26)]
+	for i in 12:
+		var a := TAU * float(i) / 12.0
+		rim.append(C(48.0 + cos(a) * 25.0, 44.0 + sin(a) * 25.0, 5.0))
+	r.fill(rim, c)
+	r.fill([R(48, 44, 18, 2.0)], c.darkened(0.2), DETAIL)
+	# a little lantern emblem
+	r.fill([B(48, 46, 7, 9, 3)], Palette.LANTERN_GLOW.lightened(0.2), {"o": 1.8, "back": false})
+	r.fill([L([Vector2(44, 36), Vector2(52, 36)], 1.8)], c.darkened(0.35), NO_LINE)
+	r.fill([C(48, 47, 2.5)], Palette.MINE_LIGHT, NO_LINE)
+	_gloss(r, E(36, 32, 6, 3, -30), 0.5)
+
+
+static func _scrap(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(18, 30), Vector2(64, 20), Vector2(80, 36), Vector2(76, 70), Vector2(66, 80), Vector2(56, 74), Vector2(44, 82), Vector2(22, 72)], 5.0)], c)
+	r.fill([P([Vector2(64, 20), Vector2(80, 36), Vector2(62, 38)], 2.0)], c.lightened(0.12))
+	r.fill([L([Vector2(24, 36), Vector2(60, 28)], 1.0), L([Vector2(26, 66), Vector2(42, 74)], 1.0)], c.lightened(0.3), DETAIL)
+	for t in [0.15, 0.35, 0.55, 0.75]:
+		var p := Vector2(22, 40).lerp(Vector2(26, 66), t)
+		r.fill([L([p, p + Vector2(3, 0)], 0.9)], Palette.MEADOW_GOLD, DETAIL)
+	_gloss(r, E(40, 44, 10, 4, -12), 0.3)
+	_sparkle(r, 84, 18, 6)
+
+
+# Building pieces ----------------------------------------------------------------------------------------
+
+static func _stairs(r: Raster, c: Color) -> void:
+	var dk := c.darkened(0.25)
+	r.fill([P([Vector2(14, 84), Vector2(80, 84), Vector2(80, 20), Vector2(68, 20)], 2.0)], dk)
+	for i in 5:
+		var x := 14.0 + float(i) * 13.0
+		var y := 84.0 - float(i + 1) * 12.8
+		r.fill([B(x + 13.0, y + 3.0, 13.5, 3.5, 1.5)], c)
+		_gloss(r, L([Vector2(x + 2.0, y + 1.5), Vector2(x + 20.0, y + 1.5)], 0.9), 0.5)
+	r.fill([L([Vector2(18, 58), Vector2(76, 10)], 2.4)], Palette.WOOD_DARK)
+	r.fill([L([Vector2(18, 58), Vector2(18, 76)], 2.0), L([Vector2(47, 34), Vector2(47, 50)], 2.0)], Palette.WOOD_DARK)
+
+
+static func _upper_floor(r: Raster, c: Color) -> void:
+	for x in [22.0, 74.0]:
+		r.fill([B(x, 70, 4, 16, 1.5)], Palette.WOOD_DARK)
+	r.fill([B(48, 84, 36, 3, 1.5)], Palette.STONE)
+	r.fill([P([Vector2(14, 46), Vector2(48, 60), Vector2(82, 46), Vector2(82, 52), Vector2(48, 66), Vector2(14, 52)], 0.5)], c.darkened(0.22))
+	r.fill([P([Vector2(14, 46), Vector2(48, 30), Vector2(82, 46), Vector2(48, 60)], 1.0)], c)
+	for k in [1.0, 2.0]:
+		var a := Vector2(14, 46).lerp(Vector2(48, 60), k / 3.0)
+		var b := Vector2(48, 30).lerp(Vector2(82, 46), k / 3.0)
+		r.fill([L([a, b], 1.1)], c.darkened(0.25), DETAIL)
+	r.fill([P([Vector2(58, 18), Vector2(66, 26), Vector2(62, 26), Vector2(62, 34), Vector2(54, 34), Vector2(54, 26), Vector2(50, 26)], 1.0)], Palette.UI_GOOD, {"o": 2.0})
+
+
+static func _railing(r: Raster, c: Color) -> void:
+	r.fill([B(48, 74, 38, 4, 2)], c.darkened(0.15))
+	for x in [18.0, 33.0, 48.0, 63.0, 78.0]:
+		var w := 4.0 if (x == 18.0 or x == 78.0) else 2.8
+		r.fill([B(x, 54, w, 20, 1.5)], c.darkened(0.05) if w < 4.0 else c.darkened(0.12))
+		if w < 4.0:
+			r.fill([C(x, 54, 3.8)], c.darkened(0.05))
+	r.fill([B(48, 34, 40, 5, 2.5)], c)
+	_gloss(r, L([Vector2(14, 32), Vector2(60, 32)], 1.2), 0.5)
+
+
+static func _half_wall(r: Raster, c: Color) -> void:
+	r.fill([B(48, 62, 34, 18, 3)], c)
+	for x in [26.0, 40.0, 56.0, 70.0]:
+		r.fill([L([Vector2(x, 46), Vector2(x, 80)], 1.2)], c.darkened(0.28), DETAIL)
+	r.fill([B(48, 42, 38, 5, 2.5)], c.darkened(0.2))
+	r.fill([E(64, 32, 8, 4, -20)], Palette.FOLIAGE)
+	r.fill([L([Vector2(58, 38), Vector2(62, 32)], 1.2)], Palette.FOLIAGE_DARK, {"o": 1.2})
+	_flower(r, 66, 30, 5.0, Palette.BLOSSOM)
+	_gloss(r, B(18, 62, 1.6, 14, 1.6), 0.3)
+
+
+static func _porch_post(r: Raster, c: Color) -> void:
+	r.fill([B(48, 82, 14, 5, 2)], Palette.STONE)
+	r.fill([B(48, 50, 7, 32, 2)], c)
+	r.fill([L([Vector2(48, 26), Vector2(48, 76)], 0.9)], c.darkened(0.28), DETAIL)
+	for y in [30.0, 70.0]:
+		r.fill([B(48, y, 10, 3, 1.5)], c.lightened(0.1))
+	r.fill([B(48, 16, 32, 4, 2)], c.darkened(0.12))
+	r.fill([L([Vector2(26, 20), Vector2(40, 32)], 2.4), L([Vector2(70, 20), Vector2(56, 32)], 2.4)], c.darkened(0.08))
+	_gloss(r, B(44, 50, 1.4, 22, 1.4), 0.4)
+
+
+static func _arched_window(r: Raster, c: Color) -> void:
+	r.fill([B(48, 50, 29, 33, 4)], c)
+	for x in [26.0, 70.0]:
+		r.fill([L([Vector2(x, 20), Vector2(x, 80)], 1.3)], c.darkened(0.28), DETAIL)
+	r.fill([B(48, 56, 13, 16, 1.5), C(48, 40, 13)], Palette.WATER.lightened(0.25))
+	r.fill([L([Vector2(48, 28), Vector2(48, 72)], 2.0)], c.darkened(0.15), {"o": 1.5, "back": false})
+	r.fill([L([Vector2(35, 50), Vector2(61, 50)], 2.0)], c.darkened(0.15), {"o": 1.5, "back": false})
+	_gloss(r, E(42, 36, 3, 5, -20), 0.75)
+	r.fill([B(48, 74, 17, 3, 1.5)], c.darkened(0.18))
+
+
+static func _gable_roof(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(20, 76), Vector2(48, 30), Vector2(76, 76)], 2.0)], Palette.WOOD_LIGHT)
+	r.fill([R(48, 58, 6.5, 2.5)], Palette.WOOD_DARK)
+	r.fill([C(48, 58, 5)], Palette.BARK_DARK.darkened(0.2), NO_LINE)
+	r.fill([L([Vector2(10, 78), Vector2(48, 18), Vector2(86, 78)], 6.0)], c)
+	var ln := c.darkened(0.22)
+	for t in [0.3, 0.6]:
+		r.fill([L([Vector2(10, 78).lerp(Vector2(48, 18), t), Vector2(10, 78).lerp(Vector2(48, 18), t) + Vector2(5, 3)], 1.0)], ln, DETAIL)
+		r.fill([L([Vector2(86, 78).lerp(Vector2(48, 18), t), Vector2(86, 78).lerp(Vector2(48, 18), t) + Vector2(-5, 3)], 1.0)], ln, DETAIL)
+	r.fill([B(48, 82, 30, 3, 1.5)], Palette.WOOD_DARK)
+	r.fill([C(48, 16, 4)], Palette.MEADOW_GOLD)
+
+
+static func _roof_corner(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(14, 66), Vector2(56, 24), Vector2(56, 82), Vector2(30, 84)], 3.0)], c.darkened(0.14))
+	r.fill([P([Vector2(56, 24), Vector2(84, 58), Vector2(76, 76), Vector2(56, 82)], 3.0)], c)
+	var ln := c.darkened(0.25)
+	for t in [0.35, 0.7]:
+		r.fill([L([Vector2(56, 24).lerp(Vector2(22, 75), t), Vector2(56, 24).lerp(Vector2(56, 82), t)], 1.1)], ln, DETAIL)
+		r.fill([L([Vector2(56, 24).lerp(Vector2(80, 67), t), Vector2(56, 24).lerp(Vector2(56, 82), t)], 1.1)], ln, DETAIL)
+	r.fill([L([Vector2(56, 24), Vector2(56, 82)], 2.2)], c.darkened(0.3), {"o": 1.5, "back": false})
+	r.fill([C(56, 22, 4.5)], Palette.MEADOW_GOLD)
+	_gloss(r, L([Vector2(62, 36), Vector2(76, 54)], 1.4), 0.4)
+
+
+static func _flower_box(r: Raster, c: Color) -> void:
+	r.fill([E(22, 50, 9, 4, 30)], Palette.FOLIAGE)
+	r.fill([E(74, 50, 9, 4, -30)], Palette.FOLIAGE_DARK)
+	for x in [30.0, 48.0, 66.0]:
+		r.fill([L([Vector2(x, 60), Vector2(x, 42)], 1.6)], Palette.FOLIAGE_DARK, {"o": 1.5})
+	_flower(r, 30, 38, 7.5, c)
+	_flower(r, 48, 34, 8.0, Palette.FLOWER_WHITE)
+	_flower(r, 66, 38, 7.5, Palette.FLOWER_BLUE)
+	r.fill([B(48, 68, 36, 11, 3)], Palette.WOOD)
+	r.fill([L([Vector2(14, 68), Vector2(82, 68)], 1.1)], Palette.WOOD_DARK, DETAIL)
+	for x in [24.0, 72.0]:
+		r.fill([L([Vector2(x, 80), Vector2(x - 4.0, 88)], 2.2)], Palette.WOOD_DARK)
+	_gloss(r, B(22, 64, 2, 5, 2), 0.35)
+
+
+static func _curtain(r: Raster, c: Color) -> void:
+	r.fill([L([Vector2(12, 18), Vector2(84, 18)], 2.6)], Palette.WOOD_DARK)
+	for x in [12.0, 84.0]:
+		r.fill([C(x, 18, 4)], Palette.MEADOW_GOLD)
+	r.fill([P([Vector2(16, 20), Vector2(42, 20), Vector2(34, 52), Vector2(40, 86), Vector2(16, 86)], 3.0)], c)
+	r.fill([P([Vector2(54, 20), Vector2(80, 20), Vector2(80, 86), Vector2(56, 86), Vector2(62, 52)], 3.0)], c.darkened(0.06))
+	for x in [22.0, 30.0]:
+		r.fill([L([Vector2(x, 24), Vector2(x - 2.0, 82)], 1.0)], c.darkened(0.25), DETAIL)
+	for x in [66.0, 74.0]:
+		r.fill([L([Vector2(x, 24), Vector2(x + 2.0, 82)], 1.0)], c.darkened(0.25), DETAIL)
+	r.fill([B(34, 54, 5, 3, 1.5), B(62, 54, 5, 3, 1.5)], Palette.MEADOW_GOLD)
+	_gloss(r, B(20, 50, 1.6, 20, 1.6), 0.4)
+
+
+static func _bookshelf(r: Raster, c: Color) -> void:
+	r.fill([B(48, 52, 30, 34, 3)], c)
+	r.fill([B(48, 52, 24, 29, 1.5)], c.darkened(0.35), NO_LINE)
+	for y in [36.0, 56.0, 76.0]:
+		r.fill([B(48, y + 4.0, 26, 2.5, 1)], c.lightened(0.05))
+	var cols := [Palette.CLOTH_RED, Palette.TEAL, Palette.FLOWER_YELLOW, Palette.FLOWER_BLUE, Palette.BERRY, Palette.MOSS]
+	var x := 28.0
+	var i := 0
+	while x < 66.0:
+		var h := 12.0 + float((i * 7) % 5)
+		r.fill([B(x, 38.0 - h * 0.5 + 0.5, 2.6, h * 0.5, 1)], cols[i % cols.size()], {"o": 1.4, "back": false})
+		x += 6.5
+		i += 1
+	r.fill([C(34, 55, 5.5)], Palette.GLOWCAP, {"o": 1.4, "back": false})
+	r.fill([B(56, 55, 7, 5, 2)], Palette.CLOTH_CREAM, {"o": 1.4, "back": false})
+	for k in 4:
+		r.fill([B(30.0 + float(k) * 6.0, 71.0, 2.6, 5.5, 1)], cols[(k + 2) % cols.size()], {"o": 1.4, "back": false})
+	r.fill([E(62, 72, 5, 4)], Palette.FLOWER_RED, {"o": 1.4, "back": false})
+
+
+static func _wardrobe(r: Raster, c: Color) -> void:
+	r.fill([B(48, 56, 28, 30, 4), E(48, 26, 28, 8)], c)
+	r.fill([L([Vector2(48, 30), Vector2(48, 84)], 1.4)], c.darkened(0.3), DETAIL)
+	r.fill([B(35, 50, 9, 16, 2), B(61, 50, 9, 16, 2)], c.lightened(0.08), {"o": 1.5, "back": false})
+	r.fill([C(44, 58, 2.4), C(52, 58, 2.4)], Palette.MEADOW_GOLD, {"o": 1.2, "back": false})
+	r.fill([B(26, 88, 3, 3, 1), B(70, 88, 3, 3, 1)], c.darkened(0.3))
+	r.fill([B(48, 80, 24, 3, 1.5)], c.darkened(0.12))
+	r.fill(_heart(48, 23, 3.5), Palette.CLOTH_RED, {"o": 1.4, "back": false})
+	_gloss(r, B(28, 54, 1.6, 20, 1.6), 0.35)
+
+
+static func _mirror(r: Raster, c: Color) -> void:
+	r.fill([B(48, 84, 16, 3, 1.5)], Palette.WOOD_DARK)
+	r.fill([L([Vector2(48, 82), Vector2(48, 66)], 3.0)], Palette.WOOD_DARK)
+	r.fill([E(48, 40, 22, 28)], c)
+	r.fill([E(48, 40, 16, 22)], Palette.WATER.lightened(0.4), {"o": 1.5, "back": false})
+	r.fill([L([Vector2(40, 28), Vector2(52, 50)], 2.0), L([Vector2(46, 26), Vector2(56, 44)], 1.2)], Color(1, 1, 1, 0.75), NO_LINE)
+	_flower(r, 66, 20, 6.0, Palette.BLOSSOM)
+	_sparkle(r, 28, 18, 6)
+
+
+static func _kitchen(r: Raster, c: Color) -> void:
+	r.fill([B(48, 66, 36, 18, 3)], Palette.WOOD)
+	r.fill([B(30, 68, 14, 12, 2), B(66, 68, 14, 12, 2)], Palette.WOOD_LIGHT, {"o": 1.5, "back": false})
+	r.fill([C(30, 66, 2), C(66, 66, 2)], Palette.MEADOW_GOLD, NO_LINE)
+	r.fill([B(48, 46, 40, 5, 2)], c)
+	r.fill([E(34, 42, 9, 3)], Palette.UI_INK_SOFT, NO_LINE)
+	r.fill([E(62, 34, 13, 5), B(62, 28, 13, 7, 3)], Palette.STONE_DARK)
+	r.fill([E(62, 22, 13, 4)], Palette.STONE)
+	r.fill([L([Vector2(58, 16), Vector2(56, 8)], 2.2)], Color(1, 1, 1, 0.9), {"o": 1.5, "shade": 0.0})
+	r.fill([L([Vector2(66, 16), Vector2(68, 8)], 2.2)], Color(1, 1, 1, 0.9), {"o": 1.5, "shade": 0.0})
+	_gloss(r, L([Vector2(14, 44), Vector2(50, 44)], 1.0), 0.5)
+
+
+static func _furnace(r: Raster, c: Color) -> void:
+	r.fill([B(68, 22, 7, 14, 2)], c.darkened(0.2))
+	r.fill([L([Vector2(66, 8), Vector2(62, 2)], 2.4)], Color(0.85, 0.85, 0.85, 0.7), {"o": 0.0, "shade": 0.0})
+	r.fill([P([Vector2(18, 86), Vector2(22, 44), Vector2(48, 28), Vector2(74, 44), Vector2(78, 86)], 5.0)], c)
+	for y in [50.0, 62.0, 74.0]:
+		r.fill([L([Vector2(22, y), Vector2(74, y)], 0.9)], c.darkened(0.3), DETAIL)
+	for p in [Vector2(34, 44), Vector2(58, 56), Vector2(30, 68), Vector2(66, 70)]:
+		r.fill([L([p, p + Vector2(0, 6)], 0.9)], c.darkened(0.3), DETAIL)
+	r.fill([B(48, 74, 13, 10, 1), C(48, 64, 13)], Color("3b2a22"))
+	_halo(r, 48, 70, 16, Palette.MINE_LIGHT, 0.6)
+	r.fill([P([Vector2(38, 82), Vector2(44, 64), Vector2(48, 72), Vector2(53, 62), Vector2(58, 82)], 2.0)], Palette.MINE_LIGHT, {"o": 1.5, "back": false})
+	r.fill([P([Vector2(44, 82), Vector2(48, 72), Vector2(52, 82)], 1.0)], Color("fff4c8"), NO_LINE)
+
+
+static func _loom(r: Raster, c: Color) -> void:
+	var dk := c.darkened(0.2)
+	r.fill([B(20, 54, 4, 32, 1.5), B(76, 54, 4, 32, 1.5)], dk)
+	r.fill([B(48, 24, 32, 4, 2), B(48, 80, 32, 4, 2)], c)
+	for x in [28.0, 34.0, 40.0, 46.0, 52.0, 58.0, 64.0, 70.0]:
+		r.fill([L([Vector2(x, 28), Vector2(x, 76)], 0.7)], Palette.CLOTH_CREAM, DETAIL)
+	r.fill([B(48, 64, 22, 10, 1.5)], Palette.CLOTH_RED, {"o": 1.8, "back": false})
+	for y in [58.0, 64.0, 70.0]:
+		r.fill([L([Vector2(28, y), Vector2(68, y)], 0.8)], Palette.CLOTH_RED.darkened(0.2), DETAIL)
+	r.fill([B(48, 46, 30, 3, 1.5)], Palette.WOOD_LIGHT)
+	r.fill([E(84, 64, 6, 9)], Palette.TEAL, {"o": 2.0})
+	r.fill([L([Vector2(80, 64), Vector2(72, 66)], 0.9)], Palette.TEAL, NO_LINE)
+
+
+static func _pet_bed(r: Raster, c: Color) -> void:
+	r.fill([E(48, 64, 38, 18)], c.darkened(0.12))
+	r.fill([E(48, 58, 38, 16), CUT(E(48, 58, 26, 9))], c)
+	r.fill([E(48, 60, 26, 9)], Palette.CLOTH_CREAM, {"o": 1.8, "back": false})
+	r.fill([E(40, 56, 11, 6)], Palette.CLOTH_CREAM.lightened(0.3), {"o": 1.5, "back": false})
+	r.fill(_heart(66, 40, 5.0), Palette.HEART_GLOW)
+	_gloss(r, E(26, 52, 6, 2.5, -15), 0.5)
+
+
+static func _perch(r: Raster, c: Color) -> void:
+	r.fill([B(40, 84, 16, 3.5, 1.5)], Palette.STONE)
+	r.fill([L([Vector2(40, 82), Vector2(40, 30)], 3.6)], Palette.WOOD_DARK)
+	r.fill([E(40, 30, 20, 6)], c)
+	r.fill([E(40, 28, 16, 4)], Palette.CLOTH_CREAM, {"o": 1.5, "back": false})
+	r.fill([L([Vector2(40, 50), Vector2(66, 50), Vector2(66, 56)], 2.0)], Palette.WOOD_DARK)
+	_halo(r, 66, 64, 14, Palette.LANTERN_GLOW, 0.5)
+	r.fill([B(66, 64, 6, 7, 2)], Palette.LANTERN_GLOW.lightened(0.3))
+	r.fill([B(66, 57, 7, 2, 1)], Palette.UI_INK_SOFT)
+	r.fill([E(40, 22, 4, 6)], Palette.FLOWER_YELLOW, {"o": 1.5})
+
+
+static func _planter(r: Raster, c: Color) -> void:
+	for x in [28.0, 48.0, 68.0]:
+		r.fill([L([Vector2(x, 50), Vector2(x, 36)], 1.8)], Palette.FOLIAGE_DARK)
+		r.fill([E(x - 6.0, 34, 6, 3.3, 30)], Palette.FOLIAGE_LIGHT)
+		r.fill([E(x + 6.0, 34, 6, 3.3, -30)], Palette.FOLIAGE)
+	r.fill([B(48, 50, 38, 5, 2)], Palette.DIRT_DARK)
+	r.fill([B(48, 66, 38, 14, 3)], c)
+	for y in [60.0, 72.0]:
+		r.fill([L([Vector2(12, y), Vector2(84, y)], 1.0)], c.darkened(0.3), DETAIL)
+	for x in [14.0, 82.0]:
+		r.fill([B(x, 66, 3.5, 16, 1.5)], c.darkened(0.15))
+	_gloss(r, B(24, 64, 6, 1.5, 1.5), 0.35)
+
+
+static func _bench(r: Raster, c: Color) -> void:
+	var dk := c.darkened(0.25)
+	r.fill([L([Vector2(22, 60), Vector2(18, 84)], 3.2), L([Vector2(74, 60), Vector2(78, 84)], 3.2)], dk)
+	r.fill([B(48, 30, 34, 9, 3)], c)
+	r.fill([L([Vector2(20, 38), Vector2(20, 58)], 2.6), L([Vector2(76, 38), Vector2(76, 58)], 2.6)], dk)
+	r.fill([B(48, 58, 38, 6, 2.5)], c.lightened(0.05))
+	r.fill([L([Vector2(18, 58), Vector2(78, 58)], 0.9)], c.darkened(0.3), DETAIL)
+	r.fill(_heart(48, 28, 4.0), Palette.CLOTH_CREAM, {"o": 1.4, "back": false})
+	_gloss(r, L([Vector2(18, 26), Vector2(50, 26)], 1.2), 0.45)
+
+
+static func _jack_lantern(r: Raster, c: Color) -> void:
+	_halo(r, 48, 58, 44, Palette.LANTERN_GLOW, 0.45)
+	_pumpkin(r, c)
+	var glow := Color("ffe08a")
+	r.fill([P([Vector2(32, 50), Vector2(38, 42), Vector2(42, 52)], 1.0)], glow, {"o": 1.5, "back": false})
+	r.fill([P([Vector2(54, 52), Vector2(58, 42), Vector2(64, 50)], 1.0)], glow, {"o": 1.5, "back": false})
+	r.fill([P([Vector2(32, 62), Vector2(64, 62), Vector2(58, 72), Vector2(38, 72)], 3.0)], glow, {"o": 1.5, "back": false})
+	r.fill([B(48, 62, 3, 3, 0.5)], c, NO_LINE)
+
+
+static func _string_lights(r: Raster, c: Color) -> void:
+	r.fill([L([Vector2(10, 22), Vector2(28, 40), Vector2(48, 46), Vector2(68, 40), Vector2(86, 22)], 1.4)], Palette.FOLIAGE_DARK, {"o": 1.2})
+	for p in [Vector2(22, 44), Vector2(48, 58), Vector2(74, 44)]:
+		_halo(r, p.x, p.y, 16, Palette.LANTERN_GLOW, 0.45)
+		r.fill([L([p + Vector2(0, -12), p + Vector2(0, -6)], 1.0)], Palette.FOLIAGE_DARK, NO_LINE)
+		r.fill([E(p.x, p.y, 9, 7.5), E(p.x - 5.0, p.y, 5, 7), E(p.x + 5.0, p.y, 5, 7)], c)
+		r.fill([E(p.x, p.y + 1.0, 3, 2)], Color("ffe08a"), NO_LINE)
+		r.fill([L([p + Vector2(0, -7.5), p + Vector2(1, -10)], 1.4)], Palette.BARK, {"o": 1.0})
+
+
+static func _bunting(r: Raster, c: Color) -> void:
+	r.fill([L([Vector2(8, 22), Vector2(30, 32), Vector2(48, 35), Vector2(66, 32), Vector2(88, 22)], 1.4)], Palette.WOOD_DARK, {"o": 1.2})
+	for p in [Vector2(22, 30), Vector2(48, 36), Vector2(74, 30)]:
+		var bat := [E(p.x, p.y + 12.0, 5.5, 7.5),
+			P([p + Vector2(-4, 8), p + Vector2(-20, 2), p + Vector2(-16, 12), p + Vector2(-18, 20), p + Vector2(-10, 16), p + Vector2(-4, 20)], 1.0),
+			P([p + Vector2(4, 8), p + Vector2(20, 2), p + Vector2(16, 12), p + Vector2(18, 20), p + Vector2(10, 16), p + Vector2(4, 20)], 1.0),
+			P([p + Vector2(-5, 6), p + Vector2(-3, 1), p + Vector2(-1, 6)], 0.5), P([p + Vector2(5, 6), p + Vector2(3, 1), p + Vector2(1, 6)], 0.5)]
+		r.fill(bat, c)
+		r.fill([C(p.x - 2.0, p.y + 10.0, 1.2), C(p.x + 2.0, p.y + 10.0, 1.2)], Color("fff4c8"), NO_LINE)
+	r.fill([C(35, 62, 4.5), C(61, 62, 4.5)], Palette.FLOWER_YELLOW.lightened(0.1), {"o": 1.5})
+	r.fill([L([Vector2(35, 58), Vector2(35, 34)], 0.8), L([Vector2(61, 58), Vector2(61, 34)], 0.8)], Palette.WOOD_DARK, NO_LINE)
+
+
+static func _ghost_lantern(r: Raster, c: Color) -> void:
+	_halo(r, 48, 50, 42, c, 0.55)
+	r.fill([L([Vector2(48, 8), Vector2(48, 18)], 1.4)], Palette.UI_INK_SOFT, NO_LINE)
+	r.fill([C(48, 42, 22), B(48, 60, 22, 16, 2),
+		CUT(C(34, 78, 5.5)), CUT(C(48, 78, 5.5)), CUT(C(62, 78, 5.5))], c)
+	r.fill([E(40, 42, 3.2, 5), E(56, 42, 3.2, 5)], Palette.UI_INK, NO_LINE)
+	r.fill([E(48, 54, 3.5, 2.5)], Palette.UI_INK, NO_LINE)
+	r.fill([E(34, 50, 3.5, 2), E(62, 50, 3.5, 2)], Color(Palette.BLOSSOM.r, Palette.BLOSSOM.g, Palette.BLOSSOM.b, 0.6), NO_LINE)
+	r.fill([C(48, 66, 5)], Color("fff4c8"), NO_LINE)
+	_gloss(r, E(38, 30, 6, 3, -25), 0.6)
+
+
+static func _crescent_window(r: Raster, c: Color) -> void:
+	r.fill([B(48, 50, 29, 33, 4)], c)
+	for x in [26.0, 70.0]:
+		r.fill([L([Vector2(x, 20), Vector2(x, 80)], 1.3)], c.darkened(0.28), DETAIL)
+	r.fill([C(48, 46, 16)], Color("2f3158"))
+	r.fill([C(46, 46, 12), CUT(C(52, 42, 10))], Palette.MOON.lightened(0.35), {"o": 1.8, "back": false})
+	r.fill([C(58, 52, 1.4), C(60, 36, 1.2)], Color("fffbe8"), NO_LINE)
+	r.fill([B(48, 68, 17, 3, 1.5)], c.darkened(0.2))
+	r.fill([P([Vector2(40, 24), Vector2(48, 16), Vector2(56, 24)], 1.0)], c.lightened(0.15))
+
+
+static func _candy_bowl(r: Raster, c: Color) -> void:
+	for p in [[36.0, 42.0, 0.0], [50.0, 38.0, 0.25], [62.0, 44.0, 0.45]]:
+		var col: Color = c.darkened(float(p[2])) if float(p[2]) < 0.4 else Palette.FLOWER_YELLOW
+		r.fill([E(float(p[0]), float(p[1]), 8, 6), P([Vector2(float(p[0]) - 7.0, float(p[1])), Vector2(float(p[0]) - 13.0, float(p[1]) - 5.0), Vector2(float(p[0]) - 13.0, float(p[1]) + 5.0)], 1.0)], col, {"o": 1.8})
+	r.fill([E(48, 50, 34, 9), E(48, 56, 30, 22), CUT(B(48, 34, 40, 18))], Palette.FLOWER_PURPLE.darkened(0.2))
+	r.fill([L([Vector2(22, 62), Vector2(74, 62)], 1.2)], Color("f08a2e"), DETAIL)
+	r.fill([B(48, 80, 12, 3, 1.5)], Palette.FLOWER_PURPLE.darkened(0.35))
+	_gloss(r, L([Vector2(24, 58), Vector2(30, 70)], 1.8), 0.45)
+
+
+static func _scarecrow(r: Raster, c: Color) -> void:
+	r.fill([L([Vector2(48, 88), Vector2(48, 34)], 3.2)], Palette.WOOD_DARK)
+	r.fill([L([Vector2(18, 48), Vector2(78, 48)], 3.0)], Palette.WOOD_DARK)
+	r.fill([P([Vector2(30, 44), Vector2(66, 44), Vector2(62, 76), Vector2(34, 76)], 3.0)], Palette.TEAL.darkened(0.1))
+	r.fill([B(56, 62, 4, 4, 1)], Palette.CLOTH_RED, {"o": 1.4, "back": false})
+	for x in [18.0, 78.0]:
+		r.fill([L([Vector2(x, 48), Vector2(x + (-4.0 if x < 48.0 else 4.0), 56)], 1.2)], c, {"o": 1.2})
+	r.fill([E(48, 30, 13, 11)], Color("f08a2e"))
+	r.fill([P([Vector2(42, 28), Vector2(45, 24), Vector2(47, 29)], 0.5), P([Vector2(49, 29), Vector2(51, 24), Vector2(54, 28)], 0.5)], Palette.UI_INK, NO_LINE)
+	r.fill([L([Vector2(42, 34), Vector2(48, 37), Vector2(54, 34)], 1.0)], Palette.UI_INK, NO_LINE)
+	r.fill([E(48, 20, 18, 4), P([Vector2(38, 20), Vector2(46, 4), Vector2(58, 20)], 2.0)], c.darkened(0.3))
+
+
+static func _gothic_trim(r: Raster, c: Color) -> void:
+	r.fill([B(48, 22, 40, 6, 2)], c)
+	var arches: Array = []
+	for x in [22.0, 48.0, 74.0]:
+		arches.append(P([Vector2(x - 13.0, 26), Vector2(x + 13.0, 26), Vector2(x + 9.0, 40), Vector2(x, 54), Vector2(x - 9.0, 40)], 2.0))
+	r.fill(arches, c.lightened(0.08))
+	for x in [22.0, 48.0, 74.0]:
+		r.fill([C(x, 36, 4.0)], Color("2f3158"), NO_LINE)
+		r.fill([L([Vector2(x, 54), Vector2(x, 62)], 1.4), P([Vector2(x - 4.0, 62), Vector2(x, 70), Vector2(x + 4.0, 62)], 1.0)], c.darkened(0.15), {"o": 1.5})
+	for x in [9.0, 35.0, 61.0, 87.0]:
+		r.fill([P([Vector2(x - 3.0, 18), Vector2(x, 8), Vector2(x + 3.0, 18)], 1.0)], c.darkened(0.2), {"o": 1.5})
+	_gloss(r, L([Vector2(12, 19), Vector2(60, 19)], 1.0), 0.45)
+
+
+static func _music_box(r: Raster, c: Color) -> void:
+	r.fill([P([Vector2(22, 44), Vector2(30, 18), Vector2(76, 18), Vector2(74, 44)], 3.0)], c.lightened(0.12))
+	r.fill([P([Vector2(30, 22), Vector2(72, 22), Vector2(70, 40), Vector2(28, 40)], 1.5)], Palette.CLOTH_RED, {"o": 1.4, "back": false})
+	r.fill([B(48, 62, 30, 16, 3)], c)
+	r.fill([B(48, 50, 30, 3, 1.5)], c.darkened(0.15))
+	r.fill(_heart(48, 60, 4.0), Palette.MEADOW_GOLD, {"o": 1.4, "back": false})
+	r.fill([L([Vector2(78, 64), Vector2(86, 64), Vector2(86, 72)], 2.0)], Palette.MEADOW_GOLD, {"o": 1.4})
+	r.fill([C(86, 74, 2.8)], Palette.MEADOW_GOLD)
+	r.fill([L([Vector2(18, 30), Vector2(18, 14)], 1.4), E(15, 30, 3.5, 2.6, -20)], Palette.UI_INK_SOFT, {"o": 1.2})
+	r.fill([L([Vector2(84, 34), Vector2(84, 20)], 1.4), E(81, 34, 3.5, 2.6, -20)], Palette.UI_INK_SOFT, {"o": 1.2})
+	_gloss(r, B(28, 62, 1.6, 10, 1.6), 0.4)
+
+
+static func _board(r: Raster, c: Color) -> void:
+	r.fill([L([Vector2(24, 86), Vector2(24, 20)], 3.2), L([Vector2(72, 86), Vector2(72, 20)], 3.2)], c.darkened(0.2))
+	r.fill([B(48, 44, 34, 24, 3)], c)
+	r.fill([B(48, 44, 29, 19, 2)], Palette.WOOD_LIGHT, NO_LINE)
+	r.fill([B(34, 40, 9, 11, 1, -6)], Palette.UI_PAPER, {"o": 1.4, "back": false})
+	r.fill([B(58, 38, 10, 8, 1, 5)], Palette.UI_PAPER, {"o": 1.4, "back": false})
+	r.fill([B(58, 56, 8, 6, 1, -4)], Palette.UI_PAPER, {"o": 1.4, "back": false})
+	for p in [Vector2(34, 30), Vector2(58, 31), Vector2(58, 51)]:
+		r.fill([C(p.x, p.y, 2.2)], Palette.CLOTH_RED, NO_LINE)
+	r.fill([L([Vector2(29, 40), Vector2(39, 39)], 0.9), L([Vector2(29, 45), Vector2(37, 44)], 0.9)], Palette.UI_INK_SOFT, DETAIL)
+	r.fill([P([Vector2(52, 40), Vector2(58, 34), Vector2(64, 40)], 0.5)], Palette.UI_GOOD, NO_LINE)
+	r.fill([B(48, 16, 20, 5, 2)], Palette.TEAL)
+
+
+static func _wardlight(r: Raster, c: Color) -> void:
+	_halo(r, 48, 36, 40, c, 0.6)
+	r.fill([B(48, 86, 14, 3, 1.5)], Palette.STONE)
+	r.fill([L([Vector2(48, 84), Vector2(48, 52)], 3.4)], Palette.STONE_DARK)
+	r.fill([P([Vector2(48, 12), Vector2(64, 34), Vector2(48, 56), Vector2(32, 34)], 3.0)], Palette.STONE)
+	r.fill([P([Vector2(48, 20), Vector2(58, 34), Vector2(48, 48), Vector2(38, 34)], 2.0)], c.lightened(0.2), {"o": 1.5, "back": false})
+	r.fill(_heart(48, 32, 4.2), Palette.HEART_GLOW, NO_LINE)
+	_sparkle(r, 74, 16, 7)
+	_sparkle(r, 20, 22, 5)
+
+
+static func _miner_lamp(r: Raster, c: Color) -> void:
+	_halo(r, 34, 46, 30, Palette.LANTERN_GLOW, 0.5)
+	r.fill([B(58, 64, 16, 20, 5)], c)
+	r.fill([B(58, 44, 12, 4, 1.5)], c.darkened(0.15))
+	r.fill([L([Vector2(48, 40), Vector2(58, 26), Vector2(68, 40)], 2.4)], c.darkened(0.2), {"o": 1.8})
+	r.fill([E(34, 50, 8, 16)], c.lightened(0.1))
+	r.fill([E(32, 50, 5, 11)], Palette.LANTERN_GLOW.lightened(0.3), {"o": 1.5, "back": false})
+	r.fill([C(32, 50, 3)], Color("fff4c8"), NO_LINE)
+	r.fill([L([Vector2(42, 50), Vector2(50, 56)], 3.0)], c.darkened(0.1))
+	for y in [58.0, 70.0]:
+		r.fill([L([Vector2(44, y), Vector2(72, y)], 1.0)], c.darkened(0.3), DETAIL)
+	_gloss(r, B(48, 64, 1.6, 12, 1.6), 0.5)
+
+
+static func _veil(r: Raster, c: Color) -> void:
+	r.fill([L([Vector2(12, 16), Vector2(84, 16)], 2.4)], Palette.WOOD_DARK)
+	r.fill([P([Vector2(16, 18), Vector2(80, 18), Vector2(78, 60), Vector2(70, 74), Vector2(60, 64), Vector2(48, 80), Vector2(36, 66), Vector2(26, 76), Vector2(18, 62)], 4.0)], c)
+	for x in [28.0, 40.0, 52.0, 64.0]:
+		r.fill([L([Vector2(x, 20), Vector2(x + 2.0, 64)], 0.9)], c.darkened(0.14), DETAIL)
+	for p in [Vector2(26, 78), Vector2(48, 82), Vector2(70, 76)]:
+		r.fill([L([p, p + Vector2(0, 8)], 1.2)], Palette.MEADOW_GOLD, {"o": 1.2})
+		r.fill([C(p.x, p.y + 9.0, 2.2)], Palette.MEADOW_GOLD, {"o": 1.2})
+	_gloss(r, B(22, 40, 1.6, 16, 1.6), 0.5)
+	_sparkle(r, 62, 36, 5)
+	_sparkle(r, 34, 48, 4)
+
+
+static func _festival_table(r: Raster, c: Color) -> void:
+	var dk := c.darkened(0.25)
+	r.fill([L([Vector2(18, 58), Vector2(16, 86)], 3.2), L([Vector2(78, 58), Vector2(80, 86)], 3.2)], dk)
+	r.fill([B(48, 56, 40, 7, 3)], c)
+	r.fill([B(48, 57, 12, 9, 1.5)], Palette.CLOTH_RED, {"o": 1.6, "back": false})
+	r.fill([P([Vector2(36, 66), Vector2(60, 66), Vector2(48, 74)], 1.0)], Palette.CLOTH_RED, {"o": 1.6, "back": false})
+	for x in [26.0, 70.0]:
+		_halo(r, x, 30, 12, Palette.LANTERN_GLOW, 0.5)
+		r.fill([B(x, 42, 3, 8, 1.2)], Palette.CLOTH_CREAM)
+		r.fill([E(x, 30, 3, 5)], Palette.LANTERN_GLOW, {"o": 1.4})
+	r.fill([E(48, 44, 8, 6), E(44, 44, 4, 5.5), E(52, 44, 4, 5.5)], Color("f08a2e"))
+	_gloss(r, L([Vector2(12, 52), Vector2(48, 52)], 1.2), 0.4)
 
 
 # --- UI glyphs (sticker style) ------------------------------------------------------------------

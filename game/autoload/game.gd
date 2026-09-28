@@ -1,9 +1,54 @@
 extends Node
 ## Game flow: title <-> areas, spawning the player/companions/UI, death & respawn, pause and
-## menus (mouse capture), autosaves, the world clock and the chapter ending.
+## menus (mouse capture), autosaves, the world clock and the chapter endings.
 ## Other systems talk to the flow through these methods; they never change scenes themselves.
+## Chapter Two (docs/CHAPTER_TWO_SPEC.md §1, §8): the new areas, per-area saving rules, per-area respawn
+## memory, the Lantern Road (can_fast_travel / travel_lantern_road), companion_present() and the
+## Chapter Two ending (complete_chapter_two), which never re-runs complete_chapter().
 
-const AREAS := {"surface": "res://scenes/surface.tscn", "below": "res://scenes/below.tscn"}
+const AREAS := {
+	"surface": "res://scenes/surface.tscn",
+	"below": "res://scenes/below.tscn",
+	"tobin_annex": "res://scenes/tobin_annex.tscn",
+	"hallowmere_reach": "res://scenes/hallowmere_reach.tscn",
+	"moonveil_manor": "res://scenes/moonveil_manor.tscn",
+	"hushed_works": "res://scenes/hushed_works.tscn",
+	"echo_trial": "res://scenes/echo_trial.tscn",
+}
+## Areas where Krystal may save anywhere (manual save, the quiet autosave, save-on-close) as long as
+## nothing is chasing her within 20 m and no boss encounter is active.
+const SAFE_SAVE_AREAS := ["surface", "hallowmere_reach"]
+## Every other registered area allows saving only inside a safe zone (lanterns, checkpoints, refuges),
+## except these, which keep their own rule (the Below saves at its lanterns only; trials never save).
+const SAVE_REFUSALS := {
+	"below": "Underground, rest at a lit lantern to save.",
+	"echo_trial": "Trials aren't saved. Leave the trial to save your journey.",
+}
+## Outdoor areas: Continue resumes at the saved position (validated by the area), not at a spawn.
+const OUTDOOR_AREAS := ["surface", "hallowmere_reach"]
+## Areas whose arrival neither saves nor moves the respawn point (a trial always returns to its origin).
+const TRANSIENT_AREAS := ["echo_trial"]
+## Areas that get the horror director (created before companions spawn).
+## Wave C hook: add "hushed_works" here once data/horror_events.gd knows its anchor zones (hw_*).
+const DIRECTOR_AREAS := ["below"]
+## Where Krystal wakes in a Chapter Two area until she has rested somewhere there (spec §1).
+const AREA_DEFAULT_RESPAWN := {
+	"hallowmere_reach": "commons_arch",
+	"tobin_annex": "annex_entry",
+	"moonveil_manor": "manor_entry",
+	"hushed_works": "service_landing",
+}
+const THREAT_RADIUS := 20.0                 # an enemy hunting her this close blocks saving and travel
+const COMPANION_PRESENT_RADIUS := 25.0      # support/passives only count this close (spec §5)
+## The Lantern Road's home destination (always offered once any arch is lit).
+const HAVEN_DESTINATION := {"id": "haven", "name": "The Haven (home)", "area": "surface", "spawn": "haven_respawn"}
+## Chapter Two ending (spec §3.5 ledger, MP §17 ending card).
+const CH2_COMPLETE_FLAG := "chapter_two_complete"
+const CH2_REWARD_ID := "rw_ch2_feast"
+const CH2_FEAST_REWARDS_DEFAULT := {}   # the Wardlight is the ch2_homecoming reward (data/quests_ch2.gd)
+const QUESTS_CH2_DATA := "res://data/quests_ch2.gd"
+const CH2_ENDING_TEXT := "The lanterns shine beyond the trees. The quiet below is quiet again. There are pumpkins to plant, walls to raise, and friends waiting by the fire. The road will keep. Tonight is yours."
+const Reach := preload("res://data/hallowmere_layout.gd")
 const TITLE_SCENE := "res://scenes/title.tscn"
 const PLAYER_SCRIPT := "res://src/player/player.gd"
 const UI_ROOT_SCRIPT := "res://src/ui/ui_root.gd"
@@ -25,7 +70,7 @@ var zone_id: String = ""
 var in_safe_zone: bool = true
 var director: Node = null          # horror director in the Below (src/horror/director.gd)
 
-## Quiet surface autosave: every AUTOSAVE_SECONDS of unpaused play on the surface (bed, lantern, mine
+## Quiet autosave: every AUTOSAVE_SECONDS of unpaused play where saving is allowed (can_manual_save; bed, lantern, mine
 ## and manual saves restart the countdown). Retries every AUTOSAVE_RETRY s while saving isn't allowed.
 const AUTOSAVE_SECONDS := 300.0
 const AUTOSAVE_RETRY := 5.0
@@ -37,6 +82,9 @@ var autosave_enabled: bool = true   # off in headless runs (tests drive _tick_au
 var _autosave_t := 0.0
 var _focus_lost := false            # the window lost focus and no pause menu has covered it yet
 var _closing := false
+var _bosses: Dictionary = {}        # boss id -> true while its encounter is active (saving/travel)
+var _ch2_ending_running := false
+var _travel_seq := 0                # change_area() calls; a newer trip supersedes an older one's bookkeeping
 
 
 func _ready() -> void:
@@ -47,6 +95,10 @@ func _ready() -> void:
 	autosave_enabled = DisplayServer.get_name() != "headless"
 	Events.game_saved.connect(_on_game_saved)
 	Events.area_loaded.connect(_on_area_loaded_focus_check)
+	Events.boss_encounter_changed.connect(_on_boss_encounter_changed)
+	Events.boss_health_changed.connect(_on_boss_health_changed)
+	Events.boss_defeated.connect(_on_boss_defeated)
+	Events.area_exiting.connect(_on_area_exiting_bosses)
 
 
 func _process(delta: float) -> void:
@@ -62,6 +114,9 @@ func _process(delta: float) -> void:
 		if z != zone_id:
 			zone_id = z
 			Events.zone_entered.emit(z)
+			# Map discovery (spec §10): every landmark zone entered is remembered per area.
+			if z != "" and GameState.has_method("discover"):
+				GameState.discover(area_id, z)
 		var safe: bool = area.is_safe_zone(player.global_position) if area.has_method("is_safe_zone") else false
 		if safe != in_safe_zone:
 			in_safe_zone = safe
@@ -101,8 +156,9 @@ func _on_area_loaded_focus_check(_area_id: String) -> void:
 
 # --- Saving on close & autosave --------------------------------------------------------------------
 
-## Saves the journey before the window closes, when a manual save would be allowed (on the surface,
-## nothing chasing Krystal). Underground the lantern saves stand. Returns true when a save was written.
+## Saves the journey before the window closes, when a manual save would be allowed (see
+## can_manual_save: the surface or the Reach with nothing chasing Krystal, or a safe zone of another
+## Chapter Two area). Underground the lantern saves stand. Returns true when a save was written.
 func save_before_close() -> bool:
 	if not GameState.active or mode != "playing":
 		return false
@@ -124,10 +180,11 @@ func _on_close_requested() -> void:
 	get_tree().quit()
 
 
-## Advances the surface autosave countdown; saves quietly when it runs out and saving is allowed
-## (no menu open, not in build mode, nothing chasing Krystal). Returns true when it saved.
+## Advances the quiet autosave countdown; saves when it runs out and saving is allowed (no menu open,
+## not in build mode, can_manual_save()). Counts only in areas where saving can ever be allowed (not
+## the Below, not a trial). Returns true when it saved.
 func _tick_autosave(delta: float) -> bool:
-	if mode != "playing" or area_id != "surface" or not GameState.active:
+	if mode != "playing" or not area_allows_saving(area_id) or not GameState.active:
 		return false
 	_autosave_t += delta
 	if _autosave_t < AUTOSAVE_SECONDS:
@@ -162,6 +219,7 @@ func goto_title() -> void:
 	area_id = ""
 	mode = "title"
 	GameState.active = false
+	_ch2_ending_running = false   # an ending interrupted by quitting (its UI freed mid-await) never resumes
 	_ui_stack.clear()
 	get_tree().paused = false
 	_free_gameplay_nodes()
@@ -172,8 +230,11 @@ func goto_title() -> void:
 	get_tree().change_scene_to_file(TITLE_SCENE)
 
 
-func new_game() -> void:
+## Starts a new journey. `look` (optional) is the appearance chosen on the creation screen
+## (data/appearance.gd look dictionary); it is stored in GameState before the first save.
+func new_game(look: Dictionary = {}) -> void:
 	GameState.new_game()
+	_apply_new_game_look(look)
 	await load_area("surface", "haven_start", false)
 	# Save straight away (quietly) so Continue exists from the first minute.
 	if GameState.active and area_id == "surface":
@@ -183,13 +244,44 @@ func new_game() -> void:
 		ui.show_chapter_card("Chapter One", "The Dimming Ward")
 
 
+## Merges a creation-screen look into GameState.appearance (schema v2). Works before and after the
+## core-save module lands: uses GameState.set_appearance() when it exists, else the `appearance`
+## property, else does nothing.
+func _apply_new_game_look(look: Dictionary) -> void:
+	if look.is_empty():
+		return
+	if GameState.has_method("set_appearance"):
+		GameState.call("set_appearance", look.duplicate(true))
+	elif "appearance" in GameState:
+		var cur: Variant = GameState.get("appearance")
+		var merged: Dictionary = (cur as Dictionary).duplicate(true) if cur is Dictionary else {}
+		for k in look:
+			var v: Variant = look[k]
+			merged[k] = (v as Dictionary).duplicate(true) if v is Dictionary else v
+		GameState.set("appearance", merged)
+	else:
+		return
+	Events.appearance_changed.emit()
+
+
 func continue_game() -> bool:
 	if not SaveSystem.load_game():
 		return false
 	var a: String = String(GameState.player.get("area", "surface"))
+	var spawn: String = String(GameState.player.get("spawn", "haven_respawn"))
+	var use_saved := true
+	# A trial is never resumed (spec §1: it always returns to its origin): a save that was written inside
+	# one (by some other system) continues at the respawn point, which change_area never moves into a trial.
+	if TRANSIENT_AREAS.has(a):
+		a = String(GameState.player.get("respawn_area", "surface"))
+		spawn = String(GameState.player.get("respawn_spawn", "haven_respawn"))
+		use_saved = false
+		if TRANSIENT_AREAS.has(a) or not AREAS.has(a):
+			a = "surface"
+			spawn = "haven_respawn"
 	if not AREAS.has(a):
 		a = "surface"
-	await load_area(a, String(GameState.player.get("spawn", "haven_respawn")), true)
+	await load_area(a, spawn, use_saved)
 	# load_game() announces a backup restore from the title, where no toast widget exists yet:
 	# repeat it now that the gameplay UI is up so Krystal is actually told.
 	if SaveSystem.recovered_from_backup:
@@ -199,13 +291,14 @@ func continue_game() -> bool:
 
 # --- Areas -------------------------------------------------------------------------------
 
-## Loads an area scene and places the player. use_saved_position: surface only; the saved position
-## is validated (ground below, inside the world) and falls back to the spawn point otherwise.
+## Loads an area scene and places the player. use_saved_position: outdoor areas only (OUTDOOR_AREAS);
+## the saved position is validated (ground below, inside the world) and falls back to the spawn point.
 func load_area(target_area: String, spawn_id: String, use_saved_position: bool = false) -> void:
 	if _transitioning:
 		return
 	_transitioning = true
 	_autosave_t = 0.0
+	_bosses.clear()       # a freshly loaded area never starts inside a boss encounter
 	var prev_mode := mode
 	mode = "loading"
 	if ui != null and ui.has_method("fade_out"):
@@ -237,13 +330,17 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	# Player
 	player = _safe_new(PLAYER_SCRIPT, FALLBACK_PLAYER)
 	area.add_child(player)
-	var use_saved := use_saved_position and target_area == "surface"
+	var use_saved := use_saved_position and OUTDOOR_AREAS.has(target_area)
 	var had_spawn: bool = area.get("spawns") is Dictionary and area.spawns.has(spawn_id)
 	var xform := _spawn_transform(spawn_id, use_saved)
 	if player.has_method("read_from_state"):
 		player.read_from_state()
 	player.teleport(xform)
 	GameState.player["spawn"] = spawn_id
+	# Where she now stands IN THIS AREA: a save before the player has touched the ground must never keep
+	# a position from the area she just left (two outdoor areas share similar coordinates).
+	GameState.player["pos"] = [xform.origin.x, xform.origin.y, xform.origin.z]
+	GameState.player["yaw"] = xform.basis.get_euler().y
 	# Area systems: building (surface) and the horror director (below).
 	# BuildMode is added after the player on purpose so its _input() runs first.
 	if target_area == "surface" or (target_area == "arena" and Debug.is_cheat_allowed()):
@@ -254,9 +351,11 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 		# requested spawn only exists now.
 		await get_tree().process_frame
 		if not use_saved and not had_spawn and area.get("spawns") is Dictionary and area.spawns.has(spawn_id):
-			player.teleport(area.get_spawn(spawn_id))
+			var late: Transform3D = area.get_spawn(spawn_id)
+			player.teleport(late)
+			GameState.player["pos"] = [late.origin.x, late.origin.y, late.origin.z]
 	director = null
-	if target_area == "below":
+	if DIRECTOR_AREAS.has(target_area):
 		var ds: Script = _safe_load(DIRECTOR_SCRIPT)
 		if ds != null:
 			director = ds.new()
@@ -320,22 +419,69 @@ func _spawn_transform(spawn_id: String, use_saved: bool) -> Transform3D:
 	return fallback
 
 
-## Travel between areas (mine entrance / exit). Autosaves after arriving.
+## Travel between areas (mine entrance / exit, waygate, doors, the Lantern Road). Autosaves after
+## arriving - except in a trial (TRANSIENT_AREAS), which also keeps the respawn at the trial's origin.
 func change_area(target_area: String, spawn_id: String) -> void:
 	if _transitioning:
 		return
 	if player != null and is_instance_valid(player) and player.has_method("write_to_state"):
 		player.write_to_state()
+	_travel_seq += 1
+	var seq := _travel_seq
 	await load_area(target_area, spawn_id, false)
-	# spawn_id is only where she arrives (the mine mouth / the landing). Her return point stays the
-	# bed or the Haven on the surface, and the last lantern she rested at in the Below.
-	var rs: String = spawn_id
-	if target_area == "surface":
-		rs = _bed_spawn_or("haven_respawn")
-	elif target_area == "below":
-		rs = _below_return_point(spawn_id)
-	set_respawn(target_area, rs)
+	# Another trip started during the fade-in (load_area hands control back before it ends): that trip
+	# owns the respawn point and the save now.
+	if seq != _travel_seq or (area_id != target_area and AREAS.has(target_area)):
+		return
+	var arrived: String = area_id if area_id != "" else target_area   # an unknown id became "surface"
+	if TRANSIENT_AREAS.has(arrived):
+		return
+	# spawn_id is only where she arrives (the mine mouth / the landing / the waygate). Her return point
+	# stays the bed or the Haven on the surface, the last lantern she rested at in the Below, and the
+	# last arch / checkpoint she used in a Chapter Two area.
+	set_respawn(arrived, return_point(arrived, spawn_id))
 	SaveSystem.save_game()
+
+
+## Where Krystal wakes after being defeated in `target_area`, having arrived at `arrival_spawn`.
+func return_point(target_area: String, arrival_spawn: String) -> String:
+	match target_area:
+		"surface":
+			return _bed_spawn_or("haven_respawn")
+		"below":
+			return _below_return_point(arrival_spawn)
+	return _area_return_point(target_area, arrival_spawn)
+
+
+## Chapter Two areas: arriving at a lit Lantern Road arch makes it the return point; otherwise the
+## remembered one (area_respawn), else the area default (AREA_DEFAULT_RESPAWN), else the arrival spawn.
+## Only spawns the loaded area actually registers are used.
+func _area_return_point(target_area: String, arrival_spawn: String) -> String:
+	var spawns: Dictionary = {}
+	if area != null and is_instance_valid(area) and area.get("spawns") is Dictionary:
+		spawns = area.get("spawns")
+	if target_area == Reach.AREA_ID:
+		var arch := Reach.arch_for_spawn(arrival_spawn)
+		if arch != "" and bool(GameState.get_flag(Reach.arch_flag(arch))) and spawns.has(arrival_spawn):
+			return arrival_spawn
+	var last := area_respawn_of(target_area)
+	if last != "" and spawns.has(last):
+		return last
+	var def := String(AREA_DEFAULT_RESPAWN.get(target_area, ""))
+	if def != "" and spawns.has(def):
+		return def
+	return arrival_spawn
+
+
+## The remembered return point of an area ("" if none). The Below keeps its legacy key below_respawn
+## (old saves); Chapter Two areas use GameState.player["area_respawn"][area].
+func area_respawn_of(target_area: String) -> String:
+	if target_area == "below":
+		return String(GameState.player.get("below_respawn", ""))
+	var ar: Variant = GameState.player.get("area_respawn")
+	if ar is Dictionary and (ar as Dictionary).has(target_area):
+		return String((ar as Dictionary)[target_area])
+	return ""
 
 
 ## The Below return point on (re-)entering: the lantern last used (GameState.player["below_respawn"]),
@@ -345,7 +491,7 @@ func _below_return_point(default_spawn: String) -> String:
 	if area == null or not (area.get("spawns") is Dictionary):
 		return default_spawn
 	var spawns: Dictionary = area.get("spawns")
-	var last: String = String(GameState.player.get("below_respawn", ""))
+	var last: String = area_respawn_of("below")
 	if last != "":
 		return last if spawns.has(last) else default_spawn
 	var best: String = default_spawn
@@ -371,14 +517,24 @@ func _bed_spawn_or(default_spawn: String) -> String:
 	return default_spawn
 
 
-## Sets where Krystal wakes after being defeated (bed, checkpoint lanterns, mine entry...).
+## Sets where Krystal wakes after being defeated (bed, checkpoint lanterns, arches, mine entry...).
+## Each area's last point is also remembered (the Below in "below_respawn", Chapter Two areas in
+## "area_respawn") so a trip elsewhere doesn't forget it: change_area restores it on the way back.
+## The surface needs no memory (always the bed or the Haven), and trials never move the respawn (a
+## defeat or Continue always leaves a trial for its origin): a call for a trial area is ignored.
 func set_respawn(target_area: String, spawn_id: String) -> void:
+	if TRANSIENT_AREAS.has(target_area):
+		return
 	GameState.player["respawn_area"] = target_area
 	GameState.player["respawn_spawn"] = spawn_id
 	if target_area == "below":
-		# Remembered separately so a trip to the surface (whose respawn is the bed/Haven) doesn't
-		# forget the lantern: change_area restores it when she comes back down.
 		GameState.player["below_respawn"] = spawn_id
+	elif target_area != "surface" and not TRANSIENT_AREAS.has(target_area) and AREAS.has(target_area):
+		var ar: Variant = GameState.player.get("area_respawn")
+		if not (ar is Dictionary):
+			ar = {}
+		(ar as Dictionary)[target_area] = spawn_id
+		GameState.player["area_respawn"] = ar
 
 
 func _free_gameplay_nodes() -> void:
@@ -503,18 +659,209 @@ func set_cutscene(active: bool) -> void:
 
 # --- Saving rules ------------------------------------------------------------------------------
 
-## Manual saving is allowed on the surface when no enemy is actively hunting Krystal.
-## Underground, progress is saved at checkpoint lanterns.
+## Manual saving (also the quiet autosave and save-on-close) is allowed in SAFE_SAVE_AREAS (the surface,
+## Hallowmere Reach) and, in the other Chapter Two areas, while Krystal stands in a safe zone - always
+## only when no enemy is hunting her within 20 m and no boss encounter is active. Underground, progress
+## is saved at checkpoint lanterns; trials are never saved.
 func can_manual_save() -> Dictionary:
 	if mode != "playing" and mode != "loading":
 		return {"ok": false, "reason": "You can't save right now."}
-	if area_id != "surface":
-		return {"ok": false, "reason": "Underground, rest at a lit lantern to save."}
-	if player != null and is_instance_valid(player):
-		for e in get_tree().get_nodes_in_group("enemy"):
-			if e.has_method("is_threatening") and e.is_threatening() and e.global_position.distance_to(player.global_position) < 20.0:
-				return {"ok": false, "reason": "You can't save while something is chasing you."}
+	if not SAFE_SAVE_AREAS.has(area_id):
+		if not area_allows_saving(area_id):
+			return {"ok": false, "reason": String(SAVE_REFUSALS.get(area_id, SAVE_REFUSALS["below"]))}
+		if not player_in_safe_zone():
+			return {"ok": false, "reason": "Rest somewhere safe, like a lit lantern, to save here."}
+	if boss_active():
+		return {"ok": false, "reason": "You can't save during a boss fight."}
+	if _threat_near(THREAT_RADIUS):
+		return {"ok": false, "reason": "You can't save while something is chasing you."}
 	return {"ok": true, "reason": ""}
+
+
+## True for areas where saving can be allowed at all (SAFE_SAVE_AREAS anywhere, other registered areas in
+## a safe zone). The Below (lanterns only), trials and unregistered (debug) areas are never saved freely.
+func area_allows_saving(a: String) -> bool:
+	if SAFE_SAVE_AREAS.has(a):
+		return true
+	return AREAS.has(a) and not SAVE_REFUSALS.has(a)
+
+
+## Is Krystal standing in a safe zone of the current area (checked live, not the 0.4 s poll)?
+func player_in_safe_zone() -> bool:
+	if player != null and is_instance_valid(player) and player.is_inside_tree() and area != null and is_instance_valid(area) and area.has_method("is_safe_zone"):
+		return bool(area.is_safe_zone(player.global_position))
+	return in_safe_zone
+
+
+## Any enemy actively hunting Krystal within `radius` metres?
+func _threat_near(radius: float) -> bool:
+	if player == null or not is_instance_valid(player) or not player.is_inside_tree():
+		return false
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if e is Node3D and e.has_method("is_threatening") and e.is_threatening() and (e as Node3D).global_position.distance_to(player.global_position) < radius:
+			return true
+	return false
+
+
+# --- Boss encounters (saving & travel gate) --------------------------------------------------------------
+
+## True while a boss encounter is under way: Events.boss_encounter_changed (Chapter Two bosses/elites),
+## the legacy boss bar (Events.boss_health_changed, hp < 0 = hidden) or the area's own fight_active.
+func boss_active() -> bool:
+	if not _bosses.is_empty():
+		return true
+	if area != null and is_instance_valid(area):
+		var f: Variant = area.get("fight_active")
+		if f is bool and f:
+			return true
+	return false
+
+
+func _on_boss_encounter_changed(boss_id: String, active: bool) -> void:
+	if active:
+		_bosses[boss_id] = true
+	else:
+		_bosses.erase(boss_id)
+
+
+func _on_boss_health_changed(boss_id: String, hp: float, _max_hp: float) -> void:
+	if hp < 0.0:
+		_bosses.erase(boss_id)
+	else:
+		_bosses[boss_id] = true
+
+
+func _on_boss_defeated(boss_id: String) -> void:
+	_bosses.erase(boss_id)
+
+
+func _on_area_exiting_bosses(_area_id: String) -> void:
+	_bosses.clear()
+
+
+# --- Lantern Road (fast travel, MP §9) --------------------------------------------------------------------
+
+## Whether the Lantern Road (arches, the Ward Stone option) may be used right now: {"ok", "reason"}.
+## Never during a cutscene / loading, a boss encounter, or while something hunts her within 20 m.
+func can_fast_travel() -> Dictionary:
+	if mode != "playing" or _transitioning:
+		return {"ok": false, "reason": "You can't travel right now."}
+	if boss_active():
+		return {"ok": false, "reason": "Not while a great foe is near."}
+	if _threat_near(THREAT_RADIUS):
+		return {"ok": false, "reason": "You can't travel while something is chasing you."}
+	return {"ok": true, "reason": ""}
+
+
+## Travel list: the Haven first (once any arch is lit), then every lit arch in Reach.ARCH_ORDER.
+## Each entry: {"id", "name", "area", "spawn"}. Empty when no arch is lit yet.
+func lantern_road_destinations() -> Array:
+	var out: Array = []
+	for id in Reach.ARCH_ORDER:
+		if bool(GameState.get_flag(Reach.arch_flag(String(id)))):
+			var a: Dictionary = Reach.ARCHES[id]
+			out.append({"id": String(id), "name": String(a["name"]), "area": Reach.AREA_ID, "spawn": String(a["spawn"])})
+	if not out.is_empty():
+		out.push_front(HAVEN_DESTINATION.duplicate())
+	return out
+
+
+## Opens the travel list (ui.confirm) and travels to the chosen destination. Awaitable.
+func travel_lantern_road() -> void:
+	var ft := can_fast_travel()
+	if not bool(ft["ok"]):
+		Events.notify.emit(String(ft["reason"]), "warn")
+		return
+	var dests := lantern_road_destinations()
+	if dests.is_empty():
+		Events.notify.emit("No lantern arch is lit yet.", "info")
+		return
+	var buttons: Array = []
+	for d in dests:
+		if _is_current_destination(d):
+			continue
+		buttons.append([String(d["id"]), String(d["name"]), "AccentButton" if buttons.is_empty() else ""])
+	if buttons.is_empty():
+		Events.notify.emit("You are already there.", "info")
+		return
+	buttons.append(["cancel", "Stay here", ""])
+	if ui == null or not is_instance_valid(ui) or not ui.has_method("confirm"):
+		return
+	var pick: String = await ui.confirm("The Lantern Road", "The lanterns remember every road they light. Where to?", buttons)
+	if pick == "" or pick == "cancel":
+		return
+	await lantern_road_travel(pick)
+
+
+## Travels to one Lantern Road destination id ("haven" or an arch id) without any menu. Same area: a
+## short fade, Krystal and her follower are moved; another area: change_area (autosave, respawn rules).
+## Returns false if the destination is unknown/unlit or travel isn't allowed now.
+func lantern_road_travel(dest_id: String) -> bool:
+	var dest: Dictionary = {}
+	for d in lantern_road_destinations():
+		if String(d["id"]) == dest_id:
+			dest = d
+	if dest.is_empty():
+		return false
+	var ft := can_fast_travel()
+	if not bool(ft["ok"]):
+		Events.notify.emit(String(ft["reason"]), "warn")
+		return false
+	var target_area := String(dest["area"])
+	var spawn := String(dest["spawn"])
+	if target_area == area_id:
+		await _travel_within_area(spawn)
+		if target_area != "surface":
+			set_respawn(target_area, spawn)
+	else:
+		await change_area(target_area, spawn)
+	return true
+
+
+func _is_current_destination(d: Dictionary) -> bool:
+	if String(d["area"]) != area_id or area == null or not is_instance_valid(area) or player == null or not is_instance_valid(player):
+		return false
+	# Anywhere inside the Haven (e.g. at the Ward Stone, ~9 m from haven_respawn) she is already home.
+	if String(d["id"]) == String(HAVEN_DESTINATION["id"]) and area.has_method("get_zone_at") \
+			and String(area.get_zone_at(player.global_position)) == "haven":
+		return true
+	if not (area.get("spawns") is Dictionary) or not (area.get("spawns") as Dictionary).has(String(d["spawn"])):
+		return false
+	var xf: Transform3D = area.get_spawn(String(d["spawn"]))
+	return xf.origin.distance_to(player.global_position) < 8.0
+
+
+## Same-area Lantern Road hop: fade, move Krystal (and her follower: teleport_near only moves followers).
+func _travel_within_area(spawn: String) -> void:
+	set_cutscene(true)
+	if ui != null and is_instance_valid(ui) and ui.has_method("fade_out"):
+		await ui.fade_out(0.35)
+	if player != null and is_instance_valid(player) and area != null and is_instance_valid(area):
+		var xf: Transform3D = area.get_spawn(spawn)
+		player.teleport(xf)
+		for id in companion_nodes:
+			var c: Variant = companion_nodes[id]
+			if c is Node and is_instance_valid(c) and (c as Node).has_method("teleport_near"):
+				(c as Node).teleport_near(xf.origin)
+	await get_tree().create_timer(0.15).timeout
+	if ui != null and is_instance_valid(ui) and ui.has_method("fade_in"):
+		await ui.fade_in(0.5)
+	set_cutscene(false)
+
+
+# --- Companions ---------------------------------------------------------------------------------------------
+
+## True when `companion_id` is Krystal's follower, spawned in this area and within 25 m of her
+## (companion passives and support only count then, docs/CHAPTER_TWO_SPEC.md §5).
+func companion_present(companion_id: String) -> bool:
+	if companion_id == "" or GameState.active_companion != companion_id:
+		return false
+	var c: Variant = companion_nodes.get(companion_id)
+	if not (c is Node3D) or not is_instance_valid(c) or not (c as Node3D).is_inside_tree():
+		return false
+	if player == null or not is_instance_valid(player) or not player.is_inside_tree():
+		return false
+	return (c as Node3D).global_position.distance_to(player.global_position) <= COMPANION_PRESENT_RADIUS
 
 
 # --- Chapter ending ---------------------------------------------------------------------------------
@@ -539,6 +886,124 @@ func complete_chapter() -> void:
 	GameState.request_quest_eval()
 	await get_tree().create_timer(0.5).timeout
 	SaveSystem.save_game()
+
+
+## Chapter Two ending ("The Lanternwake", MP §11 step 20, §17). Called by whoever runs the final beat
+## (the chapter-two quest layer / the Ward Stone "Celebrate" option) with the reward items
+## {item_id: count}. Order matters (spec §3.5, MP §11 step 17): the rewards are COMMITTED first through
+## the reward ledger (GameState.grant_once("rw_ch2_feast", ...), exactly once), chapter_two_complete is
+## set and the game is saved; only then the presentation plays (companions celebrate,
+## Events.chapter2_completed, the ending), and free play resumes in the same save. A second call (or a
+## call after reloading) grants nothing and shows nothing. Never calls complete_chapter().
+## Returns true when this call completed the chapter.
+func complete_chapter_two(rewards: Dictionary = {}) -> bool:
+	if _ch2_ending_running:
+		return false
+	var was_complete := bool(GameState.get_flag(CH2_COMPLETE_FLAG))
+	var granted := _grant_chapter_two_rewards(rewards)
+	if not was_complete:
+		GameState.set_flag(CH2_COMPLETE_FLAG, true)
+	if was_complete and not granted:
+		return false
+	SaveSystem.save_game(true)
+	if was_complete:
+		return false
+	_ch2_ending_running = true
+	var was_playing := mode == "playing"
+	if was_playing:
+		set_cutscene(true)
+	for id in companion_nodes:
+		var c: Variant = companion_nodes[id]
+		if c is Node and is_instance_valid(c) and (c as Node).has_method("react"):
+			(c as Node).react("celebrate")
+	Events.chapter2_completed.emit()
+	await _show_chapter_two_ending()
+	if was_playing and mode == "cutscene":
+		set_cutscene(false)
+	GameState.request_quest_eval()
+	_ch2_ending_running = false
+	return true
+
+
+## The final Chapter Two step's on_complete ({"give": {item: n}, "flags": [...]}) from data/quests_ch2.gd
+## (its FINAL_STEP), or {} when that data doesn't exist. The quest layer grants the same step through
+## grant_once("rw_" + FINAL_STEP) = CH2_REWARD_ID, so both paths must grant the identical set.
+func _feast_step_rewards() -> Dictionary:
+	if not ResourceLoader.exists(QUESTS_CH2_DATA):
+		return {}
+	var s: Variant = load(QUESTS_CH2_DATA)
+	if not (s is Script) or not (s as Script).can_instantiate():
+		return {}
+	var consts: Dictionary = (s as Script).get_script_constant_map()
+	var final_id := String(consts.get("FINAL_STEP", "ch2_feast"))
+	var steps: Variant = consts.get("STEPS", [])
+	if steps is Array:
+		for st in steps:
+			if st is Dictionary and String((st as Dictionary).get("id", "")) == final_id:
+				var oc: Variant = (st as Dictionary).get("on_complete", {})
+				return (oc as Dictionary).duplicate(true) if oc is Dictionary else {}
+	return {}
+
+
+## The Lanternwake reward items {item_id: count} (the final step's "give"; the Wardlight itself comes
+## earlier, with ch2_homecoming). Only ids ItemDB knows. CH2_FEAST_REWARDS_DEFAULT when there is no data.
+func chapter_two_rewards() -> Dictionary:
+	var src: Variant = CH2_FEAST_REWARDS_DEFAULT
+	var oc := _feast_step_rewards()
+	if oc.has("give"):
+		src = oc["give"]
+	var out := {}
+	if src is Dictionary:
+		for id in src:
+			if ItemDB.has_item(String(id)):
+				out[String(id)] = int(src[id])
+	return out
+
+
+## Grants the Chapter Two rewards exactly once: `rewards` merged (max per item) with the final step's
+## on_complete give, flags = chapter_two_complete + the final step's flags (e.g. ch2_feast, a recipe
+## unlock). Uses the reward ledger (GameState.grant_once) when the core-save module provides it; without
+## it chapter_two_complete itself is the ledger entry (set first, then the items are given).
+## Returns true when the rewards were granted by this call.
+func _grant_chapter_two_rewards(rewards: Dictionary) -> bool:
+	var oc := _feast_step_rewards()
+	var items := {}
+	var give: Variant = oc.get("give", {})
+	if give is Dictionary:
+		for id in give:
+			items[String(id)] = int(give[id])
+	for id in rewards:
+		items[String(id)] = maxi(int(items.get(String(id), 0)), int(rewards[id]))
+	var flag_list: Array = [CH2_COMPLETE_FLAG]
+	var extra_flags: Variant = oc.get("flags", [])
+	if extra_flags is Array:
+		for f in extra_flags:
+			if not flag_list.has(String(f)):
+				flag_list.append(String(f))
+	if GameState.has_method("grant_once"):
+		return bool(GameState.call("grant_once", CH2_REWARD_ID, items, flag_list,
+			"Chapter Two complete. The Lanternwake's gifts are yours."))
+	if bool(GameState.get_flag(CH2_COMPLETE_FLAG)):
+		return false
+	for f in flag_list:
+		GameState.set_flag(String(f), true)
+	for id in items:
+		GameState.give_item(String(id), int(items[id]))
+	return true
+
+
+## The Chapter Two ending presentation: a dedicated UI ending if the UI offers one (show_chapter_two_ending()
+## or show_ending(variant)), else the chapter card plus the MP §17 ending line.
+func _show_chapter_two_ending() -> void:
+	if ui == null or not is_instance_valid(ui):
+		return
+	if ui.has_method("show_chapter_two_ending"):
+		await ui.show_chapter_two_ending()
+	elif ui.has_method("show_ending") and ui.get_method_argument_count("show_ending") >= 1:
+		await ui.show_ending("chapter_two")
+	elif ui.has_method("show_chapter_card"):
+		ui.show_chapter_card("Chapter Two Complete", "The Lanterns of Hallowmere")
+		Events.say.emit("", CH2_ENDING_TEXT, 9.0)
 
 
 func quit_to_title() -> void:

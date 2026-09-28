@@ -16,7 +16,8 @@ const TOKEN_ACTIONS := {
 const MOVE_ACTIONS := ["move_forward", "move_left", "move_back", "move_right"]
 
 const CATEGORY_NAMES := {"resource": "Material", "tool": "Tool", "weapon": "Weapon", "food": "Food",
-	"placeable": "Buildable", "seed": "Seed", "key": "Key Item", "equipment": "Equipment", "decor": "Decoration"}
+	"placeable": "Buildable", "seed": "Seed", "key": "Key Item", "equipment": "Equipment", "decor": "Decoration",
+	"wand": "Wand", "armor": "Armor", "charm": "Charm", "companion": "Companion Gear"}
 
 const LORE_SCRIPT := "res://src/world/below/lore.gd"
 

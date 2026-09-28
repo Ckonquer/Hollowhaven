@@ -12,7 +12,10 @@ const HAVEN_RADIUS := 20.0                # safe zone radius (no enemy spawns / 
 const BUILD_AREA := {"center": Vector2(0, 0), "radius": 16.0, "grid": 1.0,
 	"blocked": [ {"center": Vector2(0, -6), "radius": 3.5, "name": "Ward Stone"},
 				 {"center": Vector2(4, 3), "radius": 2.2, "name": "campfire"},
-				 {"center": Vector2(0, 7), "radius": 1.8} ]}   # start path: generic "needs to stay clear" message
+				 {"center": Vector2(0, 7), "radius": 1.8} ],   # start path: generic "needs to stay clear" message
+	# Chapter Two (append-only): extra buildable regions [{center: Vector2, radius, blocked?}] added by the
+	# Haven expansion (spec 7.1). Empty = the legacy build circle only.
+	"extra": []}
 
 ## Named places (shown on the map and used for zone detection). radius = zone size.
 const LANDMARKS := {
@@ -55,3 +58,13 @@ const SPAWN_HINTS := {
 
 ## World clock. 1 real second = MINUTES_PER_SECOND in-game minutes (daytime); nights run faster.
 const CLOCK := {"minutes_per_second": 1.0, "night_speedup": 2.5, "day_start_hour": 6.0, "night_start_hour": 20.0, "new_game_hour": 8.0}
+
+## --- Chapter Two additions (append-only; docs/CHAPTER_TWO_SPEC.md 7.1) ------------------------------------
+## Validated sites of new Hollowhaven Woods content. Never inside the legacy Haven (>= 18 m from it),
+## never on a legacy vegetation node (checked against Vegetation.plan() footprint + 2 m by
+## tests/unit/test_flow_ch2_areas.gd). The waygate spawn "waygate" stands 3 m south of the gate.
+##   waygate: the Lanternwake waygate, north of the Moonlit Ruin on its outer side (21 m from the ruin
+##            centre, 25 m from the ruin_bramblings spawner; flat ground, no tree/rock within 6.5 m).
+const CH2_POINTS := {
+	"waygate": Vector2(-4, -86),
+}

@@ -388,6 +388,8 @@ func test_every_sound_can_be_played() -> void:
 		var s := String(n)
 		if s.begins_with("music_") or s.begins_with("amb_"):
 			continue
+		if s.length() > 3 and s[0] == "m" and s.substr(1, 2).is_valid_int() and s[3] == "_":
+			continue   # Chapter Two music cues (m03_... m27_...) are music, not one-shots
 		if s.begins_with("ui_"):
 			Audio.play_ui(s, -30.0)
 		else:

@@ -12,6 +12,10 @@ const FLAG := "lower_gate_open"
 const KEY := "foreman_key"
 const OPEN_ANGLE := 86.0
 
+## Configurable for other locked gates (defaults = the Below's lower gate).
+var flag: String = FLAG
+var key: String = KEY
+var locked_text: String = "The gate is locked. The foreman kept the key."
 var width: float = 4.0
 var height: float = 3.4
 var is_open: bool = false
@@ -25,13 +29,16 @@ var _tween: Tween
 
 
 func setup(p: Dictionary) -> void:
+	flag = String(p.get("flag", flag))
+	key = String(p.get("key", key))
+	locked_text = String(p.get("locked_text", locked_text))
 	width = float(p.get("width", width))
 	height = float(p.get("height", height))
 
 
 func _ready() -> void:
 	_build()
-	if bool(GameState.get_flag(FLAG)):
+	if bool(GameState.get_flag(flag)):
 		_set_open_immediate()
 	else:
 		add_to_group("interactable")
@@ -118,7 +125,7 @@ func _open_rotation(side: float) -> float:
 func get_interaction(_player: Node = null) -> Dictionary:
 	if is_open or animating:
 		return {}
-	if GameState.has_item(KEY):
+	if GameState.has_item(key):
 		return {"text": "Unlock the gate", "enabled": true}
 	return {"text": "Try the gate", "enabled": true}
 
@@ -126,8 +133,8 @@ func get_interaction(_player: Node = null) -> Dictionary:
 func interact(_player: Node = null) -> void:
 	if is_open or animating:
 		return
-	if not GameState.has_item(KEY):
-		Events.say.emit("", "The gate is locked. The foreman kept the key.", 3.5)
+	if not GameState.has_item(key):
+		Events.say.emit("", locked_text, 3.5)
 		Audio.play_3d("door_creak", global_position + Vector3(0, 1.5, 0), -8.0)
 		GameState.set_flag("lower_gate_tried", true)
 		_rattle()
@@ -138,7 +145,7 @@ func interact(_player: Node = null) -> void:
 func unlock(animate: bool = true) -> void:
 	if is_open:
 		return
-	GameState.set_flag(FLAG, true)
+	GameState.set_flag(flag, true)
 	remove_from_group("interactable")
 	if _area != null:
 		_area.queue_free()

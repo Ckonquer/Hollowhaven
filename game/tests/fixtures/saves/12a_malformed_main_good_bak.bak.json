@@ -1,0 +1,173 @@
+{
+	"format": "hollowhaven-save",
+	"game_version": "0.9.1",
+	"meta": {
+		"area": "surface",
+		"day": 1,
+		"play_seconds": 380.25,
+		"step": "mochi",
+		"step_title": "A Timid Friend"
+	},
+	"saved_unix": 1790000000.0,
+	"state": {
+		"active_companion": "",
+		"buffs": {},
+		"companions": {
+			"lumi": {
+				"assignment": "wild",
+				"befriended": false,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			},
+			"mochi": {
+				"assignment": "wild",
+				"befriended": false,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			},
+			"pebble": {
+				"assignment": "wild",
+				"befriended": false,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			}
+		},
+		"counters": {
+			"structures_built": 1,
+			"trees_felled": 3
+		},
+		"crops": {},
+		"depleted": {
+			"tree_3": 1080.0,
+			"tree_7": 1080.0
+		},
+		"dropped": [],
+		"flags": {
+			"read_ward_intro": true
+		},
+		"hotbar_index": 1,
+		"inventory": [
+			{
+				"count": 11,
+				"id": "wood"
+			},
+			{
+				"count": 2,
+				"id": "stone"
+			},
+			{
+				"count": 3,
+				"id": "fiber"
+			},
+			{
+				"count": 1,
+				"id": "stone_axe"
+			},
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null
+		],
+		"key_items": {},
+		"lore": [],
+		"next_uid": 2,
+		"player": {
+			"area": "surface",
+			"below_respawn": "",
+			"hp": 100.0,
+			"lantern_on": false,
+			"max_hp": 100.0,
+			"max_stamina": 100.0,
+			"pos": [
+				2.5,
+				0.125,
+				6.0
+			],
+			"respawn_area": "surface",
+			"respawn_spawn": "haven_respawn",
+			"spawn": "haven_start",
+			"stamina": 100.0,
+			"yaw": 0.75
+		},
+		"player_name": "Krystal",
+		"quests": {
+			"baselines": {
+				"chop": {
+					"trees_felled": 0
+				},
+				"craft_axe": {},
+				"gather_basics": {},
+				"mochi": {},
+				"wake": {},
+				"workbench": {}
+			},
+			"completed": [
+				"wake",
+				"gather_basics",
+				"craft_axe",
+				"chop",
+				"workbench"
+			],
+			"index": 5
+		},
+		"stats": {
+			"deaths": 0,
+			"enemies_defeated": 0,
+			"items_crafted": 2,
+			"play_seconds": 380.25,
+			"started_version": "0.9.1"
+		},
+		"storages": {},
+		"structures": {
+			"s1": {
+				"area": "surface",
+				"data": {},
+				"id": "workbench",
+				"pos": [
+					3.0,
+					0.0,
+					-2.0
+				],
+				"rot": 90.0
+			}
+		},
+		"total_minutes": 575.5
+	},
+	"version": 1
+}

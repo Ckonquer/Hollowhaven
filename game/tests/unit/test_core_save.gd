@@ -4,9 +4,17 @@ extends "res://tests/unit/test_core_base.gd"
 ## All files live in SaveSystem.save_dir, which the runner points at user://test_saves/<suite>.
 
 const Layout := preload("res://data/world_layout.gd")
-const EXPECTED_STATE_KEYS := ["active_companion", "buffs", "companions", "counters", "crops", "depleted",
-	"dropped", "flags", "hotbar_index", "inventory", "key_items", "lore", "next_uid", "player",
-	"player_name", "quests", "stats", "storages", "structures", "total_minutes"]
+## Save schema v2 (docs/CHAPTER_TWO_SPEC.md §3) intentionally added: appearance, capacity, chapter2, discovered,
+## equipment, ledger, mastery, optional, orphans, schema, stations, trials, wardrobe.
+const EXPECTED_STATE_KEYS := ["active_companion", "appearance", "buffs", "capacity", "chapter2", "companions",
+	"counters", "crops", "depleted", "discovered", "dropped", "equipment", "flags", "hotbar_index", "inventory",
+	"key_items", "ledger", "lore", "mastery", "next_uid", "optional", "orphans", "player", "player_name",
+	"quests", "schema", "stations", "stats", "storages", "structures", "total_minutes", "trials", "wardrobe"]
+## Keys whose value is constant (cannot differ from a fresh state).
+const CONSTANT_STATE_KEYS := ["schema"]
+## Temporary armor definition injected into ItemDB for the equipment round trip (removed in teardown), so
+## this suite does not depend on the contents of data/items.gd.
+const FAKE_HOOD := "test_core_save_hood"
 
 
 func setup() -> void:
@@ -17,6 +25,7 @@ func setup() -> void:
 
 func teardown() -> void:
 	_wipe()
+	ItemDB._items.erase(FAKE_HOOD)
 
 
 func _cur() -> String:
@@ -129,6 +138,35 @@ func _build_rich_state() -> void:
 	GameState.stats["items_crafted"] = 3
 	GameState.stats["play_seconds"] = 1234.5
 	GameState.add_buff("stamina_regen", 1.6, 42.5)
+	# --- schema v2 sections ---
+	var hood: Dictionary = ItemDB.ITEM_DEFAULTS.duplicate()
+	hood.merge({"id": FAKE_HOOD, "name": "Test Hood", "cat": "armor", "slot": "head", "stack": 1}, true)
+	ItemDB._items[FAKE_HOOD] = hood
+	GameState.set_backpack_capacity(40)
+	GameState.inventory.set_slot(38, {"id": "stone", "count": 5})
+	GameState.give_item(FAKE_HOOD, 1)
+	assert_true(GameState.equip(FAKE_HOOD), "equip the test hood")
+	GameState.appearance["hair"] = "bob"
+	GameState.appearance["palette"]["accent"] = "rose"
+	GameState.unlock_pattern("ribbon_bow")
+	GameState.set_flag("c1x_look_chosen")
+	GameState.optional_goals.evaluate()   # latches opt_look_of_your_own (and records its reward id)
+	GameState.set_flag("chapter_one_complete")
+	GameState.set_flag("ch2_accepted")
+	GameState.chapter2.evaluate()         # ch2_light_beyond done, ch2_waygate started
+	GameState.grant_once("rw_test_bundle", {"berries": 2}, ["test_reward_flag"])
+	GameState.mastery["gathering"] = 12
+	GameState.mastery["seen"]["gathering"] = ["oak_tree"]
+	GameState.discover("hallowmere_reach", "commons")
+	GameState.trials["matron"] = {"clears": 2, "best_seconds": 95.5}
+	GameState.orphans.append({"where": "inventory", "slot": 20, "stack": {"id": "item_from_a_newer_build", "count": 3}})
+	GameState.stations["reserved"] = "yes"
+	var m := GameState.companion("mochi")
+	m["combat_mode"] = "close"
+	m["skill_ready_at"] = 12.5
+	m["home_spot"] = [1.0, 0.0, 2.0]
+	m["ribbon"] = "comfort_ribbon"
+	m["home_task"] = "garden"
 
 
 func test_round_trip_restores_every_field_exactly() -> void:
@@ -139,6 +177,8 @@ func test_round_trip_restores_every_field_exactly() -> void:
 	keys.sort()
 	assert_eq(keys, EXPECTED_STATE_KEYS, "to_dict() fields (update this test when adding state)")
 	for k in keys:
+		if CONSTANT_STATE_KEYS.has(k):
+			continue
 		assert_true(deep_diff(before[k], fresh[k], k) != "", "rich state exercises '%s'" % k)
 	assert_eq(before["quests"]["index"], 3, "quests advanced to chop")
 	assert_true(SaveSystem.save_game())
@@ -159,6 +199,13 @@ func test_round_trip_restores_every_field_exactly() -> void:
 	assert_true(GameState.is_depleted("mine_rubble"))
 	assert_almost(GameState.buff_mult("stamina_regen"), 1.6)
 	assert_eq(GameState.get_storage(GameState.structures.keys()[0]).count_of("glowcap"), 3)
+	assert_eq(GameState.inventory.size, 40, "upgraded backpack capacity survives")
+	assert_eq(GameState.inventory.get_slot(38), {"id": "stone", "count": 5})
+	assert_eq(GameState.equipment["head"], FAKE_HOOD)
+	assert_true(GameState.optional_goals.is_done("opt_look_of_your_own"))
+	assert_true(GameState.chapter2.is_done("ch2_light_beyond"))
+	assert_true(GameState.has_reward("rw_test_bundle"))
+	assert_false(GameState.grant_once("rw_test_bundle", {"berries": 2}), "a granted reward stays granted after loading")
 
 
 func test_loaded_numbers_have_runtime_types() -> void:
@@ -175,6 +222,13 @@ func test_loaded_numbers_have_runtime_types() -> void:
 	assert_eq(typeof(GameState.stats["deaths"]), TYPE_INT)
 	assert_eq(typeof(GameState.stats["play_seconds"]), TYPE_FLOAT)
 	assert_eq(typeof(GameState.quests.baselines["chop"]["trees_felled"]), TYPE_INT)
+	assert_eq(typeof(GameState.capacity["backpack"]), TYPE_INT)
+	assert_eq(typeof(GameState.mastery["gathering"]), TYPE_INT)
+	assert_eq(typeof(GameState.trials["matron"]["clears"]), TYPE_INT)
+	assert_eq(typeof(GameState.orphans[0]["slot"]), TYPE_INT)
+	assert_eq(typeof(GameState.orphans[0]["stack"]["count"]), TYPE_INT)
+	assert_eq(typeof(GameState.ledger["rw_test_bundle"]), TYPE_FLOAT)
+	assert_eq(typeof(GameState.companion("mochi")["skill_ready_at"]), TYPE_FLOAT)
 
 
 func test_load_emits_signals_and_save_reports_ok() -> void:
@@ -312,6 +366,14 @@ func test_bad_files_are_rejected_without_script_errors() -> void:
 		assert_eq(SaveSystem.peek(), {}, name + ": peek rejects")
 		assert_false(SaveSystem.load_game(), name + ": load rejects")
 		assert_eq(GameState.count_item("wood"), 9, name + ": state untouched")
+		if name == "future version":
+			# Intentional change (schema v2, spec §3.3): a newer save is NOT corrupt. It is refused in place:
+			# not moved aside, no backup fallback, nothing written.
+			assert_eq(SaveSystem.last_error, SaveSystem.FUTURE_ERROR, name + ": refusal reason")
+			assert_true(SaveSystem.blocked_by_future, name + ": blocked")
+			assert_eq(read_text(_cur()), cases[name], name + ": left in place, byte for byte")
+			assert_eq(_corrupt_files().size(), n, name + ": not treated as corrupt")
+			continue
 		n += 1
 		assert_eq(_corrupt_files().size(), n, name + ": preserved for inspection")
 

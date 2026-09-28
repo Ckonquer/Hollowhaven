@@ -30,7 +30,12 @@ var _t: float = 0.0
 var _tween: Tween
 
 
+## Area whose respawn point this lantern sets ("below" for the Chapter One dungeon).
+var area_id: String = "below"
+
+
 func setup(p: Dictionary) -> void:
+	area_id = String(p.get("area", area_id))
 	checkpoint_id = String(p.get("id", checkpoint_id))
 	spawn_id = String(p.get("spawn", spawn_id))
 	zone = String(p.get("zone", zone))
@@ -161,7 +166,7 @@ func interact(_player: Node = null) -> void:
 		GameState.set_flag(flag_name(checkpoint_id), true)
 		_apply_lit(true, true)
 		Audio.play_3d("checkpoint_light", global_position + Vector3(0, 1.4, 0), -2.0)
-	Game.set_respawn("below", spawn_id)
+	Game.set_respawn(area_id, spawn_id)
 	GameState.player["spawn"] = spawn_id     # Continue resumes at this lantern
 	var ok := true
 	if save_enabled:

@@ -1,0 +1,33 @@
+{
+	"format": "hollowhaven-save",
+	"game_version": "1.4.0",
+	"meta": {
+		"area": "tidewater",
+		"chapter": 3,
+		"day": 41,
+		"play_seconds": 99999.0,
+		"step": "ch3_tide",
+		"step_title": "A Newer Journey"
+	},
+	"saved_unix": 1790086400.0,
+	"state": {
+		"chapter3": {
+			"done": [
+				"ch3_start"
+			]
+		},
+		"flags": {
+			"chapter_one_complete": true,
+			"chapter_two_complete": true
+		},
+		"inventory": [
+			{
+				"count": 3,
+				"id": "wood"
+			}
+		],
+		"player_name": "Krystal",
+		"schema": 3
+	},
+	"version": 3
+}

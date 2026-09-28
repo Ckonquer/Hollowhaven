@@ -248,15 +248,53 @@ func to_array() -> Array:
 
 ## Replaces the contents from a to_array() result. Malformed entries and unknown item ids are
 ## skipped safely (never a script error); counts are normalised to int (JSON loads them as float).
+## Loaders that must not lose anything use from_array_collect() and keep what it returns.
 func from_array(arr: Array) -> void:
+	from_array_collect(arr)
+
+
+## Same as from_array(), but returns every well-formed stack that could NOT be placed:
+## [{"slot": index, "stack": {"id", "count"}}] for unknown item ids and for stacks beyond `size`.
+## (Save schema v2 keeps these as GameState.orphans instead of dropping them.)
+func from_array_collect(arr: Array) -> Array:
+	var rejected: Array = []
 	for i in size:
 		slots[i] = null
-	for i in mini(arr.size(), size):
+	for i in arr.size():
 		var s = arr[i]
 		if not (s is Dictionary) or not (s.get("id") is String) or not _is_number(s.get("count", 0)):
 			continue
-		if int(s.get("count", 0)) > 0 and ItemDB.has_item(String(s["id"])):
-			slots[i] = {"id": String(s["id"]), "count": int(s["count"])}
+		var n := int(s.get("count", 0))
+		if n <= 0 or String(s["id"]) == "":
+			continue
+		var stack := {"id": String(s["id"]), "count": n}
+		if i < size and ItemDB.has_item(stack["id"]):
+			slots[i] = stack
+		else:
+			rejected.append({"slot": i, "stack": stack})
+	changed.emit()
+	return rejected
+
+
+## Grows the inventory to `n` slots (new slots are empty). Never shrinks: a smaller `n` changes
+## nothing, so occupied slots can never be truncated. Returns true when the size grew.
+func resize(n: int) -> bool:
+	if n <= size:
+		return false
+	for i in n - size:
+		slots.append(null)
+	size = n
+	changed.emit()
+	return true
+
+
+## Empties the inventory and sets its size to `n` (new game / before loading). Keeps the same object,
+## so existing `changed` connections survive. Use resize() for an upgrade (it never loses items).
+func reset_to(n: int) -> void:
+	size = maxi(n, 0)
+	slots.resize(size)
+	for i in size:
+		slots[i] = null
 	changed.emit()
 
 

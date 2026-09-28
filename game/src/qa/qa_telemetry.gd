@@ -74,6 +74,11 @@ func _snapshot() -> Dictionary:
 	d["seq"] = _seq
 	d["ui_stack"] = Game._ui_stack.duplicate()
 	d["objectives"] = GameState.quests.objective_status() if GameState.active else []
+	# Combined tracker objective (legacy chain or the Chapter Two layer, docs/CHAPTER_TWO_SPEC.md §8).
+	if GameState.active:
+		var obj: Dictionary = GameState.current_objective()
+		d["objective"] = {"source": obj["source"], "chapter": obj["chapter"], "id": obj["id"], "title": obj["title"],
+			"status": obj["status"]}
 	d["hotbar_index"] = GameState.hotbar_index
 	d["hotbar"] = []
 	for i in GameState.HOTBAR_SIZE:

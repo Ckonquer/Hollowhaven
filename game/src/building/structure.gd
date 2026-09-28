@@ -98,6 +98,9 @@ func _build_colliders() -> void:
 # --- Interaction contract (defaults: nothing to do) ----------------------------------------------
 
 func get_interaction(_player: Node) -> Dictionary:
+	# Structures whose behaviour script has not been built yet still honour the interaction contract.
+	if is_interactable():
+		return {"text": display_name(), "enabled": false, "reason": "Not ready yet"}
 	return {}
 
 

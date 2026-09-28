@@ -9,10 +9,14 @@ const CreaturesData := preload("res://data/creatures.gd")
 const EnemiesData := preload("res://data/enemies.gd")
 const HorrorData := preload("res://data/horror_events.gd")
 const Layout := preload("res://data/world_layout.gd")
+const UnlocksData := preload("res://data/unlocks.gd")
+const SourcesData := preload("res://data/sources.gd")
 
-const LAYERS := ["decor", "floor", "object", "edge", "roof"]
-const SNAPS := ["cell", "floor2", "edge2", "roof2"]
-const INTERACTS := ["", "storage", "sleep", "farm", "station"]
+# Chapter Two appended "stair" / "stair2" (stairs) and the interact kinds of docs/CHAPTER_TWO_SPEC.md 4.4.
+const LAYERS := ["decor", "floor", "object", "edge", "roof", "stair"]
+const SNAPS := ["cell", "floor2", "edge2", "roof2", "stair2"]
+const INTERACTS := ["", "storage", "sleep", "farm", "station", "wardrobe", "nook", "board", "music", "face"]
+const LEGACY_ENEMIES := ["brambling", "gloomling", "weaver", "weaver_matron"]
 const TOOL_KINDS := ["axe", "pickaxe"]
 const BEFRIEND_TYPES := ["offer_item", "free_from_boulder", "rescue"]
 const EVENT_KINDS := ["sound", "wrong_sound", "glimpse", "flicker", "notice", "scratch", "silence", "spawn", "stalker_pass"]
@@ -88,7 +92,11 @@ func test_unknown_item_lookup_is_a_safe_placeholder() -> void:
 func test_items_in_category() -> void:
 	var tools := ItemDB.items_in_category("tool")
 	tools.sort()
-	assert_eq(tools, ["stone_axe", "stone_pickaxe"])
+	# Chapter One's tools are exactly the two stone tools (tier 1); Chapter Two only adds higher tiers.
+	var first_tier: Array = tools.filter(func(t: Variant) -> bool: return ItemDB.item_tier(String(t)) <= 1)
+	assert_eq(first_tier, ["stone_axe", "stone_pickaxe"])
+	for t in tools:
+		assert_true(first_tier.has(t) or ItemDB.item_tier(String(t)) >= 2, "%s is a later-tier tool" % t)
 	assert_eq(ItemDB.items_in_category("nonsense"), [])
 
 
@@ -135,7 +143,11 @@ func test_unlock_flags_are_reachable_through_the_quest_chain() -> void:
 			quest_flags[f] = true
 	for rid in RecipesData.RECIPES:
 		var flag: String = RecipesData.RECIPES[rid]["unlock"]
-		assert_true(flag == "" or quest_flags.has(flag), "%s unlock flag %s is part of the chapter" % [rid, flag])
+		if SourcesData.CHAPTER_ONE_ITEMS.has(String(RecipesData.RECIPES[rid]["result"])):
+			assert_true(flag == "" or quest_flags.has(flag), "%s unlock flag %s is part of the chapter" % [rid, flag])
+		else:
+			# Chapter Two recipes: the flag is declared (with its setter) in data/unlocks.gd
+			assert_true(flag == "" or quest_flags.has(flag) or UnlocksData.UNLOCK_FLAGS.has(flag), "%s unlock flag %s is declared" % [rid, flag])
 
 
 func test_station_names() -> void:
@@ -238,7 +250,8 @@ func test_every_enemy_reference_is_valid() -> void:
 		assert_true(float(e["hp"]) > 0.0 and float(e["damage"]) > 0.0, eid + " stats")
 		assert_true(float(e["telegraph"]) >= 0.5, eid + " attacks are readable (telegraph >= 0.5 s)")
 		assert_true(float(e["recover"]) > 0.0, eid + " has a recovery window")
-		assert_true(e["area"] in ["surface", "below"], eid + " area")
+		var areas: Array = ["surface", "below"] if LEGACY_ENEMIES.has(eid) else EnemiesData.AREA_IDS
+		assert_true(e["area"] in areas, eid + " area")
 		for drop in e.get("drops", []):
 			assert_true(ItemDB.has_item(drop["item"]), "%s drop %s exists" % [eid, drop["item"]])
 			assert_true(int(drop["min"]) >= 0 and int(drop["min"]) <= int(drop["max"]), eid + " drop range")

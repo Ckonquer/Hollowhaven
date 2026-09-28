@@ -331,10 +331,15 @@ func test_positions_on_stream_crossings_are_valid() -> void:
 	assert_true(refused > 10, "checked deep open-stream samples (%d)" % refused)
 
 
+## Chapter Two: the music director (src/audio/music_director.gd, tests/unit/test_audio_music_*.gd) owns the
+## surface playlists now. The old play/rest cycle below is its fallback when the director is unavailable,
+## so it is checked with the director switched off; the test after it checks the surface defers to it.
 func test_music_rests_between_plays() -> void:
 	var w: Node3D = await _world()
 	if not Audio.has_sound(SurfaceWorld.MUSIC_DAY) or not Audio.has_sound(SurfaceWorld.MUSIC_NIGHT):
 		return   # audio module not generated yet: nothing to cycle
+	var had_director := Audio.music_director_active()
+	Audio.set_music_director_enabled(false)
 	var track: String = SurfaceWorld.MUSIC_NIGHT if bool(w.sky.is_night) else SurfaceWorld.MUSIC_DAY
 	w.on_player_spawned(null)
 	assert_eq(Audio.current_music(), track, "the surface theme starts when Krystal arrives")
@@ -352,6 +357,24 @@ func test_music_rests_between_plays() -> void:
 	Audio.stop_music(0.0)
 	Audio.stop_ambience(0.0)
 	await wait_frames(6)       # let the Audio decks and the audio server release the streams
+	Audio.set_music_director_enabled(had_director)
+
+
+func test_surface_music_is_left_to_the_director() -> void:
+	var w: Node3D = await _world()
+	if not Audio.music_director_active():
+		return   # no director (script missing): the legacy cycle above applies
+	Audio.stop_music(0.0)
+	await wait_frames(2)
+	w.on_player_spawned(null)
+	assert_eq(Audio.current_music(), "", "arrival no longer starts a track itself: the director picks the playlist")
+	Audio.play_music("music_night", 0.0)          # whatever the director chose
+	w._update_audio(SurfaceWorld.MUSIC_PLAY_SECONDS + SurfaceWorld.MUSIC_REST_SECONDS + 1.0)
+	assert_eq(Audio.current_music(), "music_night", "the old play/rest cycle never touches the director's music")
+	w._audio_started = false
+	Audio.stop_music(0.0)
+	Audio.stop_ambience(0.0)
+	await wait_frames(6)
 
 
 func test_ruin_quest_cannot_stall_without_enemy_module() -> void:

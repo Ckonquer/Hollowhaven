@@ -15,6 +15,18 @@ extends Node
 ##   Audio.has_sound(name) -> bool
 ## Extras (optional): duck(bus, db, seconds, attack, release), stop_world_sounds(fade),
 ##   current_music(), current_ambience(layer), get_stream(name), preload_sounds(names).
+## Music director (Chapter Two, src/audio/music_director.gd, a child of this autoload so it outlives
+## scenes): while it is active it is the single owner of the music. Game code asks for authored music
+## through it and never calls play_music/stop_music directly:
+##   Audio.request_music(context, fallback := "", fade := 2.0)   e.g. ("boss_matron", "music_boss", 1.5)
+##   Audio.release_music(context, fade := 2.0)                   ("" = "my scene no longer needs music")
+##   (without an active director these fall back to play_music(fallback) / stop_music(fade))
+##   Audio.music_director_active() -> bool, Audio.music_director() -> Node,
+##   Audio.set_music_director_enabled(on)
+## Music helpers used by the director: try_play_music(name, fade) -> bool (never stops the current
+## music when `name` is missing), music_position() -> float (-1 = nothing), music_length(),
+## music_stream(), set_music_layers(names, fade) / current_music_layers() (synchronised stems on the
+## Music bus, started at the base track's playback position), prefetch_music(name).
 ##
 ## Behaviour notes
 ## * Voice limiting: each sound name has a maximum number of simultaneous voices (VOICE_LIMIT, default 4);
@@ -28,7 +40,9 @@ extends Node
 ##   sounds still held by the pause are dropped then. Going back to the title (Game.mode "title")
 ##   also drops them and fades out the gameplay ambience; music is left to the title screen.
 ## * Music and each ambience layer crossfade (equal power) between decks driven by one fader per deck,
-##   so rapid changes never fight each other.
+##   so rapid changes never fight each other. A non-looping piece that reaches its end releases its
+##   deck (current_music() becomes ""). Music streams that are on no deck are dropped from the cache
+##   (long tracks are not kept in memory forever). Files on disk that were never imported are ignored.
 ## * Arachnophobia: spider-themed names are swapped for their non-arachnid alternatives automatically
 ##   (ARACHNO_ALT) in addition to whatever the caller chose.
 ## * Composed names (e.g. "pebble_scared", "weaver_telegraph", "step_dirt") resolve through ALIASES and
@@ -45,6 +59,8 @@ const SFX_VOICES := 20
 const UI_VOICES := 10
 const VOICES_3D := 28
 const MUSIC_DECKS := 3
+const MUSIC_LAYERS := 2              # synchronised stems over the active music deck (boss phases)
+const DIRECTOR_SCRIPT := "res://src/audio/music_director.gd"
 const AMB_DECKS := 2
 const AMB_LAYERS := 2
 const DEFAULT_VOICE_LIMIT := 4
@@ -147,6 +163,10 @@ var _arachno: bool = false
 var _game: Node                      # the Game autoload (looked up lazily; may be absent in tools)
 var _game_mode: String = ""          # last Game.mode seen (to notice "back to the title")
 var _amb_mode: Array = []            # per ambience layer: Game.mode when it was last started
+var _music_layers: LayerSet
+var _music_names: Dictionary = {}    # index keys that come from the music folder (cache eviction)
+var _prefetching: Dictionary = {}    # resource path -> true while a threaded load is pending
+var _director: Node = null           # src/audio/music_director.gd (child of this autoload)
 
 
 ## A set of players for one music/ambience channel. Each deck has a fade position (0..1) that moves
@@ -160,6 +180,7 @@ class Deck extends RefCounted:
 	var names: Array = []
 	var trims: Array = []
 	var active: int = -1
+	var finished_any := false        # a piece ended since the last update()
 
 	func _init(owner: Node, bus: String, count: int, label: String) -> void:
 		for i in count:
@@ -168,12 +189,27 @@ class Deck extends RefCounted:
 			p.bus = bus
 			p.volume_db = -80.0
 			owner.add_child(p)
+			p.finished.connect(_on_finished.bind(i))
 			players.append(p)
 			gains.append(0.0)
 			targets.append(0.0)
 			speeds.append(1.0)
 			names.append("")
 			trims.append(0.0)
+
+	## A non-looping stream reached its end (looping ones never finish): release the player so the
+	## channel reports silence instead of a finished piece.
+	func _on_finished(i: int) -> void:
+		if i < 0 or i >= players.size():
+			return
+		var p: AudioStreamPlayer = players[i]
+		p.stream = null
+		gains[i] = 0.0
+		targets[i] = 0.0
+		names[i] = ""
+		finished_any = true
+		if active == i:
+			active = -1
 
 	## Name playing (or fading in) on this channel, "" when silent or fading out.
 	func current() -> String:
@@ -218,7 +254,10 @@ class Deck extends RefCounted:
 				gains[i] = 0.0
 		active = -1
 
-	func update(delta: float) -> void:
+	## Moves every fader; returns true when a player released its stream (faded out or finished).
+	func update(delta: float) -> bool:
+		var released := finished_any
+		finished_any = false
 		for i in players.size():
 			var g: float = gains[i]
 			var t: float = targets[i]
@@ -232,8 +271,90 @@ class Deck extends RefCounted:
 					p.stop()
 					p.stream = null
 					names[i] = ""
+					released = true
 				continue
 			p.volume_db = linear_to_db(maxf(sin(g * PI * 0.5), 0.00001)) + float(trims[i])
+		return released
+
+
+## Synchronised music stems (boss phase layers) over the active music deck. Each layer fades on its
+## own; a layer that starts is placed at the base track's playback position so the stems line up
+## (they share the base track's length and loop points). Bounded: MUSIC_LAYERS players.
+class LayerSet extends RefCounted:
+	var players: Array = []
+	var gains: Array = []
+	var targets: Array = []
+	var speeds: Array = []
+	var names: Array = []
+
+	func _init(owner: Node, bus: String, count: int, label: String) -> void:
+		for i in count:
+			var p := AudioStreamPlayer.new()
+			p.name = "%s%d" % [label, i]
+			p.bus = bus
+			p.volume_db = -80.0
+			owner.add_child(p)
+			players.append(p)
+			gains.append(0.0)
+			targets.append(0.0)
+			speeds.append(1.0)
+			names.append("")
+
+	## Layer names fading in or playing (in slot order, "" skipped).
+	func current() -> Array:
+		var out: Array = []
+		for i in players.size():
+			if float(targets[i]) > 0.0 and String(names[i]) != "":
+				out.append(String(names[i]))
+		return out
+
+	func set_layer(i: int, sound_name: String, stream: AudioStream, pos: float, fade: float) -> void:
+		var sp := 1.0 / maxf(fade, 0.01)
+		speeds[i] = sp
+		if sound_name == "" or stream == null:
+			targets[i] = 0.0
+			if fade <= 0.0:
+				gains[i] = 0.0
+			return
+		var p: AudioStreamPlayer = players[i]
+		if String(names[i]) == sound_name and p.stream == stream and (p.playing or float(gains[i]) > 0.0):
+			targets[i] = 1.0          # already there (or still fading out): just bring it back up
+			return
+		p.stop()
+		p.stream = stream
+		p.volume_db = -80.0
+		gains[i] = 0.0
+		names[i] = sound_name
+		var at := maxf(pos, 0.0)
+		var ln := stream.get_length()
+		if ln > 0.0:
+			at = fposmod(at, ln)
+		p.play(at)
+		targets[i] = 1.0
+
+	func stop(fade: float) -> void:
+		for i in players.size():
+			set_layer(i, "", null, 0.0, fade)
+
+	func update(delta: float) -> bool:
+		var released := false
+		for i in players.size():
+			var g: float = gains[i]
+			var t: float = targets[i]
+			if g != t:
+				var step: float = float(speeds[i]) * delta
+				g = minf(g + step, t) if t > g else maxf(g - step, t)
+				gains[i] = g
+			var p: AudioStreamPlayer = players[i]
+			if g <= 0.0 and t <= 0.0:
+				if p.playing or p.stream != null:
+					p.stop()
+					p.stream = null
+					names[i] = ""
+					released = true
+				continue
+			p.volume_db = linear_to_db(maxf(sin(g * PI * 0.5), 0.00001))
+		return released
 
 
 # ---------------------------------------------------------------------------------------------
@@ -255,12 +376,28 @@ func _ready() -> void:
 	for i in VOICES_3D:
 		_voices_3d.append(_new_voice(_make_player(true, "Pos%d" % i)))
 	_music = Deck.new(self, "Music", MUSIC_DECKS, "Music")
+	_music_layers = LayerSet.new(self, "Music", MUSIC_LAYERS, "MusicLayer")
 	for l in AMB_LAYERS:
 		_amb.append(Deck.new(self, "Ambience", AMB_DECKS, "Amb%d_" % l))
 		_amb_mode.append("")
 	Events.settings_changed.connect(_on_setting_changed)
 	Events.area_exiting.connect(_on_area_exiting)
 	apply_volumes()
+	_create_director()
+
+
+## The music director is optional: if its script is missing or broken, the old per-scene music calls
+## (request_music/release_music fallbacks) keep working exactly as in Chapter One.
+func _create_director() -> void:
+	if not ResourceLoader.exists(DIRECTOR_SCRIPT):
+		return
+	var s: Variant = load(DIRECTOR_SCRIPT)
+	if not (s is Script) or not (s as Script).can_instantiate():
+		push_warning("Audio: music director script failed to load; using the legacy music calls")
+		return
+	_director = (s as Script).new()
+	_director.name = "MusicDirector"
+	add_child(_director)
 
 
 func _setup_buses() -> void:
@@ -285,25 +422,34 @@ func _setup_buses() -> void:
 ## Scans the audio folders once. Works in the editor (x.wav) and in exported builds (x.wav.import).
 func _build_index() -> void:
 	_index.clear()
+	_music_names.clear()
 	for d in DIRS:
 		var dir_path: String = ROOT.path_join(String(d))
 		var da := DirAccess.open(dir_path)
 		if da == null:
 			continue
-		for f in da.get_files():
+		var listing: PackedStringArray = da.get_files()
+		for f in listing:
 			var file := String(f)
 			if file.ends_with(".import"):
 				file = file.trim_suffix(".import")
 			elif file.ends_with(".remap"):
 				file = file.trim_suffix(".remap")
+			elif not listing.has(file + ".import") and not listing.has(file + ".remap"):
+				continue        # a file on disk that was never imported (e.g. a new .ogg): it cannot load yet
 			if not EXTS.has(file.get_extension().to_lower()):
 				continue
 			var stem := file.get_basename()
 			var path := dir_path.path_join(file)
 			_add_index(stem, path)
 			var us := stem.rfind("_")
+			var base := stem
 			if us > 0 and stem.substr(us + 1).is_valid_int():
-				_add_index(stem.substr(0, us), path)
+				base = stem.substr(0, us)
+				_add_index(base, path)
+			if String(d) == "music":
+				_music_names[stem] = true
+				_music_names[base] = true
 
 
 func _add_index(key: String, path: String) -> void:
@@ -559,11 +705,63 @@ func _streams(resolved: String) -> Array:
 	var paths: Array = _index.get(resolved, []) if not _index.is_empty() else _probe(resolved)
 	var found: Array = []
 	for path in paths:
-		var s: Resource = load(String(path))
+		var p := String(path)
+		var s: Resource = null
+		if _prefetching.has(p):
+			_prefetching.erase(p)
+			s = ResourceLoader.load_threaded_get(p)      # waits for the background load if needed
+		if s == null:
+			s = load(p)
 		if s is AudioStream:
 			found.append(s)
 	_cache[resolved] = found
 	return found
+
+
+## Starts loading a (long) music track in the background so a later play does not hitch. At most
+## the latest request stays pending: earlier finished ones that were never played are collected.
+func prefetch_music(name: String) -> void:
+	var r := _resolve(name)
+	if r == "" or _cache.has(r) or _index.is_empty():
+		return
+	var wanted: Array = _index.get(r, [])
+	_collect_prefetches(false, wanted)
+	for path in wanted:
+		var p := String(path)
+		if _prefetching.has(p) or ResourceLoader.has_cached(p):
+			continue
+		if ResourceLoader.load_threaded_request(p, "", false) == OK:
+			_prefetching[p] = true
+
+
+## Takes back background loads that were never played (they would otherwise stay in the loader's
+## task list, and in memory, until the game quits). wait = also the ones still loading (blocks).
+func _collect_prefetches(wait: bool, keep: Array = []) -> void:
+	for key in _prefetching.keys():
+		var p := String(key)
+		if keep.has(p):
+			continue
+		var st := ResourceLoader.load_threaded_get_status(p)
+		if st == ResourceLoader.THREAD_LOAD_IN_PROGRESS and not wait:
+			continue
+		_prefetching.erase(p)
+		if st != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			ResourceLoader.load_threaded_get(p)         # result dropped: freed unless something holds it
+
+
+## Drops cached music streams that no music deck or layer holds any more (tracks can be minutes
+## long; only what is audible, or about to be, stays in memory).
+func _evict_music_cache() -> void:
+	var keep: Dictionary = {}
+	for n in _music.names:
+		if String(n) != "":
+			keep[_resolve(String(n))] = true
+	for n in _music_layers.names:
+		if String(n) != "":
+			keep[_resolve(String(n))] = true
+	for key in _cache.keys():
+		if _music_names.has(key) and not keep.has(key):
+			_cache.erase(key)
 
 
 func _pick(resolved: String, requested: String) -> AudioStream:
@@ -784,6 +982,10 @@ func stop_all() -> void:
 				p.set("stream", null)
 	_music.stop(0.0)
 	_music.update(0.0)
+	_music_layers.stop(0.0)
+	_music_layers.update(0.0)
+	_collect_prefetches(true)
+	_evict_music_cache()
 	for d in _amb:
 		(d as Deck).stop(0.0)
 		(d as Deck).update(0.0)
@@ -801,17 +1003,140 @@ func play_music(name: String, fade: float = 2.0) -> void:
 		return
 	var s := _pick(_resolve(name), name)
 	if s == null:
-		_music.stop(fade)
+		stop_music(fade)
 		return
+	_start_music(name, s, fade)
+
+
+## Like play_music, but a missing (or unloadable) track changes nothing and returns false: the music
+## director uses this so a cue that is not there yet never silences what is playing.
+func try_play_music(name: String, fade: float = 2.0) -> bool:
+	if name == "":
+		return false
+	if _music.current() == name:
+		return true
+	var s := _pick(_resolve(name), name)
+	if s == null:
+		return false
+	_start_music(name, s, fade)
+	return true
+
+
+func _start_music(name: String, s: AudioStream, fade: float) -> void:
+	_music_layers.stop(fade)             # stems belong to the track they were started with
 	_music.play(name, s, fade, 0.0)
+	_evict_music_cache()
 
 
 func stop_music(fade: float = 2.0) -> void:
 	_music.stop(fade)
+	_music_layers.stop(fade)
 
 
 func current_music() -> String:
 	return _music.current()
+
+
+## Playback position (seconds into the pass) of the music that is playing or fading in, -1 when none.
+## Compensated for the mix buffer, so phrase maths lands on the audible beat.
+func music_position() -> float:
+	var p := _active_music_player()
+	if p == null:
+		return -1.0
+	var pos := p.get_playback_position() + AudioServer.get_time_since_last_mix() - AudioServer.get_output_latency()
+	var ln := p.stream.get_length()
+	if ln > 0.0:
+		pos = fposmod(pos, ln) if _is_looping(p.stream) else minf(pos, ln)
+	return maxf(pos, 0.0)
+
+
+## Length of one pass of the active music track (0 when none or unknown).
+func music_length() -> float:
+	var p := _active_music_player()
+	return p.stream.get_length() if p != null else 0.0
+
+
+## The active music stream (null when silent), e.g. to read Ogg bpm/bar_beats import metadata.
+func music_stream() -> AudioStream:
+	var p := _active_music_player()
+	return p.stream if p != null else null
+
+
+func _active_music_player() -> AudioStreamPlayer:
+	var i: int = _music.active
+	if i < 0 or float(_music.targets[i]) <= 0.0:
+		return null
+	var p: AudioStreamPlayer = _music.players[i]
+	return p if p.stream != null else null
+
+
+## Where the mixer is in the active music track (-1 when none), NOT compensated for output latency:
+## a stem started now is mixed from the next mix step, exactly like the base track, so this is the
+## position that lines the two up (music_position() is the audible one, for phrase maths).
+func _music_mix_position() -> float:
+	var p := _active_music_player()
+	if p == null:
+		return -1.0
+	var pos := p.get_playback_position()
+	var ln := p.stream.get_length()
+	if ln > 0.0:
+		pos = fposmod(pos, ln) if _is_looping(p.stream) else minf(pos, ln)
+	return maxf(pos, 0.0)
+
+
+## Fades synchronised stems in/out over the active music track: names[i] plays on layer player i
+## ("" or a missing name = that layer fades out). New layers start at the base track's position.
+func set_music_layers(names: Array, fade: float = 2.0) -> void:
+	var base_pos := _music_mix_position()
+	for i in MUSIC_LAYERS:
+		var want := String(names[i]) if i < names.size() else ""
+		var s: AudioStream = null
+		if want != "" and base_pos >= 0.0:
+			s = _pick(_resolve(want), want)
+		_music_layers.set_layer(i, want if s != null else "", s, base_pos, fade)
+	_evict_music_cache()
+
+
+func current_music_layers() -> Array:
+	return _music_layers.current()
+
+
+# --- music director -----------------------------------------------------------------------------
+
+func music_director() -> Node:
+	return _director if is_instance_valid(_director) else null
+
+
+## True while the director owns the music (legacy call sites then leave the music to it).
+func music_director_active() -> bool:
+	return is_instance_valid(_director) and bool(_director.get("enabled"))
+
+
+func set_music_director_enabled(on: bool) -> void:
+	if not is_instance_valid(_director):
+		return
+	if on and not bool(_director.get("enabled")) and _director.has_method("reset"):
+		_director.call("reset")
+	_director.set("enabled", on)
+
+
+## An authored scene wants its music (the title, the restoration, a boss...). With the director this
+## is a context request (no restart when already active); without it, `fallback` is played directly.
+func request_music(context: String, fallback: String = "", fade: float = 2.0) -> void:
+	if music_director_active() and _director.has_method("request"):
+		_director.call("request", context, fade)
+	elif fallback != "":
+		play_music(fallback, fade)
+
+
+## The scene no longer needs its music. With the director the context is released (it chooses what
+## follows; "" = nothing to release); without it the music stops over `fade` seconds.
+func release_music(context: String, fade: float = 2.0) -> void:
+	if music_director_active():
+		if context != "" and _director.has_method("release"):
+			_director.call("release", context, fade)
+	else:
+		stop_music(fade)
 
 
 func play_ambience(name: String, fade: float = 3.0, layer: int = 0) -> void:
@@ -851,7 +1176,9 @@ func _process(delta: float) -> void:
 		_game_mode = mode
 		if mode == "title":
 			_back_to_title()            # before the pause logic below could resume held sounds
-	_music.update(delta)
+	var freed := _music.update(delta)
+	if _music_layers.update(delta) or freed:
+		_evict_music_cache()
 	for d in _amb:
 		(d as Deck).update(delta)
 	var paused := get_tree().paused

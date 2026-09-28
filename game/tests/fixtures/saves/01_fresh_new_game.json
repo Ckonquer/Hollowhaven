@@ -1,0 +1,124 @@
+{
+	"format": "hollowhaven-save",
+	"game_version": "0.9.1",
+	"meta": {
+		"area": "surface",
+		"day": 1,
+		"play_seconds": 0.0,
+		"step": "wake",
+		"step_title": "A Dim Haven"
+	},
+	"saved_unix": 1790000000.0,
+	"state": {
+		"active_companion": "",
+		"buffs": {},
+		"companions": {
+			"lumi": {
+				"assignment": "wild",
+				"befriended": false,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			},
+			"mochi": {
+				"assignment": "wild",
+				"befriended": false,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			},
+			"pebble": {
+				"assignment": "wild",
+				"befriended": false,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			}
+		},
+		"counters": {},
+		"crops": {},
+		"depleted": {},
+		"dropped": [],
+		"flags": {},
+		"hotbar_index": 0,
+		"inventory": [
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null
+		],
+		"key_items": {},
+		"lore": [],
+		"next_uid": 1,
+		"player": {
+			"area": "surface",
+			"below_respawn": "",
+			"hp": 100.0,
+			"lantern_on": false,
+			"max_hp": 100.0,
+			"max_stamina": 100.0,
+			"pos": null,
+			"respawn_area": "surface",
+			"respawn_spawn": "haven_respawn",
+			"spawn": "haven_start",
+			"stamina": 100.0,
+			"yaw": 0.0
+		},
+		"player_name": "Krystal",
+		"quests": {
+			"baselines": {
+				"wake": {}
+			},
+			"completed": [],
+			"index": 0
+		},
+		"stats": {
+			"deaths": 0,
+			"enemies_defeated": 0,
+			"items_crafted": 0,
+			"play_seconds": 0.0,
+			"started_version": "0.9.1"
+		},
+		"storages": {},
+		"structures": {},
+		"total_minutes": 480.0
+	},
+	"version": 1
+}

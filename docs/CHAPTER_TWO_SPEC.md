@@ -248,16 +248,21 @@ wave assigns them to; everyone else reports needed changes.)
 
 ### 7.2 Hallowmere Reach (`data/hallowmere_layout.gd`, x east, z south, metres, origin = Commons centre)
 Playable extent x in [-140, 140], z in [-110, 110]; soft boundary (hills, cliffs, dense autumn trees).
+The ids below are BOTH landmark ids and zone ids (`get_zone_at`). Zone ids must never reuse a legacy zone string
+(companion bond xp and music are keyed by zone), hence the prefixes. Manor zones: `mm_cloakroom`, `mm_hall`,
+`mm_ballroom`, `mm_gallery`, `mm_balcony`. Works zones: `hw_landing`, `hw_lockers`, `hw_rails`, `hw_sluice`,
+`hw_bells`, `hw_eyes`, `hw_refuge`, `hw_lightwell`, `hw_winch`, `hw_crossing`, `hw_wrong_landing`, `hw_porch`,
+`hw_throat`, `hw_vault`. Annex zones: `ta_entry`, `ta_lockers`, `ta_sump`. Trial zone: `trial`.
 | id | name | centre | radius | safe | notes |
 |---|---|---|---|---|---|
-| `commons` | Lanternwake Commons | (0, 60) | 24 | yes | arrival arch `commons_arch` (0, 78), festival map board, stalls, festival mirror (wardrobe), cottage foundation (optional outpost build area r=8 at (-16, 54)) |
-| `conservatory` | Ward-Keeper's Conservatory | (0, 6) | 14 | yes | lamp-linking pedestal, recipes, preparation notes + practice seam |
-| `orchard` | Pumpkintide Orchard | (-82, 36) | 30 | no | `orchard_arch` (-60, 50), irrigation sluice, garden lamp, mimic pockets, pumpkin/roseberry beds |
-| `pools` | Thimblebrook Pools | (-44, -8) | 18 | no | brook, stepping stones, moonpetals, sugarcap patch, chime trail |
-| `candleyard` | The Candleyard | (-86, -60) | 22 | no | leaning stones, moonflowers, groundskeeper notes, dress pattern, bench |
-| `quarry` | Ashbell Quarry | (86, 18) | 30 | no | `quarry_arch` (62, 38), lower iron terraces, winch (100, 0), upper Moon Crystal shelf (110, -26), Warden arena (90, 10) |
-| `manor_grounds` | Moonveil Manor | (18, -74) | 26 | no | `manor_arch` (10, -50), manor door (18, -86) -> `moonveil_manor` |
-| `bellhouse` | Sunken Bellhouse | (72, -74) | 16 | no | stair down -> `hushed_works` (revealed by `ch2_lamps_linked`) |
+| `hr_commons` | Lanternwake Commons | (0, 60) | 24 | yes | arrival arch `commons_arch` (0, 78), festival map board, stalls, festival mirror (wardrobe), cottage foundation (optional outpost build area r=8 at (-16, 54)) |
+| `hr_conservatory` | Ward-Keeper's Conservatory | (0, 6) | 14 | yes | lamp-linking pedestal, recipes, preparation notes + practice seam |
+| `hr_orchard` | Pumpkintide Orchard | (-82, 36) | 30 | no | `orchard_arch` (-60, 50), irrigation sluice, garden lamp, mimic pockets, pumpkin/roseberry beds |
+| `hr_pools` | Thimblebrook Pools | (-44, -8) | 18 | no | brook, stepping stones, moonpetals, sugarcap patch, chime trail |
+| `hr_candleyard` | The Candleyard | (-86, -60) | 22 | no | leaning stones, moonflowers, groundskeeper notes, dress pattern, bench |
+| `hr_quarry` | Ashbell Quarry | (86, 18) | 30 | no | `quarry_arch` (62, 38), lower iron terraces, winch (100, 0), upper Moon Crystal shelf (110, -26), Warden arena (90, 10) |
+| `hr_manor_grounds` | Moonveil Manor | (18, -74) | 26 | no | `manor_arch` (10, -50), manor door (18, -86) -> `moonveil_manor` |
+| `hr_bellhouse` | Sunken Bellhouse | (72, -74) | 16 | no | stair down -> `hushed_works` (revealed by `ch2_lamps_linked`) |
 The waygate arrival (`waygate_arrival`) is at (0, 98) facing north. Main paths: arrival -> Commons ->
 Conservatory, then three visible branches west (orchard), east (quarry), north (manor); the Candleyard
 loops off the orchard/pools, the Bellhouse sits between quarry and manor.
@@ -297,3 +302,73 @@ lift returns to 7. Flags: `ch2_line_water`, `ch2_line_bell`, `ch2_line_light`, `
 * Rewards: `GameState.grant_once(reward_id, items := {}, flags := [], message := "") -> bool`.
 * Combined tracker accessor: `GameState.current_objective() -> Dictionary` `{"source": "chapter2" |
   "legacy", "steps": [step dicts to display], "title", "status": [objective rows]}`.
+
+## 9. Wave B cross-module contracts (decided by the lead)
+* **Timed buffs** (`GameState.add_buff(key, mult, seconds)`, saved, ticked while unpaused) consumed by
+  `Stats`: `stamina_regen` (legacy), `glimmerstep` (Lumi skill: move bonus fraction in `mult`, e.g. 0.12),
+  `sprint_saver` (Lumi 3-heart perk: sprint stamina cost multiplier), `slow` (enemy slow: speed
+  multiplier < 1, bounded, never chained past MP limits), `slow_resist` (moonpetal tea), `ward_calm`
+  (kindling charm utility). Food buffs carry a `family`; a new food of the same family replaces/refreshes
+  it instead of stacking.
+* **Shield**: `Game.player.add_shield(amount: float, seconds: float, source: String)` (player_health),
+  absorbed AFTER armor mitigation; `Events.player_shield_changed(amount)`; transient (not saved).
+* **Heals** from companions go through `Game.player.health.heal(amount)`; `Stats.heal_mult()` is applied
+  inside the player's heal path (not by callers). Heal-over-time is ticked by the caster.
+* **Damage intake order** (player): invulnerable/i-frames -> armor/companion reduction (Stats) -> shield ->
+  Health. Never process one hit twice. Special damage never silently bypasses armor.
+* **Companion attacks** use `Combat.melee(...)` or `src/combat/projectile.gd` (shared, pooled, LOS-checked,
+  target groups ["enemy"]); enemies expose `can_be_hit_by(source) -> bool` (false while a boss is
+  invulnerable/overhead) - attacks respect it. No XP/bond from invulnerable targets, dummies, friends.
+* **Structure scripts owned by other modules** are mapped in `structure_factory.gd` through a
+  safe-loaded `LAZY_SCRIPTS := {structure_id: path}`: `furnace` -> `src/building/structures/furnace.gd`
+  (crafting module), `companion_bed` / `companion_perch` -> `src/building/structures/companion_nook.gd`
+  (companions module), `wardrobe` / `vanity_mirror` -> `src/building/structures/wardrobe.gd` (building
+  module), `pumpkin_lantern` -> `src/building/structures/pumpkin_lantern.gd` (building module),
+  `loom` / `kitchen_counter` -> `workbench.gd` with the station id from data.
+* **Crafting stations**: `crafting_station` group nodes expose `station_id`; the furnace also exposes
+  `queue_add(recipe_id) -> bool`, `queue() -> Array`, `collect() -> int`. The crafting panel shows the
+  queue when the station is a furnace (`Game.open_panel("crafting", {"station": "furnace", "uid": uid})`).
+* **Mastery** (`src/core/mastery.gd`, autoload-free static + Events listeners owned by the crafting
+  module): `Mastery.award(track, kind_id, xp) -> int` (dedupes by kind for first-time xp, caps repeats per
+  in-game day), `Mastery.rank(track) -> int`, `Mastery.apply_legacy_credit()` (once, flag in state).
+* **Panels**: new panel `wardrobe` (appearance UI module). The creation screen is a title-flow screen,
+  not a gameplay panel. Other modules extend existing panels (crafting, storage, inventory, companion,
+  journal, map) they own in the wave; the UI root is owned by the appearance UI module in Wave B.
+* **Underground vs outdoor** (companions & saving): outdoor = `surface`, `hallowmere_reach`;
+  underground = `below`, `tobin_annex`, `hushed_works`; interior = `moonveil_manor`, `echo_trial`.
+  Mochi refuses underground areas unless flag `c1x_mochi_courage`; outdoor/interior are fine.
+
+## 10. Lore, discovery and shared world contracts (lead decisions, Wave B/C)
+* **Lore**: `src/core/lore_db.gd` (static) is the one lookup: `LoreDB.get_lore(id)`, `ids()`, `has_lore(id)`.
+  Chapter Two notes live in one data file per module, shaped like `src/world/below/lore.gd`
+  (`ORDER`, `LORE` with optional `alt_title`/`alt_text`): `data/lore_ch2_annex.gd` (Tobin's annex),
+  `data/lore_ch2_reach.gd` (Reach surface districts), `data/lore_ch2_manor.gd`, `data/lore_ch2_works.gd`,
+  `data/lore_ch2_story.gd` (story/ending). Ids `lore_ch2_<name>`. Discover with `GameState.discover_lore(id)`.
+* **Landmark discovery**: Game's zone poll calls `GameState.discover(area_id, zone_id)` for every landmark
+  zone entered (integrator); modules do not need to.
+* **Reach districts** (world module C1 owns `reach_world`): district scripts at
+  `res://src/world/reach/districts/{orchard,pools,candleyard,quarry,manor_grounds}.gd`, each with
+  `static func footprints() -> Array` ([[Vector2 centre, float radius], ...]: kept clear of generic
+  vegetation and grass), optional `static func shape_terrain(terrain) -> void` (heightfield edits strictly
+  inside its own landmark radius, applied before meshes/collision are built, deterministic), and
+  `static func build(area: Node3D) -> void` (called after the base region exists; use
+  `area.height_at(x, z)`, `area.surface_at(pos)`, `area.register_spawn`, `area.add_zone` only for sub-zones
+  that never contain a landmark centre). Districts place their own resource nodes (ids `hr_<kind>_<n>`),
+  spawners (`hr_sp_<name>`) and interactables. District data files: `data/reach_west.gd`,
+  `data/reach_east.gd`, `data/manor_layout.gd`.
+* **Hushed Works**: area script `src/world/areas_ch2/hushed_works_world.gd` (works module A) merges
+  `data/works_layout.gd` (rooms 1-8) with `data/works_layout_deep.gd` (rooms 9-14, works module B) into
+  one room table for `below_builder.gd` (now layout-agnostic: `Builder.new(root, seed, rooms)`), then calls
+  `res://src/world/works/rooms_deep.gd` `static func build(area, builder) -> void` if present. Fixed
+  connection: room 7 (hub) east door centre at (40, -18, 0) opening toward +x into room 9; rooms 1-8 live
+  in x in [-80, 40], rooms 9-14 in x in [40, 170]; floors y in [-34, -6]. Room 11's real lift returns to the
+  hub by teleport (spawn `refuge`).
+* **Reusable Below nodes** now take setup keys: `checkpoint_lantern.gd` `area` (respawn area),
+  `lower_gate.gd` `flag`/`key`/`locked_text` (the key is checked, never consumed), `below_lift.gd`
+  `requires_flag` (+ instance `usable()`).
+* **Enemies from other modules**: spawn by id through `EnemyFactory`/`EnemySpawner`; a missing enemy script
+  must never crash (guard). Chapter Two enemy/boss scripts arrive in a later wave.
+* **Bosses** emit `Events.boss_encounter_changed(id, active)` and `Events.boss_phase_changed(id, phase)` with
+  the ids of data/enemies.gd (`weaver_matron`, `count_velour`, `crossing_matron`, `borrowed_choir`); music
+  follows them. Areas never call `Audio.play_music`/`stop_music` (music director owns music; use
+  `Audio.request_music`/`release_music` or `Events.music_context_changed` for special cases).

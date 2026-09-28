@@ -1,0 +1,501 @@
+[
+ {
+  "title": "The Empty Waltz",
+  "duration_s": 125.09,
+  "loop": false,
+  "bpm": "96 (ritardando to 46 in the last 4 bars)",
+  "key": "A minor",
+  "meter": "3/4",
+  "sections": "intro(0.0-7.5s) A(7.5-37.5s) B(37.5-67.5s) interlude(67.5-75.0s) A'(75.0-105.0s) coda(105.0-125.1s) (ends; natural decay tail)",
+  "instruments": "harpsichord-like (8' + 4' and lute stop, KS quill strings), celesta, muted low strings (con sordino section + cello counter-line), pizzicato bass, soft clock ticks (interlude)",
+  "motif_notes": "Head motif: rest on the downbeat, then 5th-octave (E5 A5) falling through the leading tone G#5-F5-E5: the waltz whose melody always enters after the downbeat (a missing partner). Those five pitches are the house 'For Krystal' shape in minor (5-1-7-b6-5, the same degrees as music_boss's A D C# Bb A), used deliberately as a family link but in a new rhythm, register and timbre; the rest of the tune is new. Lament bass A-G#-G-F(#). B section is a new flowing tune in C major rising to E6. Manor timbre (harpsichord/celesta/muted strings) is shared with m21.",
+  "location_playlist": "Moonveil Manor exploration (hallways, ballroom)",
+  "loudness_reference": "haven/night (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 96.0,
+   "beats_per_bar": 3,
+   "bars": 64,
+   "bar_s": 1.875,
+   "section_start_bars": [
+    0,
+    4,
+    20,
+    36,
+    40,
+    56
+   ],
+   "pass_s": 122.622,
+   "tempo_changes": "ritardando in the last bars (see bpm)"
+  },
+  "section_loudness_lufs": {
+   "intro 0.0-7.5s": -21.4,
+   "A 7.5-37.5s": -16.3,
+   "B 37.5-67.5s": -18.6,
+   "interlude 67.5-75.0s": -21.4,
+   "A' 75.0-105.0s": -16.2,
+   "coda 105.0-125.1s": -20.1
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m20_empty_waltz",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. Changed: the A celesta tune was 8 dB above everything else and the B / A' harpsichord tune sat level with the pizzicato bass (sections A -14.1, B -21.7 LUFS; LRA 9.9 LU vs 3-8 for the existing pieces). Celesta tune -5.5 dB on its own bus, other celesta -3 dB, harpsichord tune +5 dB; whole-mix -3 dB shelf above 5.5 kHz and a 12 kHz low-pass (>8 kHz share now level with music_haven; 4-8 kHz stays ~8 dB above it - that is the harpsichord the brief asks for). Manifest motif note corrected: the head IS the house motif shape in minor (it had said 'no melodic quotation').",
+  "id": "m20",
+  "file": "m20_the_empty_waltz.ogg",
+  "peak_dbfs": -1.33,
+  "loudness_lufs": -17.52,
+  "loudness_range_lu": 6.1,
+  "frames": 5516370
+ },
+ {
+  "title": "A Midnight Invitation",
+  "duration_s": 100.0,
+  "loop": true,
+  "bpm": "144",
+  "key": "E minor (Waltz II in G major, middle section in G minor)",
+  "meter": "3/4",
+  "sections": "intro(0.0-5.0s) waltz I(5.0-25.0s) waltz II(25.0-45.0s) MIDNIGHT B1(45.0-55.0s) B2(55.0-65.0s) B3(65.0-75.0s) turn(75.0-80.0s) waltz I reprise(80.0-100.0s)",
+  "instruments": "velvet fiddle (solo bowed string), harpsichord (flourishes, Waltz II tune, running 8ths), muted string 'pah-pah', pizzicato bass, timpani, low bell (12 midnight strokes), frame drum, horn (from the existing boss piece), celesta, cymbal-air swell",
+  "motif_notes": "Waltz I 'invitation': B4 leaps a minor sixth to G5 then leans down chromatically F#-E-D#. Waltz II: charming G-major tune with a C minor-6 shadow. MIDNIGHT: G-minor half-note theme in hemiola (2 against 3) in low strings, then fiddle, with twelve bell strokes; B3 climax reuses the minor-sixth leap on Eb/Dm/Cm.",
+  "location_playlist": "Count Velour encounter (boss); MIDNIGHT section usable as phase-2 contrast",
+  "loudness_reference": "boss (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 144.0,
+   "beats_per_bar": 3,
+   "bars": 80,
+   "bar_s": 1.25,
+   "section_start_bars": [
+    0,
+    4,
+    20,
+    36,
+    44,
+    52,
+    60,
+    64
+   ],
+   "pass_s": 100.0,
+   "tempo_changes": "none"
+  },
+  "section_loudness_lufs": {
+   "intro 0.0-5.0s": -22.9,
+   "waltz I 5.0-25.0s": -18.0,
+   "waltz II 25.0-45.0s": -20.0,
+   "MIDNIGHT B1 45.0-55.0s": -20.3,
+   "B2 55.0-65.0s": -19.1,
+   "B3 65.0-75.0s": -15.0,
+   "turn 75.0-80.0s": -17.5,
+   "waltz I reprise 80.0-100.0s": -15.8
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m21_midnight_invitation",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. Changed: Waltz II measured -25.4 LUFS against -17.7 for Waltz I (the harpsichord tune sat 5 dB under the pizzicato bass) - a 20-second hole in a boss fight - and the MIDNIGHT entry was -22.9. Waltz II tune +8.5 dB on its own bus, a soft muted-string bed, and the fiddle shadowing the second half an octave below; MIDNIGHT B1 theme +4.5 dB. Both additions use their own seeds, so every other note is unchanged.",
+  "phase_points": {
+   "midnight_start_s": 45.0,
+   "midnight_bars": "36-59",
+   "midnight_climax_B3_s": 65.0,
+   "turn_back_s": 75.0,
+   "note": "single file: for a phase-2 contrast seek to midnight_start_s (bar 36, a bell stroke on a G-minor downbeat after a D7 bar) with a short crossfade; the file loops at its end into the intro"
+  },
+  "id": "m21",
+  "file": "m21_a_midnight_invitation.ogg",
+  "peak_dbfs": -2.79,
+  "loudness_lufs": -17.6,
+  "loudness_range_lu": 5.7,
+  "frames": 4410000,
+  "loop_seam": {
+   "sample_jump_vs_p99_9_step": 0.251,
+   "slope_change_vs_p99_9": 0.364,
+   "level_end_db": -16.1,
+   "level_start_db": -13.2,
+   "hf_at_seam_vs_loudest_other_downbeat": 0.091,
+   "verdict": "seamless",
+   "criteria": "sample jump and slope change across the seam below the file's own 99.9th-percentile steps (x1.0 / x1.5); 2 kHz+ transient at the seam no more than 1.15x the loudest other bar downbeat (the loop start is a written downbeat)"
+  }
+ },
+ {
+  "title": "Harvest Trouble",
+  "duration_s": 75.0,
+  "loop": true,
+  "bpm": "160",
+  "key": "C minor (B section E-flat major, bridge on a G pedal with a D-flat Neapolitan build)",
+  "meter": "4/4 (straight-eighth galop)",
+  "sections": "intro(0.0-3.0s) A(3.0-27.0s) B(27.0-51.0s) C bridge(51.0-57.0s) C2 build+stop(57.0-63.0s) A''(63.0-75.0s)",
+  "instruments": "spiccato muted strings doubled by a hard-mallet marimba (lead), cellos (B tune, A'' doubling), violins (B' tune two octaves up), pizzicato bass, muted-string stabs on 2 and 4, bones/clacks, brush, woodblock, frame drum, metal ticks, timpani and one low bell (bridge)",
+  "motif_notes": "Scamper: C5-Eb5-G5-Eb5-C5 . G4 tumbling back, then a chromatic creep Ab4-B4-C5-D5-Eb5 and a b9 (Ab over G7); the answer turns to a D-flat (Neapolitan) bar. B: a legato cello song in E-flat with a G-major 'trouble' chord. Bridge: strings creep G-Ab-G-F# / Ab-Bb-Ab-G ... on a G-G-G-Ab pizzicato pedal while the marimba answers from above, a D-flat build with timpani roll, stop-time G7(b9) hits and ticks in the silence. Review rewrite: the first version (6/8 C-minor reed jig over marimba, ~68 s) shared meter, pulse, length and palette with m10 'Thorns in the Path' (6/8 E-minor oboe/bassoon over marimba, 67 s); this one is a 4/4 galop at 160 with a string/marimba lead. Distinct from the bosses: no toms or ostinato pluck, no Krystal motif, not 3/4.",
+  "location_playlist": "Ordinary Chapter Two combat (orchard, commons, manor grounds)",
+  "loudness_reference": "boss (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 160.0,
+   "beats_per_bar": 4,
+   "bars": 50,
+   "bar_s": 1.5,
+   "section_start_bars": [
+    0,
+    2,
+    18,
+    34,
+    38,
+    42
+   ],
+   "pass_s": 75.0,
+   "tempo_changes": "none"
+  },
+  "section_loudness_lufs": {
+   "intro 0.0-3.0s": -20.6,
+   "A 3.0-27.0s": -17.5,
+   "B 27.0-51.0s": -19.1,
+   "C bridge 51.0-57.0s": -18.5,
+   "C2 build+stop 57.0-63.0s": -16.0,
+   "A'' 63.0-75.0s": -15.8
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m22_harvest_trouble",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. Rewritten: the first version (C-minor 6/8 reed jig over marimba, dotted quarter 112, 68.6 s) matched m10 'Thorns in the Path' (E-minor 6/8 oboe/bassoon over marimba, dotted quarter 100, 67.2 s) in meter, pulse, length and palette although the brief requires m22 to be distinct from m10. New: 4/4 straight-eighth galop at 160, spiccato strings + hard-mallet marimba lead, cello B tune, same key, same E-flat contrast and G-pedal bridge idea. Melody strong-beat tones checked against the chords (remaining non-chord tones are passing notes or the deliberate b9).",
+  "id": "m22",
+  "file": "m22_harvest_trouble.ogg",
+  "peak_dbfs": -1.59,
+  "loudness_lufs": -17.6,
+  "loudness_range_lu": 4.1,
+  "frames": 3307500,
+  "loop_seam": {
+   "sample_jump_vs_p99_9_step": 0.133,
+   "slope_change_vs_p99_9": 0.254,
+   "level_end_db": -22.8,
+   "level_start_db": -15.8,
+   "hf_at_seam_vs_loudest_other_downbeat": 0.386,
+   "verdict": "seamless",
+   "criteria": "sample jump and slope change across the seam below the file's own 99.9th-percentile steps (x1.0 / x1.5); 2 kHz+ transient at the seam no more than 1.15x the loudest other bar downbeat (the loop start is a written downbeat)"
+  }
+ },
+ {
+  "title": "Under the Bellhouse",
+  "duration_s": 153.6,
+  "loop": true,
+  "bpm": "50 (free-feeling, no pulse)",
+  "key": "F minor / Phrygian (Gb over F)",
+  "meter": "4/4 (no audible meter)",
+  "sections": "A drone+bell(0.0-57.6s) B glass melody(57.6-115.2s) A' bells return(115.2-153.6s)",
+  "instruments": "bowed metal drone, muted low strings, dark pad, cast low bells (hum/prime/tierce partials), far bells, glass celesta, faint muted violins, sparse gear ticks; cave reverb",
+  "motif_notes": "Low bell figure C4-Ab3-F3-G3 (5-3-1-2, left hanging) with long silences between strokes; B section moves the harmony (Bbm7 Gbmaj7 Db C7sus4-C7 Dbmaj7) under a slow glass melody F5-Db5-C5 ... E5 (the one leading-tone moment), then the bells return and thin out into the loop.",
+  "location_playlist": "Hushed Works (under the bellhouse) - leaves room for environmental clues",
+  "loudness_reference": "night (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 50.0,
+   "beats_per_bar": 4,
+   "bars": 32,
+   "bar_s": 4.8,
+   "section_start_bars": [
+    0,
+    12,
+    24
+   ],
+   "pass_s": 153.6,
+   "tempo_changes": "none"
+  },
+  "section_loudness_lufs": {
+   "A drone+bell 0.0-57.6s": -20.0,
+   "B glass melody 57.6-115.2s": -18.6,
+   "A' bells return 115.2-153.6s": -20.0
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m23_under_the_bellhouse",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. No change: sparse, quiet (-19.4 LUFS, LRA ~4), bell/metal ambience with slow harmony; bass-heavy by design (drone below 120 Hz), almost nothing above 4 kHz, so environmental cues have room.",
+  "id": "m23",
+  "file": "m23_under_the_bellhouse.ogg",
+  "peak_dbfs": -5.26,
+  "loudness_lufs": -19.42,
+  "loudness_range_lu": 4.3,
+  "frames": 6773760,
+  "loop_seam": {
+   "sample_jump_vs_p99_9_step": 0.125,
+   "slope_change_vs_p99_9": 0.478,
+   "level_end_db": -22.6,
+   "level_start_db": -22.7,
+   "hf_at_seam_vs_loudest_other_downbeat": 0.02,
+   "verdict": "seamless",
+   "criteria": "sample jump and slope change across the seam below the file's own 99.9th-percentile steps (x1.0 / x1.5); 2 kHz+ transient at the seam no more than 1.15x the loudest other bar downbeat (the loop start is a written downbeat)"
+  }
+ },
+ {
+  "title": "A Pocket of Day",
+  "duration_s": 126.1,
+  "loop": false,
+  "bpm": "76 (ritardando to 44 in the coda)",
+  "key": "E-flat major",
+  "meter": "4/4",
+  "sections": "intro(0.0-6.3s) A piano(6.3-31.6s) A2 harp(31.6-56.8s) B flute(56.8-82.1s) A'(82.1-107.4s) coda(107.4-126.1s) (ends; natural decay tail)",
+  "instruments": "felt piano (inharmonic partials, pedalled left hand), harp, celesta, flute, ocarina, warm strings, pad, soft bass",
+  "motif_notes": "Piano song: Bb4-Eb5-G5 rising sixth that settles G-F-Eb, answered from C6; harp sings it again reaching Eb6; B section flute tune over Abmaj7-Bb/Ab-Gm7-C7; coda sighs through Ab minor-6 (Cb) before home. Original; no shared motif requested.",
+  "location_playlist": "Underground refuge garden (safe, relief)",
+  "loudness_reference": "haven/night (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 76.0,
+   "beats_per_bar": 4,
+   "bars": 38,
+   "bar_s": 3.157895,
+   "section_start_bars": [
+    0,
+    2,
+    10,
+    18,
+    26,
+    34
+   ],
+   "pass_s": 123.342,
+   "tempo_changes": "ritardando in the last bars (see bpm)"
+  },
+  "section_loudness_lufs": {
+   "intro 0.0-6.3s": -25.3,
+   "A piano 6.3-31.6s": -18.8,
+   "A2 harp 31.6-56.8s": -17.8,
+   "B flute 56.8-82.1s": -16.4,
+   "A' 82.1-107.4s": -15.8,
+   "coda 107.4-126.1s": -19.8
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m24_pocket_of_day",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. Changed: the B flute was 10 dB above the A piano (B -13.0, A -24.8 LUFS; LRA 12.9 LU). Flute -9 dB, piano +3.5 dB, strings -1 dB, harp tune -1.5 dB, ocarina counter-line -2 dB: the piece now builds from the piano solo to the A' reprise instead of jumping at the flute.",
+  "id": "m24",
+  "file": "m24_a_pocket_of_day.ogg",
+  "peak_dbfs": -1.69,
+  "loudness_lufs": -17.4,
+  "loudness_range_lu": 4.8,
+  "frames": 5560823
+ },
+ {
+  "title": "The Borrowed Welcome",
+  "duration_s": 106.67,
+  "loop": true,
+  "bpm": "108",
+  "key": "B minor (tritone from the title's F major)",
+  "meter": "4/4",
+  "sections": "S1(0.0-35.6s) S2 (canon at the tritone)(35.6-71.1s) S3 stretto(71.1-106.7s)",
+  "instruments": "l1: wordless formant choir, music box (detuned), heartbeat, muted low strings, soft bass; l2: pizzicato 3+3+2 ostinato, frame drums, low bell, metal ticks, timpani; l3: horns (existing boss horn voice) in canon, high strings, choir descant, timpani rolls, air swells",
+  "motif_notes": "Borrows the 'For Krystal' motif SHAPE (rising 4th + three steps down) in B minor: F#4 B4 A#4 G#4 F#4 (natural-minor turn F# B A G F# over G/C bars), and sets it against the motif at its original title pitches C5 F5 E5 D5 C5 (music box ~20-30 cents flat; second horn two beats behind the first = stretto canon) a tritone apart, over F/B - familiar intervals as unsettling counterpoint. Choir is wordless (formant vowels).",
+  "location_playlist": "Final Choir encounter (final boss): l1 = phase A (plays alone), +l2 = phase B, +l3 = phase C",
+  "loudness_reference": "boss (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 108.0,
+   "beats_per_bar": 4,
+   "bars": 48,
+   "bar_s": 2.222222,
+   "section_start_bars": [
+    0,
+    16,
+    32
+   ],
+   "pass_s": 106.667,
+   "tempo_changes": "none"
+  },
+  "section_loudness_lufs": {
+   "l1": {
+    "S1 0.0-35.6s": -18.5,
+    "S2 (canon at the tritone) 35.6-71.1s": -18.6,
+    "S3 stretto 71.1-106.7s": -20.1
+   },
+   "l1+l2+l3": {
+    "S1 0.0-35.6s": -17.2,
+    "S2 (canon at the tritone) 35.6-71.1s": -16.7,
+    "S3 stretto 71.1-106.7s": -16.8
+   }
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m26_borrowed_welcome",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. No change: layers sample-identical in length, every layer combination <= -1.5 dBTP, 1-4 kHz kept low for gameplay cues (2-5 kHz share about 13 dB under music_haven). Bars 25-27 are deliberately dissonant (borrowed motif at the title pitches over F/B).",
+  "id": "m26_l1",
+  "file": "m26_borrowed_welcome_l1.ogg",
+  "peak_dbfs": -2.5,
+  "loudness_lufs": -19.03,
+  "loudness_range_lu": 5.4,
+  "layer": "l1",
+  "frames": 4704000,
+  "layer_role": "phase A base (plays alone)",
+  "combined": {
+   "l1+l2": {
+    "loudness_lufs": -17.92,
+    "true_peak_dbtp": -1.64
+   },
+   "l1+l3": {
+    "loudness_lufs": -17.76,
+    "true_peak_dbtp": -1.92
+   },
+   "l2+l3": {
+    "loudness_lufs": -21.04,
+    "true_peak_dbtp": -5.25
+   },
+   "l1+l2+l3": {
+    "loudness_lufs": -16.92,
+    "true_peak_dbtp": -1.5
+   }
+  },
+  "loop_seam": {
+   "sample_jump_vs_p99_9_step": 0.337,
+   "slope_change_vs_p99_9": 0.994,
+   "level_end_db": -21.9,
+   "level_start_db": -18.5,
+   "hf_at_seam_vs_loudest_other_downbeat": 0.561,
+   "verdict": "seamless",
+   "criteria": "sample jump and slope change across the seam below the file's own 99.9th-percentile steps (x1.0 / x1.5); 2 kHz+ transient at the seam no more than 1.15x the loudest other bar downbeat (the loop start is a written downbeat)"
+  }
+ },
+ {
+  "title": "The Borrowed Welcome",
+  "duration_s": 106.67,
+  "loop": true,
+  "bpm": "108",
+  "key": "B minor (tritone from the title's F major)",
+  "meter": "4/4",
+  "sections": "S1(0.0-35.6s) S2 (canon at the tritone)(35.6-71.1s) S3 stretto(71.1-106.7s)",
+  "instruments": "l1: wordless formant choir, music box (detuned), heartbeat, muted low strings, soft bass; l2: pizzicato 3+3+2 ostinato, frame drums, low bell, metal ticks, timpani; l3: horns (existing boss horn voice) in canon, high strings, choir descant, timpani rolls, air swells",
+  "motif_notes": "Borrows the 'For Krystal' motif SHAPE (rising 4th + three steps down) in B minor: F#4 B4 A#4 G#4 F#4 (natural-minor turn F# B A G F# over G/C bars), and sets it against the motif at its original title pitches C5 F5 E5 D5 C5 (music box ~20-30 cents flat; second horn two beats behind the first = stretto canon) a tritone apart, over F/B - familiar intervals as unsettling counterpoint. Choir is wordless (formant vowels).",
+  "location_playlist": "Final Choir encounter (final boss): l1 = phase A (plays alone), +l2 = phase B, +l3 = phase C",
+  "loudness_reference": "boss (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 108.0,
+   "beats_per_bar": 4,
+   "bars": 48,
+   "bar_s": 2.222222,
+   "section_start_bars": [
+    0,
+    16,
+    32
+   ],
+   "pass_s": 106.667,
+   "tempo_changes": "none"
+  },
+  "section_loudness_lufs": {
+   "l1": {
+    "S1 0.0-35.6s": -18.5,
+    "S2 (canon at the tritone) 35.6-71.1s": -18.6,
+    "S3 stretto 71.1-106.7s": -20.1
+   },
+   "l1+l2+l3": {
+    "S1 0.0-35.6s": -17.2,
+    "S2 (canon at the tritone) 35.6-71.1s": -16.7,
+    "S3 stretto 71.1-106.7s": -16.8
+   }
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m26_borrowed_welcome",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. No change: layers sample-identical in length, every layer combination <= -1.5 dBTP, 1-4 kHz kept low for gameplay cues (2-5 kHz share about 13 dB under music_haven). Bars 25-27 are deliberately dissonant (borrowed motif at the title pitches over F/B).",
+  "id": "m26_l2",
+  "file": "m26_borrowed_welcome_l2.ogg",
+  "peak_dbfs": -5.34,
+  "loudness_lufs": -24.41,
+  "loudness_range_lu": 1.8,
+  "layer": "l2",
+  "frames": 4704000,
+  "layer_role": "phase B: add to l1 (rhythm/resonance)",
+  "combined": {
+   "l1+l2": {
+    "loudness_lufs": -17.92,
+    "true_peak_dbtp": -1.64
+   },
+   "l1+l3": {
+    "loudness_lufs": -17.76,
+    "true_peak_dbtp": -1.92
+   },
+   "l2+l3": {
+    "loudness_lufs": -21.04,
+    "true_peak_dbtp": -5.25
+   },
+   "l1+l2+l3": {
+    "loudness_lufs": -16.92,
+    "true_peak_dbtp": -1.5
+   }
+  },
+  "loop_seam": {
+   "sample_jump_vs_p99_9_step": 0.172,
+   "slope_change_vs_p99_9": 0.626,
+   "level_end_db": -37.0,
+   "level_start_db": -15.9,
+   "hf_at_seam_vs_loudest_other_downbeat": 0.539,
+   "verdict": "seamless",
+   "criteria": "sample jump and slope change across the seam below the file's own 99.9th-percentile steps (x1.0 / x1.5); 2 kHz+ transient at the seam no more than 1.15x the loudest other bar downbeat (the loop start is a written downbeat)"
+  }
+ },
+ {
+  "title": "The Borrowed Welcome",
+  "duration_s": 106.67,
+  "loop": true,
+  "bpm": "108",
+  "key": "B minor (tritone from the title's F major)",
+  "meter": "4/4",
+  "sections": "S1(0.0-35.6s) S2 (canon at the tritone)(35.6-71.1s) S3 stretto(71.1-106.7s)",
+  "instruments": "l1: wordless formant choir, music box (detuned), heartbeat, muted low strings, soft bass; l2: pizzicato 3+3+2 ostinato, frame drums, low bell, metal ticks, timpani; l3: horns (existing boss horn voice) in canon, high strings, choir descant, timpani rolls, air swells",
+  "motif_notes": "Borrows the 'For Krystal' motif SHAPE (rising 4th + three steps down) in B minor: F#4 B4 A#4 G#4 F#4 (natural-minor turn F# B A G F# over G/C bars), and sets it against the motif at its original title pitches C5 F5 E5 D5 C5 (music box ~20-30 cents flat; second horn two beats behind the first = stretto canon) a tritone apart, over F/B - familiar intervals as unsettling counterpoint. Choir is wordless (formant vowels).",
+  "location_playlist": "Final Choir encounter (final boss): l1 = phase A (plays alone), +l2 = phase B, +l3 = phase C",
+  "loudness_reference": "boss (haven -17.0, night -17.6, boss -17.8)",
+  "phrase_grid": {
+   "bpm": 108.0,
+   "beats_per_bar": 4,
+   "bars": 48,
+   "bar_s": 2.222222,
+   "section_start_bars": [
+    0,
+    16,
+    32
+   ],
+   "pass_s": 106.667,
+   "tempo_changes": "none"
+  },
+  "section_loudness_lufs": {
+   "l1": {
+    "S1 0.0-35.6s": -18.5,
+    "S2 (canon at the tritone) 35.6-71.1s": -18.6,
+    "S3 stretto 71.1-106.7s": -20.1
+   },
+   "l1+l2+l3": {
+    "S1 0.0-35.6s": -17.2,
+    "S2 (canon at the tritone) 35.6-71.1s": -16.7,
+    "S3 stretto 71.1-106.7s": -16.8
+   }
+  },
+  "generator": "tools/audio/music2/group_manor_works.py:m26_borrowed_welcome",
+  "format": "OGG Vorbis 44100 Hz stereo",
+  "verified": "analysis only - not listened",
+  "review": "Independent review 2026-09-27 (note data, measurements and spectrograms only; nobody has listened): generator code read; loudness / true peak re-measured with manor_meter (calibrated: EBU 3341 1 kHz stereo sine -23.0 / -33.0 dBFS read -22.99 / -32.99 LUFS) and cross-checked with ffmpeg ebur128; DC, >8 kHz energy, silences, loop seams (sample jump, slope change, 20 ms spectral flux at the seam vs every bar line) and per-section loudness checked. No change: layers sample-identical in length, every layer combination <= -1.5 dBTP, 1-4 kHz kept low for gameplay cues (2-5 kHz share about 13 dB under music_haven). Bars 25-27 are deliberately dissonant (borrowed motif at the title pitches over F/B).",
+  "id": "m26_l3",
+  "file": "m26_borrowed_welcome_l3.ogg",
+  "peak_dbfs": -9.62,
+  "loudness_lufs": -23.52,
+  "loudness_range_lu": 14.3,
+  "layer": "l3",
+  "frames": 4704000,
+  "layer_role": "phase C: add to l1+l2 (climax)",
+  "combined": {
+   "l1+l2": {
+    "loudness_lufs": -17.92,
+    "true_peak_dbtp": -1.64
+   },
+   "l1+l3": {
+    "loudness_lufs": -17.76,
+    "true_peak_dbtp": -1.92
+   },
+   "l2+l3": {
+    "loudness_lufs": -21.04,
+    "true_peak_dbtp": -5.25
+   },
+   "l1+l2+l3": {
+    "loudness_lufs": -16.92,
+    "true_peak_dbtp": -1.5
+   }
+  },
+  "loop_seam": {
+   "sample_jump_vs_p99_9_step": 0.206,
+   "slope_change_vs_p99_9": 0.607,
+   "level_end_db": -28.5,
+   "level_start_db": -23.0,
+   "hf_at_seam_vs_loudest_other_downbeat": 1.083,
+   "verdict": "seamless",
+   "criteria": "sample jump and slope change across the seam below the file's own 99.9th-percentile steps (x1.0 / x1.5); 2 kHz+ transient at the seam no more than 1.15x the loudest other bar downbeat (the loop start is a written downbeat)",
+   "note": "l3 on its own: the seam is the designed downbeat of bar 1 (timpani B1 + air-swell arrival), the same event as bars 17 and 33, whose 2 kHz+ peaks are within ~10 % of the seam's (noise swell varies); no sample jump or slope break"
+  }
+ }
+]

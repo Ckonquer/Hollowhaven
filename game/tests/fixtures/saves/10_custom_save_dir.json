@@ -1,0 +1,433 @@
+{
+	"format": "hollowhaven-save",
+	"game_version": "0.9.1",
+	"meta": {
+		"area": "surface",
+		"day": 4,
+		"play_seconds": 4210.5,
+		"step": "lumi",
+		"step_title": "Lights in the Ruin"
+	},
+	"saved_unix": 1790000000.0,
+	"state": {
+		"active_companion": "pebble",
+		"buffs": {},
+		"companions": {
+			"lumi": {
+				"assignment": "wild",
+				"befriended": false,
+				"bond_xp": 0,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			},
+			"mochi": {
+				"assignment": "wait",
+				"befriended": true,
+				"bond_xp": 30,
+				"last_fed_day": 2,
+				"last_gift_day": -1,
+				"last_pet_day": 3,
+				"wait_area": "surface",
+				"wait_pos": [
+					5.0,
+					0.25,
+					-3.0
+				]
+			},
+			"pebble": {
+				"assignment": "follow",
+				"befriended": true,
+				"bond_xp": 12,
+				"last_fed_day": -1,
+				"last_gift_day": 3,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null
+			}
+		},
+		"counters": {
+			"crops_planted": 1,
+			"max_bond": 2,
+			"structures_built": 15,
+			"trees_felled": 3
+		},
+		"crops": {
+			"s3": {
+				"crop": "sweetroot",
+				"planted_at": 1500.0,
+				"tended_minutes": 30.0
+			}
+		},
+		"depleted": {
+			"pebble_boulder": -1.0,
+			"tree_3": 1080.0,
+			"tree_7": 1080.0
+		},
+		"dropped": [],
+		"flags": {
+			"custom_dir_note": "kept in D:/Games/HollowhavenSaves",
+			"read_ward_intro": true
+		},
+		"hotbar_index": 1,
+		"inventory": [
+			{
+				"count": 11,
+				"id": "wood"
+			},
+			{
+				"count": 2,
+				"id": "stone"
+			},
+			{
+				"count": 3,
+				"id": "fiber"
+			},
+			{
+				"count": 1,
+				"id": "stone_axe"
+			},
+			{
+				"count": 3,
+				"id": "sweetroot_seeds"
+			},
+			{
+				"count": 1,
+				"id": "stone_pickaxe"
+			},
+			{
+				"count": 2,
+				"id": "copper_ore"
+			},
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null
+		],
+		"key_items": {},
+		"lore": [],
+		"next_uid": 17,
+		"player": {
+			"area": "surface",
+			"below_respawn": "",
+			"hp": 100.0,
+			"lantern_on": false,
+			"max_hp": 100.0,
+			"max_stamina": 100.0,
+			"pos": [
+				-3.0,
+				0.0625,
+				4.5
+			],
+			"respawn_area": "surface",
+			"respawn_spawn": "bed",
+			"spawn": "bed",
+			"stamina": 100.0,
+			"yaw": 2.125
+		},
+		"player_name": "Krys",
+		"quests": {
+			"baselines": {
+				"chop": {
+					"trees_felled": 0
+				},
+				"craft_axe": {},
+				"gather_basics": {},
+				"home": {
+					"crops_planted": 0
+				},
+				"lumi": {},
+				"mochi": {},
+				"pebble": {},
+				"wake": {},
+				"workbench": {}
+			},
+			"completed": [
+				"wake",
+				"gather_basics",
+				"craft_axe",
+				"chop",
+				"workbench",
+				"mochi",
+				"pebble",
+				"home"
+			],
+			"index": 8
+		},
+		"stats": {
+			"deaths": 1,
+			"enemies_defeated": 3,
+			"items_crafted": 41,
+			"play_seconds": 4210.5,
+			"started_version": "0.9.1"
+		},
+		"storages": {
+			"s4": [
+				{
+					"count": 40,
+					"id": "wood"
+				},
+				{
+					"count": 25,
+					"id": "stone"
+				},
+				null,
+				null,
+				null,
+				{
+					"count": 3,
+					"id": "glowcap"
+				},
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				{
+					"count": 12,
+					"id": "berries"
+				}
+			],
+			"s5": [
+				{
+					"count": 6,
+					"id": "copper_ore"
+				},
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			]
+		},
+		"structures": {
+			"s1": {
+				"area": "surface",
+				"data": {},
+				"id": "workbench",
+				"pos": [
+					3.0,
+					0.0,
+					-2.0
+				],
+				"rot": 90.0
+			},
+			"s10": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					1.0,
+					0.0,
+					-1.0
+				],
+				"rot": 0.0
+			},
+			"s11": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_wall",
+				"pos": [
+					-1.0,
+					0.0,
+					1.0
+				],
+				"rot": 90.0
+			},
+			"s12": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_doorway",
+				"pos": [
+					3.0,
+					0.0,
+					1.0
+				],
+				"rot": 90.0
+			},
+			"s13": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_roof",
+				"pos": [
+					1.0,
+					2.5,
+					1.0
+				],
+				"rot": 180.0
+			},
+			"s14": {
+				"area": "surface",
+				"data": {},
+				"id": "fence",
+				"pos": [
+					6.0,
+					0.0,
+					-4.0
+				],
+				"rot": 0.0
+			},
+			"s15": {
+				"area": "surface",
+				"data": {},
+				"id": "lantern_post",
+				"pos": [
+					-2.0,
+					0.0,
+					6.0
+				],
+				"rot": 0.0
+			},
+			"s16": {
+				"area": "surface",
+				"data": {},
+				"id": "rug",
+				"pos": [
+					1.0,
+					0.0,
+					1.0
+				],
+				"rot": 0.0
+			},
+			"s2": {
+				"area": "surface",
+				"data": {
+					"respawn": true
+				},
+				"id": "bed",
+				"pos": [
+					-6.0,
+					0.0,
+					5.0
+				],
+				"rot": 270.0
+			},
+			"s3": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					-4.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s4": {
+				"area": "surface",
+				"data": {
+					"label": "Pantry"
+				},
+				"id": "storage_chest",
+				"pos": [
+					2.0,
+					0.0,
+					3.0
+				],
+				"rot": 90.0
+			},
+			"s5": {
+				"area": "surface",
+				"data": {},
+				"id": "storage_chest",
+				"pos": [
+					4.0,
+					0.0,
+					3.0
+				],
+				"rot": 0.0
+			},
+			"s6": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s7": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					0.0
+				],
+				"rot": 0.0
+			},
+			"s8": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					0.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			},
+			"s9": {
+				"area": "surface",
+				"data": {},
+				"id": "wood_floor",
+				"pos": [
+					2.0,
+					0.0,
+					2.0
+				],
+				"rot": 0.0
+			}
+		},
+		"total_minutes": 4770.0
+	},
+	"version": 1
+}

@@ -365,7 +365,7 @@ func start_fight() -> void:
 		return
 	fight_started = true
 	_emit_health()
-	Audio.play_music("music_boss", 2.0)
+	Audio.request_music("boss_matron", "music_boss", 2.0)
 	Audio.play_3d(_snd("shriek"), global_position, -4.0, 0.03, 60.0)
 	Events.caption.emit(_caption("intro"))
 	Events.hint.emit("boss_braziers", "Light the braziers with {interact} to burn it off the ceiling. Your Lantern can kindle them.")
@@ -659,7 +659,7 @@ func _finish_defeat() -> void:
 	GameState.set_flag("weaver_defeated", true)
 	Events.boss_defeated.emit(BOSS_ID)
 	defeated.emit()
-	Audio.stop_music(4.0)
+	Audio.release_music("boss_matron", 4.0)
 	ensure_heartseed(get_parent() if get_parent() != null else self, arena_center)
 	state_changed.emit("gone")
 
@@ -681,7 +681,7 @@ func reset_fight() -> void:
 	if fight_started:
 		fight_started = false
 		Events.boss_health_changed.emit(BOSS_ID, -1.0, health.max_hp)
-		Audio.stop_music(3.0)
+		Audio.release_music("boss_matron", 3.0)
 	_enter("dormant")
 
 

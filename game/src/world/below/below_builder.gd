@@ -23,13 +23,17 @@ var _bodies: Dictionary = {}
 var _batches: Dictionary = {}
 var _occluders: Array = []       # [room, center, size, basis] boxes for occlusion culling
 var batch_visibility_end: float = 85.0
+## Room table (id -> {x0,x1,z0,z1,y,h,...}). Defaults to the Below's; other dungeons pass their own.
+var rooms: Dictionary = Layout.ROOMS
 
 static var _meshes: Dictionary = {}
 
 
-func _init(p_root: Node3D, seed_value: int = 7331) -> void:
+func _init(p_root: Node3D, seed_value: int = 7331, p_rooms: Dictionary = {}) -> void:
 	root = p_root
 	rng.seed = seed_value
+	if not p_rooms.is_empty():
+		rooms = p_rooms
 
 
 # --- Shared unit meshes -----------------------------------------------------------------
@@ -338,7 +342,7 @@ func occluder(center: Vector3, size: Vector3, basis: Basis = Basis.IDENTITY) -> 
 
 ## Floor + ceiling + four walls from the layout table. Returns {side: spans}.
 func shell(id: String, floor_color: Color, wall_color: Color, ceil_color: Color, opts: Dictionary = {}) -> Dictionary:
-	var r: Dictionary = Layout.ROOMS[id]
+	var r: Dictionary = rooms[id]
 	var y: float = float(r["y"])
 	if not opts.get("no_floor", false):
 		floor_rect(float(r["x0"]), float(r["x1"]), float(r["z0"]), float(r["z1"]), y, floor_color, String(opts.get("surface", "stone")))
@@ -446,7 +450,7 @@ func _skipped(t: float, y: float, skip: Array, margin: float) -> bool:
 
 ## Dresses all walls of a layout room with rock blobs (openings kept clear).
 func dress_room_rock(id: String, colors: Array, opts: Dictionary = {}) -> void:
-	var r: Dictionary = Layout.ROOMS[id]
+	var r: Dictionary = rooms[id]
 	var y: float = float(r["y"])
 	var h: float = float(r["h"]) * float(opts.get("height_frac", 1.0))
 	var x0: float = float(r["x0"])

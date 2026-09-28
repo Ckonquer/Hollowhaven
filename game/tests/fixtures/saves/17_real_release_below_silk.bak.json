@@ -1,0 +1,351 @@
+{
+	"format": "hollowhaven-save",
+	"game_version": "0.9.0",
+	"meta": {
+		"area": "below",
+		"day": 1,
+		"play_seconds": 514.966013673224,
+		"step": "deeper",
+		"step_title": "Deeper Still"
+	},
+	"saved_unix": 1790554813.894,
+	"state": {
+		"active_companion": "lumi",
+		"buffs": {},
+		"companions": {
+			"lumi": {
+				"assignment": "follow",
+				"befriended": true,
+				"bond_xp": 12,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null,
+				"zones": [
+					"haven",
+					"mine_mouth",
+					"mine",
+					"ruins"
+				]
+			},
+			"mochi": {
+				"assignment": "home",
+				"befriended": true,
+				"bond_xp": 6,
+				"last_fed_day": -1,
+				"last_gift_day": -1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null,
+				"zones": [
+					"haven",
+					"quarry"
+				]
+			},
+			"pebble": {
+				"assignment": "home",
+				"befriended": true,
+				"bond_xp": 11,
+				"last_fed_day": -1,
+				"last_gift_day": 1,
+				"last_pet_day": -1,
+				"wait_area": "",
+				"wait_pos": null,
+				"work_day": 1,
+				"work_xp": 2,
+				"zones": [
+					"haven",
+					"glade",
+					"ruin"
+				]
+			}
+		},
+		"counters": {
+			"crops_planted": 1,
+			"max_bond": 1,
+			"structures_built": 3,
+			"trees_felled": 8
+		},
+		"crops": {
+			"s3": {
+				"crop": "sweetroot",
+				"planted_at": 837.464150775255,
+				"tended_minutes": 90.0
+			}
+		},
+		"depleted": {
+			"below_gallery_rubble": -1.0,
+			"bush_0": 1378.78299514703,
+			"bush_2": 1370.18294459152,
+			"bush_6": 1388.67236355435,
+			"bush_7": 1360.90685312022,
+			"bush_9": 1397.74129666542,
+			"mine_rubble": -1.0,
+			"ore_0": 2173.44812225751,
+			"ore_1": 2168.78293392424,
+			"ore_2": 2164.24960059095,
+			"pebble_boulder": -1.0,
+			"spawner_hall_gloom": 1696.37877509086,
+			"stick_0": 1108.97910233324,
+			"stick_12": 1110.42955970363,
+			"stick_16": 1103.01099081809,
+			"stick_8": 1095.66140727268,
+			"stone_1": 1112.64333333325,
+			"stone_13": 1145.88649599958,
+			"stone_15": 1119.30846770359,
+			"stone_16": 1132.88181307379,
+			"stone_18": 1126.68286270351,
+			"stone_2": 1152.36246166617,
+			"stone_4": 1139.54821218483,
+			"tree_122": 2195.64942859059,
+			"tree_138": 2030.07765799932,
+			"tree_139": 2201.76626725723,
+			"tree_152": 2035.77995033264,
+			"tree_158": 2040.96218233263,
+			"tree_159": 2045.94475963566,
+			"tree_166": 2056.01283251776,
+			"tree_175": 2050.9795051205,
+			"tuft_1": 1046.77401051797,
+			"tuft_11": 1261.67422759038,
+			"tuft_13": 1254.71256355337,
+			"tuft_15": 1064.75383852315,
+			"tuft_3": 1033.55595433283,
+			"tuft_30": 1286.12279974186,
+			"tuft_32": 1056.77544233272,
+			"tuft_38": 1296.67804974185,
+			"tuft_4": 1268.94585425702,
+			"tuft_5": 1039.64004766615,
+			"tuft_9": 1276.64352304489
+		},
+		"dropped": [
+			{
+				"area": "below",
+				"count": 1,
+				"item": "glowcap",
+				"pos": [
+					-2.30217814445496,
+					0.0199999995529652,
+					-49.6490020751953
+				],
+				"uid": "d8"
+			}
+		],
+		"flags": {
+			"cp_lit_landing": true,
+			"cp_lit_office": true,
+			"cp_lit_shrine": true,
+			"entered_below": true,
+			"foreman_key_taken": true,
+			"gallery_cleared": true,
+			"hint_below_lantern": true,
+			"hint_build_controls": true,
+			"hint_farming_growth": true,
+			"hint_intro_move": true,
+			"hint_quest_chop": true,
+			"hint_quest_craft_axe": true,
+			"hint_quest_descend": true,
+			"hint_quest_gather_basics": true,
+			"hint_quest_home": true,
+			"hint_quest_lumi": true,
+			"hint_quest_mochi": true,
+			"hint_quest_old_mine": true,
+			"hint_quest_pebble": true,
+			"hint_quest_prepare": true,
+			"hint_quest_wake": true,
+			"hint_quest_workbench": true,
+			"imitation_seen": true,
+			"lower_gate_open": true,
+			"mine_comfort_seen": true,
+			"mine_opened": true,
+			"moment_crossing": true,
+			"moment_threshold": true,
+			"read_ward_intro": true,
+			"read_ward_warning": true,
+			"ruin_cleared": true,
+			"spawner_cleared_gallery_gloom": true,
+			"spawner_cleared_hall_gloom": true,
+			"spawner_cleared_ruin_bramblings": true
+		},
+		"hotbar_index": 0,
+		"inventory": [
+			{
+				"count": 8,
+				"id": "wood"
+			},
+			{
+				"count": 1,
+				"id": "stone_pickaxe"
+			},
+			{
+				"count": 1,
+				"id": "lantern"
+			},
+			{
+				"count": 1,
+				"id": "stone_axe"
+			},
+			{
+				"count": 7,
+				"id": "berries"
+			},
+			{
+				"count": 3,
+				"id": "sweetroot_seeds"
+			},
+			{
+				"count": 10,
+				"id": "stone"
+			},
+			{
+				"count": 4,
+				"id": "copper_ore"
+			},
+			{
+				"count": 1,
+				"id": "shiny_pebble"
+			},
+			{
+				"count": 1,
+				"id": "copper_sword"
+			},
+			{
+				"count": 2,
+				"id": "berry_snack"
+			},
+			{
+				"count": 6,
+				"id": "fiber"
+			},
+			{
+				"count": 1,
+				"id": "echo_shard"
+			},
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null
+		],
+		"key_items": {
+			"foreman_key": 1
+		},
+		"lore": [
+			"foreman_order"
+		],
+		"next_uid": 10,
+		"player": {
+			"area": "below",
+			"hp": 46.0,
+			"lantern_on": true,
+			"max_hp": 100.0,
+			"max_stamina": 100.0,
+			"pos": [
+				58.7735366821289,
+				-5.99899959564209,
+				-83.7026977539063
+			],
+			"respawn_area": "below",
+			"respawn_spawn": "cp_shrine",
+			"spawn": "cp_shrine",
+			"stamina": 16.7333333333333,
+			"yaw": -2.23122033524241
+		},
+		"player_name": "Krystal",
+		"quests": {
+			"baselines": {
+				"chop": {
+					"trees_felled": 0
+				},
+				"craft_axe": {},
+				"deeper": {},
+				"descend": {},
+				"gather_basics": {},
+				"home": {
+					"crops_planted": 0
+				},
+				"lumi": {},
+				"mochi": {},
+				"old_mine": {},
+				"pebble": {},
+				"prepare": {},
+				"wake": {},
+				"workbench": {}
+			},
+			"completed": [
+				"wake",
+				"gather_basics",
+				"craft_axe",
+				"chop",
+				"workbench",
+				"mochi",
+				"pebble",
+				"home",
+				"lumi",
+				"prepare",
+				"descend",
+				"old_mine"
+			],
+			"index": 12
+		},
+		"stats": {
+			"deaths": 0,
+			"enemies_defeated": 7,
+			"items_crafted": 9,
+			"play_seconds": 514.966013673224,
+			"started_version": "0.9.0"
+		},
+		"storages": {},
+		"structures": {
+			"s1": {
+				"area": "surface",
+				"data": {},
+				"id": "workbench",
+				"pos": [
+					-9.5,
+					0.0,
+					2.0
+				],
+				"rot": 90.0
+			},
+			"s2": {
+				"area": "surface",
+				"data": {},
+				"id": "bed",
+				"pos": [
+					-9.5,
+					0.0,
+					-5.0
+				],
+				"rot": 0.0
+			},
+			"s3": {
+				"area": "surface",
+				"data": {},
+				"id": "crop_plot",
+				"pos": [
+					-6.0,
+					0.0,
+					12.0
+				],
+				"rot": 180.0
+			}
+		},
+		"total_minutes": 994.96601366952
+	},
+	"version": 1
+}

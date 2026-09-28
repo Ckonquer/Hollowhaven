@@ -86,6 +86,7 @@ func _ready() -> void:
 	var plan: Dictionary = VegetationScript.plan(terrain)
 	_mark("veg_plan")
 	VegetationScript.clear_grass_for(terrain, plan)
+	preload("res://src/world/surface/annexes.gd").clear_grass(terrain)   # Chapter Two annex footprints
 	vegetation = VegetationScript.new()
 	vegetation.terrain = terrain
 	vegetation.plan_data = plan
@@ -112,6 +113,7 @@ func _ready() -> void:
 	_register_spawns()
 	_add_zones()
 	_build_boundary()
+	preload("res://src/world/surface/annexes.gd").build(self)   # Chapter Two additions (waygate, annexes)
 	_mark("spawns")
 	_apply_restored_state(bool(GameState.get_flag("ward_restored")))
 	_update_daylight()
@@ -204,20 +206,26 @@ func on_player_spawned(_player: Node3D) -> void:
 func _start_music() -> void:
 	_music_on = true
 	_music_t = 0.0
+	if Audio.music_director_active():
+		return      # the music director (src/audio/music_director.gd) rotates the Haven/woods playlists
 	Audio.play_music(MUSIC_NIGHT if bool(sky.is_night) else MUSIC_DAY, 4.0)
 
 
-## Ambience follows day/night; music cycles play (MUSIC_PLAY_SECONDS) -> quiet rest -> play again.
-## Called a few times per second. Never touches the music during cutscenes (restoration, ending).
+## Ambience follows day/night. Music: with the music director active it owns the surface playlists
+## (day/night rotation, rests); otherwise the legacy cycle plays (MUSIC_PLAY_SECONDS) -> quiet rest
+## -> play again. Called a few times per second. Never touches the music during cutscenes.
 func _update_audio(dt: float) -> void:
 	if restoring or Game.mode == "cutscene":
 		return
 	var night: bool = sky.is_night
+	var legacy_music := not Audio.music_director_active()
 	if night != _was_night:
 		_was_night = night
 		Audio.play_ambience("amb_forest_night" if night else "amb_forest_day", 4.0)
-		if _music_on:
+		if _music_on and legacy_music:
 			Audio.play_music(MUSIC_NIGHT if night else MUSIC_DAY, 4.0)   # crossfade, keep the phase
+	if not legacy_music:
+		return
 	_music_t += dt
 	if _music_on and _music_t > MUSIC_PLAY_SECONDS:
 		_music_on = false
@@ -386,7 +394,7 @@ func play_restoration() -> void:
 	if Audio.has_sound("ward_restore"):
 		Audio.play_sfx("ward_restore", 0.0, 0.0)
 	if Audio.has_sound("music_ending"):
-		Audio.play_music("music_ending", 1.5)
+		Audio.request_music("restoration", "music_ending", 1.5)     # m14, once (released after the ending)
 	Events.camera_shake.emit(0.18, 0.8)
 	Events.caption.emit("[The Ward Stone hums, warm and bright]")
 	var cine := _start_cinematic_camera(center)

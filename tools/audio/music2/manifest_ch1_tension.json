@@ -1,0 +1,376 @@
+[
+ {
+  "id": "m10",
+  "title": "Thorns in the Path",
+  "file": "m10_thorns_in_the_path.ogg",
+  "duration_s": 67.2,
+  "loop": true,
+  "bpm": 100,
+  "key": "E minor (B section in G major)",
+  "meter": "6/8 (dotted quarter = 100; eighth = 300)",
+  "sections": "intro(0.0-4.8s) A(4.8-24.0s) B(24.0-43.2s) A'(43.2-62.4s) coda(62.4-67.2s) -> loops to start",
+  "instruments": "oboe-like double reed (lead), bassoon-like reed, violin section, flute (hhsynth), marimba ostinato, pizzicato strings, upright pluck bass (hhsynth), string pad (hhsynth), taiko, frame drum, brush, dark ticks, shaker (hhsynth), hall reverb 1.7 s",
+  "motif_notes": "Thorn motif E5-E5-B5 (repeated note, fifth leap) falling by step A5-G5-F#5; A phrase E E B A G | F# D A | G C E G F# | F# D#; cadence G F# D# E. B section: new lyrical G-major tune (D5 B4 | A4 F#4 A4 | G4 B4 E5) on bassoon then violins. Coda restates the thorn motif and cadences C-B7-Em. Own material, no shared motif.",
+  "peak_dbfs": -2.27,
+  "true_peak_dbtp": -2.24,
+  "loudness_lufs": -17.6,
+  "loudness_reference": "music_boss (-17.8 LUFS)",
+  "location_playlist": "ch1_combat (ordinary Chapter One enemies: bramblings, gloomlings)",
+  "generator": "tools/audio/music2/group_ch1_tension.py (+ ch1_tension_voices.py, ch1_tension_qa.py; hhsynth read-only)",
+  "qa": {
+   "frames": 2963520,
+   "format": "OGG Vorbis, 44100 Hz, 2 ch",
+   "loop_seam": "end->start jump 0.0047 = x0.09 of the file's 99.9th-percentile sample step; 50 ms RMS -24.4 -> -16.7 dBFS (step 7.7 dB, file p99 window step 10.4 dB): OK",
+   "silence_gaps_gt3s": [],
+   "quiet_passages_gt1s_below_-45dBFS": [],
+   "short_term_lufs_range": [
+    -22.0,
+    -15.2
+   ],
+   "section_loudness_lufs": {
+    "intro@0.0s": -21.8,
+    "A@4.8s": -17.7,
+    "B@24.0s": -19.2,
+    "A'@43.2s": -16.2,
+    "coda@62.4s": -16.0
+   },
+   "band_balance_db": {
+    "sub <60": -21.1,
+    "bass 60-250": -5.0,
+    "lowmid 250-1k": -2.9,
+    "mid 1-4k": -8.0,
+    "high 4-10k": -24.2,
+    "air >10k": -44.2,
+    "centroid_hz": 613.0
+   }
+  },
+  "verified": "analysis only - not listened",
+  "import": "OGG Vorbis 44.1 kHz stereo (AudioStreamOggVorbis). Needs loop=true, loop_offset=0 in its .import; no .import file was written and Godot's importer was not run for this group.",
+  "review": "Independent review 2026-09-27 (numbers and spectrograms only, nobody listened): generator code read; loudness/true peak re-measured with ffmpeg ebur128; loop seam checked for clicks (>4 kHz residual at the seam vs the file's own transients) and spectral jumps; DC below -90 dBFS; >8 kHz band at most about -49 dBFS per 200 ms window (music_boss -47). Composition: E minor 6/8, A (oboe, 16 bars), B (G major, bassoon then violins), A' (violin counter-lines, flute), coda cadence C-B7-Em then a drum pickup; own material, unrelated to music_boss. No change."
+ },
+ {
+  "id": "m11",
+  "title": "The Last Shift",
+  "file": "m11_the_last_shift.ogg",
+  "duration_s": 144.0,
+  "loop": true,
+  "bpm": 60,
+  "key": "G minor",
+  "meter": "4/4",
+  "sections": "A(0.0-48.0s) B(48.0-96.0s) A'(96.0-136.0s) breath(136.0-144.0s) -> loops to start",
+  "instruments": "struck steel pipe (modal, beating partials), felt low pulse, dark bowed-synth drone, low bowed 'cello' line, celesta echoes (hhsynth), cave reverb 3.8 s with slap echoes",
+  "motif_notes": "Last-Shift motif on isolated pipe notes: D5 . Bb4 A4 . G4 D5 C5 . Bb4 | Eb5 D5 C5 G4 | A4 F#4; B section lament F3 D3 Bb3 A3 G3 F3 G3 | A3 C4 F3 | Eb4 C4 G3 | G3 Eb3 C4 Bb3 | A3 F#3 Eb3 D3. Own material.",
+  "peak_dbfs": -3.13,
+  "true_peak_dbtp": -3.13,
+  "loudness_lufs": -18.98,
+  "loudness_reference": "music_night (-17.6 LUFS), kept ~1.4 LU quieter",
+  "location_playlist": "old_mine, tobin_annex",
+  "generator": "tools/audio/music2/group_ch1_tension.py (+ ch1_tension_voices.py, ch1_tension_qa.py; hhsynth read-only)",
+  "qa": {
+   "frames": 6350400,
+   "format": "OGG Vorbis, 44100 Hz, 2 ch",
+   "loop_seam": "end->start jump 0.0062 = x0.23 of the file's 99.9th-percentile sample step; 50 ms RMS -24.8 -> -19.7 dBFS (step 5.1 dB, file p99 window step 6.3 dB): OK",
+   "silence_gaps_gt3s": [],
+   "quiet_passages_gt1s_below_-45dBFS": [
+    [
+     13.75,
+     15.95
+    ],
+    [
+     109.55,
+     112.0
+    ],
+    [
+     125.0,
+     126.0
+    ]
+   ],
+   "short_term_lufs_range": [
+    -44.5,
+    -15.7
+   ],
+   "section_loudness_lufs": {
+    "A@0.0s": -19.6,
+    "B@48.0s": -17.3,
+    "A'@96.0s": -21.2,
+    "breath@136.0s": -22.6
+   },
+   "band_balance_db": {
+    "sub <60": -27.5,
+    "bass 60-250": -2.8,
+    "lowmid 250-1k": -3.5,
+    "mid 1-4k": -16.6,
+    "high 4-10k": -40.6,
+    "air >10k": -60.7,
+    "centroid_hz": 314.0
+   }
+  },
+  "verified": "analysis only - not listened",
+  "import": "OGG Vorbis 44.1 kHz stereo (AudioStreamOggVorbis). Needs loop=true, loop_offset=0 in its .import; no .import file was written and Godot's importer was not run for this group.",
+  "review": "Independent review 2026-09-27 (numbers and spectrograms only, nobody listened): generator code read; loudness/true peak re-measured with ffmpeg ebur128; loop seam checked for clicks (>4 kHz residual at the seam vs the file's own transients) and spectral jumps; DC below -90 dBFS; >8 kHz band at most about -49 dBFS per 200 ms window (music_boss -47). Composition: G minor, pipe motif A, cello lament B over Bb-F/A-Abmaj7-Cm/Eb-D7b9, varied A', thinning breath into the loop. The drone breathes out to below -60 dBFS for about 1.1 s at 15 s and 1.3 s at 111 s (the intended 'space'; the mine ambience will sit under it). No change."
+ },
+ {
+  "id": "m12",
+  "title": "Eyes That Stay Shut",
+  "file": "m12_eyes_that_stay_shut.ogg",
+  "duration_s": 135.0,
+  "loop": true,
+  "bpm": 48,
+  "key": "octatonic on B (B C D Eb F F# G# A); B section pedal F",
+  "meter": "3/4",
+  "sections": "A(0.0-37.5s) space(37.5-45.0s) B(45.0-82.5s) space(82.5-90.0s) A'(90.0-127.5s) coda(127.5-135.0s) -> loops to start",
+  "instruments": "dark bronze 'ruin bells' (minor-third tierce, beating partials), bowed-synth clusters with sul-ponticello glass, low bowed pedal, bowed-glass modal resonators, hall reverb 4.6 s",
+  "motif_notes": "Bell cell B4-C5-F5 (semitone + tritone), often cut short to B-C; 'eyes' dyad F5+B5; transposed G#4-A4-D5 and D5-D#5-A5; inverted F5-E5-Bb4 in B; bowed-glass line sinks E5 D#5 D5 C#5 C5 B4. Own material.",
+  "peak_dbfs": -2.92,
+  "true_peak_dbtp": -2.91,
+  "loudness_lufs": -19.01,
+  "loudness_reference": "music_night (-17.6 LUFS), kept ~1.4 LU quieter",
+  "location_playlist": "ruins, silk_approach",
+  "generator": "tools/audio/music2/group_ch1_tension.py (+ ch1_tension_voices.py, ch1_tension_qa.py; hhsynth read-only)",
+  "qa": {
+   "frames": 5953500,
+   "format": "OGG Vorbis, 44100 Hz, 2 ch",
+   "loop_seam": "end->start jump 0.0043 = x0.14 of the file's 99.9th-percentile sample step; 50 ms RMS -26.8 -> -28.3 dBFS (step 1.5 dB, file p99 window step 3.1 dB): OK",
+   "silence_gaps_gt3s": [],
+   "quiet_passages_gt1s_below_-45dBFS": [
+    [
+     39.45,
+     42.5
+    ],
+    [
+     84.7,
+     87.5
+    ]
+   ],
+   "short_term_lufs_range": [
+    -47.6,
+    -15.8
+   ],
+   "section_loudness_lufs": {
+    "A@0.0s": -19.0,
+    "space@37.5s": -24.0,
+    "B@45.0s": -18.8,
+    "space@82.5s": -20.3,
+    "A'@90.0s": -18.6,
+    "coda@127.5s": -21.1
+   },
+   "band_balance_db": {
+    "sub <60": -18.2,
+    "bass 60-250": -3.5,
+    "lowmid 250-1k": -3.0,
+    "mid 1-4k": -14.9,
+    "high 4-10k": -38.9,
+    "air >10k": -58.0,
+    "centroid_hz": 384.0
+   }
+  },
+  "verified": "analysis only - not listened",
+  "import": "OGG Vorbis 44.1 kHz stereo (AudioStreamOggVorbis). Needs loop=true, loop_offset=0 in its .import; no .import file was written and Godot's importer was not run for this group.",
+  "review": "Independent review 2026-09-27 (numbers and spectrograms only, nobody listened): generator code read; loudness/true peak re-measured with ffmpeg ebur128; loop seam checked for clicks (>4 kHz residual at the seam vs the file's own transients) and spectral jumps; DC below -90 dBFS; >8 kHz band at most about -49 dBFS per 200 ms window (music_boss -47). Composition: octatonic on B, bell cell B-C-F, bowed clusters, tritone-shifted B section on F, return. Deliberate silences below -60 dBFS for about 1.6-1.7 s at 41 s and 86 s. No change."
+ },
+ {
+  "id": "m13_layer2",
+  "title": "The Thread Above - phase 2 layer (urgency)",
+  "file": "m13_layer2.ogg",
+  "duration_s": 60.0,
+  "loop": true,
+  "bpm": 120,
+  "key": "D minor",
+  "meter": "4/4",
+  "sections": "intro(0.0-4.0s) A(4.0-20.0s) B(20.0-36.0s) A(36.0-52.0s) breakdown(52.0-58.0s) build(58.0-60.0s) - bar grid identical to music_boss (30 bars x 2 s)",
+  "instruments": "spiccato violin 16ths (3+3+2 arpeggios), deep taiko, backbeat brush, dark 16th ticks, snare rolls, hall 2.2 s (same IR settings as music_boss)",
+  "motif_notes": "No melody by design (ostinato layer): 16th arpeggios on the boss chords in 3+3+2; in the B section each chord adds the same upper neighbour the boss ostinato uses (b2 Eb on Dm, b9 Bb on A, 9th on Bb/C/Eb); breakdown: repeated D4/D5 eighths + ticking clock; bar 29 roll into the loop start.",
+  "peak_dbfs": -6.83,
+  "true_peak_dbtp": -6.81,
+  "loudness_lufs": -23.69,
+  "loudness_note": "additive stem: alone it is quieter than music_boss on purpose; the mixes the player hears are boss -17.77 LUFS, boss+L2 -16.80 LUFS, boss+L2+L3 -15.90 LUFS (true peak -2.92 dBTP, 0 clipped samples at unity gain)",
+  "sync": "2646000 frames = music_boss.wav loop length. music_boss.wav is already 44.1 kHz stereo 16-bit (no resampling needed); it has 2646001 frames = the 2646000-frame loop + 1 wrap frame (copy of frame 0). Its import (loop_mode Forward, loop_end -1) is taken to loop [0, 2646000) without the wrap frame, as the project's earlier audio audit found; not re-checked in the engine here (Godot not run). If Godot looped all 2646001 frames, the boss would drift 1 frame (23 us) per loop against the layers. Start all three streams on the same mix frame.",
+  "location_playlist": "boss_matron phase 2 (layer2) / phase 3 (layer2 + layer3), over music_boss",
+  "generator": "tools/audio/music2/group_ch1_tension.py (+ ch1_tension_voices.py, ch1_tension_qa.py; hhsynth read-only)",
+  "qa": {
+   "frames": 2646000,
+   "format": "OGG Vorbis, 44100 Hz, 2 ch",
+   "loop_seam": "end->start jump 0.0071 = x0.14 of the file's 99.9th-percentile sample step; 50 ms RMS -26.2 -> -23.5 dBFS (step 2.7 dB, file p99 window step 13.8 dB): OK",
+   "silence_gaps_gt3s": [],
+   "quiet_passages_gt1s_below_-45dBFS": [],
+   "short_term_lufs_range": [
+    -30.3,
+    -22.5
+   ],
+   "section_loudness_lufs": {
+    "intro@0.0s": -24.9,
+    "A@4.0s": -23.5,
+    "B@20.0s": -22.9,
+    "A@36.0s": -23.6,
+    "breakdown@52.0s": -30.2,
+    "build@58.0s": -22.7
+   },
+   "band_balance_db": {
+    "sub <60": -17.4,
+    "bass 60-250": -6.1,
+    "lowmid 250-1k": -2.3,
+    "mid 1-4k": -8.9,
+    "high 4-10k": -19.0,
+    "air >10k": -39.3,
+    "centroid_hz": 640.0
+   },
+   "sums_with_boss_unity_gain": {
+    "boss": {
+     "loudness_lufs": -17.77,
+     "true_peak_dbtp": -6.18,
+     "sample_peak_dbfs": -6.18,
+     "clipped_samples": 0
+    },
+    "boss+L2": {
+     "loudness_lufs": -16.8,
+     "true_peak_dbtp": -2.94,
+     "sample_peak_dbfs": -2.94,
+     "clipped_samples": 0
+    },
+    "boss+L3": {
+     "loudness_lufs": -16.67,
+     "true_peak_dbtp": -4.45,
+     "sample_peak_dbfs": -4.46,
+     "clipped_samples": 0
+    },
+    "boss+L2+L3": {
+     "loudness_lufs": -15.9,
+     "true_peak_dbtp": -2.92,
+     "sample_peak_dbfs": -2.92,
+     "clipped_samples": 0
+    }
+   }
+  },
+  "verified": "analysis only - not listened",
+  "import": "OGG Vorbis 44.1 kHz stereo (AudioStreamOggVorbis). Needs loop=true, loop_offset=0 in its .import; no .import file was written and Godot's importer was not run for this group.",
+  "review": "Independent review 2026-09-27 (numbers and spectrograms only, nobody listened): generator code read; loudness/true peak re-measured with ffmpeg ebur128; loop seam checked for clicks (>4 kHz residual at the seam vs the file's own transients) and spectral jumps; DC below -90 dBFS; >8 kHz band at most about -49 dBFS per 200 ms window (music_boss -47). Review fix: in the B section, Dm bars 12-13 now add Eb (the b2 music_boss's ostinato and rub pad use on D) instead of E natural, so every added neighbour note matches the boss's own. Checked against music_boss's note lists (music_tracks.py): no layer-2 note forms a semitone with a boss note sounding at the same moment. Onset cross-correlation with the decoded boss: best lag -1 ms (1 ms steps)."
+ },
+ {
+  "id": "m13_layer3",
+  "title": "The Thread Above - phase 3 layer (desperation)",
+  "file": "m13_layer3.ogg",
+  "duration_s": 60.0,
+  "loop": true,
+  "bpm": 120,
+  "key": "D minor",
+  "meter": "4/4",
+  "sections": "intro(0.0-4.0s) A(4.0-20.0s) B(20.0-36.0s) A(36.0-52.0s) breakdown(52.0-58.0s) build(58.0-60.0s) - bar grid identical to music_boss (30 bars x 2 s)",
+  "instruments": "violin section counter-melody, low brass section (fp-crescendo and swells), hall 2.2 s",
+  "motif_notes": "Counter-melody answering the boss horn motif (A3 D4 C#4 Bb3 A3): D5 Eb5 F5 Eb5 D5 | . F5 Eb5 F5 A5 | G5 E5 C#5 | D5 F5 Bb5 | A5 G5 F5 E5; climbs to F6 (D6 Eb6 F6 | Eb6 D6) in the B section; Phrygian lament A5 G5 F5 Eb5 D5 C#5 in the breakdown. On Dm bars it uses Eb (the boss's own flat second), never E natural.",
+  "peak_dbfs": -10.72,
+  "true_peak_dbtp": -10.71,
+  "loudness_lufs": -23.33,
+  "loudness_note": "additive stem: alone it is quieter than music_boss on purpose; the mixes the player hears are boss -17.77 LUFS, boss+L2 -16.80 LUFS, boss+L2+L3 -15.90 LUFS (true peak -2.92 dBTP, 0 clipped samples at unity gain)",
+  "sync": "2646000 frames = music_boss.wav loop length. music_boss.wav is already 44.1 kHz stereo 16-bit (no resampling needed); it has 2646001 frames = the 2646000-frame loop + 1 wrap frame (copy of frame 0). Its import (loop_mode Forward, loop_end -1) is taken to loop [0, 2646000) without the wrap frame, as the project's earlier audio audit found; not re-checked in the engine here (Godot not run). If Godot looped all 2646001 frames, the boss would drift 1 frame (23 us) per loop against the layers. Start all three streams on the same mix frame.",
+  "location_playlist": "boss_matron phase 2 (layer2) / phase 3 (layer2 + layer3), over music_boss",
+  "generator": "tools/audio/music2/group_ch1_tension.py (+ ch1_tension_voices.py, ch1_tension_qa.py; hhsynth read-only)",
+  "qa": {
+   "frames": 2646000,
+   "format": "OGG Vorbis, 44100 Hz, 2 ch",
+   "loop_seam": "end->start jump 0.0080 = x0.29 of the file's 99.9th-percentile sample step; 50 ms RMS -25.8 -> -25.3 dBFS (step 0.5 dB, file p99 window step 4.9 dB): OK",
+   "silence_gaps_gt3s": [],
+   "quiet_passages_gt1s_below_-45dBFS": [],
+   "short_term_lufs_range": [
+    -27.6,
+    -22.1
+   ],
+   "section_loudness_lufs": {
+    "intro@0.0s": -22.9,
+    "A@4.0s": -22.9,
+    "B@20.0s": -23.3,
+    "A@36.0s": -23.0,
+    "breakdown@52.0s": -27.3,
+    "build@58.0s": -23.9
+   },
+   "band_balance_db": {
+    "sub <60": -24.2,
+    "bass 60-250": -5.6,
+    "lowmid 250-1k": -2.7,
+    "mid 1-4k": -7.5,
+    "high 4-10k": -25.3,
+    "air >10k": -50.5,
+    "centroid_hz": 707.0
+   },
+   "sums_with_boss_unity_gain": {
+    "boss": {
+     "loudness_lufs": -17.77,
+     "true_peak_dbtp": -6.18,
+     "sample_peak_dbfs": -6.18,
+     "clipped_samples": 0
+    },
+    "boss+L2": {
+     "loudness_lufs": -16.8,
+     "true_peak_dbtp": -2.94,
+     "sample_peak_dbfs": -2.94,
+     "clipped_samples": 0
+    },
+    "boss+L3": {
+     "loudness_lufs": -16.67,
+     "true_peak_dbtp": -4.45,
+     "sample_peak_dbfs": -4.46,
+     "clipped_samples": 0
+    },
+    "boss+L2+L3": {
+     "loudness_lufs": -15.9,
+     "true_peak_dbtp": -2.92,
+     "sample_peak_dbfs": -2.92,
+     "clipped_samples": 0
+    }
+   }
+  },
+  "verified": "analysis only - not listened",
+  "import": "OGG Vorbis 44.1 kHz stereo (AudioStreamOggVorbis). Needs loop=true, loop_offset=0 in its .import; no .import file was written and Godot's importer was not run for this group.",
+  "review": "Independent review 2026-09-27 (numbers and spectrograms only, nobody listened): generator code read; loudness/true peak re-measured with ffmpeg ebur128; loop seam checked for clicks (>4 kHz residual at the seam vs the file's own transients) and spectral jumps; DC below -90 dBFS; >8 kHz band at most about -49 dBFS per 200 ms window (music_boss -47). Review fix: E natural on Dm bars (0, 1, 2, 6, 12, 13, 28) changed to Eb. Before, E5 sounded against the boss ostinato's Eb3 at the same instant in bars 1, 2, 6 and 28 (a cross-relation the boss never makes). After, no layer-3 note forms a semitone with a boss ostinato note sounding at the same moment. Six brief passing/neighbour tones remain against sustained string chord tones, which is normal counterpoint. The sum boss+L2+L3 was re-measured after the fix."
+ },
+ {
+  "id": "m25",
+  "title": "No Thread Left Unseen",
+  "file": "m25_no_thread_left_unseen.ogg",
+  "duration_s": 101.6,
+  "loop": true,
+  "bpm": 150,
+  "key": "C minor",
+  "meter": "7/8 (2+2+3) with a 16-bar 4/4 middle section; eighth = 300",
+  "sections": "intro(0.0-5.6s) A(5.6-28.0s) A2(28.0-39.2s) B 4/4(39.2-64.8s) C(64.8-76.0s) A'(76.0-98.4s) T(98.4-101.6s) -> loops to start",
+  "instruments": "violin section (lead), oboe-like reed, bassoon-like reed, low brass section, skitter ostinato pluck (hhsynth, shared timbre with the boss loop), 16th-note pluck threads, ponticello bowed synth, pizzicato col-legno threads, soft bass (hhsynth), felt pulse, taiko, frame drum, brush, ticks, snare roll, hall 2.0 s",
+  "motif_notes": "Thread theme C5 G5 F5 Eb5 D5 | Eb5 C5 G4 (fifth up, 'snagging' fall), sequenced up to C6; A2 'snag' answers G-F-Eb falling in sequence over a bassoon line; B: low brass G2 C3 | B2 ... nods to the boss motif shape (5-1-7, from music_boss/M13) under a new violin line Eb5 D5 C5 | D5 G5 | C6 Bb5 Ab5 | G5; C: chromatic G5->C5 ponticello descent.",
+  "peak_dbfs": -2.18,
+  "true_peak_dbtp": -2.18,
+  "loudness_lufs": -17.29,
+  "loudness_reference": "music_boss (-17.8 LUFS)",
+  "location_playlist": "weavers_crossing (Weaver rematch)",
+  "generator": "tools/audio/music2/group_ch1_tension.py (+ ch1_tension_voices.py, ch1_tension_qa.py; hhsynth read-only)",
+  "qa": {
+   "frames": 4480560,
+   "format": "OGG Vorbis, 44100 Hz, 2 ch",
+   "loop_seam": "end->start jump 0.0061 = x0.12 of the file's 99.9th-percentile sample step; 50 ms RMS -17.6 -> -12.4 dBFS (step 5.2 dB, file p99 window step 11.1 dB): OK",
+   "silence_gaps_gt3s": [],
+   "quiet_passages_gt1s_below_-45dBFS": [],
+   "short_term_lufs_range": [
+    -26.2,
+    -14.9
+   ],
+   "section_loudness_lufs": {
+    "intro@0.0s": -22.6,
+    "A@5.6s": -16.9,
+    "A2@28.0s": -17.1,
+    "B 4/4@39.2s": -18.2,
+    "C@64.8s": -25.1,
+    "A'@76.0s": -15.5,
+    "T@98.4s": -16.2
+   },
+   "band_balance_db": {
+    "sub <60": -15.9,
+    "bass 60-250": -2.8,
+    "lowmid 250-1k": -4.4,
+    "mid 1-4k": -10.9,
+    "high 4-10k": -25.1,
+    "air >10k": -45.0,
+    "centroid_hz": 402.0
+   }
+  },
+  "verified": "analysis only - not listened",
+  "import": "OGG Vorbis 44.1 kHz stereo (AudioStreamOggVorbis). Needs loop=true, loop_offset=0 in its .import; no .import file was written and Godot's importer was not run for this group.",
+  "review": "Independent review 2026-09-27 (numbers and spectrograms only, nobody listened): generator code read; loudness/true peak re-measured with ffmpeg ebur128; loop seam checked for clicks (>4 kHz residual at the seam vs the file's own transients) and spectral jumps; DC below -90 dBFS; >8 kHz band at most about -49 dBFS per 200 ms window (music_boss -47). Composition: C minor, 7/8 thread theme (new), A2 bassoon/snags, 4/4 B with brass nodding to the boss motif under a new violin line, chromatic breakdown, A', G7b9 turnaround; not a copy of music_boss. Low end: 45-100 Hz holds -5.0 dB of the total energy vs -9.2 dB for music_boss, but relative to its 1-4 kHz band m25 (+5.9 dB) matches music_boss (+6.4 dB), because m25 also has more upper-mid content. Judged not a defect and left unchanged; still worth a headphone check."
+ }
+]

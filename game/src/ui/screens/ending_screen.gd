@@ -97,7 +97,7 @@ func _ready() -> void:
 
 ## Runs the whole sequence; returns when the player continues.
 func play() -> void:
-	Audio.play_music("music_ending", 2.0)
+	Audio.request_music("restoration", "music_ending", 2.0)     # no restart: the restoration already asked for m14
 	var tw := Kit.retween(self, _tw, "main")
 	tw.tween_property(bg, "color:a", 0.42, 1.2)
 	tw.parallel().tween_property(title_box, "modulate:a", 1.0, 1.6).set_delay(0.4)

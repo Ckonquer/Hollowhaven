@@ -20,14 +20,19 @@ var _signal_light: OmniLight3D
 var _signal_bulb: MeshInstance3D
 
 
+## Flag that frees the winch (the Below: "weaver_defeated"). Other lifts pass their own.
+var requires_flag: String = "weaver_defeated"
+
+
 func setup(p: Dictionary) -> void:
+	requires_flag = String(p.get("requires_flag", requires_flag))
 	role = String(p.get("role", role))
 	target_spawn = String(p.get("target", "lift_bottom" if role == "chamber" else "lift_chamber"))
 	area = p.get("area", null)
 
 
-static func usable() -> bool:
-	return bool(GameState.get_flag("weaver_defeated"))
+func usable() -> bool:
+	return requires_flag == "" or bool(GameState.get_flag(requires_flag))
 
 
 func _ready() -> void:
@@ -50,7 +55,7 @@ func _ready() -> void:
 
 
 func _on_flag(flag: String, _v: Variant) -> void:
-	if flag == "weaver_defeated":
+	if flag == requires_flag:
 		_refresh()
 
 

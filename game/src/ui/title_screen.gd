@@ -49,7 +49,7 @@ func _ready() -> void:
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(Kit.full_rect(fade))
 	_refresh_continue()
-	Audio.play_music("music_title", 3.0)
+	Audio.request_music("title", "music_title", 3.0)
 	# gentle intro
 	logo_box.modulate.a = 0.0
 	menu.modulate.a = 0.0
@@ -191,17 +191,22 @@ static func continue_text(save_data: Dictionary) -> String:
 
 
 func _refresh_continue() -> void:
-	_save_meta = SaveSystem.peek() if SaveSystem.has_save() else {}
-	var has := not _save_meta.is_empty()
+	var any_save := SaveSystem.has_save()
+	_save_meta = SaveSystem.peek() if any_save else {}
+	# A save from a newer version is refused (never replaced by an older backup): Continue stays
+	# visible but disabled, with the reason underneath.
+	var blocked := any_save and _save_meta.is_empty() and SaveSystem.blocked_by_future
+	var has := not _save_meta.is_empty() or blocked
 	continue_btn.visible = has
+	continue_btn.disabled = blocked
 	continue_sub.get_parent().visible = has
-	continue_sub.text = continue_text(_save_meta)
+	continue_sub.text = SaveSystem.FUTURE_ERROR if blocked else continue_text(_save_meta)
 
 
 func _focus_menu() -> void:
 	if _panel != null:
 		return
-	if continue_btn.visible:
+	if continue_btn.visible and not continue_btn.disabled:
 		continue_btn.grab_focus()
 	else:
 		new_btn.grab_focus()
@@ -267,7 +272,7 @@ func _on_continue() -> void:
 	if _busy:
 		return
 	if SaveSystem.peek().is_empty():
-		_show_msg("We couldn't find a save to continue.")
+		_show_msg(SaveSystem.FUTURE_ERROR if SaveSystem.blocked_by_future else "We couldn't find a save to continue.")
 		_refresh_continue()
 		return
 	_busy = true
@@ -285,7 +290,7 @@ func _on_continue_timeout() -> void:
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tw := create_tween()
 	tw.tween_property(fade, "color:a", 0.0, 0.6)
-	Audio.play_music("music_title", 1.5)
+	Audio.request_music("title", "music_title", 1.5)
 	_refresh_continue()
 	_show_msg("Your save couldn't be loaded. %s" % SaveSystem.last_error)
 	_focus_menu()
@@ -294,8 +299,14 @@ func _on_continue_timeout() -> void:
 func _on_new_game() -> void:
 	if _busy:
 		return
+	var future_save := false
 	if SaveSystem.has_save():
-		var choice := await _confirm("Start a new journey?", "Your current save will be replaced.",
+		SaveSystem.peek()   # refreshes SaveSystem.blocked_by_future
+		future_save = SaveSystem.blocked_by_future
+		var text := "Your current save will be replaced."
+		if future_save:
+			text = "%s Starting fresh sets it aside in your save folder (it is kept, not deleted)." % SaveSystem.FUTURE_ERROR
+		var choice := await _confirm("Start a new journey?", text,
 			[["new", "Start fresh", "AccentButton"], ["cancel", "Keep my save", ""]])
 		if choice != "new":
 			return
@@ -305,6 +316,8 @@ func _on_new_game() -> void:
 	await c.confirmed
 	if not c.accepted:
 		return   # closed with Esc / X: stay on the title
+	# The confirmation above is the player's permission to set a newer-version save aside (never deleted).
+	SaveSystem.replace_future_allowed = future_save
 	_busy = true
 	await _fade_to_black(1.1)
 	Game.new_game.call_deferred()
@@ -333,7 +346,7 @@ func _fade_to_black(t: float) -> void:
 	fade.mouse_filter = Control.MOUSE_FILTER_STOP
 	var tw := create_tween()
 	tw.tween_property(fade, "color:a", 1.0, t)
-	Audio.stop_music(t)
+	Audio.release_music("title", t)
 	await tw.finished
 
 

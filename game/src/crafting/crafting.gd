@@ -58,6 +58,9 @@ static func check(recipe_id: String, stations: Array) -> Dictionary:
 		return {"ok": false, "reason": "Unknown recipe.", "missing": {}}
 	if not ItemDB.recipe_known(recipe_id):
 		return {"ok": false, "reason": "You haven't learned this recipe yet.", "missing": {}}
+	if ItemDB.has_method("recipe_kind") and String(ItemDB.recipe_kind(recipe_id)) not in ["item", ""]:
+		# Timed (furnace), apply (upgrades) and pattern recipes need their own handlers (crafting module).
+		return {"ok": false, "reason": "This is made at its own station.", "missing": {}}
 	var missing := _missing(r)
 	var station: String = String(r.get("station", "hand"))
 	if not stations.has(station):
