@@ -182,7 +182,8 @@ static func build_credits(width: float = 1000.0, on_dark: bool = false) -> VBoxC
 		["display", "Hollowhaven"],
 		["sub", "Chapter One: The Dimming Ward"],
 		["gap", ""],
-		["heart", "Made for Krystal"],
+		["heart", "For Krystal"],
+		["from", "from Ali"],
 		["gap", ""],
 		["h", "Friends"],
 	]
@@ -227,6 +228,18 @@ static func build_credits(width: float = 1000.0, on_dark: bool = false) -> VBoxC
 				h.add_child(l3)
 				h.add_child(Kit.icon_rect(IconFactory.icon("ui_heart", Color("ff8fa8"), 64), 40))
 				v.add_child(h)
+			"from":
+				# "from Ali" + a drawn heart (the fonts have no emoji glyphs, so the heart is an icon)
+				var hf := Kit.hbox(10)
+				hf.alignment = BoxContainer.ALIGNMENT_CENTER
+				hf.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				var lf := Kit.label(text, head, HORIZONTAL_ALIGNMENT_CENTER)
+				lf.add_theme_font_size_override("font_size", 38)
+				if on_dark:
+					lf.add_theme_color_override("font_color", Color("ffe2a0"))
+				hf.add_child(lf)
+				hf.add_child(Kit.icon_rect(IconFactory.icon("ui_heart", Color("e4665c"), 64), 34))
+				v.add_child(hf)
 			"h":
 				var l4 := Kit.label(text, head, HORIZONTAL_ALIGNMENT_CENTER)
 				l4.add_theme_font_size_override("font_size", 34)
