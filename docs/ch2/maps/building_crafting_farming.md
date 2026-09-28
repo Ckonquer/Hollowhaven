@@ -120,12 +120,11 @@ ctx keys (:14-22): `structures, area_id, build_area, height_fn, player_pos, phys
 
 ## 5. BuildMode (`build_mode.gd`, Node in group `build_mode`, child of the area)
 
-Constants: `MAX_REACH 8` (horizontal clamp), `RAY_LENGTH 45`, `REVALIDATE_SECONDS 0.2`. Local signals are `placed(uid)` and
-`dismantled(uid)`. API: `begin(item_id="")` (if `can_start()` is false it remembers the request for 1.5 s and retries on
-`ui_stack_changed(0)` / unpause), `end()`, `is_active()`, `get_state()`, `placeables()` (owned placeable ids in slot order),
-`cycle(dir)`, `select_number(i)`, `rotate_step()`, `try_place() -> uid`, `try_dismantle() -> bool`, and `debug_cursor: Vector3`
-(tests pin the cursor). Input (`_input` :174): build/pause/interact → end, attack → place, build_rotate, build_dismantle,
-zoom wheel → cycle, hotbar_1..8. It sets `player.build_mode_active` and clears it 0.15 s after exit.
+Constants: `MAX_REACH 8` (horizontal), `RAY_LENGTH 45`, `REVALIDATE_SECONDS 0.2`. Local signals: `placed(uid)`,
+`dismantled(uid)`. API: `begin(item_id="")` (if it can't start yet it retries for 1.5 s once the UI closes), `end()`, `is_active()`,
+`get_state()`, `placeables()`, `cycle(dir)`, `select_number(i)`, `rotate_step()`, `try_place() -> uid`, `try_dismantle() -> bool`,
+`debug_cursor: Vector3` (tests). Keys: build/pause/interact exit, attack places, R rotates, X dismantles, wheel and 1-8 select.
+It sets `player.build_mode_active` and clears it 0.15 s after exit.
 Per frame (`_update` :293): cursor ray (mask 1|32, player excluded) → `snap_position` → validate only when the key
 `"sid|rot|x|z"` changes, on `_dirty`, or every 0.2 s. Ghost = `Models.build` + `U.ghost_mat(valid)` override, a footprint plate
 and a facing arrow for cell snaps. The grid is an ImmediateMesh rebuilt only when its key changes. `_structure_under_cursor` walks the
@@ -136,9 +135,8 @@ The HUD build bar (`src/ui/hud/build_bar.gd:84`) shows **at most 8** placeables.
 
 ## 6. Place / dismantle (`build_ops.gd`)
 
-`place_structure(area, item_id, pos, rot) -> uid` (:89): `take_item(item,1)` → `GameState.add_structure` →
-spawn + `play_place_anim` → (floor) `reseat_objects` → counter `structures_built` → `notify_area` →
-`Events.structure_placed(uid, sid)` → sfx. The caller must validate first.
+`place_structure(area, item_id, pos, rot) -> uid` (:89): `take_item(item,1)` → `add_structure` → spawn + anim → (floor)
+`reseat_objects` → counter `structures_built` → `notify_area` → `Events.structure_placed(uid, sid)`. The caller validates first.
 `can_dismantle(uid)` (:112): a storage is refused (`MSG_CHEST_FULL`) unless all contents fit, simulated on a copy of the backpack;
 edge/roof are refused if any currently supported roof would lose support. `dismantle(area, uid)` (:151): chest
 contents → `give_item`; a ripe plot is harvested, a growing plot refunds 1 seed; `remove_structure`; node
@@ -190,11 +188,9 @@ Setup param `stage` forces a preview stage.
 
 ## 10. UI panels
 
-`storage_panel.gd` (args `{uid}`): `GameState.get_storage(uid)`, a chest grid with **5 columns** of 88 px slots, a backpack of 8 columns
-built from `GameState.INVENTORY_SIZE` (:76, :130), connects `chest.changed`, and has Take all / Store all (skips the hotbar).
-`inventory_panel.gd`: 92 px slots, hotbar 8 + backpack `range(HOTBAR_SIZE, INVENTORY_SIZE)` (:68), and the detail card shows
-heal/buff/damage. Panel `_build()` runs on open (`panel_base.gd:61`). Panels are registered in `ui_root.gd:23 PANELS` and
-`FULLSCREEN/GAMEPLAY_PANELS` (:37-39).
+`storage_panel.gd` (args `{uid}`): chest grid of **5 columns** × 88 px, a backpack grid of 8 columns from
+`GameState.INVENTORY_SIZE` (:76, :130), a `chest.changed` connection, Take all / Store all. `inventory_panel.gd`: 92 px slots,
+backpack `range(HOTBAR_SIZE, INVENTORY_SIZE)` (:68). `_build()` runs on open (`panel_base.gd:61`). Registry: `ui_root.gd:23-39`.
 
 ## Extension recipes
 
@@ -226,13 +222,11 @@ heal/buff/damage. Panel `_build()` runs on open (`panel_base.gd:61`). Panels are
 
 **(b) ~25 new decor/furniture pieces.** For each piece: `data/items.gd` (`cat "placeable"`, never "decor"), stack 20, `place`, `icon`
 (reuse existing ids or add drawings + `ITEM_ICONS` in `icon_factory.gd:21` and the `_compose` match at :191); `data/structures.gd`
-(`snap "cell"`, `layer "object"`, or `"decor"` for flat rugs, `solid` false for small things); `data/recipes.gd` (a workbench recipe,
-unlock "" or a quest flag). Add a `structure_models.gd:18` `build()` case pointing to a new file such as `src/building/models_cozy.gd`:
-`U.baked("<sid>", func(b: Batch)...)` + `U.instance(root, mesh, U.vc_outlined(0.012))`, return named parts only if animated.
-Set custom collision in `collision_shapes` when the box default is wrong, and `surface_kind` for stone pieces. Animate with toon `wind` opts
-(`U.vc_mat({"wind":..})`), not `_process`. Keep each piece < 9000 tris and ≤ 8 mesh instances. Verify with
-`--preview=res://src/building/preview_all.gd` (the "all" mode lists every sid automatically). Also fix the build bar's 8-item cap and
-`placeables()` cycling UX (30+ owned ids).
+(`snap "cell"`, `layer "object"` or `"decor"` for flat rugs); `data/recipes.gd` (workbench, unlock "" or a quest flag). Add a
+`structure_models.gd:18` `build()` case to a new `src/building/models_cozy.gd`: `U.baked("<sid>", func(b: Batch)...)` +
+`U.instance(root, mesh, U.vc_outlined(0.012))`. Custom `collision_shapes` only where the box default is wrong; `surface_kind` for
+stone pieces. Sway via toon `wind` opts, not `_process`. Stay < 9000 tris and ≤ 8 meshes each. Preview:
+`--preview=res://src/building/preview_all.gd` lists every sid. Also fix the build bar's 8-item cap and `placeables()` cycling.
 
 **(c) Recolor a placed piece, keeping its UID.** Store `rec.data.tint = "<variant id>"` (a String: a Color would not survive
 JSON). Give `Models.build(sid, root, opts := {})` a default param and use `U.baked("<sid>|<tint>", ...)` with a palette swap,
@@ -265,11 +259,10 @@ consumes like `Crafting.craft`'s snapshot/restore; `start = max(now, last end)`)
 `Crafting.check` must refuse `minutes` recipes. Add the tab at `crafting_panel.gd:43`. Dismantle refunds queue and output (or refuses).
 
 **(g) Crafting that pulls from nearby chests, transactionally.** Add an optional `sources: Array = []` to `check/_missing/
-max_craftable/craft` (the default keeps the signatures and tests). Add `chest_sources_near(pos, r)`: uids in `GameState.structures` with
-interact storage, the same area, distance ≤ r → `GameState.get_storage(uid)`. In `craft`, snapshot the backpack, every source and
-`key_items`. Take from the backpack first, then from the chests: compute per-source amounts, because `remove` is all-or-nothing per
-inventory. Add the result to the backpack (`_result_fits` must simulate removing only the backpack share) and restore **all**
-snapshots on failure. Emit `item_removed` only for the backpack share (chests emit their own `changed`). Show the chest counts in the panel.
+max_craftable/craft` (the default keeps tests). `chest_sources_near(pos, r)`: storage uids in the same area within r →
+`GameState.get_storage(uid)`. In `craft`, snapshot the backpack, every source and `key_items`. Take from the backpack first, then the
+chests, with per-source amounts (`remove` is all-or-nothing per inventory). `_result_fits` must simulate removing only the backpack
+share. Restore **all** snapshots on failure. Emit `item_removed` only for the backpack share. Show chest counts in the panel.
 
 **(h) New crops (sunflax, roseberry, pumpkin).** `CROPS` entries (yield must include the seed, `stages: 4`). Seed items
 (`cat "seed"`, `crop`, `icon "seeds"` with distinct colours) and produce items (`food` with `heal > 0`, or `resource`). Visuals:

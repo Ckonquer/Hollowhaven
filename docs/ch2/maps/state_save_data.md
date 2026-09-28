@@ -1,601 +1,510 @@
-# Map: state, saves, data & test infrastructure (`state_save_data`)
+# Map: state, saves, data & tests (`state_save_data`)
 
-Paths are relative to `game/`. `L` = line. This adds to `docs/ARCHITECTURE.md` and does not repeat it.
+Paths are relative to `game/`, and `L` means line. This map adds to `docs/ARCHITECTURE.md` and does not repeat it.
 
-## 1. Runtime construction
-Autoload order (`project.godot` L23-30): Events, Settings, ItemDB, GameState, SaveSystem, Audio, Game, Debug.
-- `Settings._ready` loads `user://settings.cfg` and builds the InputMap before GameState exists.
-- `ItemDB._ready` merges `ITEM_DEFAULTS` into every `data/items.gd` entry and adds `id`.
-- `GameState._ready` (L44) connects `inventory.changed` and 8 Events to `request_quest_eval`, then calls `reset()`.
-- `SaveSystem._ready` creates `user://saves`.
-- `Debug._ready` parses user args. `--save-dir` calls `SaveSystem.set_save_dir()`. `--qa-telemetry` adds a `QATelemetry` child.
+## 1. Construction
+The autoload order is Events, Settings, ItemDB, GameState, SaveSystem, Audio, Game, Debug (`project.godot` L23-30). The project version is `0.9.1`.
 
-Version is `application/config/version="0.9.1"`.
+- **Settings** loads `user://settings.cfg` and builds the InputMap before GameState exists.
+- **GameState._ready** (L44) connects `inventory.changed` plus `item_added`, `structure_placed`, `structure_removed`, `companion_befriended`, `crafted`, `flag_set`, `counter_changed` and `key_item_added` to `request_quest_eval`, then calls `reset()`.
+- **Debug** applies `--save-dir` via `SaveSystem.set_save_dir()`; `--qa-telemetry` adds a `QATelemetry` child.
 
 ## 2. GameState (`autoload/game_state.gd`)
-**Constants:**
+Constants:
 - `HOTBAR_SIZE=8`, `INVENTORY_SIZE=32`, `MINUTES_PER_DAY=1440.0`.
 - `COMPANION_ASSIGNMENTS=["wild","home","follow","wait"]`.
 
-**Fields (L16-37) and `reset()` defaults (L77-101):**
+Fields and their `reset()` defaults (L77-101):
 - `player_name="Krystal"`.
-- `active` is not saved. It is set by `new_game`/`from_dict` and cleared by `Game.goto_title`.
-- `inventory`: a single `Inventory(32)` object that is never replaced. `reset` calls `from_array([])`.
-- `key_items {id:int}`, `hotbar_index`.
-- `player`: `{hp:100.0, max_hp:100.0, stamina:100.0, max_stamina:100.0, area:"surface", pos:null, yaw:0.0, spawn:"haven_start", respawn_area:"surface", respawn_spawn:"haven_respawn", lantern_on:false, below_respawn:""}`.
+- `active`: not saved.
+- `inventory`: an `Inventory(32)`. This object is **never replaced**; reset calls `from_array([])` on it.
+- `key_items {id:int}`, `hotbar_index=0`.
+- `player {hp:100.0, max_hp:100.0, stamina:100.0, max_stamina:100.0, area:"surface", pos:null, yaw:0.0, spawn:"haven_start", respawn_area:"surface", respawn_spawn:"haven_respawn", lantern_on:false, below_respawn:""}`.
 - `flags {}`, `counters {}`.
-- `quests`: `QuestLog.new()`, which **is replaced** on reset/load. Never cache it.
-- `companions`: one record per `ItemDB.creature_ids()`: `{befriended:false, bond_xp:0, assignment:"wild", wait_area:"", wait_pos:null, last_pet_day:-1, last_gift_day:-1, last_fed_day:-1}`. `companion_logic.gd` adds `work_day`, `work_xp` and `zones:[zone_id]`.
+- `quests`: a `QuestLog`. It is **replaced** on reset and load, so do not cache it.
+- `companions`: one record per creature, `{befriended:false, bond_xp:0, assignment:"wild", wait_area:"", wait_pos:null, last_pet_day:-1, last_gift_day:-1, last_fed_day:-1}`. `companion_logic.gd` adds `work_day`, `work_xp` and `zones:[]` to these records.
 - `active_companion=""`.
-- `structures {uid:{id, area, pos:[x,y,z], rot:deg, data:{}}}`. The bed stores `data.respawn=true` (`bed.gd` L186).
-- `storages {uid: Inventory}`, replaced on load.
-- `crops {plot_uid:{crop, planted_at, tended_minutes}}`.
-- `depleted {node_id: respawn_at_total_minutes | -1.0}`.
+- `structures {uid:{id, area, pos:[x,y,z], rot, data:{}}}`. The bed uses `data.respawn`.
+- `storages {uid:Inventory}`: replaced on load.
+- `crops {uid:{crop, planted_at, tended_minutes}}`.
+- `depleted {node_id: respawn_at | -1.0}`.
 - `dropped [{uid, item, count, area, pos}]`.
-- `lore [ids]`: `landing_notice`, `foreman_order`, `ward_keeper`, `hollows_page` (`src/world/below/lore.gd`).
-- `total_minutes`: `CLOCK.new_game_hour*60` = 480.0.
+- `lore [id]`. The ids are `landing_notice`, `foreman_order`, `ward_keeper`, `hollows_page`.
+- `total_minutes=480.0`.
 - `stats {play_seconds:0.0, deaths:0, enemies_defeated:0, items_crafted:0, started_version:"0.9.1"}`.
-- `buffs {name:{mult, remaining_real_seconds}}`.
-- `next_uid=1`. Uid prefixes: `s` = structure, `d` = dropped.
+- `buffs {name:{mult, remaining}}`.
+- `next_uid=1`. Uid prefixes are `s` for structures and `d` for dropped items.
 
-**API (signatures):**
+API:
 ```
-give_item(id: String, count: int, drop_pos: Variant = null) -> int   # L120; unknown id -> 0 silently
-take_item(id: String, count: int) -> bool                            # L144; all-or-nothing
-count_item(id) -> int; has_item(id, count := 1) -> bool; best_tool(kind) -> String; best_weapon() -> String
-selected_slot() -> Variant; select_hotbar(i: int)
-set_flag(name: String, value: Variant = true); get_flag(name) -> Variant  # default false
-add_counter(name, amount := 1) -> int; set_counter_max(name, value: int); get_counter(name) -> int
+give_item(id: String, count: int, drop_pos: Variant = null) -> int   # L120; unknown id -> 0, no warning
+take_item(id, count) -> bool (all-or-nothing); count_item(id) -> int; has_item(id, count := 1) -> bool
+best_tool(kind) -> String; best_weapon() -> String; selected_slot(); select_hotbar(i)
+set_flag(name, value: Variant = true); get_flag(name) -> Variant (default false)
+add_counter(name, amount := 1) -> int; set_counter_max(name, value); get_counter(name) -> int
 discover_lore(id) -> bool; new_uid(prefix := "u") -> String
-is_depleted(node_id) -> bool; deplete(node_id, respawn_minutes: float)   # <0 = never
-add_dropped(item, count, area, pos: Vector3) -> String; get_dropped(uid) -> Dictionary; remove_dropped(uid); dropped_in_area(area) -> Array
-add_structure(structure_id, pos: Vector3, rot_deg: float, area := "surface") -> String; remove_structure(uid); count_structures(id) -> int; get_storage(uid) -> RefCounted
-companion(id) -> Dictionary; is_befriended(id); befriend(id); set_companion_assignment(id, assignment, wait_area := "", wait_pos: Variant = null)
-bond_level(id) -> int; max_bond_xp() -> int (=100); add_bond(id, xp: int)
-day() -> int; hour() -> float; time_of_day() -> float; is_night() -> bool; advance_clock(real_s); skip_to_morning(wake_hour := 7.0) -> float
-add_buff(name, mult, seconds); buff_mult(name) -> float
-request_quest_eval(); to_dict() -> Dictionary; from_dict(d: Dictionary)
+is_depleted(node_id) -> bool; deplete(node_id, respawn_minutes)   # <0 never respawns
+add_dropped(item, count, area, pos) -> String; get_dropped(uid); remove_dropped(uid); dropped_in_area(area)
+add_structure(id, pos, rot_deg, area := "surface") -> String; remove_structure(uid); count_structures(id); get_storage(uid)
+companion(id); is_befriended(id); befriend(id); set_companion_assignment(id, a, wait_area := "", wait_pos = null)
+bond_level(id); max_bond_xp() (=100); add_bond(id, xp)
+day(); hour(); time_of_day(); is_night(); advance_clock(real_s); skip_to_morning(wake_hour := 7.0) -> float
+add_buff(name, mult, seconds); buff_mult(name); request_quest_eval(); to_dict(); from_dict(d)
 ```
 
-**Emitted signals:**
-- `give_item` emits `key_item_added`, `item_added`, `notify` ("Obtained: X"). On overflow it also emits `item_overflow_dropped` and a warn notify, then calls `Game.spawn_dropped_item`.
-- `take_item` emits `item_removed`. Taking a key item also emits `inventory_changed`.
-- `set_flag` emits `flag_set` only when the value changed. It compares types first, because `String==bool` is a script error in Godot 4.7.
+Signals:
+- `set_flag` emits `flag_set` only when the value actually changes, comparing types first. In Godot 4.7, `String==bool` is a script error.
 - `add_counter` always emits `counter_changed`. `set_counter_max` emits only when the value rises.
-- Other emitters: `lore_discovered`, `companion_befriended`, `companion_assignment_changed`, `companion_bond_changed`, `time_of_day_changed` (once per in-game minute via `_minute_accum`), `day_started`, `hotbar_selected`.
+- `give_item` emits `key_item_added`, `item_added` and `notify`. On overflow it also emits `item_overflow_dropped` plus a warning, and spawns the drop through `Game.spawn_dropped_item`.
+- `time_of_day_changed` fires at most once per in-game minute.
 
-**Performance tricks:**
-- `request_quest_eval` coalesces calls through `_eval_pending` plus `call_deferred`, so it runs at most once per frame and only when `active`.
-- `_process` skips `buffs.keys()` when buffs are empty.
-- A 1 s poll (`_quest_poll`) re-evaluates when `step_done(current)` is true.
-- `QuestLog.evaluate` has a 32-step cascade guard and an `_evaluating` re-entrancy flag.
+Performance:
+- Quest evaluation is coalesced: `_eval_pending` plus `call_deferred` means at most one evaluation per frame, and only while `active`.
+- A 1 s poll re-evaluates whenever the current step is done.
+- `_process` skips `buffs.keys()` when the dictionary is empty.
+- `QuestLog.evaluate` stops cascading after 32 steps and has a re-entrancy guard.
 
 ## 3. Save file (`autoload/save_system.gd`)
-`SAVE_VERSION=1`, `DEFAULT_DIR="user://saves"`, `SLOT="slot1"`, `BACKUP_NOTICE` (L14).
+Constants: `SAVE_VERSION=1`, `DEFAULT_DIR="user://saves"`, `SLOT="slot1"`, `BACKUP_NOTICE` (L14).
 
-Files in `save_dir`:
-- `slot1.json`
-- `slot1.bak.json`
-- `slot1.tmp`
-- `slot1.corrupt-<unix>[-n].json`
+Files in the save directory: `slot1.json`, `slot1.bak.json`, `slot1.tmp` and `slot1.corrupt-<unix>[-n].json`.
 
-Exact JSON (`build_save_data` L43; `JSON.stringify(data,"\t")`):
+Exact JSON written by `build_save_data` (L43):
 ```
-{ "format":"hollowhaven-save", "version":1, "game_version":"0.9.1", "saved_unix":float,
-  "meta":{"day":int,"step":"<QuestLog.current_id() or ''>","step_title":"<arachno-aware or 'Chapter complete'>",
-          "play_seconds":float,"area":"surface|below"},
-  "state":{ "player_name","inventory":[32x null|{id,count}],"key_items":{id:n},"hotbar_index",
-    "player":{...12 keys above...},"flags":{name:any},"counters":{name:int},
-    "quests":{"index":int,"completed":[ids],"baselines":{step_id:{counter:int}}},
-    "companions":{id:{record}},"active_companion","structures":{uid:{id,area,pos,rot,data,+extras}},
-    "storages":{uid:[20x null|{id,count}]},"crops":{uid:{crop,planted_at,tended_minutes}},
-    "depleted":{node:float},"dropped":[{uid,item,count,area,pos}],"lore":[..],"total_minutes":float,
-    "stats":{...},"buffs":{name:{mult,remaining}},"next_uid":int } }
+{"format":"hollowhaven-save","version":1,"game_version":"0.9.1","saved_unix":float,
+ "meta":{"day":int,"step":"<current_id or ''>","step_title":"<arachno-aware | 'Chapter complete'>","play_seconds":float,"area":str},
+ "state":{"player_name","inventory":[32 x null|{id,count}],"key_items":{id:n},"hotbar_index","player":{12 keys},
+  "flags":{name:any},"counters":{name:int},"quests":{"index":int,"completed":[ids],"baselines":{step:{counter:int}}},
+  "companions":{id:{..}},"active_companion","structures":{uid:{id,area,pos,rot,data,+extras}},
+  "storages":{uid:[20 x null|{id,count}]},"crops":{..},"depleted":{node:float},
+  "dropped":[{uid,item,count,area,pos}],"lore":[..],"total_minutes","stats":{..},"buffs":{..},"next_uid":int}}
 ```
 
 Functions:
-- **`save_game(quiet := false) -> bool`** (L71): calls `Game.player.write_to_state()`, then `_atomic_write`, then emits `Events.game_saved(ok)` unless `quiet and ok`. On failure it calls `push_error`.
-- **`_atomic_write`** (L85):
-  1. Writes tmp.
-  2. Runs `_read_and_validate(tmp)`.
-  3. If the current file is valid, rotates it to bak. Otherwise it calls `_preserve_corrupt_main()`.
-  4. Renames tmp to the current file.
-- **`_read_and_validate(path)`** (L122): returns `{}` for any of these:
-  - missing file, empty file or bad JSON
-  - a root that is not a Dictionary
-  - `format` that is not the String `"hollowhaven-save"`
-  - `version` that is not a number, or is `<1` or `>SAVE_VERSION`
-  - `state` that is not a Dictionary
+- **`save_game(quiet := false) -> bool`** (L71)
+  - Calls `Game.player.write_to_state()`, then `_atomic_write`.
+  - Emits `game_saved(ok)` unless the save was quiet and succeeded.
+- **`_atomic_write`** (L85)
+  1. Writes the tmp file.
+  2. Validates the tmp file.
+  3. If the current file is valid, rotates it to `.bak`. If it is not, calls `_preserve_corrupt_main()`.
+  4. Renames the tmp file into place.
+- **`_read_and_validate`** (L122) returns `{}` when any of these hold:
+  - the file is missing or empty, or the JSON is bad;
+  - the root is not a Dictionary;
+  - `format` is not the String `"hollowhaven-save"`;
+  - `version` is not a number, or is below 1 or above `SAVE_VERSION`;
+  - `state` is not a Dictionary.
 
-  Otherwise it returns **`migrate(d)`**. This runs for main, tmp and bak on every `peek`/`has_save`/`load_game`, and on the tmp during a save.
-- **`migrate(d)`** (L151): currently only `d["version"] = max(v, SAVE_VERSION)`.
-- **`_best_available()`** (L167): tries main. A tmp is used only when it is valid and at least as new as bak, compared by `saved_unix`. Then bak.
-- **`load_game()`** (L188):
-  - If the chosen source is not main but a main file exists, main is moved aside as corrupt.
-  - A tmp source is promoted to the main file.
-  - A bak source sets `recovered_from_backup` and emits a notify.
-  - Then `GameState.from_dict(d["state"])` and `Events.game_loaded`.
-- **`delete_test_saves()`** only runs when `save_dir.contains("test")`. It removes only `slot1.json/.bak.json/.tmp` and `slot1.corrupt*`.
+  Otherwise it returns `migrate(d)`. This runs on main, tmp and bak for every `has_save`, `peek` and `load_game`, and on the tmp file during each save.
+- **`migrate`** (L151) currently only sets `d["version"] = max(v, SAVE_VERSION)`.
+- **`_best_available`** (L167) picks, in order:
+  1. main;
+  2. tmp, if its `saved_unix` is at least the backup's;
+  3. bak.
+- **`load_game`** (L188)
+  - If the chosen source is not main but a main file exists, main is renamed to `.corrupt-*`.
+  - A chosen tmp is promoted to main.
+  - A chosen bak sets `recovered_from_backup` and emits a notify.
+  - Then it calls `GameState.from_dict(d["state"])` and emits `game_loaded`.
+- **`delete_test_saves`** acts only when `save_dir` contains `"test"`, and removes only `slot1.json`, `slot1.bak.json`, `slot1.tmp` and `slot1.corrupt*`.
 
-**Future-version behaviour today:** a save with version > 1 is treated as **corrupt**. It is renamed to `.corrupt-*`, and the loader falls back to bak.
+**Today a save with a version above 1 is treated as corrupt.** It is moved aside and the loader falls back to the backup.
 
-## 4. Load normalisation and unknown ids (`GameState.from_dict` L512)
-`from_dict` runs `reset()` first. It then type-checks every section (`_num` rejects INF/NaN; `_dict`, `_arr`, `_str`, `_int`, `_float`, `_vec_arr`).
+## 4. Load normalisation and unknown ids (`from_dict` L512)
+`from_dict` calls `reset()` first. It then type-checks every section with `_num`, `_dict`, `_arr`, `_str`, `_int`, `_float` and `_vec_arr`; `_num` rejects INF and NaN.
 
-| Section | Unknown or bad data |
+| Section | How bad or unknown data is handled |
 |---|---|
-| inventory / storages (`Inventory.from_array` L251) | Unknown item id or malformed slot: the **slot becomes null** and the item is lost. Slot indices are kept. Extra entries beyond `size` are cut. |
-| key_items | Unknown id or count ≤0 is dropped. |
-| structures | Kept when `id` is a non-empty String, **even if the structure id is unknown**. Extra record keys are kept. `StructureFactory.spawn_structure` skips unknown ids with a warning. A storage Inventory is only created for `interact=="storage"`. |
-| crops | Rebuilt for every farm structure. Orphans are pruned. |
-| dropped | Entries with an unknown item, non-String item or count ≤0 are **discarded**. A missing or duplicate uid is re-labelled with `new_uid("d")` after `next_uid` is fixed. |
-| flags | Any key or value is copied (no type filter). |
-| counters | Numbers only, stored as int. |
-| companions | Any id is kept. Extra fields are kept. Assignment is repaired. `_repair_followers` enforces one follower. |
-| stats | Kept when the type matches the default. Unknown keys are copied. |
-| player | `_load_player`: unknown keys copied. hp ≤0 or >max resets to max. Stamina is clamped. |
-| next_uid | `max(saved, 1, _max_uid_suffix()+1)`. |
-| quests | `QuestLog.from_dict` is called **last**, after counters, so baselines can read counters. |
+| `inventory` and `storages` (`Inventory.from_array` L251) | An unknown id or malformed slot becomes `null`, so the item is lost. Slot indices are kept. |
+| `key_items` | Unknown ids are dropped. |
+| `structures` | Kept whenever `id` is a non-empty String, even if the id is unknown, together with any extra keys. The factory skips unknown ids with a warning when spawning. |
+| `crops` | Rebuilt for every farm structure; orphan entries are pruned. |
+| `dropped` | Entries with an unknown item or count ≤0 are **discarded**. Missing or duplicate uids are relabelled. |
+| `flags` | Every key and value is copied, with no type filter. |
+| `counters` | Numeric values only, stored as int. |
+| `companions` | Any id is kept. Assignments are repaired and the one-follower rule is enforced. |
+| `stats` | A value is kept if its type matches the default; unknown keys are copied. |
+| `player` | Unknown keys are copied. hp ≤0 is reset to max. |
+| `next_uid` | Set above the highest uid suffix in use. |
+| `quests` | Loaded **last**, after counters, so baselines can read them. |
 
-`from_dict` does **not** emit `flag_set`/`counter_changed`. Listeners must re-read state on `Events.game_loaded` or `area_loaded`.
+`from_dict` emits no `flag_set` or `counter_changed`. React to `game_loaded` or `area_loaded` instead.
 
 ## 5. Inventory and QuestLog (`src/core/`)
-**`inventory.gd`:**
-- `signal changed`. `size`, `slots` hold `null|{id,count}`.
-- Queries: `count_of`, `has`, `space_for`, `can_add`, `is_empty`, `free_slots`, `get_slot(i)`, `totals()`.
-- `add(id,count)->int` returns the leftover. It refuses unknown ids and fills existing stacks, then empty slots, hotbar first.
-- `remove(id,count)->bool` is all-or-nothing and takes from the last slots first.
-- Other mutators: `remove_from_slot`, `set_slot`, `clear_slot`, `move`, `transfer_slot_to(other,i)`.
-- `sort_items(keep_hotbar := true)` orders by `CATEGORY_ORDER`, then name, then id.
-- Persistence: `to_array`, `from_array`, `snapshot`, `restore`.
+**`inventory.gd`**
+- `signal changed`; `slots` holds `null` or `{id, count}`.
+- `add(id, n) -> int` returns the leftover. It refuses unknown ids and fills existing stacks first, then empty slots, hotbar first.
+- `remove(id, n) -> bool` is all-or-nothing and takes from the last slots first.
+- Other methods: `count_of`, `has`, `space_for`, `can_add`, `is_empty`, `free_slots`, `get_slot`, `totals`, `remove_from_slot`, `set_slot`, `clear_slot`, `move`, `transfer_slot_to`, `sort_items(keep_hotbar := true)`, `to_array`/`from_array`, `snapshot`/`restore`.
 
-**`quest_log.gd`:**
-- State: `index`, `completed:Array`, `baselines`.
-- Methods: `steps()`, `current_step()`, `current_id()`, `step_by_id()`, `step_string(step,field)` (uses `alt_<field>` when arachnophobia is on), `is_completed()`, `is_chapter_complete()` (= `completed.has("return")`), `start()`, `objective_status(step := {})`, `is_skipped()`, `step_done()`, `evaluate()`.
-- Objective types (`_check` L92): `flag`, `item`, `item_any`, `placed`, `befriended`, `counter` (with `since_start`, which subtracts the baseline). An unknown type gives a warning.
-- `_complete` L162: rewards are applied only if the id is not already in `completed`. It sets `on_complete.flags`, gives `give` items, emits `quest_step_completed` and notifies (suppressed when skipped). After the last step, `index = STEPS.size()`.
-- `from_dict` repairs data: every step before `index` is marked completed **without rewards**.
+**`quest_log.gd`**
+- Fields: `index`, `completed`, `baselines`.
+- Methods:
+  - `current_step`, `current_id`, `step_by_id`;
+  - `step_string(step, field)`, which uses `alt_<field>` in arachnophobia mode;
+  - `is_chapter_complete()`, which returns `completed.has("return")`;
+  - `objective_status`, `is_skipped`, `step_done`, `evaluate`.
+- `_check` (L92) supports the objective types `flag`, `item`, `item_any`, `placed`, `befriended` and `counter` (optionally `since_start`).
+- `_complete` (L162) grants rewards only if the step id is not already in `completed`.
+- `from_dict` marks every step before `index` as completed **without granting rewards**.
 
-**Steps** (`data/quests.gd`, 16, index 0-15):
-- `wake`* (flag `read_ward_intro`)
-- `gather_basics` (3 wood, 2 stone, 2 fiber)
-- `craft_axe`
-- `chop` (counter `trees_felled` 2 since_start, plus 10 wood)
-- `workbench` (placed)
-- `mochi` (befriended; gives 3 `sweetroot_seeds`)
-- `pebble` (`stone_pickaxe` plus befriended; gives 2 `copper_ore`)
-- `home` (bed, crop_plot, counter `crops_planted` 1)
-- `lumi` (`ruin_cleared` plus befriended)
-- `prepare`* (`read_ward_warning`, lantern, 2 of snack/stew/skewer)
-- `descend`* (`mine_opened`, `entered_below`)
-- `old_mine`* (`foreman_key`)
-- `deeper`* (`reached_silk_hollows`)
-- `silk`* (heartseed)
-- `return` (flag `ward_restored`; gives 1 `haven_banner`, flags `["chapter_one_complete"]`)
-- `free_play`: `"optional": true`, counter `max_bond`≥5, placed `heartbloom_lamp`≥1
+Steps in `data/quests.gd` (index 0-15). An asterisk means `skip_if_flag:"ward_restored"`.
 
-\* = `skip_if_flag:"ward_restored"`. The `optional` key is read only by `src/ui/hud/tracker.gd:66` and `journal_panel.gd:99,146`.
+| # | Step | Objectives | Reward |
+|---|---|---|---|
+| 0 | `wake`* | `read_ward_intro` | |
+| 1 | `gather_basics` | wood 3, stone 2, fiber 2 | |
+| 2 | `craft_axe` | stone axe | |
+| 3 | `chop` | `trees_felled` 2 since start; wood 10 | |
+| 4 | `workbench` | place a workbench | |
+| 5 | `mochi` | befriend Mochi | 3 `sweetroot_seeds` |
+| 6 | `pebble` | stone pickaxe; befriend Pebble | 2 `copper_ore` |
+| 7 | `home` | bed; crop_plot; `crops_planted` 1 | |
+| 8 | `lumi` | `ruin_cleared`; befriend Lumi | |
+| 9 | `prepare`* | `read_ward_warning`; lantern; 2 meals | |
+| 10 | `descend`* | `mine_opened`; `entered_below` | |
+| 11 | `old_mine`* | `foreman_key` | |
+| 12 | `deeper`* | `reached_silk_hollows` | |
+| 13 | `silk`* | heartseed | |
+| 14 | `return` | `ward_restored` | `haven_banner`, flag `chapter_one_complete` |
+| 15 | `free_play` | `max_bond` ≥5; place `heartbloom_lamp` | none (`optional:true`) |
 
-QuestLog consumers: tracker, journal, map_panel, pause_panel, ui_root L444, title_screen L181, ward_stone L259, `SaveSystem.meta`, `Debug.state_snapshot`, qa_telemetry.
+The `optional` key is read only by `tracker.gd` L66 and `journal_panel.gd` L99/146.
 
-## 6. Flags, counters, stats, and chapter completion
-**Story flags:**
-- `read_ward_intro`, `read_ward_warning` (ward_stone.gd L254/261)
-- `ruin_cleared` (enemy spawner `ruin_bramblings`; landmarks.gd L631 failsafe; Lumi rescue flag)
-- `mine_opened`, `mine_comfort_seen`, `entered_below` (mine_entrance.gd; below_world L689)
-- `foreman_key_taken`
-- `lower_gate_open`, `lower_gate_tried`
-- `gallery_cleared` (rubble)
-- `reached_silk_hollows`
-- `weaver_defeated` (weaver_boss L659, below_world L579/716, heartseed_cocoon L247)
-- `heartseed_spawned_checked`
-- `ward_restored` (Game.complete_chapter; qa_restoration debug)
-- `chapter_one_complete`
+QuestLog is read by the tracker, journal, map, pause and title screens, `ui_root` L444, `ward_stone` L259, the save `meta`, `Debug.state_snapshot` and `qa_telemetry`.
 
-**Moment flags:**
-- `moment_threshold`, `moment_crossing`, `crossing_clue_seen`, `imitation_seen`, `imitation_folded`, `moment_silk_intro`, `moment_nursery` (below_moments.gd)
-- `moment_return` (below_world L675)
+## 6. Flags, counters, stats and chapter completion
+**Story flags**
+- `read_ward_intro`, `read_ward_warning` (ward_stone).
+- `ruin_cleared` (the spawner `ruin_bramblings`; also forced by landmarks L631 as a failsafe).
+- `mine_opened`, `mine_comfort_seen`, `entered_below`.
+- `foreman_key_taken`, `lower_gate_open`, `lower_gate_tried`, `gallery_cleared`.
+- `reached_silk_hollows`, `weaver_defeated`, `heartseed_spawned_checked`.
+- `ward_restored`, `chapter_one_complete`.
 
-**Patterned flags:**
-- `cp_lit_<landing|office|shrine|arena>` (checkpoint_lantern.gd L39)
-- `spawner_cleared_<ruin_bramblings|thicket_bramblings|quarry_bramblings|gallery_gloom|hall_gloom>` (enemy_spawner L86)
-- `horror_once_wrong_mochi` (director.gd L34; only `once` event)
-- `hint_<id>`, written by hint_card.gd L57-64. `settings_panel._reset_hints` erases these directly. The ids are:
-  - `quest_<step>`
-  - `intro_move`, `bed_respawn`, `below_lantern`
-  - `boss_braziers`, `boss_glance`, `boss_scorched`, `boss_stuck`
-  - `build_controls`, `demo_hint`, `farming_growth`, `mochi_shy`, `need_tool`
-  - `pebble_boulder_pickaxe`, `silk_light`, `silk_light_raise`, `workbench_crafting`
-- `boss_brazier.persist_flag` is supported but unused.
+**Moment flags:** `moment_threshold`, `moment_crossing`, `crossing_clue_seen`, `imitation_seen`, `imitation_folded`, `moment_silk_intro`, `moment_nursery`, `moment_return`.
 
-**Counters:**
-- `trees_felled` (resource_node tree kind)
-- `crops_planted` (farming.gd L133)
-- `crops_harvested` (L171)
-- `structures_built` (build_ops.gd L102)
-- `max_bond` (`add_bond` → `set_counter_max`)
+**Patterned flags**
+- `cp_lit_<landing|office|shrine|arena>`.
+- `spawner_cleared_<ruin_bramblings|thicket_bramblings|quarry_bramblings|gallery_gloom|hall_gloom>`.
+- `horror_once_wrong_mochi`.
+- `hint_<id>`, set in `hint_card.gd` L55. `settings_panel._reset_hints` (L231) erases these flags directly. The ids:
+  - `quest_<step>`;
+  - `intro_move`, `bed_respawn`, `below_lantern`;
+  - `boss_braziers`, `boss_glance`, `boss_scorched`, `boss_stuck`;
+  - `build_controls`, `demo_hint`, `farming_growth`, `mochi_shy`, `need_tool`;
+  - `pebble_boulder_pickaxe`, `silk_light`, `silk_light_raise`, `workbench_crafting`.
 
-**Stats:**
-- `play_seconds` (advance_clock)
-- `deaths` (Game.on_player_died)
-- `enemies_defeated` (enemy_base.gd L595)
-- `items_crafted` (crafting.gd L132; ui_util L453 fallback)
-- `started_version`
+**Counters:** `trees_felled` (resource_node), `crops_planted` and `crops_harvested` (farming), `structures_built` (build_ops L102), `max_bond` (`add_bond`).
 
-**Chapter One complete** can be detected three ways:
-- flag `ward_restored` (the ward is lit, the Heartbloom recipe is unlocked, crops grow ×1.5)
-- flag `chapter_one_complete`
-- `quests.is_chapter_complete()`
+**Stats:** `play_seconds`, `deaths`, `enemies_defeated` (enemy_base L595), `items_crafted` (crafting L132), `started_version`.
 
-`meta.step_title=="Chapter complete"` only after the optional free_play step is also done (`index==16`). The QA bot `tools/qa/persistence.py` L154 checks `chapter_one_complete` in the telemetry flags.
+**Signs that Chapter One is complete:**
+- the flag `ward_restored`, which also unlocks the Heartbloom recipe and multiplies crop growth by 1.5;
+- the flag `chapter_one_complete`;
+- `quests.is_chapter_complete()`.
 
-**`Game.complete_chapter()`** (autoload/game.gd L523), called only by `ward_stone.gd` L250:
-1. It returns early if `ward_restored` is set.
-2. `take_item("heartseed")`.
-3. `set_cutscene(true)`.
-4. `set_flag("ward_restored")`. This emits `flag_set`, and a deferred quest eval then completes `return` **during the cutscene**: it gives `haven_banner` (overflow is dropped), sets `chapter_one_complete`, posts the toasts "Goal complete…" and "The Haven is safe. New recipe: Heartbloom Lamp.", and begins `free_play`.
-5. `await area.play_restoration()`.
-6. Companions `react("celebrate")`.
-7. `Events.chapter_completed` is emitted (no consumer).
-8. `await ui.show_ending()`.
-9. `set_cutscene(false)`, then `request_quest_eval`.
-10. A 0.5 s timer, then `SaveSystem.save_game()` (not quiet).
+`meta.step_title` reads "Chapter complete" only once `free_play` is also finished (index 16). The QA bot's `tools/qa/persistence.py` L154 checks `chapter_one_complete`.
 
-If the window closes mid-ending, `save_before_close` refuses because mode is `"cutscene"`. The last save still holds the heartseed, so the sequence replays on the next load.
+**`Game.complete_chapter()`** (game.gd L523) is called only from `ward_stone` L250:
+1. Returns early if `ward_restored` is already set.
+2. Takes the heartseed and calls `set_cutscene(true)`.
+3. Sets `ward_restored`. A deferred evaluation then completes the `return` step during the cutscene:
+   - gives the banner (overflow is dropped);
+   - sets `chapter_one_complete`;
+   - shows the toasts "Goal complete…" and "The Haven is safe. New recipe: Heartbloom Lamp.";
+   - starts `free_play`.
+4. Awaits `area.play_restoration()`.
+5. Makes each companion `react("celebrate")`.
+6. Emits `Events.chapter_completed` (nothing listens to it).
+7. Awaits `ui.show_ending()`.
+8. Calls `set_cutscene(false)` and `request_quest_eval`.
+9. After 0.5 s, calls `save_game()` (not quiet).
 
-**Recipe unlock:**
-- `recipes.gd` field `unlock` holds a flag. `ItemDB.recipe_known(id)` returns true when `unlock == "" or bool(GameState.get_flag(unlock))`.
-- `Crafting.known_recipes()` and `check()` use it. `check` gives "You haven't learned this recipe yet."
-- Heartbloom Lamp is the **only** gated recipe (`unlock:"ward_restored"`).
-- `Events.recipe_unlocked` is declared but **never emitted**. The "New recipe" toast is just the `return` step message.
+If the window closes during the ending, nothing is saved because the mode is `"cutscene"`, and the whole sequence replays after reload.
+
+**Recipe unlock:** a recipe's `unlock` field names a flag. `ItemDB.recipe_known` returns `unlock == "" or bool(get_flag(unlock))`. The Heartbloom Lamp is the only gated recipe. `Events.recipe_unlocked` is declared but never emitted.
 
 ## 7. Data catalogue
-**ItemDB:** `ITEM_DEFAULTS` = `{name:"?", desc:"", cat:"resource", stack:99, icon:"unknown", color:WHITE, heal:0.0, damage:0.0, reach:2.0, tool:"", power:1.0, place:"", quest:false}`. Functions:
-- `item(id)` returns a placeholder plus a warning for unknown ids.
-- `has_item`, `all_item_ids`, `display_name`, `display_desc`, `stack_max`, `category`
-- `is_quest_item` (true for `quest:true` or `cat=="key"`), `items_in_category`
-- `recipe`, `all_recipe_ids`, `station_name`, `recipe_known`
-- `structure`, `all_structure_ids`, `crop`, `creature`, `creature_ids`, `creature_line`
-- `enemy`, `enemy_display_name`, `bond_level_for_xp`
+`ITEM_DEFAULTS` is `{name:"?", desc:"", cat:"resource", stack:99, icon:"unknown", color:WHITE, heal:0, damage:0, reach:2, tool:"", power:1, place:"", quest:false}`. `ItemDB.item()` returns a placeholder for unknown ids. `is_quest_item` is true when `quest` is set or `cat=="key"`.
 
-`CATEGORY_ORDER=["tool","weapon","equipment","food","resource","seed","placeable","key"]` (`decor` is allowed but unused).
+`CATEGORY_ORDER` is `[tool, weapon, equipment, food, resource, seed, placeable, key]`.
 
-**Items (39):**
+**Items (39)**
 
 | Group | Items |
 |---|---|
-| Resources | `wood` (99), `stone` (99), `fiber` (99), `copper_ore` (99), `shiny_pebble` (50) |
-| Food | `berries` (50, heal 8), `sweetroot` (50, heal 15) |
-| Seed | `sweetroot_seeds` (50, `crop:"sweetroot"`) |
-| Below resources | `glowcap` (50), `silk` (50; alt "Pale Thread"), `echo_shard` (50) |
-| Tools | `stone_axe` and `stone_pickaxe` (stack 1, tool axe/pickaxe, power 1.0, damage 9, reach 2.2) |
+| Resources | `wood`, `stone`, `fiber`, `copper_ore` (stack 99); `shiny_pebble`, `glowcap`, `silk` (alt "Pale Thread"), `echo_shard` (stack 50) |
+| Food | `berries` (heal 8), `sweetroot` (heal 15) (stack 50); `berry_snack` (heal 30), `hearty_stew` (heal 60, buff `{stamina_regen:1.6, seconds:120}`), `glowcap_skewer` (heal 45) (stack 20) |
+| Seed | `sweetroot_seeds` (stack 50, `crop:"sweetroot"`) |
+| Tools | `stone_axe`, `stone_pickaxe` (tool axe/pickaxe, damage 9, reach 2.2) |
 | Weapon | `copper_sword` (damage 18, reach 2.5) |
-| Equipment | `lantern` (stack 1) |
-| Cooked food | `berry_snack` (20, heal 30), `hearty_stew` (20, heal 60, `buff:{stamina_regen:1.6, seconds:120}`), `glowcap_skewer` (20, heal 45) |
-| Placeables | `place` = own id. Stack 5: `workbench`, `storage_chest`, `bed`, `haven_banner`. Stack 10: `crop_plot`. Stack 50: `wood_floor`, `wood_wall`, `wood_window`, `wood_doorway`, `wood_roof`, `fence`. Stack 20: `lantern_post`, `flower_pot`, `rug`, `table`, `stool`, `pebble_cairn`, `echo_chime`, `heartbloom_lamp` |
-| Key (quest, stack 1) | `foreman_key`, `heartseed` |
+| Equipment | `lantern` |
+| Placeables, stack 5 | `workbench`, `storage_chest`, `bed`, `haven_banner` |
+| Placeables, stack 10 | `crop_plot` |
+| Placeables, stack 50 | `wood_floor`, `wood_wall`, `wood_window`, `wood_doorway`, `wood_roof`, `fence` |
+| Placeables, stack 20 | `lantern_post`, `flower_pot`, `rug`, `table`, `stool`, `pebble_cairn`, `echo_chime`, `heartbloom_lamp` |
+| Key items | `foreman_key`, `heartseed` |
 
-**Recipes (25, `result==id`, count 1 unless noted):**
+Tools, the weapon, the lantern and the key items all stack to 1. Each placeable's `place` is its own id.
+
+**Recipes (25).** Each recipe's result has the same id, and count is 1 unless noted.
 
 | Station | Recipe | Ingredients |
 |---|---|---|
-| hand | `stone_axe` | wood 3, stone 2, fiber 2 |
-| hand | `stone_pickaxe` | wood 3, stone 3, fiber 2 |
-| hand | `workbench` | wood 8, stone 2 |
-| hand | `berry_snack` | berries 4 |
-| hand | `crop_plot` | wood 3, fiber 3 |
-| workbench | `copper_sword` | wood 2, copper 4, fiber 2 |
-| workbench | `lantern` | copper 3, fiber 2, wood 2 |
-| workbench | `storage_chest` | wood 10, copper 1 |
-| workbench | `bed` | wood 8, fiber 6 |
-| workbench | `wood_floor` | wood 2 |
-| workbench | `wood_wall` | wood 3 |
-| workbench | `wood_window` | wood 3, fiber 1 |
-| workbench | `wood_doorway` | wood 3 |
-| workbench | `wood_roof` | wood 2, fiber 2 |
-| workbench | `fence` (count 2) | wood 2 |
-| workbench | `lantern_post` | wood 3, copper 1, fiber 1 |
-| workbench | `flower_pot` | stone 3, fiber 1 |
-| workbench | `rug` | fiber 6, berries 2 |
-| workbench | `table` | wood 5 |
-| workbench | `stool` | wood 2 |
-| workbench | `pebble_cairn` | shiny_pebble 3, stone 2 |
-| workbench | `echo_chime` | echo_shard 3, wood 1, fiber 1 |
-| workbench | `heartbloom_lamp` (unlock `ward_restored`) | glowcap 2, silk 2, wood 2 |
-| campfire | `hearty_stew` | sweetroot 2, berries 3 |
-| campfire | `glowcap_skewer` | glowcap 2, wood 1 |
+| Hand | `stone_axe` | wood 3, stone 2, fiber 2 |
+| Hand | `stone_pickaxe` | wood 3, stone 3, fiber 2 |
+| Hand | `workbench` | wood 8, stone 2 |
+| Hand | `berry_snack` | berries 4 |
+| Hand | `crop_plot` | wood 3, fiber 3 |
+| Workbench | `copper_sword` | wood 2, copper 4, fiber 2 |
+| Workbench | `lantern` | copper 3, fiber 2, wood 2 |
+| Workbench | `storage_chest` | wood 10, copper 1 |
+| Workbench | `bed` | wood 8, fiber 6 |
+| Workbench | `wood_floor` | wood 2 |
+| Workbench | `wood_wall` | wood 3 |
+| Workbench | `wood_window` | wood 3, fiber 1 |
+| Workbench | `wood_doorway` | wood 3 |
+| Workbench | `wood_roof` | wood 2, fiber 2 |
+| Workbench | `fence` (count 2) | wood 2 |
+| Workbench | `lantern_post` | wood 3, copper 1, fiber 1 |
+| Workbench | `flower_pot` | stone 3, fiber 1 |
+| Workbench | `rug` | fiber 6, berries 2 |
+| Workbench | `table` | wood 5 |
+| Workbench | `stool` | wood 2 |
+| Workbench | `pebble_cairn` | shiny_pebble 3, stone 2 |
+| Workbench | `echo_chime` | echo_shard 3, wood 1, fiber 1 |
+| Workbench | `heartbloom_lamp` (unlock `ward_restored`) | glowcap 2, silk 2, wood 2 |
+| Campfire | `hearty_stew` | sweetroot 2, berries 3 |
+| Campfire | `glowcap_skewer` | glowcap 2, wood 1 |
 
-`STATIONS={hand:"By Hand", workbench:"Workbench", campfire:"Campfire"}`.
+**Structures (19).** Fields are name, item, layer, snap, size, height, solid, interact, station, slots, light and passable.
 
-**Structures** (`data/structures.gd`; fields name, item, layer, snap, size:Vector2i, height, solid, interact, station, slots, light, passable):
-
-| Structure | Layer / snap | Size | Other |
+| Structure | Layer / snap | Size | Notes |
 |---|---|---|---|
-| `workbench` | object / cell | 2x1 | interact station, station workbench |
-| `storage_chest` | object / cell | — | interact storage, slots 20 |
-| `bed` | object / cell | 1x2 | interact sleep |
-| `crop_plot` | object / cell | 2x2 | interact farm, not solid |
-| `wood_floor` | floor / floor2 | — | |
-| `wood_wall`, `wood_window` | edge / edge2 | — | height 3 |
-| `wood_doorway` | edge / edge2 | — | `passable:true` |
-| `wood_roof` | roof / roof2 | — | |
-| `fence`, `table` | object / cell | — | solid |
-| `lantern_post` | object / cell | — | light ffc978 / 1.6 / 7 |
-| `flower_pot`, `stool`, `pebble_cairn`, `echo_chime` | object / cell | — | not solid |
+| `workbench` | object / cell | 2x1 | interact station |
+| `storage_chest` | object / cell | 1x1 | storage, 20 slots |
+| `bed` | object / cell | 1x2 | sleep |
+| `crop_plot` | object / cell | 2x2 | farm, not solid |
+| `wood_floor` | floor / floor2 | 2x2 | |
+| `wood_wall`, `wood_window` | edge / edge2 | 2x1 | |
+| `wood_doorway` | edge / edge2 | 2x1 | passable |
+| `wood_roof` | roof / roof2 | 2x2 | |
 | `rug` | decor / cell | 2x2 | |
-| `heartbloom_lamp` | object / cell | — | light ffb3c7 / 1.4 / 6 |
-| `haven_banner` | object / cell | — | solid |
+| `fence`, `table`, `haven_banner` | object / cell | 1x1 | solid |
+| `lantern_post` | object / cell | 1x1 | light |
+| `heartbloom_lamp` | object / cell | 1x1 | light, not solid |
+| `flower_pot`, `stool`, `pebble_cairn`, `echo_chime` | object / cell | 1x1 | not solid |
 
-`CROPS.sweetroot={seed:"sweetroot_seeds", grow_minutes:360, stages:4, yield:{sweetroot:[2,3], sweetroot_seeds:[1,2]}}`.
+There is one crop, `sweetroot`: 360 minutes to grow, 4 stages, yields `{sweetroot:[2,3], sweetroot_seeds:[1,2]}`.
 
-**Creatures:** `BOND_XP_PER_LEVEL=[0,10,25,45,70,100]`.
+**Creatures.** `BOND_XP_PER_LEVEL` is `[0,10,25,45,70,100]`.
 
-| Creature | Befriend | Ability | Favourite food | Enters Below | Brave |
-|---|---|---|---|---|---|
-| `mochi` | offer 3 berries | forager | berries | false | 0.1 |
-| `pebble` | `free_from_boulder` | miner | shiny_pebble | true | 1.0 |
-| `lumi` | rescue, flag `ruin_cleared` | lightbearer | sweetroot | true | 0.4 |
+| Creature | Befriend | Ability | Favourite | Enters the Below |
+|---|---|---|---|---|
+| `mochi` | offer 3 berries | forager | berries | no |
+| `pebble` | `free_from_boulder` | miner | shiny_pebble | yes |
+| `lumi` | rescue after `ruin_cleared` | lightbearer | sweetroot | yes |
 
-`LINES[id][context]` supports `{name}`.
-
-**Enemies:**
+**Enemies**
 
 | Enemy | HP | Damage | Area | Notes |
 |---|---|---|---|---|
-| `brambling` | 30 | 10 | surface | drops fiber 1-3, berries 1-2 @0.5 |
-| `gloomling` | 40 | 12 | below | light_fear |
-| `weaver` | 999 | 18 | below | stalker; alt name "The Hollow Shade" |
-| `weaver_matron` | 240 | 20 | below | boss; alt name "The Hollow Mother" |
+| `brambling` | 30 | 10 | surface | |
+| `gloomling` | 40 | 12 | below | fears light |
+| `weaver` | 999 | 18 | below | stalker |
+| `weaver_matron` | 240 | 20 | below | boss |
 
-**Horror (`data/horror_events.gd`):**
-- `INTENSITY` 0/1/2:
-  - event_rate .45/1/1.5
-  - damage_mult .6/1/1.15
-  - allow_major false/true/true
-- `DIRECTOR` keys: tick 1, global_cd 14, major_cd 90, recovery 25, do_nothing_weight 3, max_threats 3, spawn distance 9-22, linger 12, unease_after 20, anticipation_after 45.
-- 14 `EVENTS`: distant_pickaxe, creaking_timbers, footsteps_behind, pebbles_fall, whisper, wrong_mochi (once), lantern_flicker, far_glimpse, lumi_notices, scratching_above, web_rustle, silence, gloomling_ambush (major), stalker_pass (major).
+**Horror data.** `INTENSITY` 0/1/2 sets event_rate 0.45/1.0/1.5, damage_mult 0.6/1.0/1.15 and allow_major no/yes/yes. There are 14 `EVENTS`; only `wrong_mochi` is `once`, and `gloomling_ambush` and `stalker_pass` are major.
 
-**`data/world_layout.gd`:**
-- `WORLD_HALF_EXTENT=110`, `KILL_Y=-40`, `HAVEN_RADIUS=20`.
-- `BUILD_AREA={center (0,0), radius 16, grid 1, blocked:[Ward Stone (0,-6) r3.5, campfire (4,3) r2.2, path (0,7) r1.8]}`.
-- `LANDMARKS`: haven (0,0) r20, glade (-55,12) r22, quarry (66,-12) r22, ruin (-12,-66) r20, mine_mouth (54,-74) r14, pond (46,52) r16, meadow (-8,60) r22, old_oak (-34,-20) r10, thicket (-62,-46) r16.
-- `STREAM_POINTS`, `STREAM_WIDTH=4`, `STREAM_CROSSINGS` (3), `SPAWN_HINTS` (10 ids).
-- `CLOCK={minutes_per_second:1.0, night_speedup:2.5, day_start_hour:6, night_start_hour:20, new_game_hour:8}`.
+**World layout.** `WORLD_HALF_EXTENT=110`, `KILL_Y=-40`, `HAVEN_RADIUS=20`.
+- `BUILD_AREA`: centre (0,0), radius 16, grid 1. Blocked circles: Ward Stone (0,-6) r3.5, campfire (4,3) r2.2, path (0,7) r1.8.
+- `LANDMARKS` (position, radius): haven (0,0) 20; glade (-55,12) 22; quarry (66,-12) 22; ruin (-12,-66) 20; mine_mouth (54,-74) 14; pond (46,52) 16; meadow (-8,60) 22; old_oak (-34,-20) 10; thicket (-62,-46) 16.
+- Also `STREAM_POINTS`, `STREAM_WIDTH=4`, 3 stream crossings, 10 `SPAWN_HINTS`.
+- `CLOCK`: `minutes_per_second` 1.0, `night_speedup` 2.5, `day_start_hour` 6, `night_start_hour` 20, `new_game_hour` 8.
 
 ## 8. Settings (`autoload/settings.gd`)
-`PATH="user://settings.cfg"`. The ConfigFile section is `"settings"`.
+Settings are stored in `user://settings.cfg`, section `"settings"`. Ranges come from `RANGES`.
 
-**DEFAULTS:**
 - Camera: `mouse_sensitivity` 0.5 [0.1-2], `invert_y` false, `fov` 70 [55-95], `camera_distance` 5 [2.5-8], `show_hints` true.
-- Audio: `master_volume` .85, `music_volume` .6, `ambience_volume` .8, `sfx_volume` .85, `ui_volume` .7 (all [0-1]).
-- Comfort: `horror_intensity` 1 [0-2], `arachnophobia` false, `reduce_shake` false, `reduce_flashing` false, `captions` true, `comfort_confirmed` false.
-- Video: `fullscreen` true, `vsync` true, `max_fps` 0 [0-1000], `render_scale` 1.0 [.5-1], `quality` 2 [0-2], `show_fps` false.
-- `bindings` `{}`: only overrides are stored.
+- Audio [0-1]: `master_volume` 0.85, `music_volume` 0.6, `ambience_volume` 0.8, `sfx_volume` 0.85, `ui_volume` 0.7.
+- Comfort: `horror_intensity` 1 [0-2], `arachnophobia`, `reduce_shake`, `reduce_flashing` false, `captions` true, `comfort_confirmed` false.
+- Video: `fullscreen` true, `vsync` true, `max_fps` 0 [0-1000], `render_scale` 1.0 [0.5-1], `quality` 2 [0-2], `show_fps` false.
+- `bindings` `{}` stores overrides only.
 
-**Default bindings** (`DEFAULT_BINDINGS`, 32 actions):
+**Default bindings (32 actions).** Bindings are stored as `"key:<physical keycode>"` or `"mouse:<button>"`.
 
 | Action | Default |
 |---|---|
-| move_forward | W / Up |
-| move_back | S / Down |
-| move_left | A / Left |
-| move_right | D / Right |
-| jump | Space |
-| sprint | Shift |
-| dodge | Ctrl / V |
-| attack | LMB |
-| use_item | RMB / Q |
-| interact | E |
-| lantern | F |
-| inventory | Tab / I |
-| craft | C |
-| build | B |
-| journal | J |
-| map | M |
-| companion_command | G |
-| pause | Esc |
-| help | F1 |
-| screenshot | F12 |
-| build_rotate | R |
-| build_dismantle | X |
-| zoom_in | Wheel up |
-| zoom_out | Wheel down |
-| hotbar_1..8 | 1..8 |
+| `move_forward` | W, Up |
+| `move_back` | S, Down |
+| `move_left` | A, Left |
+| `move_right` | D, Right |
+| `jump` | Space |
+| `sprint` | Shift |
+| `dodge` | Ctrl, V |
+| `attack` | Left mouse |
+| `use_item` | Right mouse, Q |
+| `interact` | E |
+| `lantern` | F |
+| `inventory` | Tab, I |
+| `craft` | C |
+| `build` | B |
+| `journal` | J |
+| `map` | M |
+| `companion_command` | G |
+| `pause` | Esc |
+| `help` | F1 |
+| `screenshot` | F12 |
+| `build_rotate` | R |
+| `build_dismantle` | X |
+| `zoom_in` | Wheel up |
+| `zoom_out` | Wheel down |
+| `hotbar_1`…`hotbar_8` | 1…8 |
 
-Binding format is `"key:<physical keycode>"` or `"mouse:<button>"`.
+`REBINDABLE` lists 17 actions, from `move_forward` through `companion_command`.
 
-`REBINDABLE` (17): the movement actions through `companion_command`. It excludes pause, help, screenshot, build_*, zoom and the hotbar.
+Unbound keys: T, Y, U, O, P, H, K, L, Z, N, 9, 0 and F2-F11. Some screens hard-code keys: the journal uses Q, E, PgUp and PgDn; crafting uses Enter; settings capture uses Esc.
 
-**Free keys:** T, Y, U, O, P, H, K, L, Z, N, 9, 0 and F2-F11 are unbound. Hard-coded keys: the journal uses Q/E/PgUp/PgDn for pages (L69-73), crafting uses Enter, settings capture uses Esc.
+API: `get_value`, `set_value` (coerces, then emits `settings_changed` only on change), `coerce_value`, `sanitize_bindings` (drops unknown actions), `load_settings(path)`, `save(path)`, `reset_to_defaults`, `apply_video`, `setup_input_map` (only `DEFAULT_BINDINGS` keys, deadzone 0.2), `rebind` (refuses unknown actions), `actions_using`, `reset_bindings`, `action_label`, `event_label`.
 
-**API:** `get_value`, `set_value` (via `coerce_value`, emits `settings_changed(key)` only on change), `coerce_value`, `sanitize_bindings`, `load_settings(path)`, `save(path)`, `reset_to_defaults(keep_bindings)`, `apply_video`, `setup_input_map`, `rebind(action, ev)`, `actions_using(ev)`, `reset_bindings`, `action_label`, `event_label`.
+Where actions are consumed:
+- `player.gd` L583-600 handles player actions.
+- `ui_root.HOTKEYS` (L40) handles panel keys.
+- `build_mode.gd` handles the `build_*` actions.
 
-**Input actions:**
-- InputMap actions exist only for `DEFAULT_BINDINGS` keys, with deadzone 0.2.
-- Unknown actions are dropped by `sanitize_bindings` and refused by `rebind`.
-- The player handles its actions in `player.gd` L583-600. `ui_root.HOTKEYS` (L40) handles the panel keys. `build_mode.gd` handles the build keys.
+## 9. Debug CLI (`autoload/debug.gd`)
+Arguments go after `--`.
 
-## 9. Debug CLI (`autoload/debug.gd`, user args after `--`)
-**Always available:**
-- `--shots=<dir> --shot-times=a,b --quit-at=s`
-- `--log-state=<file> --log-interval=1.0`
-- `--perf-log=<file>`
-- `--save-dir=<dir>`
-- `--seed=<int>`
-- `--max-seconds=n` (quits with exit code 3)
-- `--no-focus-pause`
-- `--windowed`
-- `--qa-telemetry=<file> --qa-interval=0.1` (minimum 0.03)
+**Always available:** `--shots=<dir> --shot-times= --quit-at=`, `--log-state=<f> --log-interval=`, `--perf-log=<f>`, `--save-dir=<d>`, `--seed=`, `--max-seconds=` (exit code 3), `--no-focus-pause`, `--windowed`, `--qa-telemetry=<f> --qa-interval=0.1` (min 0.03).
 
-**Cheats** (require `OS.is_debug_build()`):
-- `--area=<surface|below|arena> --spawn=<id>`
-- `--load-save`
-- `--cams="x,y,z,yaw,pitch;..." --shot-dir`
-- `--hour`, `--flags=a,b`, `--give=item:n`
-- `--befriend=mochi,lumi:follow`
-- `--settings=k=v`
-- `--spawn-enemy=id:n`
-- `--preview=<script>`
+**Debug builds only:** `--area=surface|below|arena --spawn=`, `--load-save`, `--cams= --shot-dir=`, `--hour=`, `--flags=a,b`, `--give=item:n`, `--befriend=mochi,lumi:follow`, `--settings=k=v`, `--spawn-enemy=id:n`, `--preview=<script>`.
 
-**Module args:**
-- `ui-open`, `ui-args`, `ui-demo`, `ui-lore`, `ui-show` (ui_root L461)
-- `title-show`
-- `companion-{walk,log,follow,scenario}`
-- `director-{log,force,probe}`
-- `below-moment`, `below-debug-light`
-- `sandbox*` (sandbox, sandbox-area, sandbox-dark, sandbox-enemies, sandbox-full, sandbox-lantern, sandbox-swap-at, sandbox-time)
-- `player-{demo,demo-seconds,log,shots}`
-- `preview-{args,anim,dist,height,light,shots,target-y,wait}`
-- `wallhug-{pos,yaw}`
-- `icon-dump`
-- `parse-prefix`
-- `filter`, `results` (runner)
+**Module arguments:** `ui-{open,args,demo,lore,show}`, `title-show`, `companion-{walk,log,follow,scenario}`, `director-{log,force,probe}`, `below-moment`, `below-debug-light`, `sandbox*`, `player-{demo,demo-seconds,log,shots}`, `preview-*`, `wallhug-{pos,yaw}`, `icon-dump`, `parse-prefix`, and the runner's `filter` and `results`.
 
-`state_snapshot()` (L222) returns `{t, mode, area, zone, step, day, hour, fps, ui_open, paused, pos, hp, inv, keys, companions}`.
-
-**QA telemetry** (`src/qa/qa_telemetry.gd`) writes one JSON line per interval. Each line is the snapshot plus:
-- `seq`, `ui_stack`
-- `objectives` (legacy QuestLog only)
-- `hotbar_index`, `hotbar`
-- `flags` (key list)
-- `messages` (last 12)
-- `build`
-- `nearby`: groups within 80 m, max 60, refreshed every 0.4 s
-- `buttons`: window rects, refreshed every 0.2 s
-- `window`
-- `player{pos, vel, on_floor, stamina, lantern, cam_*, prompt, focus, hp}`
-- `companion_nodes`
+**QA telemetry** writes one JSON line per interval: the `Debug.state_snapshot()` fields (`t, mode, area, zone, step, day, hour, fps, ui_open, paused, pos, hp, inv, keys, companions`) plus `seq`, `ui_stack`, `objectives` (legacy QuestLog only), `hotbar_index`, `hotbar`, `flags` (keys), `messages` (last 12), `build`, `nearby` (80 m, max 60, every 0.4 s), `buttons` (every 0.2 s), `window`, `player{...}` and `companion_nodes`.
 
 ## 10. Test infrastructure
-**`tests/test_case.gd`:**
-- Hooks: `before_each`, `after_each`, `fail(msg)`.
-- Asserts: `assert_true`, `assert_false`, `assert_eq` (type-strict except int vs float), `assert_ne`, `assert_almost(a, e, eps=0.001)`, `assert_not_null`, `assert_null`.
-- Helpers: `wait_frames(n)`, `wait_physics(n)`, `wait_seconds(t)`, `fresh_state()` (= `GameState.new_game()`).
+**`tests/test_case.gd`**
+- Hooks: `before_each`, `after_each`.
+- Asserts: `fail`, `assert_true`, `assert_false`, `assert_eq` (type-strict except int vs float), `assert_ne`, `assert_almost(a, e, eps=0.001)`, `assert_not_null`, `assert_null`.
+- Helpers: `wait_frames`, `wait_physics`, `wait_seconds`, `fresh_state()` (which calls `GameState.new_game()`).
 
-**`tests/runner.gd`:**
-- Collects `res://tests/unit/**/test_*.gd` recursively and sorts them.
-- Filter: `path.get_file().contains(filter)` (case-sensitive substring of the file name).
-- Per suite:
-  - `SaveSystem.set_save_dir("user://test_saves/<suite>")`.
-  - Methods starting with `test_` run in declaration order.
-  - Before each: `GameState.active=false`, then `await before_each / method / after_each`.
-  - After the suite: `delete_test_saves()`.
-- A `ScriptErrorCatcher` (a Logger) turns every **ERROR_TYPE_SCRIPT** logged during a test into a failure. `push_error` does not count here.
-- Exit code 1 on failures. `--results=<json>`.
-- `tools/test.sh <filter>` wraps this with `timeout 600` and `--max-seconds=580`, writing to `qa/tmp/test_results_<filter|all>.json`.
+**`tests/runner.gd`**
+- Collects `tests/unit/**/test_*.gd`, sorted; the filter is a case-sensitive substring of the file name.
+- Per suite: save dir `user://test_saves/<suite>`, `test_*` methods in file order, `GameState.active=false` before each test, `delete_test_saves()` afterwards.
+- A Logger subclass fails any test that raises an ERROR_TYPE_SCRIPT (`push_error` is not counted). Exit code 1 on failure; `--results=<json>`.
+- `tools/test.sh <filter>` adds `timeout 600` and `--max-seconds=580` and writes `qa/tmp/test_results_<filter|all>.json`.
 
-**`tests/unit/test_core_base.gd`** (base for core suites; override `setup()`/`teardown()`):
-- Also fails on unexpected `push_error`. Use `expect_error(fragment)` to allow one; `logged(fragment)` checks the log.
-- Restores Settings values, the InputMap, the SaveSystem dir and flags, and GameState after each test.
-- Helpers: `listen`, `record(sig, arity)`, `json_norm(v)` (JSON round trip), `assert_deep_eq`/`deep_diff` (strict int≠float), `fill_backpack`, `write_text`, `read_text`.
+**`tests/unit/test_core_base.gd`** (override `setup` and `teardown`)
+- Also fails on any `push_error` not allowed by `expect_error(fragment)`.
+- Restores Settings, the InputMap, SaveSystem and GameState after each test.
+- Helpers:
+  - `logged`, `listen`, `record(sig, arity)`;
+  - `json_norm`;
+  - `assert_deep_eq` and `deep_diff` (strict: int is not equal to float);
+  - `fill_backpack`, `write_text`, `read_text`.
 
-**Save fixture** (`tests/unit/test_core_save.gd`):
-- `_build_rich_state()` (L82-131) sets every one of the 20 state keys (`EXPECTED_STATE_KEYS` L7).
-- `_save_text(saved_unix)` returns a full file text from `build_save_data()`.
-- `_wood_in(path)` reads the wood count from a file.
-- The fixtures are built in code. There are no fixture files on disk.
-
-Other save suites: `test_audit_persistence_flow.gd` (continue with a torn main or a tmp only, via `Game.continue_game`) and `test_core_quests.gd` (reload never re-grants).
+**Save fixture (`test_core_save.gd`)**
+- `_build_rich_state()` (L82-131) touches all 20 `EXPECTED_STATE_KEYS` (L7).
+- `_save_text(saved_unix)` and `_wood_in(path)` are helpers.
+- Everything is built in code; there are no fixture files on disk. See also `test_audit_persistence_flow.gd` (Continue with a torn save or tmp only).
 
 ## 11. Pitfalls
-- Never replace the `GameState.inventory` object, or the `changed` hook is lost. `quests` and `storages` objects are replaced on load.
-- `get_flag` returns the Variant `false` for missing flags. Flags may hold non-bool values (the test uses `"note":"hello"`). Always wrap reads in `bool()`.
-- Rewards are idempotent only through `QuestLog.completed`. `from_dict`'s repair marks earlier steps completed **without granting**.
-- Legacy quests are **index-based**. Inserting or reordering `STEPS` shifts every saved `index`.
-- `migrate()` runs on the tmp during each save, and several times per title screen (`has_save` plus `peek`). It must be pure and idempotent. It must also tolerate a dict with no `state`: `test_migrate_keeps_current_version` passes `{"version":1}`.
-- JSON turns ints into floats. INF survives as `1e99999`. Always normalise through `_num`/`_int`.
+- `get_flag` returns `false` for missing flags, and flags can hold non-bool values. Wrap reads in `bool()`.
+- Legacy quests are indexed by position. Inserting or reordering `STEPS` shifts every saved `index`.
+- `migrate()` must be pure, idempotent and cheap, and must tolerate a dict with no `"state"` (`test_migrate_keeps_current_version` passes `{"version":1}`).
+- JSON loads every number as a float, and `1e99999` reads back as INF. Always normalise.
 
 ## 12. Extension recipes
-**(a) v1→v2 migration with new sections**
-1. In `save_system.gd`, set `SAVE_VERSION := 2`.
-2. In `migrate()`, add:
+**(a) v1 → v2 migration with new sections**
+1. Set `SAVE_VERSION := 2`.
+2. In `migrate`, add:
    ```
    if v < 2 and d.get("state") is Dictionary:
-       var st: Dictionary = d["state"]
-       # derive, never overwrite: st["quests2"] = ..., st["goals"] = ..., st["rewards"] = backfill_from(st)
+       var st: Dictionary = d["state"]   # derive from Ch1 data; never overwrite existing keys
        d["version"] = 2
    ```
-   Keep `max(v, SAVE_VERSION)` last.
-3. In `GameState`, add fields, `reset()` defaults, `to_dict()` keys and **tolerant** `from_dict()` parsing that defaults missing sections. Tests call `from_dict` directly with v1-shaped dicts and bypass `migrate`.
-4. Put anything derived from Chapter One state in `migrate`. Note that `from_dict` runs `reset()` first, so read the saved `d` rather than GameState.
-5. Optionally add `meta.chapter` and `meta.quest2_title` in `build_save_data`.
-6. Update `test_core_save.gd`: `EXPECTED_STATE_KEYS` and `_build_rich_state`. Every new key must differ from a fresh state.
+3. In GameState, add the new fields, their `reset()` defaults, their `to_dict` keys and a tolerant `from_dict`. `from_dict` must default missing sections because tests call it directly with v1 dicts.
+4. Put derivations from Chapter One data in `migrate`, reading the saved dict. `from_dict` calls `reset()` first, so live state is gone by then.
+5. Optionally add `meta.chapter` and `meta.quest2_title`.
+6. Update `EXPECTED_STATE_KEYS` and `_build_rich_state`. Each new key must differ from a fresh state.
 
-**(b) Future-version rejection without backup fallback**
-1. Split `_read_and_validate` into `_read_status(path) -> {"data", "status": "ok"|"missing"|"corrupt"|"future"}` and keep the old wrapper.
-2. In `_best_available`, if main is `"future"`, return `{data:{}, source:"future"}` (and apply the same rule when only tmp or bak is future).
-3. `load_game` sets `last_error = "This save was made by a newer version…"` and returns false. It must not call `_preserve_corrupt_main` and must not use bak.
-4. `_atomic_write` must refuse to rotate or overwrite a future main, or should move it aside as `slot1.future-<ver>-<unix>.json`, and only after the title screen's New Game confirmation.
-5. Expose `SaveSystem.blocked_by_future: bool`. `title_screen._refresh_continue` (L194) and `_on_continue` (L269) should show that message instead of "couldn't find a save".
-6. Update the `"future version"` case in `test_bad_files_are_rejected_without_script_errors` (it currently expects a corrupt copy). Extend `delete_test_saves` to remove `slot1.future*`.
+**(b) Reject future versions without falling back to the backup**
+1. Split `_read_and_validate` into `_read_status(path) -> {data, status: ok|missing|corrupt|future}`.
+2. When main is `future`, `_best_available` returns source `"future"`.
+3. `load_game` then sets `last_error` and returns false, with no `_preserve_corrupt_main` and no backup.
+4. `_atomic_write` must not rotate or overwrite a future main. On confirmed New Game, move it to `slot1.future-<ver>-<unix>.json`.
+5. Add `SaveSystem.blocked_by_future`. Show a message for it in `title_screen._refresh_continue` (L194) and `_on_continue` (L269).
+6. Update the `"future version"` case in `test_bad_files_are_rejected_without_script_errors`.
+7. Extend `delete_test_saves` to remove `slot1.future*`.
 
-**(c) Stable-ID parallel Chapter Two quest layer**
-1. Add `data/quests_ch2.gd`: `QUESTS := {quest_id: {"title", "requires_flag":"chapter_one_complete", "steps":[{"id": stable, ...same objective schema, "on_complete":{...}, "reward_id"}]}}`.
-2. Add `src/core/quest_book.gd` (RefCounted): `active: {quest_id: step_id}`, `completed: {quest_id: true}`, `steps_done: {"q/step": true}`, `baselines: {"q/step": {counter: int}}`. Use string keys only, never indices. Provide `evaluate()`, `current(quest_id)`, `objective_status(quest_id)`, `to_dict()`/`from_dict()`. An unknown step id should fall back to the first step that is not done.
-3. Reuse the `QuestLog._check` semantics. Copy them or factor them into a static helper, because quest_log.gd is shared.
-4. Hook it into `GameState._do_eval` and the 1 s poll. Add a state key `quests2`.
-5. Leave `data/quests.gd` untouched. Tests require `free_play` to be last and `return` second-last.
-6. The tracker, journal, map, pause, title (`meta`) and qa_telemetry currently read only `GameState.quests`. Give them a combined "current objective" accessor.
+**(c) Stable-ID Chapter Two quest layer**
+1. Create `data/quests_ch2.gd` with `QUESTS := {qid: {title, requires_flag:"chapter_one_complete", steps:[{id, objectives (same schema), on_complete, reward_id}]}}`.
+2. Create `src/core/quest_book.gd` with `active {qid:step_id}`, `completed {qid:true}`, `steps_done {"q/s":true}`, `baselines {"q/s":{counter:int}}`, `evaluate()`, `objective_status(qid)`, `to_dict()` and `from_dict()`. An unknown step id falls back to the first step that is not done.
+3. Reuse the `_check` semantics by copying them or moving them into a static helper; `quest_log.gd` is shared.
+4. Hook into `GameState._do_eval` and the 1 s poll, and save it under state key `quests2`.
+5. Do not touch `data/quests.gd`.
+6. Give the tracker, journal, map, pause, `meta` and telemetry a combined current-objective accessor.
 
-**(d) Optional-goals tracker preserving free_play**
-1. Add goals with stable ids, e.g. `ch1_max_bond` (counter `max_bond` ≥5) and `ch1_heartbloom` (placed `heartbloom_lamp` ≥1). Both are state-based with no baselines.
-2. Store `goals: {"done": {goal_id: day}}`.
-3. In migrate or first load: if `quests.completed.has("free_play")` or `index>=16`, mark both goals done with no message. Otherwise leave them to live evaluation.
-4. Keep QuestLog's `free_play` step active so legacy saves and tests still pass. Once Chapter Two is active, the tracker should hide the legacy "OPTIONAL GOALS" header.
+**(d) Optional-goals tracker that keeps `free_play` progress**
+1. Add goals `ch1_max_bond` (counter `max_bond` ≥5) and `ch1_heartbloom` (placed `heartbloom_lamp` ≥1). Both are state-based and need no baselines.
+2. Store them as `goals {"done": {id: day}}`.
+3. In `migrate`, if `completed.has("free_play")` or `index >= 16`, mark both done silently.
+4. Keep the legacy `free_play` step. Hide its "OPTIONAL GOALS" header once Chapter Two is active.
 
 **(e) Reward-once ledger**
-1. Add GameState `rewards: {reward_id: {"day": int}}`.
-2. Add:
+1. Add `rewards {reward_id: {"day": int}}` to GameState.
+2. Add this method:
    ```
    func grant_once(reward_id: String, give: Dictionary, flags := []) -> bool:
        if rewards.has(reward_id): return false
-       rewards[reward_id] = {"day": day()}   # mark first
+       rewards[reward_id] = {"day": day()}          # mark before granting
        for f in flags: set_flag(f)
-       for id in give: give_item(id, int(give[id]))   # overflow -> dropped, never lost
+       for id in give: give_item(id, int(give[id])) # overflow -> dropped, never lost
        return true
    ```
-3. In migrate, backfill `ch1:mochi`, `ch1:pebble` and `ch1:return` from `quests.completed`.
-4. Chapter Two steps call `grant_once("ch2:<quest>/<step>", ...)`. Never grant from `from_dict`.
+3. In `migrate`, backfill `ch1:mochi`, `ch1:pebble` and `ch1:return` from `quests.completed`.
+4. Never grant anything from `from_dict`.
 
 **(f) New input action `companion_skill` on T**
-1. `settings.gd` `DEFAULT_BINDINGS`: add `"companion_skill": ["key:%d" % KEY_T]`.
-2. `REBINDABLE`: add `["companion_skill", "Companion: Skill"]`.
-3. `player.gd` L595: add an `elif event.is_action_pressed("companion_skill")` branch, gated by `Game.gameplay_input_allowed()`.
-4. `controls_panel.gd` L6 "Doing" group: add the entry.
-5. `ui_util.gd` `TOKEN_ACTIONS` L10: add `"skill": "companion_skill"`. If quest hints use it, also add it to `HINT_TOKENS` in `test_core_quests.gd` L7 and the token doc in `data/quests.gd` L13.
+1. In `DEFAULT_BINDINGS`, add `"companion_skill": ["key:%d" % KEY_T]`.
+2. In `REBINDABLE`, add `["companion_skill", "Companion: Skill"]`.
+3. In `player.gd` near L595, handle it with an `elif event.is_action_pressed("companion_skill")` branch.
+4. Add it to the Doing group in `controls_panel.gd` L6.
+5. If quest hints will use it, add a token to `UiUtil.TOKEN_ACTIONS` (L10), the `HINT_TOKENS` in `test_core_quests.gd` L7, and the comment in `data/quests.gd` L13.
 
-T is currently unbound. `test_core_settings.gd` L265 only rebinds lantern to logical T inside that test. Existing players' `bindings` hold overrides only, so they get T automatically. If a player already rebound another action to T, both actions fire and nothing resolves it. `actions_using` can warn about the clash.
+T is currently unbound. The only mention is in `test_core_settings.gd` L265, where a test locally rebinds lantern to logical T. Stored overrides don't include new actions, so existing players get T automatically. If a player already rebound another action to T, both actions fire on T.
 
 **(g) Fixtures for 12 save scenarios**
-1. Create `tests/unit/ch2_save_fixtures.gd`. It has no `test_` prefix, so the runner will not collect it. Give it static builders that return full save dicts: `{"format":"hollowhaven-save", "version":1, "game_version":"0.9.1", "saved_unix":1000.0, "meta":{...}, "state": json_norm(GameState.to_dict())}`. Build state through real GameState calls, then `json_norm`.
-2. Suites go in `test_ch2_save_*.gd`, extend `test_core_base.gd`, write with `write_text(SaveSystem.save_dir.path_join("slot1.json"), JSON.stringify(d))`, then run `SaveSystem.load_game()`.
-3. The 12 scenarios:
-   1. fresh v1 (`wake`)
-   2. mid-chain v1 (`chop` with baselines)
-   3. Below with key and `below_respawn` lantern
-   4. heartseed held, not returned
-   5. chapter one complete, on `free_play`
-   6. free_play done (`index` 16)
-   7. complete with the banner overflowed into `dropped`
-   8. legacy stuck on a dungeon step with `ward_restored`
-   9. minimal `{"state":{}}`
-   10. corrupt main plus good bak
-   11. future version v3 (rejected in place)
-   12. v2 with Chapter Two sections plus unknown item ids in inventory/storages/dropped
-4. For each scenario assert: `GameState.to_dict()` after load, the deep-equality of a second save, that rewards are not re-granted, and the migrated sections.
+1. Create `tests/unit/ch2_save_fixtures.gd` without the `test_` prefix, so the runner doesn't collect it. Give it static builders that return full save dicts built from real GameState calls: `{"format", "version", "game_version":"0.9.1", "saved_unix", "meta", "state": json_norm(GameState.to_dict())}`.
+2. Put the suites in `test_ch2_save_*.gd` extending `test_core_base.gd`. Each writes `slot1.json` with `write_text`, then calls `load_game()`.
+3. Cover these 12 scenarios:
+   1. Fresh v1 save.
+   2. Mid-chain save with baselines.
+   3. In the Below holding the key, with `below_respawn` set.
+   4. Heartseed held but not returned.
+   5. On `free_play`.
+   6. `free_play` done (index 16).
+   7. Banner overflowed into `dropped`.
+   8. Stuck on a dungeon step while `ward_restored` is set.
+   9. `{"state":{}}`.
+   10. Corrupt main with a good backup.
+   11. v3 save, rejected in place.
+   12. v2 save with Chapter Two sections and unknown item ids.
+4. In each scenario, assert the post-load state, that save → load is stable, and that no reward is granted twice.
 
 ## 13. Risks
-- **Downgrade:** the shipped 0.9.1 build treats any v2 save as corrupt, moves it to `.corrupt-*` and falls back to bak. After two v2 saves nothing loads in the old build. The files are preserved, not deleted.
-- **Unknown ids:** an item id that is removed or renamed is lost silently from slots and drops. Never rename ids in `data/items.gd`. Structures with unknown ids survive in state but do not spawn.
-- **Tests that pin data or state:**
-  - `EXPECTED_STATE_KEYS` (test_core_save)
-  - `free_play` last and `return` second-last (test_core_quests L357-359)
-  - every recipe `unlock` flag must appear as a quest flag objective or an `on_complete` flag in `data/quests.gd` (test_core_item_db L128). A Chapter Two unlock flag set elsewhere fails this unless the test also scans the Chapter Two data.
-  - every item needs a source (test_core_economy L281)
-  - bindings must be conflict-free (test_core_settings L62, test_ui_util L216)
-  - `REBINDABLE` actions must be defined
-  - hint tokens must be documented
-  - the `"future version"` corrupt-preservation expectation
-- **Chapter One completion detection:** changing `QuestLog.is_chapter_complete` or the flag names breaks the QA bot's `persistence.py` and the title `meta`.
-- **Reward-order change:** moving reward grants out of `QuestLog._complete` risks double grants on load. `from_dict` repair assumes earlier steps are already rewarded.
-- **Performance:** a heavy `migrate()` is paid on every save validation and on each title-screen peek.
+- **Downgrade.** The shipped 0.9.1 build treats v2 saves as corrupt, moves them aside and falls back to the backup. After two v2 saves the old build finds nothing it can load. The files are kept, not deleted.
+- **Renamed or removed ids.** A renamed or removed item id is silently lost from slots and drops. Structures with unknown ids stay in the save but don't spawn.
+- **Pinned tests.** These tests pin current behaviour and will fail if it changes:
+  - `EXPECTED_STATE_KEYS`.
+  - `free_play` must be the last step and `return` the second to last (test_core_quests L357-359).
+  - Every recipe unlock flag must appear among the flags in `data/quests.gd` (test_core_item_db L128). A Chapter Two unlock flag will fail this test unless it scans the Chapter Two data too.
+  - Every item needs a source (test_core_economy L281).
+  - Bindings must not conflict (test_core_settings L63, test_ui_util L216).
+  - The `"future version"` case expects the save to be kept as a corrupt copy.
+- **Completion detection.** Renaming the completion flags or changing `is_chapter_complete` breaks `persistence.py` and the title screen's meta.
+- **Double grants.** Moving reward grants out of `QuestLog._complete` risks granting twice, because the `from_dict` repair assumes earlier steps were already rewarded.
+- **Slow migration.** A heavy `migrate()` runs on every save validation and every title-screen peek.
