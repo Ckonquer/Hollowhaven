@@ -18,6 +18,15 @@ input; no teleport / flag / item cheats):
   -> walk a few metres, pause menu "Save Game" -> "Quit Game" -> "Quit without saving"
   -> relaunch -> title Continue -> verify area / position / appearance / flags / inventory / step.
 
+Native start (a version-2 save the game wrote after New Game - "Meet Krystal" -> Chapter One -> the ending -> Chapter
+Two accepted at the Ward Stone, i.e. the path a first-time player takes; detected by save_kind()): nothing is migrated,
+so the migration steps become load_checks (the look is the one saved in the file, Chapter Two active when it was
+accepted) and first_save_checks (no pre_v2_backup folder appears, version 2 and stats.started_version preserved, the
+look and notice_shown unchanged); no wardrobe notice is expected (visible runs check that none appears; the wardrobe
+is opened from the pause menu); the wardrobe picks an alternative where the save already wears a NEW_* choice; the
+Ward Stone step reads the stone's Chapter Two menu (acceptance happened in Chapter One) and closes it; missing waygate
+wood is also chopped from trees when the Haven's sticks run out. Version-1 starts behave exactly as before.
+
 API: run(bot, out_dir, launcher=None, game=None, options=None) -> dict (status, checkpoints with timings, shots,
 problems, bugs, notes, data, save-file checks). `bot` should be an s1_common.S1Bot (float look/clicks for the headless
 1/30-scale UI); a plain hhbot.Bot works in visible runs. `launcher()` must (re)start the game on the SAME save folder
@@ -59,6 +68,11 @@ LEGACY_LOOK = {"hair": "side_braid", "hair_color": "auburn", "skin": "skin_2", "
 NEW_HAIR = ("High Ponytail", "high_ponytail")
 NEW_HAIR_COLOR = ("Honey", "honey")
 NEW_OUTFIT = ("Strawberry Picnic", "strawberry_picnic")
+# Used instead of a NEW_* choice when the start save already wears it (a native save's creation look), so every pick
+# changes the look. Never needed for the v1 fixture (LEGACY_LOOK: side_braid / auburn / cozy_explorer).
+ALT_HAIR = ("Twin Braids", "twin_braids")
+ALT_HAIR_COLOR = ("Chestnut", "chestnut")
+ALT_OUTFIT = ("Ribboned Adventurer", "ribboned_adventurer")
 PRESET_NAME = "Autumn Picnic"
 WAYGATE_COST = {"wood": 8, "stone": 4, "copper_ore": 2}
 ARMOR_OR_CHARM = ["padded_hood", "padded_vest", "padded_boots", "copperwood_hood", "copperwood_vest", "copperwood_boots",
@@ -73,6 +87,33 @@ TO_WAYGATE = [(-4.6, -3.5), (-4.6, -9.0), (-2.0, -13.0), (-4.0, -25.0), (-7.0, -
 REACH_TO_ARCH = [(0.0, 92.0), (0.0, 81.2)]
 BOARD_STAND = (0.6, 76.3)        # north of the arch, in front of the festival board (it faces south-west)
 SAVE_SPOT = (1.5, 68.0)          # inside the Commons (safe), a few metres past the arch
+TREE_WORDS = ["Oak", "Tree", "Pine", "Birch", "Blossom"]     # choppable trees (playthrough.py's Chapter One words)
+
+
+def save_kind(save: dict) -> str:
+    """'v1': a version-1 (Chapter One) save, migrated by the first Continue. 'native_v2': a version-2 save begun with
+    New Game in a 2.x build (stats.started_version 2.x) - what a first-time player has. 'v2': a version-2 save whose
+    journey began before 2.0 (migrated earlier; nothing is migrated on this Continue either)."""
+    try:
+        ver = int(save.get("version") or 1)
+    except (TypeError, ValueError):
+        ver = 1
+    if ver < 2:
+        return "v1"
+    sv = str(((save.get("state") or {}).get("stats") or {}).get("started_version") or "")
+    major = sv.split(".")[0]
+    return "native_v2" if major.isdigit() and int(major) >= 2 else "v2"
+
+
+def wardrobe_choices(look: dict | None) -> list:
+    """[(tab, (label, id), appearance key)] for hair style, hair colour and outfit: the NEW_* picks, or the ALT_* one
+    where the start look already wears that NEW_* id (so each pick is a real change)."""
+    look = look or {}
+    out = []
+    for tab, choice, alt, key in (("Hair", NEW_HAIR, ALT_HAIR, "hair"), ("Hair Colour", NEW_HAIR_COLOR, ALT_HAIR_COLOR, "hair_color"),
+                                  ("Outfits", NEW_OUTFIT, ALT_OUTFIT, "outfit")):
+        out.append((tab, alt if look.get(key) == choice[1] else choice, key))
+    return out
 
 
 class Seg(Play):
@@ -224,8 +265,16 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
     p = Seg(bot, out, shoot)
     orig = C.load_json(original)
     ost = orig["state"]
+    kind = save_kind(orig)
+    native = kind != "v1"          # a version-2 start: nothing to migrate (see the module doc "Native start")
+    chk_step = "load_checks" if native else "migration_checks"
+    save_step = "first_save_checks" if native else "migration_save"
+    choices = wardrobe_choices(ost.get("appearance") if native else None)
+    p.data["start_kind"] = kind
+    p.data["wardrobe_choices"] = {key: value for _tab, (_label, value), key in choices}
     res = {"segment": "S1", "status": "running", "checkpoints": p.checkpoints, "problems": p.problems, "bugs": p.bugs,
-           "notes": p.notes, "shots": shots, "data": p.data, "save_dir": str(save_dir), "original_save": str(original)}
+           "notes": p.notes, "shots": shots, "data": p.data, "save_dir": str(save_dir), "original_save": str(original),
+           "start_kind": kind}
 
     def step(name, fn):
         t0 = time.time()
@@ -283,13 +332,13 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
                 continue
             e = p.nearest_named("S_" + uid, 90)
             if not e:
-                p.problem("migration_checks", f"structure {uid} ({rec.get('id')}) not found near the Haven")
+                p.problem(chk_step, f"structure {uid} ({rec.get('id')}) not found near the Haven")
                 ok = False
                 continue
             d = C.dist2(C.xz(e["pos"]), (rec["pos"][0], rec["pos"][2]))
             found[uid] = {"id": rec.get("id"), "text": e.get("text"), "pos": e["pos"], "moved_m": round(d, 2)}
             if d > 0.3:
-                p.problem("migration_checks", f"structure {uid} moved {d:.2f} m")
+                p.problem(chk_step, f"structure {uid} moved {d:.2f} m")
                 ok = False
         p.data["home_structures"] = found
         # crops
@@ -298,11 +347,13 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
             txt = (e or {}).get("text", "")
             p.data.setdefault("crops", {})[uid] = {"crop": crop.get("crop"), "prompt": txt}
             if crop.get("crop", "").lower() not in txt.lower():
-                p.problem("migration_checks", f"crop plot {uid} prompt {txt!r} does not mention {crop.get('crop')}")
+                p.problem(chk_step, f"crop plot {uid} prompt {txt!r} does not mention {crop.get('crop')}")
                 ok = False
         # chests
         p.data["chests_in_original"] = len(ost.get("storages") or {})
-        if not ost.get("storages"):
+        if not ost.get("storages") and native:
+            p.note("the start save has no chests (storages {}); chest contents are only covered by the save_integrity diff")
+        elif not ost.get("storages"):
             p.note("the real Chapter-One-complete save has no chests (storages {}); chest migration is only covered by "
                    "the save_integrity diff here")
         # pets
@@ -312,7 +363,7 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
         for cid, rec in (ost.get("companions") or {}).items():
             pets[cid] = {"assignment": comps.get(cid), "node": bool(nodes.get(cid)), "expected": rec.get("assignment")}
             if comps.get(cid) != rec.get("assignment") or not nodes.get(cid):
-                p.problem("migration_checks", f"companion {cid}: {pets[cid]}")
+                p.problem(chk_step, f"companion {cid}: {pets[cid]}")
                 ok = False
         p.data["pets"] = pets
         # inventory / pouch / flags / quest
@@ -321,14 +372,14 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
             if st:
                 v1_inv[st["id"]] = v1_inv.get(st["id"], 0) + int(st["count"])
         if p.inv_totals() != v1_inv:
-            p.problem("migration_checks", f"inventory totals differ: {p.inv_totals()} vs {v1_inv}")
+            p.problem(chk_step, f"inventory totals differ: {p.inv_totals()} vs {v1_inv}")
             ok = False
         if s.get("keys") != ost.get("key_items"):
-            p.problem("migration_checks", f"key pouch differs: {s.get('keys')} vs {ost.get('key_items')}")
+            p.problem(chk_step, f"key pouch differs: {s.get('keys')} vs {ost.get('key_items')}")
             ok = False
         missing_flags = [f for f, v in (ost.get("flags") or {}).items() if v and f not in s.get("flags", [])]
         if missing_flags:
-            p.problem("migration_checks", f"flags lost: {missing_flags}")
+            p.problem(chk_step, f"flags lost: {missing_flags}")
             ok = False
         p.data["start_step"] = s.get("step")
         p.data["start_chapter2"] = s.get("chapter2")
@@ -340,19 +391,34 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
             d = C.dist2(C.xz(p.pos()), (sp[0], sp[2]))
             p.data["continue_pos_error_m"] = round(d, 2)
             if d > 1.0:
-                p.problem("migration_checks", f"continued {d:.2f} m away from the saved position")
+                p.problem(chk_step, f"continued {d:.2f} m away from the saved position")
         # appearance (telemetry "appearance" when this build's telemetry has it)
         ap = s.get("appearance")
         p.data["start_appearance"] = ap
+        want_look = (ost.get("appearance") or {}) if native else LEGACY_LOOK
         if ap is None:
             p.note("telemetry has no 'appearance' in this build: the look is checked in the saved files only")
-        elif any(ap.get(k) != v for k, v in LEGACY_LOOK.items()):
-            p.problem("migration_checks", f"migrated look is not LEGACY_LOOK: {ap}")
+        elif native and not want_look:
+            p.problem(chk_step, "the version-2 start save has no appearance section")
+            ok = False
+        elif any(ap.get(k) != v for k, v in want_look.items()):
+            p.problem(chk_step, f"loaded look differs from the one in the save: {ap} vs {want_look}" if native
+                      else f"migrated look is not LEGACY_LOOK: {ap}")
             ok = False
         ch2 = s.get("chapter2") or {}
-        if not ch2.get("available") or ch2.get("active"):
-            p.problem("migration_checks", f"chapter2 state after load: {ch2}")
-            ok = False
+        if not native:
+            if not ch2.get("available") or ch2.get("active"):
+                p.problem(chk_step, f"chapter2 state after load: {ch2}")
+                ok = False
+        else:
+            # a native save may already have accepted Chapter Two (the Ward Stone choice right after the ending)
+            accepted = bool((ost.get("flags") or {}).get("ch2_accepted"))
+            p.data["start_ch2_accepted"] = accepted
+            if not ch2.get("available") or bool(ch2.get("active")) != accepted:
+                p.problem(chk_step, f"chapter2 state after load: {ch2} (ch2_accepted in the save: {accepted})")
+                ok = False
+            p.data["start_notice_shown"] = (ost.get("wardrobe") or {}).get("notice_shown")
+            p.data["start_started_version"] = (ost.get("stats") or {}).get("started_version")
         return ok
 
     def migration_save():
@@ -394,10 +460,68 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
         p.data["integrity_after_migration"] = summarize_integrity(rep)
         return True
 
+    def first_save_checks():
+        """Native start: pause menu -> Save Game right after loading a version-2 save. Nothing is migrated, so no
+        pre_v2_backup folder may appear; the file stays version 2 with the journey's started_version, look and
+        notice state (the save_integrity diff against the start file is informational: v2 vs v2)."""
+        if not p.open_pause():
+            raise StepFailed("pause menu did not open")
+        since = p.msg_t()
+        if not bot.click_button("Save Game", exact=True):
+            raise StepFailed("no Save Game button")
+        if not p.saved_after(since, 10):
+            raise StepFailed(f"no 'journey saved' message; messages {p.recent_msgs(since)}")
+        time.sleep(0.5)
+        snap = out / "save_after_first_save.json"
+        shutil.copyfile(save_dir / "slot1.json", snap)
+        p.data["first_save"] = str(snap)
+        bdir = save_dir / "pre_v2_backup"
+        p.data["pre_v2_backup_all"] = sorted(f.name for f in bdir.glob("*")) if bdir.exists() else []
+        p.data["pre_v2_backup_exists"] = bdir.exists()
+        if bdir.exists():
+            p.problem(save_step, f"a pre_v2_backup folder appeared for a version-2 save: {p.data['pre_v2_backup_all']}")
+            p.bug("pre_v2_backup made for a save that needs no migration", "minor", "save/migration",
+                  "Continue a version-2 (New Game) save, pause > Save Game", "no pre_v2_backup folder (only v1 saves are upgraded)",
+                  f"folder has {p.data['pre_v2_backup_all']}", str(bdir))
+        doc = C.load_json(snap)
+        st = doc.get("state") or {}
+        sv0 = (ost.get("stats") or {}).get("started_version")
+        sv1 = (st.get("stats") or {}).get("started_version")
+        p.data["first_save_file"] = {"version": doc.get("version"), "game_version": doc.get("game_version"),
+                                     "started_version": sv1, "appearance": st.get("appearance"),
+                                     "notice_shown": (st.get("wardrobe") or {}).get("notice_shown")}
+        if not isinstance(doc.get("version"), int) or doc.get("version") < 2:
+            p.problem(save_step, f"saved file version is {doc.get('version')!r}, expected 2+")
+        if sv1 != sv0:
+            p.problem(save_step, f"stats.started_version changed from {sv0!r} to {sv1!r}")
+        if ost.get("appearance") and st.get("appearance") != ost.get("appearance"):
+            p.problem(save_step, f"saved look differs from the start look: {st.get('appearance')} vs {ost.get('appearance')}")
+        n0 = (ost.get("wardrobe") or {}).get("notice_shown")
+        if n0 is not None and (st.get("wardrobe") or {}).get("notice_shown") != n0:
+            p.problem(save_step, f"wardrobe.notice_shown changed from {n0} to {(st.get('wardrobe') or {}).get('notice_shown')}")
+        rep = integrity(original, snap, out / "integrity_after_first_save.json")
+        p.data["integrity_after_first_save"] = summarize_integrity(rep)
+        return True
+
     def wardrobe():
         """The one-time notice (visible builds) or the pause menu's Wardrobe (headless: the notice is off)."""
         via = ""
-        if headless[0] and not opt.get("force_notice"):
+        if native and not opt.get("force_notice"):
+            # a native save chose its look at creation and has notice_shown: the one-time notice must not appear
+            if not headless[0]:
+                if "pause" in p.ui():
+                    p.resume()
+                s = bot.wait_state(lambda s: "confirm" in s.get("ui_stack", []) and any(b.get("text") == "Open the wardrobe" for b in s.get("buttons", [])), 6)
+                p.data["wardrobe_notice"] = "shown (unexpected for a native save)" if s else "not shown within 6 s (expected: native save)"
+                if s:
+                    shoot("wardrobe_notice_unexpected")
+                    p.problem("wardrobe", "the one-time wardrobe notice appeared for a native save (notice_shown was true)")
+                    if bot.click_button("Open the wardrobe", exact=True):
+                        via = "notice"
+            else:
+                p.note("wardrobe notice: native save (none expected; headless builds switch it off anyway); opened the "
+                       "wardrobe from the pause menu")
+        elif headless[0] and not opt.get("force_notice"):
             p.note("wardrobe notice: headless builds switch the automatic notice off (ui_root.gd: wardrobe_notice_enabled "
                    "= DisplayServer.get_name() != 'headless'); opened the wardrobe from the pause menu instead")
         else:
@@ -425,8 +549,7 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
         time.sleep(0.6)
         changed = {}
         # hair style, hair colour, outfit
-        for tab, (label, value), key in (("Hair", NEW_HAIR, "hair"), ("Hair Colour", NEW_HAIR_COLOR, "hair_color"),
-                                         ("Outfits", NEW_OUTFIT, "outfit")):
+        for tab, (label, value), key in choices:
             if not bot.click_button(tab, exact=True):
                 raise StepFailed(f"no wardrobe tab {tab!r}")
             time.sleep(0.4)
@@ -448,7 +571,7 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
                 if ap.get(key) != value:
                     raise StepFailed(f"{key} is {ap.get(key)!r} after clicking {label!r}")
         ap = p.appearance()
-        if ap is not None and ap.get("hair") != NEW_HAIR[1]:
+        if ap is not None and ap.get("hair") != p.data["wardrobe_choices"]["hair"]:
             p.problem("wardrobe", f"choosing the outfit changed the hair style to {ap.get('hair')!r} (outfits must keep hair)")
         p.data["look_after_edit"] = ap
         shoot("wardrobe_new_look")
@@ -493,6 +616,11 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
         owned = [i for i in ARMOR_OR_CHARM if s.get("inv", {}).get(i)]
         eq = s.get("equipment") or {}
         p.data["equipment_before"] = eq
+        if not owned and native:
+            p.note("equipment: skipped - no armor or charm is owned yet in this New-Game journey"
+                   + (" (the Tailor's Cache is done, but no Woven Cloth has been woven)" if "c1x_tailor_cache" in p.flags() else ""))
+            p.data["equipment"] = "skipped: none owned"
+            return True
         if not owned:
             p.note("equipment: skipped - no armor or charm is owned (the save predates equipment) and none is cheap to "
                    "craft here: every armor recipe needs Woven Cloth (Loom, recipe unlocked by the optional Tailor's Cache "
@@ -526,6 +654,8 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
         if not e:
             raise StepFailed("no Ward Stone nearby")
         since = p.msg_t()
+        if native and "ch2_accepted" in p.flags():
+            return ward_stone_menu(e, since)
 
         def asked():
             return "confirm" in p.ui() or "ch2_accepted" in p.flags()
@@ -546,6 +676,30 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
         p.wait_playing(timeout=6)
         return True
 
+    def ward_stone_menu(e, since):
+        """Native start: Chapter Two was accepted at the Ward Stone right after the Chapter One ending, so reading
+        the stone now opens its Chapter Two menu (ward_stone.gd menu_options: Read the inscription / Change your look
+        / [Travel the Lantern Road once an arch is lit] / Close). Records it and closes it."""
+        p.data["ward_stone"] = "accepted before S1 (Chapter One ending flow)"
+        if not p.press_interact_on(e, ["Read the Ward Stone"], lambda: "confirm" in p.ui(), stop=2.2):
+            raise StepFailed(f"the Ward Stone menu did not open (prompt {p.prompt()})")
+        menu = p.wait_button("Close", 5) or [b.get("text") for b in bot.buttons()]
+        p.data["ward_stone_menu_after_acceptance"] = menu
+        shoot("ward_stone_menu")
+        missing = [x for x in ("Read the inscription", "Change your look", "Close") if x not in menu]
+        if missing:
+            p.problem("ward_stone", f"the Ward Stone menu lacks {missing}: {menu}")
+        if not bot.click_button("Close", exact=True):
+            bot.tap("ESC")
+        if not p.wait_playing(timeout=6):
+            p.close_panels()
+        cur = (p.st().get("chapter2") or {}).get("current") or []
+        p.data["ward_stone_ch2_current"] = cur
+        if "ch2_waygate" not in cur:
+            p.problem("ward_stone", f"chapter2 current step is {cur}, expected ch2_waygate")
+        p.data["ward_stone_lines"] = [m["text"] for m in p.recent_msgs(since) if m.get("k") in ("say", "notify", "quest", "hint")]
+        return True
+
     def materials():
         have = {k: int(p.inv_totals().get(k, 0)) for k in WAYGATE_COST}
         miss = {k: v - have[k] for k, v in WAYGATE_COST.items() if have[k] < v}
@@ -554,8 +708,18 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
             p.note(f"waygate materials: nothing missing (the save carries {have})")
             return True
         p.log(f"gathering missing waygate materials {miss}")
-        if "wood" in miss:
+        if "wood" in miss and not native:
             p.gather_hand(["Stick"], "wood", WAYGATE_COST["wood"], maxd=60)
+        elif "wood" in miss:
+            # a New-Game journey spends its wood in Chapter One: sticks first, then the axe on a tree (like a player)
+            try:
+                p.gather_hand(["Stick"], "wood", WAYGATE_COST["wood"], maxd=60)
+            except StepFailed as ex:
+                p.note(f"waygate wood: {ex} - chopping a tree for the rest")
+            if p.inv("wood") < WAYGATE_COST["wood"]:
+                if not any(v and k.endswith("_axe") for k, v in p.inv_totals().items()):
+                    raise StepFailed(f"wood short ({p.inv('wood')}/{WAYGATE_COST['wood']}) and no axe")
+                p.harvest_tool(TREE_WORDS, "wood", WAYGATE_COST["wood"], maxd=60)
         if "stone" in miss:
             p.gather_hand(["Stone"], "stone", WAYGATE_COST["stone"], maxd=60)
         if "copper_ore" in miss:
@@ -819,9 +983,9 @@ def run(bot, out_dir, launcher=None, game=None, options: dict | None = None) -> 
         return ok
 
     # --------------------------------------------------------------------------------------- driver
-    steps = [("title_continue", title_continue), ("migration_checks", migration_checks)]
+    steps = [("title_continue", title_continue), (chk_step, migration_checks)]
     if not opt.get("no_migration_save"):
-        steps.append(("migration_save", migration_save))
+        steps.append((save_step, first_save_checks if native else migration_save))
     steps += [("wardrobe", wardrobe), ("equipment", equipment), ("ward_stone", ward_stone), ("materials", materials),
               ("waygate", waygate), ("travel_reach", travel_reach), ("commons_arch", commons_arch),
               ("festival_map", festival_map), ("lantern_road_home", lantern_road_home),
@@ -884,7 +1048,8 @@ def summarize_integrity(rep: dict) -> dict:
 
 def check_final_save(p: Seg, st: dict, res: dict):
     look = st.get("appearance") or {}
-    if look.get("hair") != NEW_HAIR[1] or look.get("hair_color") != NEW_HAIR_COLOR[1] or look.get("outfit") != NEW_OUTFIT[1]:
+    want = p.data.get("wardrobe_choices") or {"hair": NEW_HAIR[1], "hair_color": NEW_HAIR_COLOR[1], "outfit": NEW_OUTFIT[1]}
+    if look.get("hair") != want["hair"] or look.get("hair_color") != want["hair_color"] or look.get("outfit") != want["outfit"]:
         p.problem("final_save", f"saved look is not the wardrobe choice: {look}")
     pres = (st.get("wardrobe") or {}).get("presets") or []
     if not pres:

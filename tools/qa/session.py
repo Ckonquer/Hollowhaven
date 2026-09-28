@@ -34,11 +34,14 @@ from pathlib import Path
 
 from hhbot import Bot, GameWindow, Telemetry, VirtualInput
 try:
-    from fglock import FocusWatchdog, ForegroundLock
+    from fglock import FocusWatchdog, ForegroundLock, assert_on_second_monitor, second_monitor_rect
 except Exception:  # noqa: BLE001  (non-Windows)
-    FocusWatchdog = ForegroundLock = None
+    FocusWatchdog = ForegroundLock = assert_on_second_monitor = second_monitor_rect = None
 
-SECOND_MONITOR_RECT = "1920,0,1920,1080"
+# The first non-primary monitor from the LIVE layout, 8 px inside its edges (fglock.second_monitor_rect): a window
+# exactly the monitor's size at its origin sat on the owner's PRIMARY monitor for 30+ min on 2026-09-28.
+_SM = second_monitor_rect() if second_monitor_rect is not None else None
+SECOND_MONITOR_RECT = ",".join(str(v) for v in _SM) if _SM else "1928,8,1904,1064"
 SW_SHOWNOACTIVATE = 4
 ROOT = Path(__file__).resolve().parents[2]
 GAME_DIR = ROOT / "game"
@@ -306,6 +309,8 @@ class Session:
                 f"--save-dir={self.save_dir.as_posix()}", f"--settings-file={self.settings_file.as_posix()}",
                 f"--qa-input-port={port}", "--qa-no-focus", "--no-focus-pause"] + self._common_user_args()
         if rect is not None:
+            if assert_on_second_monitor is not None:
+                assert_on_second_monitor(rect)       # never open a QA window on the owner's primary monitor
             x, y, w, h = rect
             # The engine creates its first window on that rect (so nothing appears on the owner's monitor);
             # Settings.apply_video() then keeps it borderless there (--qa-window).
@@ -327,7 +332,9 @@ class Session:
         self.fg_lock = ForegroundLock().__enter__() if ForegroundLock is not None else None
         self.proc = subprocess.Popen([exe] + args, cwd=self.cwd, startupinfo=si)
         _proc = self.proc
-        self.fg_watch = FocusWatchdog(lambda: _proc.pid if _proc.poll() is None else 0).start() if FocusWatchdog is not None else None
+        # ...and moves the window back / kills the game if it ever lands on the owner's primary monitor.
+        self.fg_watch = FocusWatchdog(lambda: _proc.pid if _proc.poll() is None else 0,
+                                      target_rect=rect).start() if FocusWatchdog is not None else None
         tele = Telemetry(self.tele_path)
         log_path = self.out / f"{self.name}_bot.log"
         try:

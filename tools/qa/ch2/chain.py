@@ -28,6 +28,14 @@ where the route itself quits the game (S1's save / quit / relaunch + Continue, a
                                           the Lanternwake, free play.
   END  (this file)                        relaunch + Continue: the same save, chapter complete, the same items.
 
+Native start (--start-save <a COPY of a version-2 slot1.json the game wrote after New Game>, e.g. the fresh-game run's
+Chapter-One-ending save with Chapter Two already accepted at the Ward Stone - the path a first-time player takes):
+detected from the save itself (s1_continuation.save_kind: version 2 and stats.started_version 2.x; --native only
+asserts it). S1 then checks a plain load instead of the v1 migration (no pre_v2_backup, the saved look and
+started_version kept, no wardrobe notice, the Ward Stone's Chapter Two menu instead of the acceptance choice) and
+gathers what that journey lacks by play (waygate wood); the slot1.bak.json next to the start save is placed too
+(a real save folder has one). A version-1 start behaves exactly as before.
+
 The segment scripts were developed from diagnostic fixture starts; here they run from natural state. The
 adaptation lives in this file (segment modules untouched): the transitions T23 / T34 (see above), S3's backpack
 eating (its own eat() only uses hotbar food), a look calibration that also works on a 1080p second-monitor window
@@ -91,7 +99,7 @@ for _p in (str(HERE), str(QA_DIR)):
 import s1_common as C  # noqa: E402
 from hhbot import Telemetry, angle_diff  # noqa: E402
 from session import SECOND_MONITOR_RECT, parse_rect, prepare_qa_exe, port_free  # noqa: E402
-from fglock import FocusWatchdog, ForegroundLock  # noqa: E402  (never take the owner's focus)
+from fglock import FocusWatchdog, ForegroundLock, assert_on_second_monitor  # noqa: E402  (never take the owner's focus / primary monitor)
 
 GODOT_DIR = ROOT / ".tools" / "godot"
 CONSOLE_EXE = GODOT_DIR / "Godot_v4.7.2-stable_win64_console.exe"
@@ -177,37 +185,59 @@ class ChainBot(C.S1Bot):
     adapts its motion: one window pixel turns the camera ~4 degrees in the 64 px headless window but only ~0.13
     degrees in a 1920 px second-monitor window, so a fixed probe (S1Bot: 3 px) cannot measure the visible case."""
 
+    def _look_probe(self, amt: float):
+        """Moves the mouse `amt` window px to the right (in three parts) and returns the camera yaw change in degrees
+        (None when the telemetry had no yaw)."""
+        time.sleep(0.25)
+        y0 = self.cam_yaw()
+        if y0 is None:
+            time.sleep(0.3)
+            return None
+        for _k in range(3):
+            self.win.mouse_move(amt / 3.0, 0)
+            time.sleep(0.04)
+        time.sleep(0.4)
+        y1 = self.cam_yaw()
+        return None if y1 is None else angle_diff(y1, y0)
+
     def calibrate_look(self) -> float:
+        """Escalates a small probe until the turn is measurable, then VERIFIES the result with a probe sized for 20
+        degrees. A probe that does not turn the camera at all (right after waking from the bed the camera can hold
+        still for a moment) is repeated, not escalated: escalating then let one probe turn 290 degrees, which reads
+        as -70 through the angle wrap and inverted the steering (native chain run 2026-09-28, T23 home_rest)."""
         if not self.wait_state(lambda s: s.get("mode") == "playing" and not s.get("ui_stack"), 10.0):
             self.log("calibrate_look: not playing / a menu is open - calibration postponed")
             return self.px_per_deg
         amt = 3.0
         d = 0.0
-        for _ in range(7):
-            time.sleep(0.25)
-            y0 = self.cam_yaw()
-            if y0 is None:
-                time.sleep(0.3)
+        still = 0
+        for _ in range(12):
+            d = self._look_probe(amt)
+            if d is None:
                 continue
-            for _k in range(3):
-                self.win.mouse_move(amt / 3.0, 0)
-                time.sleep(0.04)
-            time.sleep(0.4)
-            y1 = self.cam_yaw()
-            if y1 is None:
+            if abs(d) < 0.05:
+                still += 1
+                self.log(f"calibrate_look: {amt:.2f} px did not turn the camera (#{still}); probing again")
+                time.sleep(0.5)
                 continue
-            d = angle_diff(y1, y0)
             if abs(d) < 3.0:
-                amt *= 5.0
+                amt *= min(5.0, 12.0 / abs(d))
                 continue
             if abs(d) > 150.0:
                 amt /= 4.0
                 continue
-            self.px_per_deg = amt / abs(d)
+            ppd = amt / abs(d)
+            v = self._look_probe(20.0 * ppd)
+            if v is None or not (10.0 <= abs(v) <= 30.0) or (v > 0) != (d > 0):
+                self.log(f"calibrate_look: {ppd:.4f} px/deg (motion {amt:.2f} px -> dyaw={d:.1f}) failed its check "
+                         f"(20-degree probe turned {v}); starting over")
+                amt = 3.0
+                continue
+            self.px_per_deg = ppd
             self.invert = -1.0 if d > 0 else 1.0
             self.calibrated = True
             break
-        self.log(f"calibrated look: {self.px_per_deg:.4f} px/deg (motion {amt:.2f} px -> dyaw={d:.1f}) "
+        self.log(f"calibrated look: {self.px_per_deg:.4f} px/deg (motion {amt:.2f} px -> dyaw={d if d is None else round(d, 1)}) "
                  f"invert={self.invert} ok={self.calibrated}")
         return self.px_per_deg
 
@@ -308,11 +338,14 @@ class ChainGame:
             # tools/qa/fglock.py: a fresh helper holds the foreground lock for the game's life, and a watchdog hands
             # the foreground straight back to the owner if the game ever gets it (the packaged build activates itself
             # ~0.6 s after launch otherwise - measured 2026-09-28).
+            assert_on_second_monitor(tuple(self.cfg.rect))     # never open it on the owner's primary monitor
             self.fg_lock = ForegroundLock().__enter__()
             self.proc = subprocess.Popen(self.cmd, cwd=str(ROOT), stdout=self._fh, stderr=subprocess.STDOUT,
                                          stdin=subprocess.DEVNULL, startupinfo=si)
             _proc = self.proc
-            self.fg_watch = FocusWatchdog(lambda: _proc.pid if _proc.poll() is None else 0).start()
+            # the watchdog also moves the window back / kills the game if it ever lands on the primary monitor
+            self.fg_watch = FocusWatchdog(lambda: _proc.pid if _proc.poll() is None else 0,
+                                          target_rect=tuple(self.cfg.rect)).start()
         tele = Telemetry(self.tele_path)
         try:
             self.vin = C.FloatVI(self.port, proc=self.proc, tele=tele, connect_timeout=connect_timeout)
@@ -566,6 +599,11 @@ class Chain:
         self.deadline = self.t0 + cfg.max_minutes * 60.0
         self._log_fh = open(self.out / "chain.log", "a", encoding="utf-8")
         self.start_save = cfg.start_save
+        self.start_kind = getattr(cfg, "start_kind", "v1")
+        self.titles = dict(TITLES)
+        if self.start_kind != "v1":
+            self.titles["S1"] = ("Chapter Two start from a version-2 save (load checks, wardrobe, Ward Stone menu, waygate, "
+                                 "Commons, relaunch)")
 
     # ------------------------------------------------------------------ plumbing
     @property
@@ -663,8 +701,8 @@ class Chain:
     # ------------------------------------------------------------------ segments
     def run_segment(self, seg: str, fn) -> bool:
         self.monitor.set_segment(seg)
-        self.log(f"################ {seg}: {TITLES[seg]} ################")
-        rec = {"id": seg, "title": TITLES[seg], "start": now(), "start_state": self.state_summary()}
+        self.log(f"################ {seg}: {self.titles[seg]} ################")
+        rec = {"id": seg, "title": self.titles[seg], "start": now(), "start_state": self.state_summary()}
         ev0 = len(self.monitor.events)
         shots0 = len(self.shots)
         pre, pre_w = self.collect_errors()      # lines logged before this segment (boot, between segments)
@@ -1144,7 +1182,8 @@ class Chain:
         self.monitor.start()
         try:
             self.save_dir.mkdir(parents=True, exist_ok=True)
-            bak = Path(self.start_save).with_name("slot1.bak.json") if cfg.from_seg != "S1" else None
+            # resumes, and native starts (a real v2 save folder has its .bak), also place the .bak next to the start save
+            bak = Path(self.start_save).with_name("slot1.bak.json") if (cfg.from_seg != "S1" or self.start_kind != "v1") else None
             C.prepare_saves(self.save_dir, Path(self.start_save), bak)
             self.launch()
             if cfg.from_seg != "S1":
@@ -1199,8 +1238,9 @@ class Chain:
         res = {
             "chain": "Chapter Two natural route (MP 20.4 Run A): S1 -> S2 -> T23 -> S3 -> T34 -> S4 -> relaunch",
             "status": status,
-            "natural": cfg.from_seg == "S1" and Path(self.start_save).name == FIXTURE_NAME,
+            "natural": cfg.from_seg == "S1" and (Path(self.start_save).name == FIXTURE_NAME or self.start_kind == "native_v2"),
             "start_save": str(self.start_save),
+            "start_kind": self.start_kind,
             "resumed_from": None if cfg.from_seg == "S1" else cfg.from_seg,
             "mode": {"headless": cfg.headless, "packaged_exe": str(cfg.exe) if cfg.exe else None, "project": str(cfg.project),
                      "godot": str(cfg.godot or (CONSOLE_EXE if cfg.headless else EDITOR_EXE)), "muted": cfg.mute,
@@ -1250,7 +1290,10 @@ def main(argv=None) -> int:
     ap.add_argument("--max-minutes", type=float, default=80.0, help="bound for the whole chain and each game process")
     ap.add_argument("--mute", action="store_true", help="--qa-mute (visible runs keep the sound on by default)")
     ap.add_argument("--qa-window", default=SECOND_MONITOR_RECT, help="visible: x,y,w,h of the game window")
-    ap.add_argument("--start-save", default="", help="diagnostic resume: a save folder or slot1.json the game wrote")
+    ap.add_argument("--start-save", default="", help="diagnostic resume: a save folder or slot1.json the game wrote; with "
+                    "--from S1: the start save (default the v1 fixture; a COPY of a New-Game v2 save = native start)")
+    ap.add_argument("--native", action="store_true",
+                    help="assert that the start save is a native version-2 (New Game, started_version 2.x) save")
     ap.add_argument("--from", dest="from_seg", default="S1", choices=SEGMENTS)
     ap.add_argument("--until", default="", choices=[""] + SEGMENTS)
     ap.add_argument("--dry-run", action="store_true", help="print the game launch command for these options and exit")
@@ -1258,6 +1301,11 @@ def main(argv=None) -> int:
     headless = not a.visible
     out = Path(a.out) if a.out else ROOT / "qa" / "tmp" / "bot" / "chain" / time.strftime("run_%Y%m%d_%H%M%S")
     out = out.resolve()
+    if a.start_save:
+        # --out is wiped below: never let that delete the start save (a native start is a user-supplied COPY)
+        _ss = Path(a.start_save).resolve()
+        if _ss == out or out in _ss.parents:
+            ap.error(f"--start-save {_ss} is inside --out {out}, which is wiped at start: copy the save elsewhere first")
     if not a.dry_run:
         if out.exists():
             shutil.rmtree(out)          # a run folder is always fresh (only ever point --out at a QA folder)
@@ -1272,21 +1320,29 @@ def main(argv=None) -> int:
         start_save = Path(a.start_save) if a.start_save else project / "tests" / "fixtures" / "saves" / FIXTURE_NAME
     if not start_save.exists():
         ap.error(f"start save {start_save} not found")
+    import s1_continuation as S1
+    try:
+        start_kind = S1.save_kind(json.loads(start_save.read_text(encoding="utf-8")))
+    except (OSError, ValueError) as e:
+        ap.error(f"start save {start_save} is not readable JSON: {e}")
+    if a.native and start_kind != "native_v2":
+        ap.error(f"--native: {start_save} is a {start_kind!r} save, not a native version-2 (New Game, 2.x) save")
     exe = Path(a.exe).resolve() if a.exe else None
     if exe is not None and not exe.exists():
         ap.error(f"packaged build {exe} not found")
     cfg = SimpleNamespace(out=out, headless=headless, exe=exe, project=project, godot=Path(a.godot) if a.godot else None,
                           port=a.port, seed=a.seed, max_minutes=a.max_minutes, mute=a.mute,
                           rect=parse_rect(a.qa_window), start_save=start_save.resolve(), from_seg=a.from_seg, until=a.until,
-                          dry_run=a.dry_run)
+                          dry_run=a.dry_run, start_kind=start_kind)
     if a.dry_run:
         g = ChainGame(cfg, 1, out / "saves", a.port)
         print(json.dumps({"mode": "headless" if headless else f"visible at {cfg.rect}, sound {'off' if a.mute else 'on'}",
                           "build": str(exe) if exe else f"source {project}", "start_save": str(start_save),
-                          "cmd": g.command()}, indent=1))
+                          "start_kind": start_kind, "cmd": g.command()}, indent=1))
         return 0
     ch = Chain(cfg)
-    ch.log(f"out={out} headless={headless} exe={exe} project={project} start_save={start_save} from={a.from_seg} until={a.until}")
+    ch.log(f"out={out} headless={headless} exe={exe} project={project} start_save={start_save} ({start_kind}) "
+           f"from={a.from_seg} until={a.until}")
     status = ch.run()
     res = json.loads((out / "chain_result.json").read_text(encoding="utf-8"))
     print(f"\n{'seg':4} {'ok':5} {'seconds':>8} {'deaths':>6} {'hp min':>6} {'errors':>6} {'cues':>5} {'shots':>5}  hp/food at the end")
