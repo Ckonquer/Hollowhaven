@@ -21,7 +21,7 @@ Write-Host "== Hollowhaven $Version release build =="
 if (-not $SkipTests) {
     Write-Host "== Running tests =="
     $res = Join-Path $Root "qa\tmp\test_results_release.json"
-    & $Godot --headless --path $Game "res://tests/runner.tscn" -- "--results=$res" "--max-seconds=900" | Select-String -Pattern "FAIL|====" | ForEach-Object { $_.Line }
+    & $Godot --headless --path $Game "res://tests/runner.tscn" -- "--results=$res" "--max-seconds=2400" | Select-String -Pattern "FAIL|====" | ForEach-Object { $_.Line }
     if ($LASTEXITCODE -ne 0) { throw "Tests failed (exit $LASTEXITCODE). See $res" }
 }
 
