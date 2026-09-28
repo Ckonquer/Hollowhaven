@@ -89,7 +89,7 @@ const HINTS := {
 	"ob_storage": {"where": "",
 		"text": "Backpack full: the rest waits safely on the ground. The Loom sews a bigger backpack, and a storage chest can grow to 40 slots from its own menu."},
 	"ob_furnace": {"where": "",
-		"text": "Ore can become bars now: build a Furnace at the Workbench and queue a few batches. They keep smelting while you play."},
+		"text": "Ore can become bars: build a Furnace at the Workbench and queue a few batches. They keep smelting while you play."},
 	"ob_loom": {"where": "",
 		"text": "Your Loom also sews bigger backpacks (40, then 48 slots) and mixes dyes: new colours for clothes in the Wardrobe and for furniture in build mode."},
 	"ob_recolour": {"where": "",
@@ -101,7 +101,7 @@ const HINTS := {
 	"ob_crops": {"where": "",
 		"text": "Pumpkin seeds grow in a Crop Plot or Sturdy Planter, just like sweetroot. Pumpkins take the longest, and every harvest gives seeds back."},
 	"ob_companion_menu": {"where": "",
-		"text": "Press {interact} on a friend for their menu: Assist or Stay close in fights, their skill, a home spot and more. {companion} still asks them to follow or wait."},
+		"text": "Press {interact} on a friend for their menu: Assist or Stay close in fights, their skill, a home spot and more. {companion} asks them to follow or wait."},
 	"ob_mastery": {"where": "",
 		"text": "A mastery grew! Gathering, hearthcraft and wayfinding rise with ordinary play and bring small bonuses. See them in your Journal ({journal}) > Mastery."},
 	"ob_chest_crafting": {"where": "",
@@ -326,7 +326,8 @@ func hint_text(id: String) -> String:
 
 ## The companion support hint, worded for the two companion settings (Settings > Gameplay).
 static func companion_skill_text(auto_attack: bool, autocast: bool) -> String:
-	var lead := "Friends now help in fights" if auto_attack else "Friends now support you"
+	# No "now": new journeys see this shortly after befriending their first friend, so it must not read as an update note.
+	var lead := "Your friends help in fights" if auto_attack else "Your friends support you"
 	var use := "They use it when it helps, or press {skill} yourself." if autocast else "Press {skill} to use it."
 	return "%s, and each has a special skill: Mochi heals, Pebble shields, Lumi quickens your step. %s The ring round their portrait shows when it's ready." % [lead, use]
 

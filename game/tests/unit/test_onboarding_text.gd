@@ -1,8 +1,10 @@
 extends "res://tests/test_case.gd"
-## Module D4: the onboarding hint texts and the player update note. Every {token} resolves through the HUD's token
+## Module D4: the onboarding hint texts and the player doc. Every {token} resolves through the HUD's token
 ## system to a real key, nothing is left unformatted, the table and its priority list agree, texts stay short and
-## arachnophobia-neutral, and the keys the player docs name are the keys the game really binds (pass 2: the wardrobe
-## key O and the rebindable build keys Z / P / N, D02 / D03), and the places / features the note names exist.
+## arachnophobia-neutral, and the keys the player doc names are the keys the game really binds (pass 2: the wardrobe
+## key O and the rebindable build keys Z / P / N, D02 / D03), and the menus / options / features it names exist.
+## 2.0.3 (the gift build, a first-time player): the returning-player update note "Chapter Two - What's New.txt" is
+## gone; "How to Play.txt" is the one player doc (written for New Game) and its checks moved here.
 
 const Onboarding := preload("res://src/world/story_ch2/onboarding_hints.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
@@ -14,8 +16,19 @@ const ExpeditionData := preload("res://data/expeditions.gd")
 
 const MAX_LEN := 240
 const SPIDER_WORDS := ["spider", "web", "silk", "weaver", "brood", "skitter", "arachn", "leg"]
-const NOTE := "docs/player/Chapter Two - What's New.txt"
 const HOW_TO := "docs/player/How to Play.txt"
+## The 2.x returning-player update note: no longer shipped, and removed from docs/player/ (2.0.3).
+const OLD_NOTE := "docs/player/Chapter Two - What's New.txt"
+const MAX_DOC_COLUMNS := 100       # reads well in Notepad without wrapping
+const MAX_DOC_LINES := 170
+## Wording that only makes sense to someone who played an earlier version (lower case).
+const RETURNING_PLAYER_WORDS := ["what's new", "not new game", "pre_v2_backup", "already played", "update note",
+	"older version", "new version", "this version", "welcome back", "since you last", "still there", "used to"]
+const PausePanel := preload("res://src/ui/panels/pause_panel.gd")
+const Schema := preload("res://src/ui/settings_schema.gd")
+const Tracker := preload("res://src/ui/hud/tracker.gd")
+const WardStone := preload("res://src/world/surface/ward_stone.gd")
+const HorrorData := preload("res://data/horror_events.gd")
 
 var ob: Node = null
 var _settings := {}
@@ -121,7 +134,8 @@ func test_build_keys_come_from_build_mode_or_a_token() -> void:
 func test_companion_text_follows_the_companion_settings() -> void:
 	assert_true(Onboarding.companion_skill_text(true, true).contains("They use it when it helps"), "autocast on")
 	assert_true(Onboarding.companion_skill_text(true, false).contains("Press {skill} to use it"), "autocast off")
-	assert_true(Onboarding.companion_skill_text(false, true).begins_with("Friends now support you"), "auto attack off")
+	assert_true(Onboarding.companion_skill_text(false, true).begins_with("Your friends support you"), "auto attack off")
+	assert_true(Onboarding.companion_skill_text(true, true).begins_with("Your friends help in fights"), "auto attack on")
 	Settings.values["companion_autocast"] = false
 	assert_true(String(ob.hint_text("ob_companion_skill")).contains("Press {skill} to use it"), "reads the live setting")
 
@@ -142,18 +156,103 @@ func _primary_key(action: String) -> int:
 	return s.substr(4).to_int() if s.begins_with("key:") else -1
 
 
-func test_update_note_exists_is_short_and_says_continue() -> void:
-	var note := _read_repo_file(NOTE)
-	assert_true(note != "", "the update note exists: " + NOTE)
-	if note == "":
+func _read_res(path: String) -> String:
+	var f := FileAccess.open(path, FileAccess.READ)
+	return f.get_as_text() if f != null else ""
+
+
+## The doc with every run of whitespace (line breaks and indents included) collapsed to one space, so a phrase the
+## doc wraps over two lines still matches.
+func _flat(text: String) -> String:
+	var re := RegEx.create_from_string("\\s+")
+	return re.sub(text, " ", true)
+
+
+func _re_escape(s: String) -> String:
+	var out := ""
+	for i in s.length():
+		var c := s[i]
+		out += ("\\" + c) if "\\.+*?()[]{}|^$/".contains(c) else c
+	return out
+
+
+## True when the doc lists `label` with dot leaders and then `key` ("Jump ....... Space").
+func _lists(doc: String, label: String, key: String) -> bool:
+	return RegEx.create_from_string(_re_escape(label) + " \\.{2,} " + _re_escape(key)).search(doc) != null
+
+
+## [label in How to Play's CONTROLS table, the key text it gives, action, the default bindings that text describes]
+const DOC_CONTROLS := [
+	["Move", "W A S D (or arrows)", "move_forward", ["key:%d" % KEY_W, "key:%d" % KEY_UP]],
+	["Jump", "Space", "jump", ["key:%d" % KEY_SPACE]],
+	["Sprint", "Shift (hold)", "sprint", ["key:%d" % KEY_SHIFT]],
+	["Dodge roll", "Ctrl (or V)", "dodge", ["key:%d" % KEY_CTRL, "key:%d" % KEY_V]],
+	["Camera zoom", "Mouse wheel", "zoom_in", ["mouse:%d" % MOUSE_BUTTON_WHEEL_UP]],
+	["Attack / chop / mine", "Left mouse", "attack", ["mouse:%d" % MOUSE_BUTTON_LEFT]],
+	["Eat / use item", "Right mouse (or Q)", "use_item", ["mouse:%d" % MOUSE_BUTTON_RIGHT, "key:%d" % KEY_Q]],
+	["Interact / pick up", "E", "interact", ["key:%d" % KEY_E]],
+	["Raise lantern", "F", "lantern", ["key:%d" % KEY_F]],
+	["Backpack", "Tab (or I)", "inventory", ["key:%d" % KEY_TAB, "key:%d" % KEY_I]],
+	["Crafting", "C", "craft", ["key:%d" % KEY_C]],
+	["Build mode", "B", "build", ["key:%d" % KEY_B]],
+	["Wardrobe", "O", "wardrobe", ["key:%d" % KEY_O]],
+	["Journal", "J", "journal", ["key:%d" % KEY_J]],
+	["Map", "M", "map", ["key:%d" % KEY_M]],
+	["Companion follow / wait", "G", "companion_command", ["key:%d" % KEY_G]],
+	["Companion skill", "T", "companion_skill", ["key:%d" % KEY_T]],
+	["Talk to a friend", "E", "interact", ["key:%d" % KEY_E]],
+	["Hotbar slot", "1 - 8", "hotbar_1", ["key:%d" % KEY_1]],
+	["Pause menu", "Esc", "pause", ["key:%d" % KEY_ESCAPE]],
+	["All controls", "F1", "help", ["key:%d" % KEY_F1]],
+	["Screenshot", "F12", "screenshot", ["key:%d" % KEY_F12]],
+]
+## Build mode rows: [key text, what the doc says it does, action, default key].
+const DOC_BUILD_KEYS := [
+	["R", "rotate", "build_rotate", KEY_R],
+	["X", "take a piece down", "build_dismantle", KEY_X],
+	["Z", "undo your last piece (press twice)", "build_undo", KEY_Z],
+	["P", "recolour a piece with dyes from the Loom", "build_recolor", KEY_P],
+	["N", "choose a carved pumpkin's face", "build_variant", KEY_N],
+]
+
+
+## 2.0.3: the one player doc is for someone who has never played - New Game first, Continue later - and nothing in
+## it speaks to a returning player. Short, plain ASCII, <= MAX_DOC_COLUMNS wide for Notepad.
+func test_how_to_play_is_written_for_a_first_time_player() -> void:
+	var how := _read_repo_file(HOW_TO)
+	assert_true(how != "", "the player doc exists: " + HOW_TO)
+	if how == "":
 		return
-	var lines := note.split("\n").size()
-	assert_true(lines <= 130, "one to two pages (%d lines)" % lines)
-	assert_true(note.contains("Continue"), "tells her to press Continue")
-	assert_true(note.contains("New Game"), "and not New Game")
-	assert_true(note.contains("For Krystal, from Ali") or note.contains("from Ali"), "keeps the dedication")
-	for w in ["spider", "Weaver"]:
-		assert_false(note.contains(String(w)), "the note stays arachnophobia-neutral (%s)" % w)
+	var lines := how.split("\n")
+	assert_true(lines.size() <= MAX_DOC_LINES, "a short read (%d lines)" % lines.size())
+	for i in lines.size():
+		var l := String(lines[i]).trim_suffix("\r")
+		assert_true(l.length() <= MAX_DOC_COLUMNS, "line %d fits Notepad (%d columns)" % [i + 1, l.length()])
+	var odd := -1
+	for i in how.length():
+		var c := how.unicode_at(i)
+		if c > 126 or (c < 32 and c != 10 and c != 13):
+			odd = i
+			break
+	assert_eq(odd, -1, "plain ASCII text (no tabs, no fancy quotes or arrows)")
+	var new_game := how.find("\"New Game\"")
+	assert_true(new_game >= 0, "tells her to choose New Game")
+	assert_true(new_game < how.find("\"Continue\""), "New Game first; Continue is what appears afterwards")
+	var low := how.to_lower()
+	for w in RETURNING_PLAYER_WORDS:
+		assert_false(low.contains(String(w)), "nothing for a returning player ('%s')" % w)
+	assert_true(how.contains("for Krystal"), "keeps the dedication")
+	assert_false(how.contains("Weaver"), "no boss names (spoiler-light, arachnophobia-neutral)")
+	# "spider" appears only where the Arachnophobia mode option is explained.
+	var a := how.find("Arachnophobia mode:")
+	var b := how.find("\n  -", a)
+	assert_true(a >= 0 and b > a, "the Arachnophobia mode option is explained")
+	var at := low.find("spider")
+	while at >= 0:
+		assert_true(at > a and at < b, "'spider' only inside the Arachnophobia mode explanation (at %d)" % at)
+		at = low.find("spider", at + 1)
+	var old := ProjectSettings.globalize_path("res://").path_join("..").path_join(OLD_NOTE).simplify_path()
+	assert_false(FileAccess.file_exists(old), "the returning-player update note is gone from docs/player/")
 
 
 func test_docs_name_the_real_default_keys() -> void:
@@ -176,22 +275,30 @@ func test_docs_name_the_real_default_keys() -> void:
 		if Settings.DEFAULT_BINDINGS.has(action):
 			assert_eq(_primary_key(action), int(pair[1]), "%s default key" % action)
 		assert_true(_rebindable(action), "%s can be changed in Settings > Controls (the docs say so)" % action)
-	var note := _read_repo_file(NOTE)
 	var how := _read_repo_file(HOW_TO)
-	assert_true(note != "" and how != "", "both player docs exist")
-	if note != "":
-		assert_true(note.contains("press T (companion skill)"), "the note: T for the companion skill")
-		assert_true(note.contains("Press E on a friend") and note.contains("G still asks them"), "the note: E menu, G follow / wait")
-		assert_true(note.contains("Z takes back") and note.contains("P recolours") and note.contains("N picks"), "the note: build keys")
-		assert_true(note.contains("can be changed in Settings > Controls"), "the note: the build keys are rebindable")
-		assert_false(note.contains("can't be changed"), "the note no longer says the build keys are fixed")
-		assert_true(note.contains("press O (the Wardrobe key)"), "the note: O opens the wardrobe")
-		assert_true(note.contains("8 wood") and note.contains("4 stone") and note.contains("2 copper ore"), "the note: waygate cost")
+	assert_true(how != "", "the player doc exists")
 	if how != "":
-		assert_true(how.contains("Companion skill . T"), "How to Play lists T")
-		assert_true(how.contains("Z undo") and how.contains("P recolour") and how.contains("N pumpkin face"), "How to Play lists the build keys")
-		assert_true(how.contains("Wardrobe ................. O"), "How to Play lists the wardrobe key O")
-	# The waygate cost the note quotes is the real one.
+		var flat := _flat(how)
+		# Every row of the CONTROLS table names the game's real default binding(s).
+		for row in DOC_CONTROLS:
+			var act := String(row[2])
+			assert_true(_lists(how, String(row[0]), String(row[1])), "How to Play lists %s ..... %s" % [row[0], row[1]])
+			assert_true(Settings.DEFAULT_BINDINGS.has(act), "%s is a real action" % act)
+			if Settings.DEFAULT_BINDINGS.has(act):
+				var binds: Array = Settings.DEFAULT_BINDINGS[act]
+				for i in (row[3] as Array).size():
+					assert_true(i < binds.size() and String(binds[i]) == String(row[3][i]), "%s default binding %d is %s (%s)" % [act, i, row[3][i], str(binds)])
+		assert_eq(String(Settings.DEFAULT_BINDINGS["hotbar_8"][0]), "key:%d" % KEY_8, "hotbar slots run 1 - 8")
+		for row in DOC_BUILD_KEYS:
+			assert_true(_lists(how, String(row[0]), String(row[1])), "How to Play's build keys: %s ... %s" % [row[0], row[1]])
+			assert_eq(_primary_key(String(row[2])), int(row[3]), "%s default key" % row[2])
+		assert_true(_lists(how, "Left mouse", "place a piece") and _primary_key("attack") == -1, "build mode places with the attack button")
+		assert_true(flat.contains("most keys can be changed in Settings > Controls"), "How to Play: most keys are rebindable")
+		assert_false(how.contains("can't be changed"), "never says the build keys are fixed")
+		assert_true(flat.contains("press T") and flat.contains("Press E on a friend") and flat.contains("G asks it to wait"),
+			"FRIENDS: T for the skill, E for the menu, G to wait / follow")
+		assert_true(flat.contains("Press O (or Pause > Wardrobe)"), "THE WARDROBE: O opens it")
+	# The waygate cost 2.0.x players were told (the quest hint names the same three materials) is the real one.
 	assert_eq(str(Waygate.REPAIR_COST), str([["wood", 8], ["stone", 4], ["copper_ore", 2]]), "waygate repair cost")
 
 
@@ -202,27 +309,87 @@ func _rebindable(action: String) -> bool:
 	return false
 
 
-## Pass 2 (P49): the places and features the update note names are the ones the game has - an echo stone at every
-## trial's origin, the three expedition routes by name, the Expedition Board and the Music Box.
-func test_update_note_names_what_the_game_has() -> void:
-	var note := _read_repo_file(NOTE)
-	if note == "":
-		assert_true(false, "the update note exists")
+## The menus, buttons, options and places How to Play names are the ones the game has (2.0.3; it replaces the
+## pass-2 P49 check of the update note, which named the echo stones, routes, Expedition Board and Music Box).
+func test_how_to_play_names_what_the_game_has() -> void:
+	var how := _read_repo_file(HOW_TO)
+	if how == "":
+		assert_true(false, "the player doc exists")
 		return
-	var place_words := {"below": "Heartseed Chamber", "moonveil_manor": "manor ballroom", "hushed_works": "Bell Throat"}
+	var flat := _flat(how)
+	# Title -> "Before You Begin" -> "Meet Krystal": the buttons a first-time player clicks through, then Continue.
+	var src := {
+		"res://src/ui/title_screen.gd": ["_menu_button(\"New Game\"", "_menu_button(\"Continue\"", "_menu_button(\"Settings\""],
+		"res://src/ui/screens/comfort_screen.gd": ["\"Before You Begin\"", "\"Begin the journey\"", "\"Comfort & Accessibility\""],
+		"res://src/ui/screens/creation_screen.gd": ["title = \"Meet Krystal\"", "Kit.button(\"Confirm\""],
+		"res://src/ui/panels/pause_panel.gd": ["\"Save Game\"", "Kit.button(\"Wardrobe\"", "\"Comfort & Accessibility\"",
+			"\"Quit to Title\"", "\"Quit Game\"", "\"Save & Quit\""],
+		"res://src/ui/panels/settings_panel.gd": ["\"Show tips again\""],
+		"res://src/ui/panels/wardrobe_panel.gd": ["\"Show equipped armor\"", "section_title(\"Saved looks\")"],
+		"res://src/ui/panels/crafting_panel.gd": ["\"Also use nearby chests\""],
+		"res://src/ui/panels/inventory_panel.gd": ["section_title(\"Equipped\")"],
+		"res://src/ui/panels/journal_panel.gd": ["name = \"Optional\""],
+		"res://src/world/surface/mine_entrance.gd": ["show_comfort"],
+		"res://autoload/debug.gd": ["\"user://screenshots\""],
+	}
+	for path in src:
+		var text := _read_res(String(path))
+		assert_true(text != "", "%s readable" % path)
+		for needle in src[path]:
+			assert_true(text.contains(String(needle)), "%s has %s" % [path, needle])
+	for label in ["\"New Game\"", "\"Continue\"", "\"Before You Begin\"", "\"Begin the journey\"", "\"Meet Krystal\"",
+			"\"Confirm\"", "Save Game", "Pause > Wardrobe", "Comfort & Accessibility", "\"Quit to Title\"", "\"Quit Game\"",
+			"\"Save & Quit\"", "\"Show tips again\"", "\"Show equipped armor\"", "Three \"Saved looks\"", "\"Also use nearby chests\"",
+			"Equipped column", "Journal > Optional", "down into the old mine"]:
+		assert_true(flat.contains(String(label)), "How to Play names %s" % label)
+	assert_eq(ItemDB.preset_slots(), 3, "three saved-look slots")
+	# Getting unstuck: the pause menu's option in every kind of place.
+	for area in ["surface", "below", "hallowmere_reach", "echo_trial"]:
+		assert_true(flat.contains("\"%s\"" % PausePanel.unstuck_label(area)), "How to Play names \"%s\"" % PausePanel.unstuck_label(area))
+	# Chapter Two begins at the Ward Stone: the goal card's words and the two choices.
+	assert_true(flat.contains("\"%s\"" % Tracker.POINTER_TITLE), "the goal card's pointer: %s" % Tracker.POINTER_TITLE)
+	assert_true(flat.contains("\"%s\"" % String(WardStone.CHOICE_FOLLOW[1])) and flat.contains("\"%s\"" % String(WardStone.CHOICE_STAY[1])),
+		"the Ward Stone's two choices")
+	assert_true(flat.contains("The Lanterns of Hallowmere"), "Chapter Two's name")
+	# Settings: the tabs and every option the doc names, on the tab it names.
+	for t in Schema.TABS:
+		assert_true(flat.contains("Settings > " + String(t[1])), "How to Play names Settings > %s" % t[1])
+	var rows := {"video": ["quality", "render_scale", "max_fps", "fullscreen"],
+		"gameplay": ["show_hints", "companion_auto_attack", "companion_autocast", "seasonal_decor"],
+		"comfort": ["horror_intensity", "arachnophobia", "reduce_shake", "reduce_flashing", "captions", "high_visibility_cues", "timing_assist"]}
+	for tab in rows:
+		for key in rows[tab]:
+			var r: Dictionary = Schema.row(String(key))
+			assert_eq(String(r.get("tab", "")), String(tab), "%s is on the %s tab" % [key, tab])
+			assert_true(flat.contains(String(r.get("label", "?"))), "How to Play names %s" % r.get("label", key))
+	assert_false(bool(Settings.DEFAULTS["seasonal_decor"]), "Seasonal decorations starts off (as the doc says)")
+	for level in [0, 1, 2]:
+		assert_true(flat.contains(String(HorrorData.INTENSITY[level]["name"])), "horror intensity %s" % HorrorData.INTENSITY[level]["name"])
+	assert_true(String(HorrorData.INTENSITY[0]["desc"]).contains("no ambushes") and flat.contains("no ambushes"), "Gentle: no ambushes")
+	# Places and things.
+	for sid in ["workbench", "crop_plot", "wardrobe", "vanity_mirror"]:
+		assert_true(flat.contains(String(ItemDB.structure(sid).get("name", "?"))), "How to Play names the %s" % sid)
+	for sid in ["wardrobe", "vanity_mirror"]:
+		assert_eq(String(ItemDB.recipe(sid).get("station", "")), "workbench", "%s is built at the Workbench (as the doc says)" % sid)
+	assert_true(String(ItemDB.structure("loom").get("name", "")).begins_with("Loom"), "the Loom")
+	assert_true(flat.contains("echo stone"), "echo stones")
 	for id in TrialsData.ORDER:
-		var origin: Dictionary = TrialsData.trial(String(id)).get("origin", {})
-		var area := String(origin.get("area", ""))
-		assert_true(place_words.has(area), "trial %s: the note has words for its origin (%s)" % [id, area])
-		if place_words.has(area):
-			assert_true(note.contains(String(place_words[area])), "the note names the %s echo stone (%s)" % [id, place_words[area]])
-	for tid in ExpeditionData.TEMPLATES:
-		var t: Dictionary = ExpeditionData.TEMPLATES[tid]
-		assert_true(note.contains(String(t.get("name", "?"))), "the note names the route %s" % String(t.get("name", tid)))
-	assert_eq(ExpeditionData.TEMPLATES.size(), 3, "three hand-made routes (the note and the hint say three)")
+		var t2: Dictionary = TrialsData.trial(String(id))
+		assert_true(String((t2.get("origin", {}) as Dictionary).get("area", "")) != "", "trial %s has an echo stone somewhere" % id)
+		assert_true(String(t2.get("requires_flag", "")) != "", "trial %s opens once its fight is won" % id)
+	# Saving and where saves live.
+	assert_true(Game.AUTOSAVE_SECONDS <= 600.0, "the quiet autosave: every few minutes")
+	assert_true(Game.SAFE_SAVE_AREAS.has("surface") and Game.SAFE_SAVE_AREAS.has("hallowmere_reach"), "the woods and the Reach save freely")
+	assert_true(Game.SAVE_REFUSALS.has("below"), "below the old mine it is the lanterns")
+	var cfg := ConfigFile.new()
+	assert_eq(cfg.load("res://project.godot"), OK, "res://project.godot readable")
+	assert_true(bool(cfg.get_value("application", "config/use_custom_user_dir", false)), "user:// is %APPDATA%\\<name>")
+	assert_eq(String(cfg.get_value("application", "config/custom_user_dir_name", "")), "Hollowhaven", "... named Hollowhaven")
+	assert_eq(SaveSystem.DEFAULT_DIR, "user://saves", "saves in user://saves")
+	assert_true(how.contains("%APPDATA%\\Hollowhaven\\saves") and how.contains("%APPDATA%\\Hollowhaven\\screenshots"), "the doc's paths")
+	# The onboarding hints still introduce the post-story Workbench recipes (the doc only says "a few new things").
+	assert_eq(ExpeditionData.TEMPLATES.size(), 3, "three hand-made routes (the hint says three)")
 	for sid in ["expedition_board", "music_box"]:
-		var st: Dictionary = ItemDB.structure(sid)
-		assert_false(st.is_empty(), "%s exists" % sid)
-		assert_true(note.contains(String(st.get("name", "?"))), "the note names the %s" % String(st.get("name", sid)))
-		assert_eq(String(ItemDB.recipe(sid).get("station", "")), "workbench", "%s is a Workbench recipe (as the note says)" % sid)
+		assert_false(ItemDB.structure(sid).is_empty(), "%s exists" % sid)
+		assert_eq(String(ItemDB.recipe(sid).get("station", "")), "workbench", "%s is a Workbench recipe" % sid)
 	assert_true(String(ob.hint_text("ob_expedition_board")).contains("three hand-made routes"), "the board hint names the routes")

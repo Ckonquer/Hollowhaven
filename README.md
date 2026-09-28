@@ -9,24 +9,25 @@ Chapter Two has been tested by automated tests, a test bot with virtual input (h
 on a second monitor) and screenshots, but not yet played by a person or listened to - see `KNOWN_ISSUES.md`.
 
 ## Just want to play?
-1. Open `dist/` and extract **`Hollowhaven-2.0.2-Windows.zip`** anywhere (e.g. your Desktop).
-   SHA-256 `2F77F52F219F5452E4140FD95DA25895C94E7C59E7A20231143ED564E4907FA8` (also in `dist/SHA256SUMS.txt`).
-   Older zips (in `builds/superseded/`, incl. 2.0.0 and 2.0.1) are superseded builds.
-2. Open the extracted `Hollowhaven` folder and **double-click `Hollowhaven.exe`**.
-3. If Windows SmartScreen says "Windows protected your PC", click **More info → Run anyway**
+1. Run the installer **`dist/Hollowhaven-Setup-2.0.3.exe`** (built by `tools/build_installer.ps1` after
+   `tools/build_release.ps1`; SHA-256 in `dist/SHA256SUMS.txt`). It adds **Hollowhaven** and **How to Play** to the
+   Start menu and, unless you untick the box, a Desktop shortcut.
+2. If Windows SmartScreen says "Windows protected your PC", click **More info → Run anyway**
    (the game isn't code-signed; this is normal for a homemade game).
+3. Start Hollowhaven and choose **New Game**: the comfort options ("Before You Begin"), then "Meet Krystal" (her look),
+   then Chapter One. The journey is saved straight away, and from then on **Continue** on the title screen carries on
+   where she left off. Chapter Two begins at the Ward Stone in the Haven after the Chapter One ending
+   ("Follow the lantern road"), in the same save.
 
-No installation, accounts, internet or game engine needed. Saves live in `%APPDATA%\Hollowhaven\saves`.
-Controls and comfort settings: see `How to Play.txt` next to the game (or press **F1** in game).
+No accounts, internet or game engine needed. Saves live in `%APPDATA%\Hollowhaven\saves`; uninstalling (Windows
+Settings > Apps) keeps them. Controls, saving, companions, building, the wardrobe and the comfort settings (e.g.
+arachnophobia mode): **`How to Play.txt`** (Start menu > How to Play, or next to `Hollowhaven.exe`; source copy:
+`docs/player/`), or press **F1** in game for every key.
 
-**Already played Chapter One? Press Continue, not New Game.** Continue opens the same house, friends and
-story (New Game would start a new world). The update note is **`Chapter Two - What's New.txt`**, next to
-`Hollowhaven.exe` in the extracted folder (source copy: `docs/player/`). The first Continue in a 2.0.x build
-keeps an untouched copy of the Chapter One save in `%APPDATA%\Hollowhaven\saves\pre_v2_backup\` - don't
-delete it. An older build cannot open the new save; to go back to Chapter One (v0.9.1: the zip in
-`builds/superseded/` or the archived copy in `C:\Users\Ali\Desktop\Hollowhaven_Backups\pre_chapter2_v0.9.1_2026-09-27\build\`,
-same SHA-256) follow `docs/ch2/SAVE_INTEGRITY_REPORT.md` §8 (also `docs/SAVE_MIGRATION.md` §8). Short handoff:
-`docs/ch2/HANDOFF_2.0.2.md`.
+No installer wanted? `dist/Hollowhaven-2.0.3-Windows.zip` is the same game: extract it anywhere and double-click
+`Hollowhaven.exe` in the extracted `Hollowhaven` folder (same saves folder; SmartScreen may ask once, as above).
+Older zips and installers in `builds/superseded/` are superseded builds. Carrying a pre-2.0 (Chapter One v0.9.x) save
+forward, or going back to it, is a developer topic: `docs/ch2/SAVE_INTEGRITY_REPORT.md` §8 (also `docs/SAVE_MIGRATION.md` §8).
 
 ## What's in this folder
 | Path | What it is |
@@ -36,7 +37,7 @@ same SHA-256) follow `docs/ch2/SAVE_INTEGRITY_REPORT.md` §8 (also `docs/SAVE_MI
 | `game/` | Editable Godot 4.7.2 project (source code, shaders, data, audio) |
 | `tools/` | Build, test, toolchain and asset-generation scripts |
 | `docs/` | Architecture contract, Chapter Two contract (`CHAPTER_TWO_SPEC.md`), save migration, install log, Chapter Two build records, the 2.0.2 handoff (`docs/ch2/HANDOFF_2.0.2.md`; the earlier `HANDOFF_2.0.1.md`, `HANDOFF_2.0.0.md`), save-integrity report and music manifest (`docs/ch2/`) |
-| `docs/player/` | `How to Play.txt` and `Chapter Two - What's New.txt` (the player update note) |
+| `docs/player/` | `How to Play.txt` (the player guide shipped next to the game and opened from the Start Menu) |
 | `qa/` | Test evidence (screenshots, logs; release evidence in `qa/evidence/ch2_v2.0.0/`, `ch2_v2.0.1/`, `ch2_v2.0.2/`) |
 | `GAME_SPEC.md` | Game design (concise) |
 | `PROJECT_STATE.md` | What's done, what's next (for future development) |

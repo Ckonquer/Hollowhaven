@@ -118,8 +118,8 @@ M map · G companion follow/wait · 1–8 hotbar · Wheel zoom · Esc pause · F
 
 ## Chapter Two: "The Lanterns of Hallowmere" (a continuation of the same save)
 Design: `Hollowhaven_Part2_Master_Prompt.md`. Implementation contract (wins where they differ):
-`docs/CHAPTER_TWO_SPEC.md`. Save schema v2 and rollback: `docs/SAVE_MIGRATION.md`. Player note:
-`docs/player/Chapter Two - What's New.txt`. Everything above stays true; Chapter Two only adds. Status: every
+`docs/CHAPTER_TWO_SPEC.md`. Save schema v2 and rollback: `docs/SAVE_MIGRATION.md`. Player guide:
+`docs/player/How to Play.txt` (both chapters; the returning-player update note was retired in 2.0.3). Everything above stays true; Chapter Two only adds. Status: every
 Chapter Two system is built and covered by headless tests; what is still to be checked on screen, by ear or with real
 input is the Chapter Two section of `KNOWN_ISSUES.md`.
 

@@ -10,6 +10,9 @@ const GROUPS := [
 ## Screen columns, as GROUPS indices top to bottom (every group exactly once): Building sits under Moving so the
 ## three columns stay close in height and the window fits the 1080p canvas.
 const COLUMNS := [[0, 3], [1], [2]]
+## Settings.REBINDABLE covers most rows, not all (Esc, F1, F12, R, X and the hotbar keep their keys): "most", like
+## docs/player/How to Play.txt.
+const TIP := "Tip: most of these keys can be changed in Settings > Controls."
 
 var _rebind: Button
 
@@ -37,7 +40,7 @@ func _build() -> void:
 				v.add_child(_row(String(item[0]), String(item[1])))
 	var bottom := Kit.hbox(16)
 	body.add_child(bottom)
-	var tip := Kit.label("Tip: everything here can be changed in Settings.", "Small")
+	var tip := Kit.label(TIP, "Small")
 	tip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bottom.add_child(tip)
 	bottom.add_child(Kit.expander())

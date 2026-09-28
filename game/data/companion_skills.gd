@@ -32,7 +32,7 @@ const SKILLS := {
 	"mochi": {
 		"role": "Gentle healer",
 		"passive": {"heal_received": 0.08},
-		"passive_text": "+8% healing received while Mochi is with you. Still forages as before.",
+		"passive_text": "+8% healing received while Mochi is with you. Also forages for you.",
 		"basic": {"kind": "projectile", "name": "Spore Puff", "damage": 4.0, "interval": 2.4, "range": 9.0, "projectile_speed": 8.0, "requires_los": true},
 		"signature": {"id": "bloomguard", "name": "Bloomguard", "cooldown": 25.0, "heal": 18.0, "duration": 6.0,
 			"autocast_hp_ratio": 0.6, "no_overheal": true,
@@ -47,7 +47,7 @@ const SKILLS := {
 	"pebble": {
 		"role": "Brave protector",
 		"passive": {"damage_reduction": 0.1},
-		"passive_text": "10% less physical damage while Pebble is with you (multiplies with armor). Still helps you mine.",
+		"passive_text": "10% less physical damage while Pebble is with you (multiplies with armor). Also helps you mine.",
 		"basic": {"kind": "melee", "name": "Stone Bump", "damage": 8.0, "interval": 2.4, "range": 1.8, "requires_los": true},
 		"signature": {"id": "stoneheart", "name": "Stoneheart", "cooldown": 26.0, "shield": 25.0, "duration": 6.0,
 			"stagger": 0.8, "stagger_bosses": false, "autocast_threat_range": 6.0,

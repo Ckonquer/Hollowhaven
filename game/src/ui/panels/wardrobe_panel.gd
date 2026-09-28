@@ -2,7 +2,7 @@ extends "res://src/ui/panels/panel_base.gd"
 ## Wardrobe (in-game, full-screen: pauses the world). Krystal's look editor with a rotating preview:
 ## hair style, hair colour, skin, eyes, complete outfits, single pieces and clothing colours; owned vs
 ## locked clothes (locked ones say how to earn them), three named presets (save / wear / rename), the
-## "Show equipped armor" option and a reset to her Chapter One look.
+## "Show equipped armor" option and a reset to her classic look (RESET_LABEL).
 ## Styling is free and COSMETIC ONLY: it writes GameState.appearance (+ Events.appearance_changed) and never
 ## touches equipment, stats or the inventory. Every change is worn at once; "Undo changes" returns to the
 ## look she had when the panel opened. Unknown ids from a newer version stay in the save untouched (only the
@@ -25,6 +25,9 @@ const PREVIEW_W := 420.0
 const EDITOR_W := 920.0
 const SIDE_W := 360.0
 const COSMETIC_NOTE := "Styling is always free. Clothes are cosmetic only: they never change Krystal's stats, armor or pockets."
+## The reset-to-classic button (ItemDB.legacy_look()); its tooltip is also the status line after pressing it.
+const RESET_LABEL := "Classic look"
+const RESET_TOOLTIP := "Krystal's classic look: auburn side braid and her explorer outfit."
 
 var editor: LookEditor
 var preview: Control
@@ -99,8 +102,10 @@ func _build() -> void:
 	undo_btn = Kit.button("Undo changes", _undo, "GhostButton")
 	undo_btn.tooltip_text = "Go back to the look Krystal had when you opened the wardrobe."
 	row.add_child(undo_btn)
-	reset_btn = Kit.button("Chapter One look", _reset_legacy, "GhostButton")
-	reset_btn.tooltip_text = "Krystal's original auburn side braid and explorer outfit."
+	# "Classic", not "Chapter One": a new journey's Chapter One look is whatever she chose on "Meet Krystal" (the
+	# creation screen's own reset says "classic look" too).
+	reset_btn = Kit.button(RESET_LABEL, _reset_legacy, "GhostButton")
+	reset_btn.tooltip_text = RESET_TOOLTIP
 	row.add_child(reset_btn)
 	# Bottom
 	var bottom := Kit.hbox(16)
@@ -246,7 +251,7 @@ func _undo() -> void:
 
 func _reset_legacy() -> void:
 	Looks.reset_to_legacy()
-	_sync_from_state("Krystal's Chapter One look: auburn side braid and her explorer outfit.")
+	_sync_from_state(RESET_TOOLTIP)
 
 
 func _on_armor_toggled(on: bool) -> void:

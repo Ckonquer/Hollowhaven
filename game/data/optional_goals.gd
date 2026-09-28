@@ -186,7 +186,8 @@ const GOALS := [
 		"objectives": [{"type": "counter", "counter": "max_bond", "count": 5, "label": "Reach max bond with a companion"}],
 		"reward": {}},
 	{"id": "opt_legacy_heartbloom", "chapter": 1, "title": "A Heartbloom for Home", "legacy": true,
-		"text": "The restored Ward taught you the Heartbloom Lamp. Home deserves one.",
+		# Listed from a new journey's first minute (visible_if []), so it must not say the Ward is already restored.
+		"text": "The Heartbloom Lamp is the Ward Stone's gift once its light is restored. Home deserves one.",
 		"visible_if": [],
 		"objectives": [{"type": "placed", "structure": "heartbloom_lamp", "count": 1, "label": "Build a Heartbloom Lamp"}],
 		"reward": {}},

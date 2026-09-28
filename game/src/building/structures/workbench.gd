@@ -7,7 +7,7 @@ extends "res://src/building/structure.gd"
 const STATION_HINTS := {
 	"workbench": ["workbench_crafting", "Recipes that need a Workbench can be crafted while you stand near one. Press {craft} any time."],
 	"loom": ["loom_crafting", "Weave cloth, sew clothing patterns and mix dyes at the Loom. A pattern or dye is yours forever once made."],
-	"kitchen": ["kitchen_crafting", "The kitchen cooks festival dishes. The campfire still cooks all its old recipes."],
+	"kitchen": ["kitchen_crafting", "The kitchen cooks festival dishes. Your campfire keeps all of its own recipes."],
 }
 
 var station_id: String = "workbench"

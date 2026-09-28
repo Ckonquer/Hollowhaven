@@ -7,7 +7,10 @@ extends "res://tests/test_case.gd"
 ##  * the engine window should start in the mode the default settings ask for (fullscreen), instead of
 ##    opening a 1600x900 window that Settings.apply_video() switches to fullscreen a frame later (read from
 ##    res://project.godot, not ProjectSettings, which a local QA override.cfg rewrites);
-##  * the local override.cfg is never part of an export preset.
+##  * the local override.cfg is never part of an export preset;
+##  * the player docs the release ships (2.0.3, a first-time player's gift build): tools/build_release.ps1 copies exactly
+##    docs/player/How to Play.txt next to the exe - the installer's Start Menu "How to Play" shortcut opens it - and no
+##    longer the returning-player note "Chapter Two - What's New.txt" (removed from docs/player/).
 ## The close-request and window-mode checks guard fixed findings (Game.save_before_close +
 ## auto_accept_quit off; project.godot window/size/mode=3). Nothing here writes outside user://test_saves/.
 
@@ -84,3 +87,41 @@ func test_export_presets_do_not_ship_override_cfg() -> void:
 			for path in ["override.cfg", "res://override.cfg"]:
 				assert_false(path.match(p) or p == path, "%s include_filter '%s' would ship %s" % [sec, p, path])
 	assert_true(presets > 0, "at least one export preset checked")
+
+
+func _repo_path(rel: String) -> String:
+	return ProjectSettings.globalize_path("res://").path_join("..").path_join(rel).simplify_path()
+
+
+## The docs\player\<file> names tools/build_release.ps1 copies into the build (Copy-Item lines only, not comments).
+func _shipped_player_docs(script: String) -> Array:
+	var out: Array = []
+	var re := RegEx.create_from_string("docs\\\\player\\\\([^\"]+)\"")
+	for line in script.split("\n"):
+		var l := String(line).strip_edges()
+		if not l.begins_with("Copy-Item"):
+			continue
+		for m in re.search_all(l):
+			out.append(m.get_string(1))
+	return out
+
+
+## 2.0.3: the build ships one player doc, How to Play.txt, written for someone who has never played (New Game first).
+## The 2.x update note for returning players is neither shipped nor kept in docs/player/, and if the installer script is
+## there, every document it links from the Start Menu is one the build ships.
+func test_release_ships_the_first_time_player_doc_only() -> void:
+	var f := FileAccess.open(_repo_path("tools/build_release.ps1"), FileAccess.READ)
+	assert_not_null(f, "tools/build_release.ps1 readable")
+	if f == null:
+		return
+	var docs := _shipped_player_docs(f.get_as_text())
+	assert_eq(docs, ["How to Play.txt"], "build_release.ps1 copies exactly How to Play.txt from docs/player")
+	assert_true(FileAccess.file_exists(_repo_path("docs/player/How to Play.txt")), "docs/player/How to Play.txt exists")
+	assert_false(FileAccess.file_exists(_repo_path("docs/player/Chapter Two - What's New.txt")),
+		"the returning-player update note is gone (Krystal starts with New Game)")
+	var iss := FileAccess.open(_repo_path("tools/installer/hollowhaven.iss"), FileAccess.READ)
+	if iss == null:
+		return   # the installer script is optional for this check
+	var re := RegEx.create_from_string("\\{app\\}\\\\([^\"\\\\]+\\.txt)\"")
+	for m in re.search_all(iss.get_as_text()):
+		assert_true(docs.has(m.get_string(1)), "the installer links %s, which the build ships" % m.get_string(1))
