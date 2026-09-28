@@ -6,17 +6,68 @@ extends RefCounted
 ##   ground enemies: {"home": Vector3, "wander_radius": float, "alert": bool, "no_drops": bool}
 ##   "weaver" (stalker): {"route": [Vector3...], "ambush_points": [...], "zone": "silk"}
 ##   "weaver_matron" (boss): {"arena_center": Vector3, "anchors": [Vector3...], "braziers": [Node...]}
+## Chapter One additions (ground enemies, same params) - every enemy_base enemy also takes "defeat_flag"
+## (a flag set once when it is defeated) and "damage_scale":
+##   "brambleback", "lantern_moth", "hollow_drudge"
+##   "brood_skitter" (+ "speed_scale": e.g. 0.8 for the Matron's slower Gentle minion)
+##   "knotted_elder" (+ "arena_center": Vector3, "arena_radius": float, "reward_id": "rw_c1x_elder" | "")
+## Scripts are loaded lazily and guarded: a missing or broken script returns null (warning), never a crash.
 
 const SCRIPTS := {
 	"brambling": "res://src/enemies/brambling.gd",
 	"gloomling": "res://src/enemies/gloomling.gd",
 	"weaver": "res://src/enemies/stalker.gd",
 	"weaver_matron": "res://src/enemies/weaver_boss.gd",
+	# Chapter One additions (Chapter Two expansion)
+	"brambleback": "res://src/enemies/brambleback.gd",
+	"lantern_moth": "res://src/enemies/lantern_moth.gd",
+	"hollow_drudge": "res://src/enemies/hollow_drudge.gd",
+	"brood_skitter": "res://src/enemies/brood_skitter.gd",
+	"knotted_elder": "res://src/enemies/knotted_elder.gd",
+	# Chapter Two ordinary archetypes + the Ashbell elite (module C5). Setup keys beyond the ground ones:
+	#   "pumpkin_mimic" (+ "dormant": true = sits as a twitching pumpkin until inspected / approached)
+	#   "quarry_warden" (+ "arena": node, "arena_center": Vector3, "arena_radius": float, "pillars": [quarry_pillar nodes])
+	"pumpkin_mimic": "res://src/enemies/pumpkin_mimic.gd",
+	"patchwalker": "res://src/enemies/patchwalker.gd",
+	"velvet_wing": "res://src/enemies/velvet_wing.gd",
+	"bellcap_sentry": "res://src/enemies/bellcap_sentry.gd",
+	"borrowed_wisp": "res://src/enemies/borrowed_wisp.gd",
+	"quarry_warden": "res://src/enemies/quarry_warden.gd",
+	# Chapter Two boss (module C6a): Moonveil Manor's Count's Gallery. Setup keys: "arena_center", "arena_radius",
+	# "candles" (ward_candle nodes), "teach_candle", "curtains", "fixture", "cover", "helper_points", "entry",
+	# "area" (+ optional "mode": "story" | "trial", "auto_start", "seed") - see the header of count_velour.gd.
+	"count_velour": "res://src/enemies/count_velour.gd",
+	# Weaver's Crossing rematch (module C6b): the arena's boss_params() ({"arena", "arena_center", "arena_radius",
+	# "anchors", "braziers", "crack", "bridge", "deck_y", "landing_points", "alert"}) - a NEW encounter, never the
+	# Chapter One "weaver_matron" - see the header of crossing_matron.gd.
+	"crossing_matron": "res://src/enemies/crossing_matron.gd",
+	# Chapter Two final boss (module C6c): the Choir Vault's choir_arena.gd boss_params() ({"arena_center",
+	# "arena_radius", "perimeter_radius", "anchors", "anchor_nodes", "resonators", "symbols", "arena", "alert"})
+	# (+ optional "mode": "story" | "trial", "seed") - see the header of borrowed_choir.gd.
+	"borrowed_choir": "res://src/enemies/borrowed_choir.gd",
 }
 
 
 static func has_enemy(enemy_id: String) -> bool:
 	return SCRIPTS.has(enemy_id)
+
+
+## Script path registered for an id ("" if unknown). Use this (or can_spawn) instead of indexing SCRIPTS with
+## a constant key: a constant index into this const table is checked at compile time and breaks the caller's
+## script when the id is not registered yet.
+static func script_path(enemy_id: String) -> String:
+	return String(SCRIPTS.get(enemy_id, ""))
+
+
+## True when the id is registered AND its script exists and compiles (safe-load check for spawners).
+static func can_spawn(enemy_id: String) -> bool:
+	if not SCRIPTS.has(enemy_id):
+		return false
+	var path: String = SCRIPTS[enemy_id]
+	if not ResourceLoader.exists(path):
+		return false
+	var script: Script = load(path)
+	return script != null and script.can_instantiate()
 
 
 ## Spawns an enemy under `parent` at `xform` and returns it (null if the id or parent is invalid).
