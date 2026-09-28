@@ -17,7 +17,7 @@ Follow the goal shown at the top right of the screen. Press J for your journal, 
 Chapter Two, "The Lanterns of Hallowmere", begins at the Ward Stone once Chapter One is done:
 a lantern road to Hallowmere Reach, an autumn town with a festival waiting to be finished.
 
-CONTROLS (change them any time in Settings > Controls)
+CONTROLS (most of them can be changed in Settings > Controls)
   Move ..................... W A S D          Look ............ Mouse
   Jump ..................... Space            Sprint .......... Shift
   Dodge roll ............... Ctrl (or V)      Camera zoom ..... Mouse wheel
@@ -36,17 +36,19 @@ CONTROLS (change them any time in Settings > Controls)
 COMFORT SETTINGS (Pause > Settings > Comfort)
   Horror intensity: Gentle / Standard / Intense - the underground can be scary.
   Arachnophobia mode: replaces every spider-like creature, web, sound and icon with a
-  non-spider alternative. Also: reduce camera shake, reduce flashing, sound captions,
-  high-visibility cues, timing assist, and separate volume sliders for music, ambience,
-  effects and menus.
+  non-spider alternative. Also: reduce camera shake, reduce flashing, captions,
+  high-visibility cues and timing assist.
+  Audio tab: separate volume sliders for master, music, ambience, sound effects and the
+  interface (the volumes are also on Pause > Comfort & Accessibility).
   Gameplay tab: "Friends join fights", "Friends use skills on their own", "Seasonal
   decorations", "Show hints" (and "Show tips again" while playing).
 
 TIPS
   - Sleeping in a bed saves your game and sets where you wake up.
   - Underground, light the lanterns on the walls to save your progress.
-  - Above ground the game also saves by itself every few minutes, and when you close the
-    window. Underground it is the lanterns that count.
+  - Above ground (the woods and Hallowmere Reach) the game also saves by itself every few
+    minutes, and when you close the window. Underground it is the lanterns that count; in
+    the manor and the Hushed Works, rest somewhere safe (a lit lantern or the refuge) to save.
   - Enemies always wiggle, flare or rattle before they attack - that's your cue to dodge.
   - If you ever get stuck, open the pause menu and choose "Return to the Haven"
     ("Return to last lantern" below the old mine, "Return to safety" in the Chapter Two

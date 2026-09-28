@@ -1,9 +1,15 @@
-# QA report — Hollowhaven v0.9.0
+# QA report — Hollowhaven v0.9.0 (Chapter One) and v2.0.0 (Chapter Two)
+
+Sections 1-8: Chapter One (v0.9.0 / v0.9.1). **Section 9: the Chapter Two release 2.0.0** (executed-test matrix, save integrity,
+bot runs, visual inspection, bugs, music, performance, the natural chain, and the NOT YET DONE list). Section 10: Chapter Two
+development records.
 
 Every entry says what KIND of check it was:
 **[code]** source review · **[auto]** automated tests (headless engine) · **[visual]** launched and inspected
 real rendered frames · **[interactive]** played through real OS-level keyboard/mouse input (Win32 SendInput)
 sent to the game window · **[subjective]** human judgement — marked *not verified* where it wasn't done.
+Chapter Two adds **[bot]** (headless engine driven through the game's QA input port: virtual input, not OS input, nothing rendered),
+**[stills]** (rendered still frames looked at by an agent, not play) and **[perf]** (profiling harness); see §9.
 
 Environment (all checks unless stated): the owner's PC, not a sandbox — Windows 11 Pro 10.0.26200 x64 ·
 AMD Ryzen 9 9950X (16C/32T) · 125.6 GB RAM · NVIDIA GeForce RTX 4090 (driver 32.0.15.9571) + AMD Radeon iGPU ·
@@ -118,174 +124,261 @@ Static memory 125–190 MB, video memory 370–410 MB, no growth observed across
 dedicated fullscreen 1080p profile of a fixed route on the release build (the owner needed the PC). These
 numbers come from one very powerful GPU and say nothing about minimum requirements.
 
-## 7. Not verified (honest list)
+## 7. Not verified (honest list, Chapter One)
 Human listening; human subjective fun/pacing; weaker GPUs; the scripted release persistence run (3.3);
 arachnophobia visuals on the final build; 1080p fullscreen perf profile; gamepad (not supported).
+(Chapter Two: §9.10.)
 
 ## 8. Later changes (after the release playthrough)
 The credits text changed to "For Krystal / from Ali" (commit 9512a0d) and a headless code audit produced further fixes. These later builds were verified by the automated test suite (headless) only, not by a new real-input playthrough (the owner needed the PC). Details and the final suite result: `docs/Hollowhaven_Technical_Handoff.md` section 9 and the git log.
 
-## 9. Chapter Two — integration pass after Waves B/C (2026-09-28) — [auto] only
-Chapter Two is still in development. Everything in this section is **[auto]** (headless unit tests on the owner's PC, same
-environment as above). **No Chapter Two content has been checked [visual] or [interactive] yet**: the pending visual and real-input
-checks are listed in `KNOWN_ISSUES.md` ("Chapter Two (in development)"), the debug/visual-QA commands to run them are in `AGENTS.md`,
-and the decisions of the pass are in `docs/ch2/INTEGRATION_WAVE_BC.md`.
+## 9. Chapter Two — v2.0.0 release QA (2026-09-28)
 
-The pass ran as twelve parallel fixer groups; the Wave D modules and the three Chapter Two boss modules were also still being
-written, so each full run below is a snapshot of files that were changing while it ran. Command for every row:
-`tools/godot.sh --headless --path game res://tests/runner.tscn -- --filter=<f> --results=<json> --max-seconds=2400` (what
-`tools/test.sh` runs), results kept outside the repo.
+**Build under test.** `dist/Hollowhaven-2.0.0-Windows.zip` (111.1 MB, SHA-256 `9F3FD0D2E3216B861E470158B881A10ED2CEBBC30FC3C07D3BC61D93652856CC`,
+`dist/SHA256SUMS.txt`), exe `builds/Hollowhaven/Hollowhaven.exe` (184.7 MB, 10:20), git `36e2e8a` = `9e8765f` + version bump
+(`project.godot` / `export_presets.cfg`) + 401 one-line `.uid` files. Export log `qa/tmp/build_v200.log` (EXIT=0). Same PC as above.
 
-| When | Run | Result | Observed failures |
+**Evidence kinds used for Chapter Two** (in addition to the legend at the top):
+**[bot]** the QA bot (`tools/qa/ch2/`) drives a **headless** engine through the game's QA input port: injected keyboard / mouse
+events and read-only telemetry, nothing rendered, dummy audio, no OS input layer (no Windows focus / raw input / cursor capture) -
+not **[interactive]** in the section-1 sense. It knows the route; its times are not human times.
+**[stills]** frames rendered on the second monitor (1920×1080 at 1920,0; muted, no focus, bounded runs, scratch saves) and looked at
+by the agent that reviewed or fixed them - still images, not play. **[perf]** the profiling harness `tools/qa/perf_profile.py`.
+**No human has played or listened to Chapter Two. No [interactive] (OS-level real-input) run of Chapter Two exists.**
+
+**Which code each kind of evidence ran on** (important: most runtime evidence predates the final commit):
+
+| Evidence | Code under test |
+|---|---|
+| Final full suite (§9.2) | the tree committed as `9e8765f` (run ~10:05-10:19); `36e2e8a` only adds the version bump and `.uid` files - the suite was not re-run after it |
+| Bot segments S0-S4, re-runs after bug-fix round 1 (§9.4) | S0 `vfix_fast` / `vfix_thorough`: the live tree at 08:2x; all others: snapshot `scratchpad/snap` = `5cd7774` + the bug-fix round 1 files (08:31) |
+| Natural end-to-end chain (§9.9) | the same snapshot; it differs from 2.0.0 in 166 files (the visual fixes, integration pass 3, the Weaver's finishing-blow rule); `quarry_warden.gd` is identical |
+| Still frames (§9.5) | debug runs of the source tree while the fixes were made |
+| Performance runs (§9.8) | `headless_check1`: source, headless; `packaged_smoke*`, `packaged_v200` (finished 10:57): the packaged 2.0.0 exe |
+| `save_integrity.py` re-check (§9.3) | v2 files written by the final suite run (10:16) |
+
+### 9.1 Executed-test matrix (MP §20.3 areas × kind of evidence)
+"[auto]" counts are the final full run's tests grouped by suite-name prefix (approximate grouping; 2639 in total). A dash means
+**not done**.
+
+| MP 20.3 area | Source review | [auto] unit / integration | [stills] graphical | [bot] virtual input, headless | [interactive] OS real input | [perf] | Listening |
+|---|---|---|---|---|---|---|---|
+| Customization | module builds + independent reviews (B1 avatar, B2 appearance UI), pass-3 G6 palettes (`docs/ch2/INTEGRATION_PASS3.md`) | ≈92 (`avatar_look_*`, `ui_appearance_*`, `data_ch2_appearance`, `flow_ch2_newgame`): cancel writes nothing, legacy look default, ownership, presets, armor / outfit separation, fit numbers | avatar review 20 findings; before / after sheets `qa/tmp/visual/avatar/`, `fix_avatar/sheets/`, `pass3_g6/`, `g1_pass3/` | S0 (natural): "Meet Krystal" look chosen and kept; S1 (natural): wardrobe restyle, preset "Autumn Picnic" saved, notice retired | - | n/a | n/a |
+| Inventory / crafting / building | B5 stations, B6 building reviews; pass 1-3 records | ≈263 (`building_*` incl. storeys, stairs walk, undo / tint, visual fit; `crafting_*`, `station_*`, `core_inventory`, `core_economy`, `farming_*`): reachable recipes, no circular gates, multi-chest transactions, queue completes once, capacity grows without truncation, recolour keeps uid / data | building review 15 findings; the real Haven cottage built through BuildMode (59 of 61 pieces) `qa/tmp/visual/fix_building/` | chain T23 / T34 (natural): harvest, berries, cooking; S1 extras: hand-crafted Crop Plot, gathering for the waygate; S2: wood, iron, Reach trees felled | - | n/a | n/a |
+| Equipment | B3 equipment / stats review | ≈83 (`equipment_*`, `stats_*`, `wand_*`): slot swaps, no duplication, stat recompute, caps, shield / health | armor fit (AV-02/03/04) | **not exercised**: no run equipped armor (the real save has no Loom; the chain keeps the copper sword) | - | n/a | n/a |
+| Companions | B4 companion combat review | ≈153 (`companions_*`: combat, skills, courage, nav, home, areas) | companion visuals in the review sheets; menu layout (`fix_ui`) | S0 (natural): Comfort Ribbon tied, Mochi follows below; Lumi follows through the chain. **Measured pet damage / heal / shield in play (MP Run C): not done** | - | n/a | n/a |
+| Combat | C5, C6a-c, B8, B9 reviews; pass-3 G5 | ≈513 (`combat_core`, `enemies_*`, `boss_*`, `c1x_arena`): one hit per swing, i-frames, telegraphs, budgets, boss phases / resets / rewards, pacing caps | creatures review 15 findings (tells, faces, arachnophobia looks) `fix_creatures/`, `pass3_g4/` | every boss won by the bot: 0 deaths in the segment re-runs (§9.4); in the natural chain 1 death (run3, the Choir's phase-3 hush) followed by a successful retry (§9.9); new open Warden bugs CHAIN-001 / 002 (§9.6) | - | n/a | n/a |
+| Quests / world | C1-C4, C7-C9, B7, B10 reviews | ≈775 (chapter log, optional log, `story_ch2_*`, `flow_ch2_*`, `reach_*`, `manor_*`, `works_*`, `world_*`, `annex_*`, `c1x_*`, progression audits, mastery, `expeditions_*`, `trials_*`, `below_*`): lamps in any order, legacy indices, no replay of Chapter One, return paths | Reach 20 and interiors 17 findings, camera arrivals `fix_cameras/`, `fix_reach/`, `fix_interiors/` | chain (natural): Chapter-One-complete save -> 20/20 Chapter Two steps -> free play -> relaunch; S0 (natural): fresh game through Chapter One and the Ward Stone. Only ONE lamp order (orchard, quarry, manor) was played. **Echo Trials and Expeditions: never run by the bot** | - | n/a | n/a |
+| Audio | A4 music director review; manifests with independent numeric reviews | ≈112 (`audio_*`, `music_box_*`): every cue exists / imports, anti-repeat, no per-frame restarts, boundary hysteresis, boss / ending priority, combat exit, silence, limiter, missing-file fallback, RNG independence | n/a | director cue changes in 89 telemetry files: 24 of 27 cues selected in play; m09, m12, m19 never (`docs/ch2/MUSIC_MANIFEST.md`); headless = dummy audio, nothing heard | - | - | **NOT DONE** (offline loudness / peak / seam analysis only) |
+| Comfort (arachnophobia, flashing, cues) | reviews per module | ≈42 in dedicated suites (`audit_arachno_*`, `below_arachno`, `onboarding_*`) + arachnophobia / high-visibility / timing-assist cases inside enemy, boss and building suites | arachnophobia looks rendered (Hollow Mother, pale roots, posts: `pass3_g4/`, `fix_interiors/deep_v2_arach`) | all bot runs used default comfort settings (arachnophobia off, Standard) | - | n/a | - |
+| Save / persistence | A1 core-save review | ≈107 (`save_v2_*` matrix / migration / state / title, `core_save`, `audit_persistence_*`) | - | S1 migration of a real v0.9.0 save, save diffs, relaunch + Continue (§9.3) | - | n/a | n/a |
+| UI / HUD (extra) | B2, B11 reviews | ≈169 (`ui_*`, `audit_ui_*`, incl. `test_ui_visual_qa` 18) | UI review 23 findings; `fix_ui/` sheets at 1080p and 720p | panels driven by the bot (wardrobe, Lantern Road lists, pause menu, Save & Quit) | - | n/a | n/a |
+| Performance | - | `enemies_perf` (2), build-time budgets in world tests | - | - | - | packaged exe, 9 states × 3 presets + round trips on an RTX 4090 (§9.8); no weaker GPU | n/a |
+
+### 9.2 Automated test runs — [auto]
+`tools/test.sh` (headless; the runner fails a test on any runtime SCRIPT ERROR).
+
+| When | Tree | Result | Log |
 |---|---|---|---|
-| before the pass (lead) | full suite | 2164 tests, 11 failed, 738 s | 8 order-dependent (pass alone): two companion stuck-recovery tests, one companion nav test, five world-item tests in `test_world_nodes`; per the integration plan the other three came from the audio-name scanner's false positives (R42) and the stale Wave A flow assertions (R08); all three causes were addressed in the pass (R08, R09 runner isolation, R42) |
-| 03:08-03:22 | full suite | 2279 tests, 20 failed, 834 s | taken while other groups were mid-edit: 11 map/UI tests hit map_panel / map_view halfway through the map-reward change (`data_area`, `resource_pins` not yet in the loaded scripts); the new festival pumpkin faces over the triangle budget (being modelled); 5 `test_world_nodes` world-item tests (order-dependent; `tests/runner.gd` with the new isolation was still being changed at 03:14, after this run had started); the Echo Trial unstuck label (see below); one flaky blink test; one scratch probe file that failed to load |
-| 03:24 | the 19 failed tests' suites together (`test_world_nodes, test_ui_map_areas, test_ui_root, test_audit_ui_input_layout, test_player_avatar, parse_all`) | 67 tests, 0 failed, 39 s | — (the edits above had settled) |
-| 03:23-03:37 | full suite | **2334 tests, 4 failed, 810 s** | `test_enemies_ch2_mimic.test_dormant_is_decor_that_twitches_in_pairs` (known timing flake, deferred D05); `test_music_box_selector.test_unknown_and_unplayable_favourites_are_ignored` and a load failure of `test_expeditions_zz_probe.gd` (Wave D modules still being written, not part of the pass); `test_ui_appearance_wardrobe.test_unstuck_labels_and_targets_per_area` still expects "Return to safety" in the Echo Trial, where the lead decision R17 now says "Leave the trial" (the test needs that one expectation updated) |
-| both full runs | `test_zz_parse_all.test_all_scripts_compile` | PASS | every script compiles |
+| 04:21-04:35 | after integration pass 1 | 2407 tests, 0 failed, 820 s | `qa/tmp/full_integration_bc_final.log` |
+| 07:2x | after integration pass 2 (commit `5cd7774`) | 2477 tests, 0 failed, 830.8 s | `qa/tmp/full_integration_pass2_final.log` |
+| 08:48 | snapshot `5cd7774` + bug-fix round 1 | 2534 tests, 0 failed, 842 s | `qa/tmp/full_bugfix1.log` |
+| **~10:05-10:19** | **final tree (`9e8765f`)** | **2639 tests, 0 failed, 847.0 s**; `parse_all` passes; 21 `ISOLATION` repairs; ends with "7 ObjectDB instances were leaked at exit" (§9.6 CHAIN-003) | **`qa/tmp/full_final1.log`** |
+| 2026-09-28 (docs pass) | 2.0.0 + the player-doc corrections | `test_onboarding_text` 8 tests, 0 failed (it checks the player docs against the real bindings) | console |
 
-Isolation evidence (second full run, runner R09): 22 `ISOLATION <suite>: ...` repairs were printed — stray projectiles / particles
-left by enemy, wand and companion suites, `Game._bosses` left set by the boss suites, a leftover zone / safe-zone flag in two
-progression audits, world items left by `test_reach_west_orchard` — and none of the formerly order-dependent tests failed. Those
-suites should eventually clean up after themselves.
+The known red test of pass 3 (`test_enemies_review.test_boss_killing_blow_skips_the_window_cap_climb`) passes in the final run: the
+Weaver's rule now lets a blow that would finish her in her last phase through (`weaver_boss.gd` `_on_damaged`).
 
-### 9.1 Integration test run after the pass (2026-09-28 03:44-04:35) — [auto] only
-Same command as above (`tools/test.sh`, full suite; `tools/test.sh parse_all`). Boss, Chapter Two enemy and QA-input modules and
-the Wave D modules (expeditions, trials, music box, onboarding hints) were still being edited by other agents during these runs.
-Logs: `qa/tmp/full_integration_bc.log` (first run), `qa/tmp/full_integration_bc_final.log` (final run), `qa/tmp/timing_suites_3x.log`.
+### 9.3 Save integrity — [auto] + [bot]
+Full report: `docs/ch2/SAVE_INTEGRITY_REPORT.md`. Summary:
+* **Fixture matrix (MP §20.2):** all 12 scenarios + extras + the two real v0.9.0 files: `test_save_v2_matrix` 22/22 PASS in the final
+  run. Re-checked for this report with `tools/qa/save_integrity.py` (self-test 12/12) on the 14 v1 fixtures vs the v2 files the
+  final run wrote: all exit 0, 0 preserved-field mismatches, 0 missing sections (reports `qa/tmp/save_integrity_2.0.0/`).
+* **Real QA-bot save migrations:** the upgrade backup of the real Chapter-One-complete save is byte-identical to the original in
+  `s1/vfix1`, `s1/diag_bak` (main + backup) and all five natural chain runs (`chain/dev3`, `run1`-`run4`). S1 after-migration diff: 5 strict differences, all from 2.6 s of game
+  clock (time, play seconds, float settle, one stone's respawn timer expiring); home structures, crop, inventory, key pouch,
+  companions, flags and quest index identical. S1 final diff: 29 differences, all explained by play, 0 unexplained.
+* **Relaunch / Continue:** S1, S4 and the chain END check resume the same save with the same items and no double rewards.
+* **PERSONAL-SAVE VERIFICATION BLOCKED** (Krystal's save is not on this PC). Not done either: a process kill during a real write,
+  before / after screenshots of a home, chests in a real (non-synthetic) save.
 
-| When | Run | Result | Observed failures / notes |
-|---|---|---|---|
-| 03:43 | `parse_all` | 1 tests, 0 failed | — |
-| 03:44-03:58 | full suite | 2407 tests, 3 failed, 823 s | `test_expeditions_templates.test_the_reach_gets_a_runner_and_groups_stand_on_its_ground`, `test_expeditions_ui.test_setting_aside_at_the_cache_says_the_cache_stays_closed`: the Wave D expedition files (`src/expeditions/*`, `data/expeditions.gd`, the panel and these tests) were rewritten 03:51-03:53, while the run reached them; 39/39 pass at 04:01 and 3/3 re-runs pass. `test_ui_appearance_wardrobe.test_unstuck_labels_and_targets_per_area`: outdated expectation (R17) — fixed in the test |
-| 04:02-04:18 | the 33 suites that measure time (`get_ticks_msec/usec`), three times in a row | 393 tests, 0 failed ×3 (315 s, 309 s, 312 s) | no flaky timing test found |
-| 04:18 | `test_enemies_ch2_mimic` + `test_expeditions` ×3 | 49 tests, 0 failed ×3 | the D05 mimic flake did not reproduce (still deferred: busy file) |
-| 04:21-04:35 | full suite (final) | **2407 tests, 0 failed, 820 s** | 20 `ISOLATION` repairs (was 22: the two progression audits now restore Game's zone / safe-zone state themselves) |
-| 04:36 | `parse_all` | 1 tests, 0 failed | — |
+### 9.4 QA-bot route segments — [bot]
+Scripts `tools/qa/ch2/s0_fresh_c1.py`, `s1_continuation.py`, `s2_orchard_quarry.py`, `s3_manor.py`, `s4_route.py` (fixtures `s2/s3/s4_fixture.py`); merged bug list `qa/tmp/bot/BUGS_MERGED.md`. Every final run: 0 deaths, 0 SCRIPT
+ERRORs, no problems filed.
 
-Test changes of this pass: `test_ui_appearance_wardrobe` (Echo Trial label follows lead decision R17: "Leave the trial"; the
-product requirement changed on purpose), `test_player_avatar.test_idle_head_height_and_blink` (deterministic: after the forced
-blink the test pushes the next blink out of its window, so the random 18% double blink can no longer land inside it; product code
-unchanged), `test_audit_progression_comfort` / `test_audit_progression_reentry` (restore `Game.zone_id` / `Game.in_safe_zone` in
-`after_each`).
-
-## 10. Chapter Two — bug-fix round 1 (CH2-001..017) and the visual fixes (2026-09-28)
-Kinds used in this section (in addition to the legend at the top):
-**[bot]** the QA bot (`tools/qa/ch2`, route segments S0-S4) drives a **headless** engine through the game's QA input port: injected
-keyboard / mouse events and telemetry reads, nothing rendered, no OS-level input - so these runs are not **[interactive]** in the
-section-1 sense. **[visual]** still frames rendered on the second monitor (1920×1080 at 1920,0; muted, no focus, bounded runs, scratch
-saves) and looked at by the agent that made the change. **No human has played or listened to Chapter Two yet.**
-
-### 10.1 What was found
-* Five [bot] route segments (S0 fresh Chapter One → S4 Works finale; `qa/tmp/bot/BUGS_MERGED.md`): 17 bugs - 0 blockers, 2 major
-  (CH2-001 lamp seals held back, CH2-002 Reach trees raising SCRIPT ERRORs), 5 minor (boss / elite pacing CH2-003/004/007, Count Velour's
-  channel behind the candle stand CH2-005, an enemy threatening through a wall CH2-006), 10 polish.
-* Six still-frame reviews (avatar, building, creatures, interiors, Reach, UI; `qa/tmp/visual/VISUAL_BUGS_MERGED.md`): 110 findings -
-  0 blockers, 21 major, 47 minor, 42 polish.
-
-### 10.2 Automated tests — [auto]
-Same command as section 9 (`tools/test.sh`, headless). The bug fixes landed while other agents were still editing ~75 files for the
-visual fixes, so the verifier ran the full suite on a **snapshot**: git HEAD 5cd7774 plus the 44 bug-fix files, byte-identical to the
-working tree (`C:\Users\Ali\AppData\Local\Temp\claude\...\scratchpad\snap`).
-
-| When | Tree | Run | Result | Notes |
+| Segment | Content | Start (natural or fixture) | Best run(s) | Duration (bot time) |
 |---|---|---|---|---|
-| 08:31 | snapshot | full suite | 2534 tests, 2 failed, 847 s (`qa/tmp/full_bugfix1_run1.log`) | `test_audit_release_packaging` read the local, gitignored `game/override.cfg` (window mode 0) left by a QA run; `test_flow_quit_prefetch` assumed no earlier suite left a prefetch → the test now releases them in `before_each()` (still fails on the old game.gd) |
-| 08:48 | snapshot + that test fix | full suite | **2534 tests, 0 failed, 842 s** (`qa/tmp/full_bugfix1.log`) | the run ends with "7 ObjectDB instances were leaked at exit" (CH2-011, 10.3) |
-| 08:48 | live tree, visual fixes mid-edit | full suite | 2587 tests, 33 failed (`qa/tmp/full_bugfix1_worktree.log`) | 25 from `tobin_annex_world.gd` not compiling at that moment; `camera_spawn_clearance` ×3, `reach_visual_fixes` ×2, `avatar_look_fit` ×1, `reach_west_build` ×1 (16 lights > 8), the override.cfg test; none in a bug-fix file |
-| ~09:20 | live tree, visual fixers done | the suites that had failed + `parse_all` | 91 tests, 1 failed | only the override.cfg packaging test; pass 3 G5 made it read the shipped `res://project.godot` (R3-22) |
-| 09:40 | live tree (pass 3 G1) | the suites behind the rules pass 3 documented: `parse_all`, `project_layer_names` (new), `camera_spawn_clearance`, `audit_release_packaging`, `enemies_lost_sight`, `mastery_landmark_discovery`, `flow_quit_prefetch`, `enemies_boss_pacing`, `boss_crossing_pacing`, `enemies_ch2_warden`, `boss_velour_qa_fixes`, `save_v2_chapter_log` | **97 tests, 0 failed, 15 s** | one ISOLATION note (`Game._bosses` from the Velour suite) |
+| S0 | fresh New Game -> Meet Krystal -> enriched Chapter One (Tailor's Cache, Brave Little Steps) -> 3-phase Matron -> restoration -> Ward Stone accepted | **natural** (empty save folder) | `s0/run11` (live tree 04:17, before bug-fix round 1) | 706.5 s; Matron 49 s, no damage |
+| S0 re-runs | the Weaver Matron after CH2-003 | **diagnostic fixture** (debug `--area` / `--give` at the arena lantern) | `s0/vfix_fast`, `vfix_thorough` (live tree), `vfix_snap_fast`, `vfix_snap_thorough` (snapshot) | 55.7-73.9 s; phases 1-2-3 every time |
+| S1 | Continue (v1 -> v2) -> wardrobe -> Ward Stone -> waygate -> Reach -> Commons -> Lantern Road home and back -> Save & Quit -> relaunch -> Continue | **natural** (copy of the real v0.9.0 Chapter-One-complete save, fixture 16) | `s1/vfix1`, `s1/vfix_verbose` | 73.9 s / 76.5 s wall |
+| S2 | orchard (irrigation, seed, mimics, garden lamp) + quarry (winch, Quarry Warden, lamp) -> Save & Quit -> Continue | **diagnostic fixture** (`s2_fixture.py`: save 16 + S1 flags) | `s2/vfix1` | 232.7 s; Warden 40.2 s |
+| S3 | Moonveil Manor, Looking-Glass Hall, ballroom, Count Velour | **diagnostic fixture** (`s3_fixture.py`) / the ballroom save | `s3/vfix_run`, `s3/vfix_boss` | 196.5 s / 140.7 s; Velour 78.0-78.7 s |
+| S4 | link the lanterns -> Hushed Works (3 lines) -> Weaver's Crossing -> Borrowed Choir -> home -> Lanternwake -> free play -> relaunch | **diagnostic fixture** (`s4_fixture.py`: three lamps lit) | `s4/vfix_full` | 747.8 s; Crossing 70.0 s, Choir 301.3 s; relaunch 20/20 steps, same items |
 
-Known red test at the end of pass 3: `test_enemies_review.test_boss_killing_blow_skips_the_window_cap_climb` ("expected gone got
-climb", reproduced by G1, G4 and G5). The Weaver's in-progress fix for the late-window overshoot (below) now trims even a would-be
-lethal blow to the window's room, as the pass-3 decision R3-10 records; that older test still expects a phase-1 killing blow larger
-than the room to kill. The Weaver owner has to reconcile the test with the rule before the final full run. **A clean full-suite run
-on the live tree is still to do** (R3-50) - the snapshot result is the latest full green run.
+Fight durations before / after bug-fix round 1 (bot time): Weaver Matron fast 19.8-22.8 s -> 44.6-47 s, thorough 65.9 -> 64.3-71.3 s;
+Quarry Warden 24.9 s -> 40.2 s; Count Velour 70.2 / 106.3 s -> 78.0 / 78.7 s; Crossing Matron 21.7-22.5 s -> ~65 s; Borrowed Choir
+229.8 s -> 301.3 s. The design targets (2-4 min per Chapter Two boss) are about a first human attempt, which is untested.
 
-### 10.3 The 17 bugs: fix, regression tests, [bot] confirmation
-Every fixer confirmed its new tests fail on the old code (old files swapped back in, then restored byte-identical). The [bot] column is
-the verifier's re-run on the snapshot (S0 also on the live tree). Details: the fixer reports summarised in `docs/ch2/INTEGRATION_PASS3.md`.
+### 9.5 Visual inspection — [stills]
+Six still-frame reviews (avatar, building, creatures, interiors, Reach, UI) produced **110 unique findings** (0 blockers, 21 major,
+47 minor, 42 polish; `qa/tmp/visual/VISUAL_BUGS_MERGED.md`). Fixers changed the code, added numeric regression tests and re-rendered
+their fixes as stills. Status at 2.0.0:
+
+| Area | Findings | Fixed and re-rendered | Partly fixed | Addressed in code + tests, closure not recorded | Evidence |
+|---|---|---|---|---|---|
+| Avatar | 20 | 16 | 4: AV-04 (cardigan cloud hem / ruffle collar still show under armor), AV-11 (skirt slits, knees), AV-12 (hair vs lantern pack), AV-19 (roll hover) | - | `fix_avatar/sheets/`, `pass3_g6/`, `g1_pass3/`; `test_avatar_look_fit` |
+| Building | 15 | 15 | - | - | `fix_building/`; `test_building_visual_fit` |
+| Creatures | 15 (CR-12 merged into IN-07) | 15 (CR-03 / 05 / 14 in pass 3 G4) | - | - | `fix_creatures/`, `pass3_g4/`; `test_creatures_visual_fixes` |
+| Interiors | 17 | 15 | 1: IN-13 (balcony backdrop fixed; the HUD day dial inside the manor is not, R3-43) | 1: IN-09 (HUD hush, `test_ui_visual_qa`) | `fix_cameras/`, `fix_interiors/`, `pass3_g3/`; `test_camera_spawn_clearance`, `test_works_interior_visuals` |
+| Reach | 20 | 20 (RE-00 in pass 3 G2) | - | - | `fix_reach/`, `fix_cameras/`; `test_reach_visual_fixes` |
+| UI | 23 | - | - | 23: the UI fixes landed in `9e8765f` (21 UI files); `test_ui_visual_qa` (18 tests) covers 20 of them, UI-13 has its own code fix, UI-19 was the same issue as CH2-012 (fixed), UI-11 changed the echo-stone material; stills in `fix_ui/` (1080p and 720p sheets) but **no per-finding closure record** was written | `fix_ui/` |
+| **Total** | **110** | **81** | **5** | **24** | |
+
+Nothing here was judged in motion, in a play session or by a human (list in `KNOWN_ISSUES.md` §7).
+
+### 9.6 Bugs found and fixed
+* **Bot route segments (S0-S4): 17 bugs** (0 blockers, 2 major, 5 minor, 10 polish; `qa/tmp/bot/BUGS_MERGED.md`). Bug-fix round 1
+  fixed 16 and partly fixed CH2-011 (an engine-internal leak warning in developer logs, accepted). Every fixer's new tests fail on the
+  old code; the bot re-ran each segment afterwards (details and per-bug table: §10.2).
+* **Visual reviews: 110 findings** (§9.5).
+* **Natural chain (after the release code freeze), open in 2.0.0** (`qa/tmp/bot/chain/bugs.json`):
+
+| Id | Sev | What | Status |
+|---|---|---|---|
+| CHAIN-001 | minor | Quarry Warden stands frozen in "chase" at the arena edge when Krystal is on the terrace 1.4 m below the bench (no attack, no reset); walking back up the ramp restarts the fight (`chain/run1`, `diag_warden_climb`) | open (not a softlock) |
+| CHAIN-002 | minor | Quarry Warden can be beaten with 0 pillar exposures by staying close and punishing slams (`chain/dev3` 68.5 s, `diag_warden_climb` 41 s) | open, design call |
+| CHAIN-003 | polish | "ObjectDB instances were leaked at exit" on both quit paths = CH2-011 | accepted (developer logs only) |
+
+### 9.7 Music — analysis only, NOT LISTENED
+`docs/ch2/MUSIC_MANIFEST.md`: 27 cues (5 retained + 22 new compositions) + 4 layers, each with generator, duration, loop, tempo /
+meter, playlist, peak / loudness from the manifests (new pieces -19.4 to -16.8 LUFS integrated) and in-game selection evidence (unit
+tests + bot telemetry). No human listening, no in-game recording of the new music, layer sync reasoned but not measured in the engine.
+
+### 9.8 Performance — [perf] (`qa/tmp/perf/packaged_v200/summary.md`)
+The packaged-build profile finished at 10:57 (run 10:29-10:57), after the rest of this report was written. Setup (from its summary):
+the **packaged 2.0.0 exe** (release build, not debug), Vulkan Forward+, 1920×1080 borderless window on the second monitor (60 Hz),
+**V-Sync off and no frame cap** (to show headroom; the shipped default is V-Sync on), muted, virtual input, no editor running.
+Hardware: Ryzen 9 9950X, 125.6 GB RAM, **RTX 4090** (driver 595.71). Each state: 2.5 s settle, 20 s 360° pan, 12 s walking, 4 s
+idle. States start from the real save 16 (Haven) or from S2 / S4 **diagnostic fixtures** (not a natural route). Shader caches were
+already warm from earlier runs.
+
+| Preset | Avg FPS range over the 9 states | 1 % low range | Worst frame in the samples | Frames > 33 ms in the samples | In-game loads | Private / video memory |
+|---|---|---|---|---|---|---|
+| High @1920×1080 | 398 (Haven) - 709 (ballroom) | 217 - 334 | 16.9 ms | 0 | 0.95 s (annex) - 2.7 s (Reach arrival) | 1.43-1.87 GB / 452-507 MB |
+| Low @1920×1080 | 468 - 682 | 241 - 330 | 17.2 ms | 0 | 0.85 - 2.9 s | 1.44-1.69 GB / 453-476 MB |
+| High @1280×720 | 397 - 690 | 215 - 330 | 17.8 ms | 0 | 0.86 - 2.6 s | 1.44-1.66 GB / 304-338 MB |
+
+* Loading hitches: the worst frames are inside loads (a single 0.85-2.4 s frame while an area is built) and the first seconds after
+  (post-load worst 30-44 ms); no sample frame over 50 ms outside loads ("Stalls / outliers: none").
+* Lantern Road round trips (Reach <-> Haven ×3, each preset): node, object, orphan, audio-player and video-memory counts flat;
+  harness verdict **stable**. Process private memory still rises about 9-15 MB per cycle (e.g. 1.61 -> 1.73 GB over three cycles at
+  High 1080p); the harness counts that as stable, but a long session was not measured.
+* Enemy AI: no enemy processing farther than 60 m in any sample.
+* QA-harness note (not a player issue): the packaged window took the OS foreground ~0.6 s after launch despite the no-focus override;
+  the harness held `LockSetForegroundWindow` and handed focus back (the game was foreground in 3043 of 3136 checks).
+* Earlier in the same folder: `headless_check1` (harness validation, headless, nothing rendered - its FPS figures are meaningless) and
+  `packaged_smoke*` (single-state smoke samples of the same exe, consistent with the table).
+
+**Not measured:** any weaker or integrated GPU, the shipped V-Sync-on default, a timed natural route with fights, a long session.
+These numbers come from one very powerful PC and say nothing about minimum requirements.
+
+### 9.9 The natural end-to-end chain — [bot]
+`tools/qa/ch2/chain.py` runs S1 -> S2 -> T23 -> S3 -> T34 -> S4 -> END as ONE journey from a copy of the real Chapter-One-complete
+save: no fixtures, no debug cheats, no teleports or grants; T23 / T34 earn by play what the segment fixtures handed out (home rest,
+harvest, cooking). Headless, virtual input, on the pre-release snapshot (see the table at the top of §9) - **not the 2.0.0 exe, not
+OS input, not a human**.
+
+| Run | Result | Total | S1 / S2 / T23 / S3 / T34 / S4 / END (s) | Notes |
+|---|---|---|---|---|
+| `chain/dev3` | **completes**, Chapter Two 20/20, relaunch same items | 1564.1 s | 73.2 / 255.8 / 81.2 / 228.1 / 46.1 / 864.7 / 11.1 | 0 deaths, 0 SCRIPT ERRORs, lowest HP 8 (S4); Warden 0 exposures (CHAIN-002); 62 music cue changes |
+| `chain/run2` (seed 11) | **completes**, 20/20, relaunch same items | 1306.4 s | 72.4 / 242.7 / 87.4 / 195.3 / 45.2 / 648.7 / 11.3 | 0 deaths, 0 SCRIPT ERRORs, lowest HP 28 (S4); Warden 2 exposures |
+| `chain/run1` | **stopped in S2**: Warden not defeated in time | - | 71.7 / 608.9 (stopped) | found CHAIN-001 |
+| `chain/run3` | **completes**, 20/20, relaunch same items | 1433.9 s | 69.5 / 218.6 / 87.5 / 204.2 / 46.0 / 792.2 / 12.6 | **1 death** in S4: the Borrowed Choir's phase-3 hush (the bot's lantern on a false anchor at 7 HP); respawn at the vault checkpoint, "The Choir picks up its song where you left it", fight won after the retry; 0 SCRIPT ERRORs; Warden 1 exposure |
+| `chain/run4` (seed 5) | **completes**, 20/20, relaunch same items | 1323.0 s | 69.7 / 236.9 / 87.9 / 203.0 / 49.8 / 660.0 / 12.2 | 0 deaths, 0 SCRIPT ERRORs, lowest HP 25 (S4); Warden 1 exposure |
+| `chain/exe_smoke` | harness error (QA input port not reachable) | - | - | 09:34, against the exe that existed before 2.0.0 was built; not a 2.0.0 result |
+
+Summary: **4 of 5 natural chain runs completed Chapter Two** (dev3, run2, run3, run4; 1306-1564 s each), one stopped at the Quarry
+Warden (run1, CHAIN-001). Every completed run ended with Save & Quit from the pause menu, a relaunch and Continue into the same save
+(same items, 20/20 steps, chapter complete). Every run logged 2 "ObjectDB instances were leaked" warnings (CHAIN-003) and 0 SCRIPT
+ERRORs. Boss times across the four: Quarry Warden 35.9-68.5 s (0-2 exposures), Count Velour 78-108 s (route step), Crossing Matron
+65-92 s, Borrowed Choir 188-317 s.
+
+Human-time equivalent: unknown. A route-aware bot finished Chapter Two in about 22-26 minutes of real time; a first-time player
+will take far longer, and nobody has measured it.
+
+### 9.10 NOT YET DONE (honest list)
+* **Human listening** of any music or sound (Chapter One or Two), the Music Box, transitions, boss layers.
+* **An OS-level real-input run** (SendInput, `tools/winctl.ps1` / `playthrough.py` default transport) of Chapter Two, on the
+  packaged build.
+* **A human first-time playthrough** of Chapter Two (or of the enriched Chapter One): playtime, difficulty, fun, readability of hints
+  and tells.
+* **PERSONAL-SAVE VERIFICATION BLOCKED**: Krystal's own save has not been copied, migrated or diffed (procedure:
+  `docs/ch2/SAVE_INTEGRITY_REPORT.md` §7).
+* **Performance on anything but the development PC** (RTX 4090): no weaker / integrated GPU, no V-Sync-on default, no timed
+  natural route with fights, no long session (the packaged per-state profile is done, §9.8).
+* **The natural end-to-end chain on the 2.0.0 exe** (so far only on the pre-release source snapshot, headless: §9.9); a visible
+  second-monitor chain run.
+* MP §20.4 runs: A with her save (blocked), B fresh integrated game on the packaged build with real input, C measured companion /
+  gear effects in controlled encounters, D comfort + music with arachnophobia on and listening, E persistence with a real process
+  kill during a write. Only headless bot equivalents of parts of A and B exist.
+* Echo Trials and Lanternwake Expeditions in play (unit-tested only); lamp orders other than orchard -> quarry -> manor in play;
+  equipment in play.
+* In-motion visual checks and screenshots / recordings from the packaged 2.0.0 build.
+
+## 10. Chapter Two — development records (superseded by §9 where they differ)
+
+### 10.1 Integration pass 1 (after Waves B/C) — [auto] only
+Twelve parallel fixer groups; the runs were snapshots of files that were changing while they ran. Before the pass: 2164 tests, 11
+failed (8 order-dependent, fixed by the runner's isolation R09, plus R08 / R42). During it: 2279 / 20 failed and 2334 / 4 failed (files
+mid-edit). After it: `parse_all` OK, full suite 2407 tests, 3 failed (Wave D expedition files rewritten mid-run; an outdated R17
+expectation, fixed) and then **2407 tests, 0 failed, 820 s** (04:21-04:35), with the 33 timing suites run three times (393 tests, 0
+failed ×3). Logs: `qa/tmp/full_integration_bc.log`, `qa/tmp/full_integration_bc_final.log`, `qa/tmp/timing_suites_3x.log`. Test
+changes of that pass: the Echo Trial label follows R17 ("Leave the trial"), a deterministic blink test, two progression audits restore
+`Game.zone_id` / `Game.in_safe_zone`.
+
+### 10.2 Bug-fix round 1 (CH2-001..017) — fixes, regression tests, [bot] confirmation
+Every fixer confirmed its new tests fail on the old code (old files swapped back in, then restored byte-identical). The [bot] column
+is the verifier's re-run on the snapshot (S0 also on the live tree). Details: the fixer reports summarised in `docs/ch2/INTEGRATION_PASS3.md`.
 
 | Bug | Sev | Fix (files) | Regression tests | [bot] confirmation | Status |
 |---|---|---|---|---|---|
 | CH2-001 | major | the lamp search joins step group "lamps"; `hint_when`; `ChapterLog.from_dict()` narrowing (`quests_ch2.gd`, `chapter_log.gd`) | `test_save_v2_chapter_log` ×3 (+1 updated), `test_ui_journal_tracker` ×1 (+2 updated) | S2: Garden and Quarry Seals + "Goal complete" the moment each lamp is lit; S3: Manor Seal right after its lamp | fixed |
 | CH2-002 | major | `resource_node.gd` `_visual_id()`, `_settle_depleted()` safety net; `reach_vegetation.node_params()` | `test_world_nodes` ×3, `test_world_reach_area` ×1 | S2: two Reach trees felled, 0 SCRIPT ERRORs (was 10) | fixed (respawn after 1440 in-game min: unit test only) |
-| CH2-003 | minor | Weaver: 15 % late window cap, threshold stop, banked scorch (`weaver_boss.gd`) | `test_enemies_boss_pacing` (10) | S0 ×4: fan, drop, release and channel all play before the win | fixed; the late-window overshoot the verifier saw (54 HP in a 36 HP window) was fixed afterwards in code with its own test - not re-run by the bot |
-| CH2-004 | minor | Warden: `EXPOSE_CAP` 35 %, owed pulses, `PULSE_FLOOR_RATIO` (`quarry_warden.gd`) | `test_enemies_ch2_warden` ×5 | S2: the three pulses before defeat; the one exposure took 80.4 HP (cap 105) | fixed |
+| CH2-003 | minor | Weaver: 15 % late window cap, threshold stop, banked scorch; a finishing blow in her last phase lands (`weaver_boss.gd`) | `test_enemies_boss_pacing` (10), `test_enemies_review` | S0 ×4: fan, drop, release and channel all play before the win | fixed; the later overshoot / finishing-blow changes were not re-run by the bot |
+| CH2-004 | minor | Warden: `EXPOSE_CAP` 35 %, owed pulses, `PULSE_FLOOR_RATIO` (`quarry_warden.gd`) | `test_enemies_ch2_warden` ×5 | S2: the three pulses before defeat; the one exposure took 80.4 HP (cap 105) | fixed; but see CHAIN-001 / 002 |
 | CH2-005 | minor | Velour channels beside the candle and eases round the stand (`count_velour.gd`) | `test_boss_velour_qa_fixes` ×2 | S3 ×2: both phase-3 channels broken by a straight-on blow 0.8-1.7 s in | fixed |
 | CH2-006 | minor | lost-sight give-up for ordinary enemies (`enemy_base.gd`) | `test_enemies_lost_sight` (4) | - (the bot killed the hall's Velvet Wing) | fixed, unit-tested only (real-play check open) |
 | CH2-007 | minor | Crossing: engagement rule, floors 60/35/20 %, clamped scorch, 3 s retreat run (`crossing_matron.gd`, `crossing_rules.gd`) | `test_boss_crossing_pacing` ×2, `_fight` ×3, `_rules` ×1 + 4 updated | S4: one exposure per phase; pounce, delayed pounce and release all faced | fixed |
-| CH2-008 | polish | no combat state under a boss context; the boss's engagement grace cleared (`music_selector.gd`, `music_director.gd`) | `test_audio_music_selector` ×2, `test_audio_music_director` ×1 | S0, S3, S4: boss cue → silence / area music, never m10 / m22 | fixed |
+| CH2-008 | polish | no combat state under a boss context; the boss's engagement grace cleared (`music_selector.gd`, `music_director.gd`) | `test_audio_music_selector` ×2, `test_audio_music_director` ×1 | S0, S3, S4: boss cue -> silence / area music, never m10 / m22 | fixed |
 | CH2-009 | polish | opening the wardrobe retires the notice (`wardrobe_panel.gd`) | `test_ui_appearance_wardrobe` ×1 | S1: `notice_shown` true | fixed |
-| CH2-010 | polish | helper zones; legacy landmarks marked seen (`game.gd`, `annexes.gd`, `mastery.gd`, `data/mastery.gd`) | `test_mastery_landmark_discovery` (5) | S1: `discovered.surface` = haven, ruin; Wayfinding 105 XP (rank 2 = 110) | fixed |
-| CH2-011 | polish | `Game.release_prefetches()` on quit / window close (`game.gd`) | `test_flow_quit_prefetch` (3) | S1: still "8 ObjectDB instances were leaked" (`s1/vfix1`), 3 in the `--verbose` probe (`s1/vfix_verbose`: bare RefCounted, refcount 0) | **partly fixed**: our leak source is gone (old quit 15, fixed quit 7-8); the rest is engine-internal, developer logs only - accepted (R3-16, KNOWN_ISSUES) |
-| CH2-012 | polish | the search step renamed "Find the Three Lamps" (`quests_ch2.gd`) | `test_save_v2_chapter_log` ×1 | S2: only the group title is announced | fixed |
-| CH2-013 | polish | Velour's cap applied before the blow (`velour_health.window_room`) | `test_boss_velour_qa_fixes` ×4 | S3: no window over the 60.8 HP cap (largest exactly 60.8) | fixed |
-| CH2-014 | polish | Choir anchors switched off for phase B (`borrowed_choir.gd`) | `test_boss_choir_anchors` (3) | S4: 0 anchor prompts in phase B (38 and 152 samples in the old runs) | fixed |
-| CH2-015 | polish | crossing hint wording (`quests_ch2.gd`) | `test_save_v2_chapter_log` ×1 | S4: "A checkpoint lantern waits just before the bridge." | fixed |
+| CH2-010 | polish | helper zones; legacy landmarks marked seen (`game.gd`, `annexes.gd`, `mastery.gd`, `data/mastery.gd`) | `test_mastery_landmark_discovery` (5) | S1: `discovered.surface` = haven, ruin; Wayfinding 105 XP | fixed |
+| CH2-011 | polish | `Game.release_prefetches()` on quit / window close (`game.gd`) | `test_flow_quit_prefetch` (3) | S1: still "8 ObjectDB instances were leaked"; 3 in the `--verbose` probe (bare RefCounted, refcount 0) | **partly fixed**: our leak source is gone (15 -> 7-9); the rest is engine-internal, developer logs only - accepted (R3-16) |
+| CH2-012 | polish | the search step renamed "Find the Three Lamps" (`quests_ch2.gd`) | `test_save_v2_chapter_log` ×1 | S2: only the group title is announced | fixed (same issue as visual UI-19) |
+| CH2-013 | polish | Velour's cap applied before the blow (`velour_health.window_room`) | `test_boss_velour_qa_fixes` ×4 | S3: no window over the 60.8 HP cap | fixed |
+| CH2-014 | polish | Choir anchors switched off for phase B (`borrowed_choir.gd`) | `test_boss_choir_anchors` (3) | S4: 0 anchor prompts in phase B (was 38 and 152 samples) | fixed |
+| CH2-015 | polish | crossing hint wording (`quests_ch2.gd`) | `test_save_v2_chapter_log` ×1 | S4 | fixed |
 | CH2-016 | polish | post-Choir hint names the vault's bell-lift (`quests_ch2.gd`) | `test_save_v2_chapter_log` ×1 | S4 | fixed |
 | CH2-017 | polish | vault exit caption follows the clock (`choir_arena.gd`) | `test_works_deep_vault_exit` ×1 | S4: "[the bell-lift climbs toward the daylight]" at 11:40 | fixed |
 
-**[bot] runs after the fixes** (`qa/tmp/bot/`; every run 0 deaths, 0 SCRIPT ERRORs, no problems filed):
+Runs of that round (`qa/tmp/full_bugfix1_run1.log`, `full_bugfix1.log`, `full_bugfix1_worktree.log`): the snapshot went 2534 / 2 failed
+(a packaging test reading a local `override.cfg`; a prefetch test's assumption) -> **2534 / 0** after the test fix; the live tree
+mid-edit had 33 failures (a file not compiling at that moment), none in a bug-fix file. `game/override.cfg` is gone from the tree now
+and the packaging test reads the shipped `project.godot` (R3-22).
 
-| Segment | Start | Run folder(s) | Result |
-|---|---|---|---|
-| S0 (Weaver Matron) | diagnostic fixture at the arena lantern | `s0/vfix_fast`, `s0/vfix_thorough` (live tree), `s0/vfix_snap_fast`, `s0/vfix_snap_thorough` (snapshot) | won ×4, phases 1-2-3 seen every time, lowest HP 93-100 |
-| S1 (continuation) | natural: a copy of the real v1 Chapter-One-complete save | `s1/vfix1`, `s1/vfix_verbose` | completes (74-76 s), save diff fully explained by play, CH2-011 warning as above |
-| S2 (orchard, quarry) | diagnostic fixture | `s2/vfix1` | completes, 232.7 s, both seals, Warden with pulses |
-| S3 (manor, Velour) | diagnostic fixture / the ballroom save | `s3/vfix_run`, `s3/vfix_boss` | completes, 196.5 s / 140.7 s |
-| S4 (Works, finale) | diagnostic fixture | `s4/vfix_full` | completes, 747.8 s (was 647.3 s), relaunch shows 20/20 steps, no double rewards (`s4/vfix1` is invalid: player.gd did not compile mid-edit, the run was killed) |
+### 10.3 Integration pass 3 (51 requests) — groups
+Decision record: `docs/ch2/INTEGRATION_PASS3.md`. Each group re-checked the code, added regression tests that fail on the old code,
+ran its related suites and rendered its visible changes as stills.
 
-**Fight durations** ([bot] time; all phases now play):
-
-| Fight | Before | After |
-|---|---|---|
-| Weaver Matron, fast style (intro → defeat) | 19.8-22.8 s, braziers only | 44.6-47 s (53.6-56 s bot time) |
-| Weaver Matron, thorough style | 65.9 s | 64.3-71.3 s |
-| Quarry Warden | 24.9 s, pulses skipped | 40.2 s |
-| Count Velour | 70.2 s / 106.3 s | 78.0 s / 78.7 s |
-| Crossing Matron | 21.7-22.5 s, no attack faced | ~65 s (70.0 s route step) |
-| Borrowed Choir (not retuned) | 229.8 s | 301.3 s (the bot guessing in phase A) |
-
-These are bot times with perfect route knowledge; the design targets (2-4 min for the Chapter Two bosses, "a few minutes" for the
-Matron) are about a first human attempt, which is untested. The fixers' headless simulations are in their reports (Crossing rusher 43 s,
-reactive 57 s at Standard; Weaver rush 40 s, thorough 53-55 s; Velour 62-96 s by gear and intensity).
-
-### 10.4 Visual fixes — [visual] stills
-Each group re-rendered its fixes on the second monitor and looked at the frames; each added a numeric regression suite. **Everything
-in this table was only rendered as still frames** (plus unit tests): nothing was judged in motion, in a real play session, or by a
-human. The in-motion checks are listed in KNOWN_ISSUES (R3-49).
-
-| Group | Findings | Fixed | Partly / left for other files | Before | After (pairs) | Tests |
-|---|---|---|---|---|---|---|
-| Avatar | 20 (AV-00..19) | 14 | 6 partly: AV-11 skirts (sprint slits, knees when sitting), AV-12 (paper lantern pack), AV-13 / 14 / 15 (need palette data → done in pass 3 G6, rendered `qa/tmp/visual/pass3_g6/`), AV-19 late-roll hover | `qa/tmp/visual/avatar/sheets/` | `qa/tmp/visual/fix_avatar/sheets/` (`BA_*` side-by-side) | `test_avatar_look_fit` (10) |
-| Building | 15 (BU-00..14) | 15 | - (the real Haven cottage built through BuildMode: 59 of 61 pieces; the 2 refusals are the plan's own conflict and the new wall rule) | `qa/tmp/visual/building/shots/` | `qa/tmp/visual/fix_building/` | `test_building_visual_fit` (11) |
-| Cameras (theme T1) | 8 (RE-00, RE-01, IN-00, IN-01, IN-03..06) + RE-07 | 7 + RE-07 | RE-00 Woods side → done in pass 3 G2 (R3-32), plus a new find, Tobin's `annex_door` arrival (R3-33); both rendered by G2 | `qa/tmp/visual/reach/`, `qa/tmp/visual/interiors/` | `qa/tmp/visual/fix_cameras/compare/`, `fix_cameras/after_*/` | `test_camera_spawn_clearance` (7): view covered within 2 m of the lens, before → after: arches 10-12 % → 0, Reach arrival 78 % → 0, annex lantern 16 % → 0, lift landing 58 % → 0, `vault_exit` 32 % → 0, trials 75-100 % → 0 |
-| Creatures | 16 (CR-00..15) | 12 | CR-03 partly; CR-05, CR-14 in files outside the group → all three done in pass 3 G4 (rendered `qa/tmp/visual/pass3_g4/`); CR-12 covered by IN-07 | `qa/tmp/visual/creatures/`, `fix_creatures/before_*` | `qa/tmp/visual/fix_creatures/after_*`, `w_*` | `test_creatures_visual_fixes` (12, 15 after G4) |
-| Interiors | 12 own (IN-02, IN-06..16) | 11 | IN-09 and the HUD half of IN-13 are UI work (IN-09: the UI agent's HUD hush, unconfirmed; IN-13 dial deferred, R3-43); the follow-ups were done in pass 3 G3 - each lift fits its own sign, a winch-hall rock no longer cuts the crossing-gate sign's top line from the arrival camera, resonator plates show no prompt while disabled, the Choir trial board's Moon is a crescent (rendered `qa/tmp/visual/pass3_g3/`) | `qa/tmp/visual/interiors/` | `qa/tmp/visual/fix_interiors/compare/` | `test_works_interior_visuals` (7), `test_manor_layout` (+1) |
-| Reach | 18 (RE-02..19) | 18 (RE-07 by the cameras group) | - | `qa/tmp/visual/reach/` | `qa/tmp/visual/fix_reach/_cmp_misc.png`, `_cmp_c1x.png`, `shots/fix3/_cmp_basin.png`, `shots/final/` | `test_reach_visual_fixes` (17) |
-| UI | 23 (UI-00..22) | ? | still being fixed when pass 3 closed; no report yet | `qa/tmp/visual/ui/` | - | - |
-
-Pass-3 re-check by G1 (the docs group), [visual]: `qa/tmp/visual/g1_pass3/crown_helm_recheck.png` - no hair shows through any helm
-or hood (AV-02 confirmed, its KNOWN_ISSUES note removed); `armor_hem_recheck.png` - jacket / cardigan buttons and plain hems are covered
-under body armor (AV-04), but the Cloud Cardigan's fluffy cloud hem and the Velvet Ruffle Bodice's white collar still show round every
-body armor set (kept in KNOWN_ISSUES).
-
-### 10.5 Integration pass 3
-The fixers' requests for files outside their groups, the design decisions (CH2-010 legacy landmarks, CH2-006 lost sight, CH2-011
-engine leak, Velour's finishing blow) and every group's outcome are in `docs/ch2/INTEGRATION_PASS3.md` (51 requests). Each group
-re-checked the code, added regression tests that fail on the old code, ran its related suites and rendered its visible changes:
-
-| Group | Requests | Outcome | [auto] | [visual] |
+| Group | Requests | Outcome | [auto] | [stills] |
 |---|---|---|---|---|
-| G2 surface arrival spawns | R3-32, R3-33 | Woods waygate spawn 5.8 m out; Tobin's `annex_door` spawn moved to (6.8, 7.8) (7.4 still left 8 % of the view on the lintel) | 22 + 81 + 69 tests, 0 failed; `parse_all` 0 failed | both arrivals rendered: clean third-person frames |
-| G3 Works deep interiors | R3-19, R3-35, R3-41, R3-42 | resonator prompts, crossing-gate sign (cause: a winch-hall rock, dressing RNG kept), lift signs, trial board crescent | 237 tests, 0 failed | `qa/tmp/visual/pass3_g3/` (before / after of the gate sign) |
-| G4 boss creature props | R3-36..38 (R3-39 skipped: would override the comfort setting) | trip posts, Crossing scar and mantle, Choir paper lanterns | 144 tests 0 failed; 203 tests 1 failed (the red test below) | `qa/tmp/visual/pass3_g4/` (both arachnophobia looks) |
-| G5 combat feedback, text, tests | R3-06, R3-08, R3-09, R3-22 | Crossing desc "three times", one glance spark for a player swing blocked by scenery, `win_velour` robust, packaging test reads `project.godot` | combat_core 16, data_ch2_catalogue 19, trials 31, velour 68, boss_ 230: 0 failed; `enemies_` 317, 1 failed (the red test below) | a preview scene: one spark cluster on the wall's near face |
-| G6 appearance palettes | R3-26..28, R3-30 (R3-29 skipped) | Ghostlight Party, Pumpkin Patch, mushroom beret, chorister capelet channels | avatar / appearance suites 0 failed (one UI wardrobe-preview failure from the in-progress UI fix; it passes again at 09:48) | `qa/tmp/visual/pass3_g6/` |
-| G1 docs, layer name | R3-04, 05, 10, 12, 16, 17, 18, 31, 34, 48, 51 | this section, KNOWN_ISSUES, PROJECT_STATE, the code maps, ARCHITECTURE, `project.godot` layer 10 "camera" | new `test_project_layer_names` (2); related suites 97, 0 failed | `qa/tmp/visual/g1_pass3/` (10.4) |
+| G2 surface arrival spawns | R3-32, R3-33 | Woods waygate spawn 5.8 m out; Tobin's `annex_door` spawn moved to (6.8, 7.8) | 22 + 81 + 69 tests, 0 failed | both arrivals rendered |
+| G3 Works deep interiors | R3-19, 35, 41, 42 | resonator prompts, crossing-gate sign (cause: a winch-hall rock), lift signs, trial board crescent | 237 tests, 0 failed | `qa/tmp/visual/pass3_g3/` |
+| G4 boss creature props | R3-36..38 (R3-39 skipped: would override the comfort setting) | trip posts, Crossing scar and mantle, Choir paper lanterns | 144 tests, 0 failed | `qa/tmp/visual/pass3_g4/` (both arachnophobia looks) |
+| G5 combat feedback, text, tests | R3-06, 08, 09, 22 | Crossing text "three times", one glance spark for a blocked swing, robust `win_velour`, packaging test reads `project.godot` | combat_core, catalogue, trials, velour, boss suites 0 failed | a preview scene |
+| G6 appearance palettes | R3-26..28, 30 (R3-29 skipped) | Ghostlight Party, Pumpkin Patch, mushroom beret, chorister capelet | avatar / appearance suites 0 failed | `qa/tmp/visual/pass3_g6/` |
+| G1 docs, layer name | R3-04, 05, 10, 12, 16, 17, 18, 31, 34, 48, 51 | records, `project.godot` layer 10 "camera" | `test_project_layer_names` (2); 97 related tests, 0 failed | `qa/tmp/visual/g1_pass3/` |
 
-Still open after it: the
-clean full-suite run on the live tree (R3-50), the real-play checks (R3-49), the UI group's visual fixes and its deferred tracker /
-day-dial items (R3-03, R3-43), the `.uid` import (R3-47), removing `game/override.cfg` after the QA runs (R3-23) and the S4 bot's dodge
-near braziers (R3-07) - also listed in `PROJECT_STATE.md`.
+Items pass 3 left open and their state at 2.0.0: the clean full-suite run (R3-50) - **done** (§9.2); the `.uid` import (R3-47) - **done**
+in `36e2e8a` (705 of 705 scripts have one); `game/override.cfg` (R3-23) - **gone**; the UI group's findings - **addressed** (§9.5);
+the tracker's lamp rows (R3-03) and the day dial in the manor (R3-43) - **open** (`KNOWN_ISSUES.md` §3); real-play checks (R3-49) and
+the S4 bot's dodge near braziers (R3-07) - **open**.

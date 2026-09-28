@@ -8,8 +8,9 @@ now leads somewhere new - whenever you feel like following it.
 PRESS "CONTINUE", NOT "NEW GAME"
   Continue opens your own save: the same house, furniture, chests, crops, friends and
   finished story. New Game would start a fresh journey over it (it asks first).
-  The first time this version saves, it tucks an untouched copy of your Chapter One save
-  into  %APPDATA%\Hollowhaven\saves\pre_v2_backup  . The older copy of the game can't read
+  The first time you press Continue in this version (or it first saves over your old
+  save), it tucks an untouched copy of your Chapter One save into
+  %APPDATA%\Hollowhaven\saves\pre_v2_backup  . The older copy of the game can't read
   the new save, so keep playing with this one.
 
 STYLE KRYSTAL
@@ -29,7 +30,7 @@ YOUR FRIENDS FIGHT BESIDE YOU
   They use it when it helps, or press T (companion skill). The ring round their portrait
   shows when it's ready again.
   Press E on a friend for their menu: Assist or Stay close, the skill, "Attacks on its own",
-  "Uses its skill on its own", and a home spot. G still asks them to follow or wait.
+  "Uses its skill on its own", and where its home spot is. G still asks them to follow or wait.
   Mochi used to stop at the mine. Tie a Comfort Ribbon (sewn at the Loom) from Mochi's menu,
   then rest together by the lit lantern at the mine's mouth, and Mochi will come below too.
   A Companion Bed or Perch at home gives a friend a spot of its own (press E on it).
@@ -65,8 +66,9 @@ BUILDING
   a kitchen counter, a cottage bench, a music box and more.
   In build mode (B): Z takes back your last piece (press twice, full refund), P recolours
   the piece you point at with dyes from the Loom, N picks a carved pumpkin's face. Like
-  every other key, they can be changed in Settings > Controls.
-  There is a small cottage plot by the Lanternwake Commons for building in the Reach too.
+  most keys, they can be changed in Settings > Controls.
+  There is a small cottage foundation by the Lanternwake Commons for building in the Reach
+  too (beds and friends' beds belong at home, so not there).
 
 HALLOWEEN
   Hallowmere Reach is autumn all year: pumpkin orchards, candlelit paths and a very
@@ -100,6 +102,11 @@ GOOD TO KNOW
   - The Music Box (Workbench) plays the songs you have heard in calm places. Press E at
     it, pick a song, and mark favourites: they come round a little more often at home.
     Fights and scary moments still keep their own music.
+  - Journal > Optional lists the optional goals of both chapters (for example Tobin's side
+    door by the mine mouth, Bramblewatch, and an upstairs for your house).
+  - Saving: in the woods and in the Reach you can save anywhere nothing is chasing you. In
+    the manor and the Hushed Works, rest somewhere safe (a lit lantern or the refuge) to save;
+    below the old mine it is still the lanterns; Echo Trials are never saved.
   - New tips appear once each. Settings > Gameplay > "Show tips again" brings them back.
   - One small thing: the older version of the game can't open the new save (the backup
     above is for that).
