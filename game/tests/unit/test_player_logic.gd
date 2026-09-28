@@ -308,3 +308,62 @@ func test_acceleration_and_deceleration() -> void:
 	assert_true(air.length() < Logic.approach(Vector3.ZERO, target, true, 1.0 / 60.0).length(), "less control in the air")
 	var stop := Logic.approach(Vector3(0, 0, -4.2), Vector3.ZERO, true, 1.0)
 	assert_eq(stop, Vector3.ZERO, "stops without overshoot")
+
+
+# --- Airborne speed cap (lead decision for MP 6.2: jumps never stretch unpredictably) ------------------------------
+
+func test_air_move_mult_caps_bonuses_but_never_slows() -> void:
+	assert_almost(Logic.air_move_mult(1.0), 1.0, 0.0001, "legacy: no bonus, nothing changes")
+	assert_almost(Logic.air_move_mult(1.05), 1.05, 0.0001, "small bonuses below the cap stay")
+	assert_almost(Logic.air_move_mult(1.3), Logic.AIR_MOVE_MULT_CAP, 0.0001, "+30% -> +10% in the air")
+	assert_almost(Logic.AIR_MOVE_MULT_CAP, 1.10, 0.0001)
+	assert_almost(Logic.air_move_mult(0.5), 0.5, 0.0001, "slows apply fully")
+	assert_almost(Logic.air_move_mult(0.65), 0.65, 0.0001, "a buff under a slow is not trimmed")
+	var hv := Vector3(3.0, 0.0, -6.0)
+	assert_eq(Logic.jump_takeoff(hv, 1.0), hv, "legacy take-off unchanged")
+	assert_eq(Logic.jump_takeoff(hv, 1.08), hv, "below the cap: unchanged")
+	assert_eq(Logic.jump_takeoff(hv, 0.5), hv, "slowed: unchanged")
+	var fast := Logic.jump_takeoff(Vector3(0, 0, -Logic.SPRINT_SPEED * 1.3), 1.3)
+	assert_almost(fast.length(), Logic.SPRINT_SPEED * 1.1, 0.0001, "sprinting at +30% leaves the ground at sprint x 1.10")
+	assert_true(fast.normalized().is_equal_approx(Vector3(0, 0, -1)), "direction kept")
+	assert_eq(Logic.jump_takeoff(Vector3.ZERO, 1.3), Vector3.ZERO)
+
+
+## Horizontal reach of a held full jump taken at full speed (`base` = sprint or walk top speed), simulated with the
+## same Logic steps as player.gd _physics_process: take-off trim, airborne approach toward the capped top speed,
+## gravity with the heavier fall, landing back at take-off height. `capped` = false replays the old behaviour
+## (whole multiplier in the air, no take-off trim) as a control.
+static func _jump_reach(base: float, move_mult: float, capped: bool = true) -> float:
+	var dt := 1.0 / 60.0
+	var hv := Vector3(0.0, 0.0, -base * move_mult)            # ground speed keeps the whole multiplier
+	if capped:
+		hv = Logic.jump_takeoff(hv, move_mult)
+	var air_mult := Logic.air_move_mult(move_mult) if capped else move_mult
+	var air_target := Vector3(0.0, 0.0, -base * air_mult)
+	var vy := Logic.JUMP_VELOCITY
+	var y := 0.0
+	var dist := 0.0
+	for i in 600:
+		var g := Logic.GRAVITY * (Logic.FALL_GRAVITY_MULT if vy < 0.0 else 1.0)
+		vy = maxf(vy - g * dt, -Logic.TERMINAL_FALL)
+		hv = Logic.approach(hv, air_target, false, dt)
+		y += vy * dt
+		dist += hv.length() * dt
+		if y <= 0.0:
+			break
+	return dist
+
+
+func test_jump_reach_with_a_speed_buff_and_while_slowed() -> void:
+	for base in [Logic.SPRINT_SPEED, Logic.WALK_SPEED]:
+		var normal := _jump_reach(base, 1.0)
+		var buffed := _jump_reach(base, 1.3)
+		var slowed := _jump_reach(base, 0.5)
+		var both := _jump_reach(base, 1.3 * 0.5)
+		assert_true(normal > base * 0.55, "a full jump covers ground (%.2f m at %.1f m/s)" % [normal, base])
+		assert_true(buffed / normal <= 1.105, "+30%% speed stretches the jump by at most ~10%% (%.3f)" % (buffed / normal))
+		assert_true(buffed / normal >= 1.08, "the capped bonus still counts in the air (%.3f)" % (buffed / normal))
+		assert_almost(slowed / normal, 0.5, 0.02, "a slow shortens the jump fully (%.3f)" % (slowed / normal))
+		assert_almost(both / normal, 0.65, 0.02, "buffed and slowed: the slow applies to the whole multiplier (%.3f)" % (both / normal))
+		var old := _jump_reach(base, 1.3, false)
+		assert_true(old / normal > 1.25, "control: uncapped, +30%% stretched the jump by ~30%% (%.3f)" % (old / normal))

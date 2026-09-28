@@ -9,7 +9,8 @@ extends CanvasLayer
 ## first), help (F1 controls overlay). Panels call Game.push_ui/pop_ui through here, and full-screen
 ## panels pause the tree via Game.set_paused.
 ## Chapter Two: the "wardrobe" panel (pause menu, Ward Stone, wardrobe / mirror furniture), has_panel(name),
-## and the one-time "Your wardrobe is ready" notice for older saves (tick_wardrobe_notice / show_wardrobe_notice).
+## the one-time "Your wardrobe is ready" notice for older saves (tick_wardrobe_notice / show_wardrobe_notice),
+## and show_chapter_two_ending() (awaitable; Game._show_chapter_two_ending() prefers it).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -414,16 +415,44 @@ func show_death() -> void:
 
 ## Chapter complete + thank-you + credits; returns when the player chooses to continue.
 func show_ending() -> void:
-	close_all()
-	hud.set_cinematic(true)
-	_ending = EndingScreen.new()
-	overlay_layer.add_child(_ending)
-	await _ending.play()
-	_ending = null
+	await _play_ending({})
 	if Audio.music_director_active():
 		Audio.release_music("restoration", 3.0)     # the director returns to the Haven's day/night music
 	elif Game.area_id == "surface":
 		Audio.play_music("music_haven", 3.0)
+	_end_ending_cinematic()
+
+
+## Chapter Two ending (MP section 17): "Chapter Two Complete - The Lanterns of Hallowmere", the ending card,
+## credits and "Continue exploring" (EndingScreen variant "chapter_two"). While it shows, input, the UI hotkeys
+## and the wardrobe notice are blocked exactly like the Chapter One ending. No music call: the director plays
+## the celebration on Events.chapter2_completed (there is no "restoration" request to release). Awaitable;
+## returns when the player continues. A second call while it shows just waits for the same ending.
+func show_chapter_two_ending() -> void:
+	if _ending != null and is_instance_valid(_ending):
+		if _ending.has_signal("finished"):
+			await Signal(_ending, "finished")
+		return
+	await _play_ending({"variant": "chapter_two"})
+	_end_ending_cinematic()
+
+
+## Shared by both endings: closes the menus, hides the gameplay HUD, shows the ending overlay and waits for
+## the player to continue. `_ending` is set for the whole time (blocks _input and the wardrobe notice).
+func _play_ending(params: Dictionary) -> void:
+	close_all()
+	hud.set_cinematic(true)
+	var e := EndingScreen.new()
+	if not params.is_empty():
+		e.setup(params)
+	_ending = e
+	overlay_layer.add_child(e)
+	await e.play()
+	if _ending == e:
+		_ending = null
+
+
+func _end_ending_cinematic() -> void:
 	if Game.mode == "playing" or Game.mode == "cutscene":
 		hud.set_cinematic(false)
 
@@ -560,7 +589,7 @@ func show_wardrobe_notice() -> String:
 
 
 ## Debug/QA only: --ui-open=<panel> [--ui-args=<json>] --ui-demo[=build|combat] --ui-lore=id,id
-## --ui-show=death|ending|chapter|comfort|wardrobe_notice
+## --ui-show=death|ending|ending2|chapter|comfort|wardrobe_notice
 func _debug_boot() -> void:
 	if not Debug.is_cheat_allowed():
 		return
@@ -575,6 +604,8 @@ func _debug_boot() -> void:
 			show_death()
 		"ending":
 			show_ending()
+		"ending2":
+			show_chapter_two_ending()
 		"chapter":
 			show_chapter_card("Chapter One", "The Dimming Ward")
 		"comfort":

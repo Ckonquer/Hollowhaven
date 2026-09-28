@@ -13,9 +13,22 @@ extends RefCounted
 ## shape_all() enforces the "strictly inside its own landmark radius" rule: each district runs with the
 ## terrain's shaping limit set to its landmark circle, and afterwards every height / water / path sample
 ## outside that circle is restored from a snapshot taken just before the call.
+##
+## Load time (R110): the district scripts (and everything they preload: controllers, builders, data) are compiled
+## on loader threads, like quarry.gd's warm_up(): warm_up(entries) first loads the shared enemy factory on the
+## MAIN thread (district scripts / builders preload it and quarry.gd loads it on the main thread, so no worker may
+## be compiling it then), then requests every district script that is not cached with
+## ResourceLoader.load_threaded_request. load_all() calls warm_up() itself and then collects each result in ORDER
+## (waiting only while a loader thread is still busy), with a plain load() fallback when a request could not be
+## made or returned no script. Measured (cold, headless): the engine compiles GDScript one script at a time, so
+## requesting and collecting at once inside load_all() saves little (~750-800 ms either way); the real gain comes
+## from calling warm_up() EARLIER (e.g. Game's area prefetch at the start of the travel fade): after a 1 s
+## head start load_all() waited 1.5 ms in total and no frame took longer than ~17 ms meanwhile.
 
 const Reach := preload("res://data/hallowmere_layout.gd")
 const TerrainScript := preload("res://src/world/reach/reach_terrain.gd")
+## Loaded on the main thread before any district script is requested on a loader thread (see header).
+const FACTORY_PATH := "res://src/enemies/enemy_factory.gd"
 
 const ORDER := ["orchard", "pools", "candleyard", "quarry", "manor_grounds"]
 const DISTRICTS := {
@@ -36,30 +49,87 @@ static func default_entries() -> Array:
 	return out
 
 
-## Milliseconds each district script took to load (compile + its preloads) in the last load_all().
+## Milliseconds the MAIN thread spent on each district script in the last load_all() (waiting for its loader
+## thread, or compiling it itself on the plain-load fallback).
 static var load_ms: Dictionary = {}
+## How each district script arrived in the last load_all(): "thread" (compiled on a loader thread), "cached"
+## (already loaded) or "sync" (plain load on the main thread: the fallback).
+static var load_mode: Dictionary = {}
+## Paths warm_up() requested on loader threads that load_all() has not collected yet (path -> true).
+static var _requests: Dictionary = {}
 
 
-## Loads every district script that exists and compiles: [{id, landmark, script, methods}] (order kept).
+## Starts compiling the district scripts on loader threads (no-op for a script that is cached, already
+## requested or missing). The shared enemy factory is loaded on the main thread first (see header). Returns
+## the number of new requests. entries = [] means default_entries().
+static func warm_up(entries: Array = []) -> int:
+	var list: Array = entries if not entries.is_empty() else default_entries()
+	_load_shared_on_main_thread()
+	var n := 0
+	for e in list:
+		if not (e is Dictionary):
+			continue
+		var path := String((e as Dictionary).get("path", ""))
+		if path == "" or _requests.has(path) or ResourceLoader.has_cached(path) or not ResourceLoader.exists(path):
+			continue
+		if ResourceLoader.load_threaded_request(path, "", false) == OK:
+			_requests[path] = true
+			n += 1
+	return n
+
+
+## True while warm_up() requests are waiting to be collected by load_all() (tests / QA).
+static func has_pending_requests() -> bool:
+	return not _requests.is_empty()
+
+
+static func _load_shared_on_main_thread() -> void:
+	if ResourceLoader.has_cached(FACTORY_PATH) or not ResourceLoader.exists(FACTORY_PATH):
+		return
+	load(FACTORY_PATH)
+
+
+## One district script: the loader thread's result when warm_up() requested it, else a plain (cached or
+## synchronous) load. Returns [script_or_null, mode].
+static func _collect(path: String) -> Array:
+	if _requests.has(path):
+		_requests.erase(path)
+		if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			var r: Variant = ResourceLoader.load_threaded_get(path)
+			if r is Script:
+				return [r, "thread"]
+	var mode := "cached" if ResourceLoader.has_cached(path) else "sync"
+	return [load(path), mode]
+
+
+## Loads every district script that exists and compiles: [{id, landmark, script, methods, path}] (order kept).
+## The scripts compile on loader threads (warm_up) and are collected here in order.
 static func load_all(entries: Array) -> Array:
 	var out: Array = []
 	load_ms = {}
+	load_mode = {}
+	if entries.is_empty():
+		return out
+	warm_up(entries)
 	for e in entries:
 		if not (e is Dictionary):
 			continue
 		var path := String((e as Dictionary).get("path", ""))
 		if path == "" or not ResourceLoader.exists(path):
 			continue
+		var id := String((e as Dictionary).get("id", path.get_file().get_basename()))
 		var t0 := Time.get_ticks_usec()
-		var s: Variant = load(path)
-		load_ms[String(e.get("id", path))] = float(Time.get_ticks_usec() - t0) / 1000.0
+		var got := _collect(path)
+		var s: Variant = got[0]
+		load_ms[id] = float(Time.get_ticks_usec() - t0) / 1000.0
+		load_mode[id] = String(got[1])
 		if not (s is Script) or not (s as Script).can_instantiate():
 			push_warning("ReachDistricts: %s failed to load; the base region is built without it" % path)
 			continue
 		var names: Dictionary = {}
 		for m in (s as Script).get_script_method_list():
 			names[String(m.get("name", ""))] = true
-		out.append({"id": String(e.get("id", path.get_file().get_basename())), "landmark": String(e.get("landmark", "")),
+		out.append({"id": id, "landmark": String((e as Dictionary).get("landmark", "")),
 			"script": s, "methods": names, "path": path})
 	return out
 

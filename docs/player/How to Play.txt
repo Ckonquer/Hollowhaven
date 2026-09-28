@@ -4,6 +4,8 @@ HOLLOWHAVEN - For Krystal
 To play: double-click  Hollowhaven.exe
 No installation, no account, no internet needed. Your progress is saved in
   %APPDATA%\Hollowhaven\saves   (paste that into the File Explorer address bar to find it)
+Already played Chapter One? Press Continue (not New Game): your house, friends and story
+carry on. What's new is in "Chapter Two - What's New.txt".
 
 If Windows shows "Windows protected your PC" (the game isn't code-signed):
   click "More info", then "Run anyway". This only appears the first time.
@@ -12,6 +14,8 @@ THE STORY
 The old Ward Stone in the clearing is dimming. Make the clearing your home, befriend the
 little creatures of the woods, prepare - and bring back the light from deep below the old mine.
 Follow the goal shown at the top right of the screen. Press J for your journal, M for the map.
+Chapter Two, "The Lanterns of Hallowmere", begins at the Ward Stone once Chapter One is done:
+a lantern road to Hallowmere Reach, an autumn town with a festival waiting to be finished.
 
 CONTROLS (change them any time in Settings > Controls)
   Move ..................... W A S D          Look ............ Mouse
@@ -20,9 +24,12 @@ CONTROLS (change them any time in Settings > Controls)
   Attack / chop / mine ..... Left mouse       Eat / use item .. Right mouse (or Q)
   Interact / pick up ....... E                Lantern ......... F
   Inventory ................ Tab (or I)       Crafting ........ C
-  Build mode ............... B  (R rotate, X take down, Left mouse place)
+  Build mode ............... B  (R rotate, X take down, Left mouse place,
+                                 Z undo - press twice, P recolour, N pumpkin face)
   Journal .................. J                Map ............. M
-  Companion follow / wait .. G                Hotbar .......... 1 - 8
+  Companion follow / wait .. G                Companion skill . T
+  Friend's menu ............ E on a friend    Hotbar .......... 1 - 8
+  Wardrobe ................. Esc > Wardrobe, or a Wardrobe / Vanity Mirror you build
   Pause / menu ............. Esc              All controls .... F1
   Screenshot ............... F12  (saved to %APPDATA%\Hollowhaven\screenshots)
 
@@ -30,7 +37,10 @@ COMFORT SETTINGS (Pause > Settings > Comfort)
   Horror intensity: Gentle / Standard / Intense - the underground can be scary.
   Arachnophobia mode: replaces every spider-like creature, web, sound and icon with a
   non-spider alternative. Also: reduce camera shake, reduce flashing, sound captions,
-  and separate volume sliders for music, ambience, effects and menus.
+  high-visibility cues, timing assist, and separate volume sliders for music, ambience,
+  effects and menus.
+  Gameplay tab: "Friends join fights", "Friends use skills on their own", "Seasonal
+  decorations", "Show hints" (and "Show tips again" while playing).
 
 TIPS
   - Sleeping in a bed saves your game and sets where you wake up.
@@ -38,7 +48,12 @@ TIPS
   - Above ground the game also saves by itself every few minutes, and when you close the
     window. Underground it is the lanterns that count.
   - Enemies always wiggle, flare or rattle before they attack - that's your cue to dodge.
-  - If you ever get stuck, open the pause menu and choose "Return to the Haven".
+  - If you ever get stuck, open the pause menu and choose "Return to the Haven"
+    ("Return to last lantern" below the old mine, "Return to safety" in the Chapter Two places).
+  - In Hallowmere Reach, the waygate where you arrive always leads home, and any lit lantern
+    arch can take you back to the Haven along the Lantern Road.
+  - Friends help in fights now. Press T for their special skill; the ring round their
+    portrait shows when it's ready.
   - Nothing you build or befriend can be lost. Take your time.
 
 Made with love, for Krystal.

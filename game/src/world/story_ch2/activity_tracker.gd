@@ -7,10 +7,12 @@ extends Node
 ##   game_loaded      -> repair every derived flag / counter / journal note from the save (sync_state)
 ##   reward_granted   -> rw_ch2_feast: the Lanternwake outfit + furnishing finishes, synchronously (before the
 ##                       ending's save, so a crash during the ending still resumes with them)
-##   lore_discovered  -> Tobin's / Hask's notes ("The Miner Who Came Back")
+##   lore_discovered  -> Tobin's letter / Hask's refuge note ("The Miner Who Came Back")
 ##   flag_set         -> the manor balcony shortcut ("The Long Way Home"); the Choir falling while in the Reach
 ##   crafted          -> different seasonal dishes cooked ("The Harvest Table")
-##   structure_placed -> a table set for the festival ("The Harvest Table")
+##   structure_placed -> a Lanternwake Table placed ("The Harvest Table"; a plain table does not count - the
+##                       Kitchen's festival-table choice, Crafting.decorate_table, sets the flag itself and
+##                       sync_state repairs it from that saved choice)
 ##   crop_harvested   -> a pumpkin grown and harvested ("A Pumpkin With a Face")
 ##   choice_made      -> accepting the Ward Stone's invitation shows the "Chapter Two" title card
 ## Nothing here grants a reward: the optional log / chapter log pay them once the objective flags hold.

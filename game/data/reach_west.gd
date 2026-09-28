@@ -56,6 +56,8 @@ const CHIME_REWARD_FALLBACK := {"items": {"moonpetal": 3, "sugarcap": 2, "candy"
 	"by": "content", "who": "Thimblebrook Pools: the lost festival pouch at the end of the chime trail"}
 
 # --- Lore (texts live in data/lore_ch2_reach.gd, region module; fallbacks until that file has them) ------
+## The fallback texts are kept IDENTICAL to data/lore_ch2_reach.gd (R111), so the note reads the same whichever
+## copy is shown; the empty dish (MARKER) is by the candleyard's SOUTH-WEST wall.
 const LORE_GARDEN := "lore_ch2_garden_note"
 const LORE_GROUNDSKEEPER_1 := "lore_ch2_groundskeeper_1"
 const LORE_GROUNDSKEEPER_2 := "lore_ch2_groundskeeper_2"
@@ -63,9 +65,9 @@ const LORE_FALLBACK := {
 	"lore_ch2_garden_note": {"title": "A Note in the Seed Box",
 		"text": "Plant the round ones for supper. Carve the crooked ones for company. Do not feed the one that feeds itself."},
 	"lore_ch2_groundskeeper_1": {"title": "Groundskeeper's Note",
-		"text": "Swept the paths, trimmed the moonflowers, a candle on every stone. One stone has no candle. I keep meaning to."},
+		"text": "Every night I light a candle for the moon, so she is not the only lamp awake up there. Swept the paths, trimmed the moonflowers, a candle on every stone. One dish sits empty. I keep meaning to."},
 	"lore_ch2_groundskeeper_2": {"title": "Groundskeeper's Second Note",
-		"text": "If I don't get round to it, would you? The empty dish by the west wall. A little light is all it wants."},
+		"text": "If I don't get round to it, would you? The empty dish by the south-west wall. The moon won't mind whose hand lights it. A little light is all it wants."},
 }
 
 # --- Enemy spawners (EnemySpawner; spawned by id through EnemyFactory, guarded when a script is missing) ---

@@ -465,8 +465,11 @@ func test_hotkeys_from_the_wardrobe_over_the_pause_menu_never_stick() -> void:
 func test_unstuck_labels_and_targets_per_area() -> void:
 	assert_eq(PausePanel.unstuck_label("surface"), "Return to the Haven")
 	assert_eq(PausePanel.unstuck_label("below"), "Return to last lantern")
-	for a in ["hallowmere_reach", "tobin_annex", "moonveil_manor", "hushed_works", "echo_trial"]:
+	for a in ["hallowmere_reach", "tobin_annex", "moonveil_manor", "hushed_works"]:
 		assert_eq(PausePanel.unstuck_label(a), "Return to safety", a)
+	# Lead decision R17 (docs/ch2/INTEGRATION_WAVE_BC.md, MP section 15): inside an Echo Trial the option leaves the
+	# trial, back to the checkpoint where it began (the behaviour itself is covered in test_ui_root).
+	assert_eq(PausePanel.unstuck_label("echo_trial"), "Leave the trial", "echo_trial")
 	# Pure helper: legacy rules unchanged, Chapter Two areas use their own memory.
 	assert_eq(PausePanel.unstuck_spawn("surface", {"respawn_area": "surface", "respawn_spawn": "bed"}), "bed")
 	assert_eq(PausePanel.unstuck_spawn("below", {"respawn_area": "surface", "respawn_spawn": "bed"}), "mine_entry")

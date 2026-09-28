@@ -1,7 +1,8 @@
 extends Node3D
 ## The Foreman's desk: a lore note ("The Foreman's Order") and the Foreman's Key on a hook board.
-## The key is guaranteed: it is available whenever the player doesn't hold it and the gate is still
-## locked, and it is never duplicated. Taking it sets flag "foreman_key_taken".
+## The key is guaranteed: it is available whenever the player doesn't hold it and a gate still needs it
+## (the Below's lower gate, or - Chapter Two - the Reach service gate once the lamps are linked and until
+## it is open, R73), and it is never duplicated. Taking it sets flag "foreman_key_taken".
 ## The node's local -Z faces the room (the desk stands against a wall behind it at +Z).
 
 const Palette := preload("res://src/art/palette.gd")
@@ -19,8 +20,21 @@ var _key_it: Node3D
 var _note_it: Node3D
 
 
+## Flags of the gates that still want the key (Chapter Two: the Bellhouse service gate, lower_gate.gd).
+const LOWER_GATE_FLAG := "lower_gate_open"
+const LAMPS_LINKED_FLAG := "ch2_lamps_linked"
+const SERVICE_GATE_FLAG := "ch2_service_gate_open"
+
+
+## True while the hook should offer the key: never while it is held (no duplicates), and only while some
+## gate still needs it - the lower gate is shut, or the Reach service gate is revealed but not yet open
+## (an old save that lost the key after Chapter One can never soft-lock Chapter Two).
 static func key_available() -> bool:
-	return not GameState.has_item(KEY) and not bool(GameState.get_flag("lower_gate_open"))
+	if GameState.has_item(KEY):
+		return false
+	if not bool(GameState.get_flag(LOWER_GATE_FLAG)):
+		return true
+	return bool(GameState.get_flag(LAMPS_LINKED_FLAG)) and not bool(GameState.get_flag(SERVICE_GATE_FLAG))
 
 
 func _ready() -> void:

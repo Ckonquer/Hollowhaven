@@ -497,6 +497,29 @@ func test_new_enemies_follow_the_master_prompt_ranges() -> void:
 	assert_true(float(clod["slow_immunity"]) > float(clod["slow_seconds"]), "the patchwalker slow cannot chain")
 
 
+## Integration R83-R85: enemy data agrees with the runtime rules and with the real ids it names.
+func test_enemy_data_matches_runtime_rules_and_real_ids() -> void:
+	const Base := preload("res://src/enemies/enemy_base.gd")
+	const C1x := preload("res://data/c1x_layout.gd")
+	# R83: the Brood Skitter's leap is a committed attack; its data wind-up is the enforced 1.0 s floor (what
+	# players get and what bestiary / tells read). Only the legacy Brambling keeps its pinned 0.7 s.
+	assert_almost(float(EnemiesData.ENEMIES["brambling"]["telegraph"]), 0.7, 0.001, "legacy Brambling unchanged")
+	var sk: Dictionary = EnemiesData.ENEMIES["brood_skitter"]
+	assert_almost(float(sk["telegraph"]), Base.MIN_COMMITTED_TELEGRAPH, 0.001, "skitter base telegraph = the floor")
+	for a in sk["attacks"]:
+		assert_true(float(a["telegraph"]) >= Base.MIN_COMMITTED_TELEGRAPH, "skitter %s wind-up >= the enforced floor" % a["id"])
+	assert_almost(float(sk["attacks"][0]["telegraph"]), 1.0, 0.001, "leap 1.0 s")
+	# R84: zone ids are the real ones (Bramblewatch's zone is c1x_bramblewatch); no Lantern Moth lives in the annex.
+	for eid in ["brambleback", "knotted_elder"]:
+		assert_eq(EnemiesData.ENEMIES[eid]["zones"], [C1x.BRAMBLEWATCH_ZONE], "%s zone is the real Bramblewatch zone id" % eid)
+	var moth: Dictionary = EnemiesData.ENEMIES["lantern_moth"]
+	assert_false((moth["areas"] as Array).has("tobin_annex"), "no annex moth")
+	assert_false((moth["zones"] as Array).has("ta_lockers"), "no annex moth zone")
+	assert_eq(moth["areas"], ["surface"])
+	# R85: the Quarry Warden's fallback arena matches the quarry (which passes 10 m itself).
+	assert_almost(float(EnemiesData.ENEMIES["quarry_warden"]["arena_radius"]), 10.0, 0.001, "warden fallback arena 10 m")
+
+
 # --- icons ---------------------------------------------------------------------------------------------------
 
 func test_every_icon_id_has_a_real_drawing() -> void:

@@ -226,6 +226,49 @@ func test_underground_damage_follows_intensity() -> void:
 	assert_almost(float(drudge.attack_damage_for(drudge.attack_def("scrape"))), 14.0, 0.01, "Standard: data damage")
 
 
+## Integration R80: threat scaling follows the area the enemy fights in (Combat.damage_mult_for_area), not its
+## data home; the Echo Trial and unknown / empty area ids keep the data rule. Legacy numbers never change.
+func test_threat_scaling_follows_the_area_fought_in() -> void:
+	var saved_id: String = Game.area_id
+	var d := _dummy(Vector3(0, 0, -30))
+	var drudge := _enemy("hollow_drudge", d)
+	var skitter := _enemy("brood_skitter", d, Vector3(8, 0, 0))
+	var bb := _enemy("brambleback", d, Vector3(16, 0, 0))
+	var bramble := _enemy("brambling", d, Vector3(24, 0, 0))
+	var gloom := _enemy("gloomling", d, Vector3(32, 0, 0))
+	var swing: Dictionary = drudge.attack_def("pick_swing")
+	var leap: Dictionary = skitter.attack_def("leap")
+	var charge: Dictionary = bb.attack_def("charge")
+	Settings.set_value("horror_intensity", 0)
+	Game.area_id = "hallowmere_reach"
+	assert_almost(float(drudge.attack_damage_for(swing)), 15.0, 0.01, "a Drudge in the Reach's candle yard hits like a surface threat")
+	assert_almost(float(skitter.attack_damage_for(leap)), 7.0, 0.01, "nothing scales outdoors")
+	Game.area_id = "hushed_works"
+	assert_almost(float(drudge.attack_damage_for(swing)), 15.0 * 0.6, 0.01, "Gentle x0.6 underground")
+	assert_almost(float(skitter.attack_damage_for(leap)), 7.0 * 0.6, 0.01, "a Skitter in the Works scales")
+	assert_almost(float(bb.attack_damage_for(charge)), 13.0 * 0.6, 0.01, "whatever its data home, underground scales")
+	Game.area_id = "tobin_annex"
+	assert_almost(float(drudge.attack_damage_for(swing)), 15.0 * 0.6, 0.01, "the annex is underground")
+	Game.area_id = "moonveil_manor"
+	assert_almost(float(drudge.attack_damage_for(swing)), 15.0, 0.01, "interiors never scale")
+	for keep in ["echo_trial", "", "arena", "not_an_area"]:
+		Game.area_id = String(keep)
+		assert_almost(float(skitter.attack_damage_for(leap)), 7.0 * 0.6, 0.01, "'%s': data rule (underground scales)" % keep)
+		assert_almost(float(drudge.attack_damage_for(swing)), 15.0 * 0.6, 0.01, "'%s': data rule (drudge underground)" % keep)
+		assert_almost(float(bb.attack_damage_for(charge)), 13.0, 0.01, "'%s': data rule (surface enemy never scales)" % keep)
+	# Legacy enemies keep their exact numbers everywhere (attack_damage() follows their data area).
+	for where in ["", "surface", "below", "hallowmere_reach", "hushed_works", "echo_trial"]:
+		Game.area_id = String(where)
+		assert_almost(float(bramble.attack_damage()), 10.0, 0.001, "Brambling unchanged in '%s'" % where)
+		assert_almost(float(gloom.attack_damage()), 12.0 * 0.6, 0.001, "Gloomling (Below, Gentle) unchanged in '%s'" % where)
+	Settings.set_value("horror_intensity", 1)
+	for where in ["", "surface", "below", "hushed_works"]:
+		Game.area_id = String(where)
+		assert_almost(float(bramble.attack_damage()), 10.0, 0.001, "Standard Brambling in '%s'" % where)
+		assert_almost(float(gloom.attack_damage()), 12.0, 0.001, "Standard Gloomling in '%s'" % where)
+	Game.area_id = saved_id
+
+
 func test_defeat_flag_setup_key() -> void:
 	var d := _dummy(Vector3(0, 0, -30))
 	var e := _enemy("hollow_drudge", d, Vector3.ZERO, {"defeat_flag": "c1x_drudge_defeated"})

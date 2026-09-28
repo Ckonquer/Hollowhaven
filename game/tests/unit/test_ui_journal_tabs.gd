@@ -237,7 +237,7 @@ func test_lore_tab_real_chapter_two_note() -> void:
 	# A note from a real Chapter Two lore file (spec §10) through LoreDB: named, grouped under Chapter Two.
 	var ch2_id := ""
 	for id in LoreDB.ids():
-		if String(id).begins_with("lore_ch2_"):
+		if LoreDB.chapter_of(String(id)) == 2:
 			ch2_id = String(id)
 			break
 	if ch2_id == "":
@@ -255,6 +255,46 @@ func test_lore_tab_real_chapter_two_note() -> void:
 	assert_true(texts.find("Chapter Two") >= 0 and texts.find("Chapter Two") < texts.find(String(e["title"])), "under its chapter heading")
 	j._show_lore(ch2_id)
 	assert_true(_has_text(j.lore_page, String(e["text"]).substr(0, 24)))
+
+
+## Tobin's annex notes are Chapter One optional content: filed under Chapter One by their source file
+## (data/lore_ch2_annex.gd), although their saved ids keep the lore_ch2_ prefix. Other Chapter Two files stay
+## Chapter Two; ids no file knows fall back to the prefix.
+func test_annex_notes_are_filed_under_chapter_one() -> void:
+	var Annex: Script = load("res://data/lore_ch2_annex.gd")
+	var annex_ids: Array = Annex.get_script_constant_map().get("ORDER", [])
+	assert_false(annex_ids.is_empty(), "the annex declares its notes")
+	for id in annex_ids:
+		assert_true(String(id).begins_with("lore_ch2_"), "ids unchanged: " + String(id))
+		assert_eq(LoreDB.chapter_of(String(id)), 1, String(id) + " is Chapter One content")
+		assert_eq(JournalPanel.lore_chapter(String(id)), 1)
+	assert_eq(LoreDB.chapter_of("hollows_page"), 1, "legacy note")
+	assert_eq(LoreDB.chapter_of(CH2_NOTE), 2, "unknown lore_ch2_ id: by prefix")
+	assert_eq(LoreDB.chapter_of("some_old_note"), 1, "unknown id without the prefix")
+	var ch2_id := ""
+	for id in LoreDB.ids():
+		if not annex_ids.has(id) and String(id).begins_with("lore_ch2_"):
+			ch2_id = String(id)
+			assert_eq(LoreDB.chapter_of(ch2_id), 2, ch2_id + " (a Chapter Two file) is Chapter Two")
+	if ch2_id == "":
+		print("B11: no Chapter Two lore file besides the annex yet - grouping check skipped")
+		return
+	# the journal: annex note under Chapter One (after the legacy note), the Chapter Two note under Chapter Two
+	var annex_id := String(annex_ids[0])
+	GameState.discover_lore(ch2_id)
+	GameState.discover_lore(annex_id)
+	GameState.discover_lore("hollows_page")
+	assert_eq(JournalPanel.lore_ids(), ["hollows_page", annex_id, ch2_id], "Chapter One notes first")
+	var j: Control = await _open_journal({"tab": "lore"})
+	var texts := _texts(j.lore_list)
+	var annex_title := String(LoreDB.get_lore(annex_id)["title"])
+	var ch2_title := String(LoreDB.get_lore(ch2_id)["title"])
+	var h1 := texts.find("Chapter One")
+	var h2 := texts.find("Chapter Two")
+	assert_true(h1 >= 0 and h2 > h1, "both headings, Chapter One first")
+	assert_eq(texts.count("Chapter One"), 1, "one heading per chapter")
+	assert_true(texts.find(annex_title) > h1 and texts.find(annex_title) < h2, "the annex note sits under Chapter One")
+	assert_true(texts.find(ch2_title) > h2, "the Chapter Two note sits under Chapter Two")
 
 
 func test_reopen_selects_the_requested_tab() -> void:

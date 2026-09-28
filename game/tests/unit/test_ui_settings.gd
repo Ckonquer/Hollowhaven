@@ -49,8 +49,77 @@ func test_schema_keys_exist_with_sane_ranges() -> void:
 	for t in Schema.TABS:
 		if String(t[0]) != "controls":
 			assert_true(Schema.rows_for(String(t[0])).size() > 0, "tab %s has rows" % t[0])
-	for key in ["horror_intensity", "arachnophobia", "reduce_shake", "reduce_flashing", "captions"]:
+	for key in ["horror_intensity", "arachnophobia", "reduce_shake", "reduce_flashing", "captions", "high_visibility_cues", "timing_assist"]:
 		assert_eq(String(Schema.row(key).get("tab", "")), "comfort", key)
+	for key in ["companion_auto_attack", "companion_autocast", "seasonal_decor"]:
+		assert_eq(String(Schema.row(key).get("tab", "")), "gameplay", key)
+
+
+## Every setting the game honours and a player would look for has a row in the options menu (Chapter Two:
+## high-visibility cues, timing assist, companion fighting / skills, seasonal decorations).
+func test_chapter_two_settings_are_in_the_menu() -> void:
+	var want := {"high_visibility_cues": ["comfort", "High-visibility cues"], "timing_assist": ["comfort", "Timing assist"],
+		"companion_auto_attack": ["gameplay", "Friends join fights"], "companion_autocast": ["gameplay", "Friends use skills on their own"],
+		"seasonal_decor": ["gameplay", "Seasonal decorations"]}
+	for key in want:
+		var r := Schema.row(String(key))
+		assert_false(r.is_empty(), "%s has a row" % key)
+		assert_eq(String(r.get("tab", "")), String(want[key][0]), "%s tab" % key)
+		assert_eq(String(r.get("label", "")), String(want[key][1]), "%s label" % key)
+		assert_eq(String(r.get("type", "")), "toggle", "%s is a toggle" % key)
+		assert_true(String(r.get("desc", "")) != "", "%s is explained" % key)
+	assert_true(String(Schema.row("seasonal_decor")["desc"]).contains("Never inside your home"), "decor promise stated")
+	# The Comfort tab lists every comfort toggle (and nothing else).
+	var comfort_toggles: Array = []
+	for r in Schema.rows_for("comfort"):
+		if String(r["type"]) == "toggle":
+			comfort_toggles.append(String(r["key"]))
+	assert_eq(comfort_toggles.size(), Schema.COMFORT_TOGGLES.size(), "COMFORT_TOGGLES covers the comfort rows")
+	for key in comfort_toggles:
+		assert_true(Schema.COMFORT_TOGGLES.has(key), "%s shown on the Comfort tab" % key)
+	# The built panel really shows a live toggle for each new key, in its tab.
+	var p: Control = SettingsPanel.new()
+	p.setup({"tab": "comfort"})
+	add_child(p)
+	await wait_frames(2)
+	var tab_of := {}
+	for i in Schema.TABS.size():
+		tab_of[String(Schema.TABS[i][0])] = p.tabs.get_child(i)
+	for key in want:
+		var label_text := String(want[key][1])
+		var found := _find_label(tab_of[String(want[key][0])], label_text)
+		assert_not_null(found, "%s row built on the %s tab" % [label_text, want[key][0]])
+	# Toggling the comfort row writes the setting live.
+	var before := bool(Settings.get_value("timing_assist"))
+	var cb := _toggle_after(tab_of["comfort"], "Timing assist")
+	assert_not_null(cb, "timing assist has a switch")
+	if cb != null:
+		cb.button_pressed = not before
+		assert_eq(bool(Settings.get_value("timing_assist")), not before, "the switch changes the setting")
+	p.queue_free()
+	await wait_frames(1)
+
+
+func _find_label(n: Node, text: String) -> Label:
+	if n is Label and (n as Label).text == text:
+		return n
+	for c in n.get_children():
+		var f := _find_label(c, text)
+		if f != null:
+			return f
+	return null
+
+
+## The CheckButton of the settings row whose name label reads `text`.
+func _toggle_after(root: Node, text: String) -> CheckButton:
+	var l := _find_label(root, text)
+	if l == null:
+		return null
+	var row: Node = l.get_parent().get_parent()   # name label -> left column -> row
+	for c in row.get_children():
+		if c is CheckButton:
+			return c
+	return null
 
 
 func test_snap_clamps_and_steps() -> void:
@@ -207,6 +276,10 @@ func test_reset_to_defaults_keeps_bindings_and_comfort_options() -> void:
 	Settings.set_value("captions", false)
 	Settings.set_value("horror_intensity", 0)
 	Settings.set_value("comfort_confirmed", true)
+	Settings.set_value("high_visibility_cues", true)
+	Settings.set_value("timing_assist", true)
+	Settings.set_value("companion_autocast", false)
+	Settings.set_value("seasonal_decor", true)
 	Settings.set_value("invert_y", false)
 	Settings.set_value("fov", 90.0)
 	var k := InputEventKey.new()
@@ -225,6 +298,10 @@ func test_reset_to_defaults_keeps_bindings_and_comfort_options() -> void:
 	assert_false(bool(Settings.get_value("captions")), "captions choice kept")
 	assert_eq(int(Settings.get_value("horror_intensity")), 0, "horror intensity kept")
 	assert_true(bool(Settings.get_value("comfort_confirmed")), "comfort screen stays confirmed")
+	assert_true(bool(Settings.get_value("high_visibility_cues")), "high-visibility cues kept")
+	assert_true(bool(Settings.get_value("timing_assist")), "timing assist kept")
+	assert_eq(bool(Settings.get_value("companion_autocast")), bool(Settings.DEFAULTS["companion_autocast"]), "companion skill choice reset")
+	assert_eq(bool(Settings.get_value("seasonal_decor")), bool(Settings.DEFAULTS["seasonal_decor"]), "seasonal decorations reset")
 	assert_eq(UiUtil.action_codes("jump")[0], "key:%d" % KEY_K, "key bindings kept")
 	assert_almost(float(Settings.get_value("fov")), float(Settings.DEFAULTS["fov"]), 0.001, "other settings reset")
 	assert_true(_changes.has("fov"), "changed settings are announced")

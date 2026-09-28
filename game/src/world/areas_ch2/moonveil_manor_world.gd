@@ -903,48 +903,26 @@ func echo_trial_available() -> bool:
 	return velour_defeated() and _echo_trial_script() != null
 
 
-## Places the echo stone beside the ballroom rest candles once the Count is freed and the trial exists.
+## Places the echo stone beside the ballroom rest candles once the Count is freed and the trial exists. The stone
+## (its prompt, the trial menu with the trial's record, the travel) is the echo trial module's
+## src/world/trial/trial_entry.gd; the ballroom rest candles become the return point.
+const ECHO_ENTRY_SCRIPT := "res://src/world/trial/trial_entry.gd"
+
+
 func _place_echo_trial() -> void:
 	if echo_entry != null and is_instance_valid(echo_entry):
 		return
-	if not echo_trial_available():
+	if not echo_trial_available() or not ResourceLoader.exists(ECHO_ENTRY_SCRIPT):
 		return
-	var n: Node3D = Interactable.new()
-	n.setup({"id": "echo_trial", "text": "Echo Trial", "radius": 0.8, "offset": Vector3(0, 0.9, 0),
-		"text_func": Callable(self, "_echo_trial_prompt"), "handler": Callable(self, "_enter_echo_trial")})
+	var es: Variant = load(ECHO_ENTRY_SCRIPT)
+	if not (es is Script) or not (es as Script).can_instantiate():
+		return
+	var n: Node3D = (es as Script).new()
+	n.setup({"trial": Layout.ECHO_TRIAL_ID, "origin_area": area_id, "origin_spawn": "manor_ballroom", "solid": true})
 	n.name = "EchoTrialEntry"
 	add_child(n)
 	n.position = Layout.ECHO_ENTRY
-	var stone := Mat.outlined(Mat.toon(Color("6a6282"), {"rim": 0.35, "noise": 0.18}), 0.014)
-	Kit.add(n, Kit.blob(0.38, stone, 17, 0.16, 1.9, 2), Vector3(0, 0.58, 0))
-	var band := Kit.torus(0.39, 0.44, Mat.glow(Color("cbb8ff"), 1.2))
-	Kit.add(n, band, Vector3(0, 0.7, 0), Vector3.ZERO, Vector3(1, 1.8, 1))
-	band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	Kit.static_collider(n, _cyl(0.4, 1.3), Vector3(0, 0.65, 0), 1).name = "SolidBody"
 	echo_entry = n
-
-
-func _echo_trial_prompt() -> Dictionary:
-	var s := _echo_trial_script()
-	if s == null or not velour_defeated():
-		return {}
-	return {"text": String(s.call("entry_text", Layout.ECHO_TRIAL_ID)), "enabled": true}
-
-
-## Explains that it is a memory, then travels; the ballroom rest candles become the return point.
-func _enter_echo_trial() -> void:
-	if fight_active or Game.mode != "playing":
-		return
-	var s := _echo_trial_script()
-	if s == null:
-		return
-	if Game.ui != null and is_instance_valid(Game.ui) and Game.ui.has_method("confirm"):
-		var c: String = await Game.ui.confirm(String(s.call("entry_text", Layout.ECHO_TRIAL_ID)),
-			"An echo of your evening with %s, remembered by the house. It is a memory, not undone history: the Count stays a (mostly) gracious host, and nothing on your journey changes. Leave by the pale door at any time, or fall, and you wake here by the candles." % ItemDB.enemy_display_name(Layout.BOSS_ID),
-			[["enter", "Enter the echo", "AccentButton"], ["cancel", "Not now", ""]])
-		if c != "enter" or not is_instance_valid(self) or Game.mode != "playing":
-			return
-	s.call("begin", Layout.ECHO_TRIAL_ID, area_id, "manor_ballroom")
 
 
 # =====================================================================================================

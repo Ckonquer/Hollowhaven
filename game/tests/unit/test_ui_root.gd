@@ -416,3 +416,95 @@ func test_companion_menu_closes_when_krystal_is_hurt() -> void:
 	await wait_frames(1)
 	assert_false(ui.is_open("companion"), "a hit closes the companion menu")
 	assert_false(Game.is_ui_open(), "and gives Krystal her controls back")
+
+
+## Chapter Two ending (MP section 17): awaitable, the "chapter_two" EndingScreen variant, and while it shows it
+## blocks input, the UI hotkeys and the wardrobe notice exactly like the Chapter One ending.
+func test_chapter_two_ending_is_awaitable_and_blocks_like_the_first() -> void:
+	var state := {"done": false, "second": false}
+	var run := func() -> void:
+		await ui.show_chapter_two_ending()
+		state["done"] = true
+	run.call()
+	await wait_frames(2)
+	var e: Control = ui._ending
+	assert_not_null(e, "ending overlay shown")
+	if e == null:
+		return
+	assert_true(bool(e.call("is_chapter_two")), "the Chapter Two variant")
+	assert_eq(e.get_parent(), ui.overlay_layer, "on the overlay layer")
+	assert_true(bool(ui.hud.is_cinematic()), "gameplay HUD hidden")
+	ui._input(_key("pause"))
+	assert_false(ui.is_open("pause"), "Esc opens nothing during the ending")
+	ui._input(_key("inventory"))
+	assert_false(ui.is_open("inventory"), "UI hotkeys are blocked during the ending")
+	GameState.wardrobe["notice_shown"] = false
+	assert_false(ui.wardrobe_notice_safe_now(), "no wardrobe notice over the ending")
+	assert_false(ui.tick_wardrobe_notice(5.0), "the notice waits")
+	# A second call (e.g. a repeated trigger) waits for the same ending instead of stacking another.
+	var run2 := func() -> void:
+		await ui.show_chapter_two_ending()
+		state["second"] = true
+	run2.call()
+	await wait_frames(2)
+	assert_eq(ui._ending, e, "still the one ending")
+	assert_eq(ui.overlay_layer.get_child_count(), 1, "one overlay")
+	e.call("_finish")
+	await wait_seconds(1.0)
+	assert_true(bool(state["done"]), "show_chapter_two_ending returns after Continue")
+	assert_true(bool(state["second"]), "the waiting second call returns too")
+	assert_null(ui._ending)
+	assert_false(bool(ui.hud.is_cinematic()), "HUD back for free play")
+
+
+class FakeTrial extends Node3D:
+	var left := 0
+	var paused_when_left := true
+
+	func leave() -> void:
+		left += 1
+		paused_when_left = get_tree().paused
+
+
+## Pause menu inside an Echo Trial (lead decision, MP section 15): the option reads "Leave the trial" and leaves
+## THROUGH the trial (its leave(), else the saved origin), never to the trial's own entry pad.
+func test_pause_leaves_an_echo_trial_through_the_trial() -> void:
+	assert_eq(PausePanel.unstuck_label("echo_trial"), "Leave the trial")
+	assert_true(PausePanel.unstuck_tooltip("echo_trial").contains("checkpoint"), "tooltip says where it goes")
+	for a in ["hallowmere_reach", "tobin_annex", "moonveil_manor", "hushed_works"]:
+		assert_eq(PausePanel.unstuck_label(a), "Return to safety", a)
+	assert_eq(PausePanel.unstuck_label("surface"), "Return to the Haven", "other areas unchanged")
+	assert_eq(PausePanel.unstuck_label("below"), "Return to last lantern")
+	assert_eq(PausePanel.trial_exit_destination({"respawn_area": "moonveil_manor", "respawn_spawn": "manor_ballroom"}),
+		{"area": "moonveil_manor", "spawn": "manor_ballroom"}, "the origin checkpoint")
+	assert_eq(PausePanel.trial_exit_destination({"respawn_area": "echo_trial", "respawn_spawn": "trial_start"}),
+		{"area": "surface", "spawn": "haven_respawn"}, "never back into a trial")
+	assert_eq(PausePanel.trial_exit_destination({}), {"area": "surface", "spawn": "haven_respawn"})
+	var trial := FakeTrial.new()
+	add_child(trial)
+	var old_area: Node = Game.area
+	var old_id := Game.area_id
+	Game.area = trial
+	Game.area_id = "echo_trial"
+	ui.open("pause")
+	await wait_frames(2)
+	var pp: Control = ui.panels["pause"]
+	assert_eq(String(pp.unstuck_btn.text), "Leave the trial")
+	pp.call("_unstuck")
+	await wait_frames(2)
+	assert_true(ui.is_open("confirm"), "asks first")
+	ui.panels["confirm"]._choose("cancel")
+	await wait_frames(2)
+	assert_eq(trial.left, 0, "Stay keeps her in the trial")
+	assert_true(ui.is_open("pause"), "back on the pause menu")
+	pp.call("_unstuck")
+	await wait_frames(2)
+	ui.panels["confirm"]._choose("go")
+	await wait_frames(3)
+	assert_eq(trial.left, 1, "left through the trial's own exit")
+	assert_false(trial.paused_when_left, "menus closed (world unpaused) before leaving")
+	assert_false(ui.is_open("pause"), "pause menu closed")
+	Game.area = old_area
+	Game.area_id = old_id
+	trial.queue_free()
+	await wait_frames(1)

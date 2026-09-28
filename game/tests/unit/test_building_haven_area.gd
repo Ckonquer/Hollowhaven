@@ -3,7 +3,8 @@ extends "res://tests/test_case.gd"
 ## REAL terrain and vegetation plan (away from the stream, the paths leaving the Haven, the Old Oak radius, the
 ## Ward Stone / campfire / start-path circles, the Haven sign and every tree, rock, ore, bush and log; gentle
 ## ground; one connected area), legacy placements keep exactly the legacy answers, the Haven safe zone covers
-## the new boundary plus a 4 m buffer, and the Hallowmere Reach outpost is small and has no bed.
+## the new boundary plus a 4 m buffer (and reports the "haven" zone there wherever no legacy zone does), and the
+## Hallowmere Reach outpost is small and has no bed.
 
 const P := preload("res://src/building/placement.gd")
 const Ops := preload("res://src/building/build_ops.gd")
@@ -184,6 +185,68 @@ func test_haven_safe_zone_covers_the_new_boundary_plus_a_buffer() -> void:
 				covered = true
 		assert_false(covered, "test point %s is outside" % str(p))
 		assert_false(w.is_safe_zone(Vector3(p.x, 0, p.y)), "not safe at %s" % str(p))
+	w.free()
+
+
+## The expanded Haven is also the "haven" ZONE (music, discovery, "already home"), not only safe: wherever no
+## legacy/annex zone contains a point, get_zone_at says "haven" exactly where is_safe_zone's build-area + buffer
+## test holds. Legacy zones still win, every landmark centre keeps its zone, and outside it is still the woods.
+func test_expanded_haven_reports_the_haven_zone() -> void:
+	var w: Node3D = SurfaceWorld.new()        # not added to the tree: zones added by hand, as surface_world does
+	for id in Layout.LANDMARKS:
+		var l: Dictionary = Layout.LANDMARKS[id]
+		w.add_zone(String(id), Vector3(l["pos"].x, 0, l["pos"].y), float(l["radius"]), id == "haven")
+	var regions: Array = [{"center": Layout.BUILD_AREA["center"], "radius": float(Layout.BUILD_AREA["radius"])}]
+	regions.append_array(_extra())
+	var outside_legacy := 0
+	for r in regions:
+		var c: Vector2 = r["center"]
+		for i in 24:
+			var a := TAU * float(i) / 24.0
+			for d in [0.0, float(r["radius"]), float(r["radius"]) + SAFE_BUFFER - 0.05]:
+				var p := c + Vector2(cos(a), sin(a)) * float(d)
+				var pos := Vector3(p.x, 0, p.y)
+				var legacy := ""
+				var best := INF
+				for id in Layout.LANDMARKS:
+					var l2: Dictionary = Layout.LANDMARKS[id]
+					if p.distance_to(l2["pos"]) <= float(l2["radius"]) and float(l2["radius"]) < best:
+						legacy = String(id)
+						best = float(l2["radius"])
+				if legacy == "":
+					outside_legacy += 1
+					assert_eq(String(w.get_zone_at(pos)), "haven", "expanded Haven at %s is the haven zone" % str(p))
+				else:
+					assert_eq(String(w.get_zone_at(pos)), legacy, "the legacy zone %s still wins at %s" % [legacy, str(p)])
+				assert_true(w.is_safe_zone(pos), "and safe at %s" % str(p))
+	assert_true(outside_legacy > 20, "the check really covers ground beyond the 20 m haven circle (%d points)" % outside_legacy)
+	# Every landmark centre keeps its own zone; a small zone inside the expanded Haven (an annex pocket) wins.
+	for id in Layout.LANDMARKS:
+		var lp: Vector2 = Layout.LANDMARKS[id]["pos"]
+		assert_eq(String(w.get_zone_at(Vector3(lp.x, 0, lp.y))), String(id), "landmark centre %s keeps its zone" % id)
+	w.add_zone("test_pocket", Vector3(-9, 0, 24), 1.5, false)
+	assert_eq(String(w.get_zone_at(Vector3(-9, 0, 24))), "test_pocket", "a zone that contains the point still wins")
+	assert_eq(String(w.get_zone_at(Vector3(-9, 0, 21.5))), "haven", "next to it the expanded Haven")
+	# Outside the build regions + buffer (and every zone) it is the woods again, and never safe.
+	for p in [Vector2(30, 0), Vector2(0, -34), Vector2(-26, 30), Vector2(24, 18)]:
+		var pos2 := Vector3(p.x, 0, p.y)
+		assert_eq(String(w.get_zone_at(pos2)), "", "woods at %s" % str(p))
+		assert_false(w.is_safe_zone(pos2), "not safe at %s" % str(p))
+	# The zone test and the safe test are the same shape: across a wide grid, the haven zone is always safe and
+	# no safe point is left without a zone (woods music inside the safe Haven was the bug).
+	var bad := 0
+	for x in range(-40, 41, 2):
+		for z in range(-40, 41, 2):
+			var q := Vector3(float(x), 0, float(z))
+			var zq := String(w.get_zone_at(q))
+			if zq == "haven" and not w.is_safe_zone(q):
+				bad += 1
+				fail("haven zone but not safe at %s" % str(q))
+			elif zq == "" and w.is_safe_zone(q):
+				bad += 1
+				fail("safe Haven ground without a zone at %s" % str(q))
+			if bad > 3:
+				break
 	w.free()
 
 

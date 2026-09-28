@@ -548,6 +548,14 @@ func mastery_rank(track: String) -> int:
 	return mastery_rank_for_xp(int(xp))
 
 
+## Display name and description of a track: {"name", "desc"} (data/mastery.gd TRACK_NAMES). An unknown track
+## gets its capitalised id and an empty description (never an error).
+func mastery_track_info(track: String) -> Dictionary:
+	var t: Variant = MasteryData.TRACK_NAMES.get(track, {})
+	var d: Dictionary = t if t is Dictionary else {}
+	return {"name": String(d.get("name", track.capitalize())), "desc": String(d.get("desc", ""))}
+
+
 ## XP rules of a track ({rule: {xp, once_per | daily_cap, desc}}).
 func mastery_xp_rules(track: String) -> Dictionary:
 	return MasteryData.XP.get(track, {})

@@ -10,6 +10,7 @@ const Kit := preload("res://src/art/mesh_kit.gd")
 
 const FLAG := "lower_gate_open"
 const KEY := "foreman_key"
+const LEGACY_TRIED_FLAG := "lower_gate_tried"   # the Below's lower gate only (unchanged Chapter One flag)
 const OPEN_ANGLE := 86.0
 
 ## Configurable for other locked gates (defaults = the Below's lower gate).
@@ -136,10 +137,16 @@ func interact(_player: Node = null) -> void:
 	if not GameState.has_item(key):
 		Events.say.emit("", locked_text, 3.5)
 		Audio.play_3d("door_creak", global_position + Vector3(0, 1.5, 0), -8.0)
-		GameState.set_flag("lower_gate_tried", true)
+		GameState.set_flag(tried_flag(), true)
 		_rattle()
 		return
 	unlock()
+
+
+## Flag recorded when Krystal tries this gate without its key (R74): the legacy lower gate keeps
+## "lower_gate_tried"; every other gate records "<its flag>_tried" (e.g. "ch2_service_gate_open_tried").
+func tried_flag() -> String:
+	return LEGACY_TRIED_FLAG if flag == FLAG else flag + "_tried"
 
 
 func unlock(animate: bool = true) -> void:

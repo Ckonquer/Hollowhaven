@@ -23,11 +23,31 @@ extends RefCounted
 ## exploration -> ambience only. Base contexts (refuge/exploration/ambience) change only after the
 ## zone held for region_enter_s and the previous one lasted min_dwell_s; exploration changes wait for
 ## the current piece's phrase boundary. Pieces rotate from shuffle bags with rests in between.
+##
+## Music Box (MP 18.3, src/audio/music_box.gd): a home feature, never a global override.
+##   request_preview(cue, fade := -1.0, area := "") -> bool, stop_preview(fade := -1.0), preview_cue()
+##   The "musicbox" context (PREVIEW_DEF, added to the catalogue's contexts) sits above the regional base
+##   (safe 30 / explore 20) and below everything else: ordinary combat, horror suppression, bosses, authored
+##   requests and the title. Any of those ENDS the preview (the request is dropped, not resumed), as do death,
+##   leaving the area and an unplayable cue. It plays one pass of the chosen cue ("once"), cuts in at once,
+##   and on Stop fades out and lets the Haven rotation return after a short rest (like a boss recovery).
+##   set_favourites(list) (or ctx key "favourites"): favourite cues get extra, bounded weight in the Haven's
+##   own rotation (FAVOURITE_CONTEXTS, only while it is the base context): every piece of the Haven playlist
+##   still plays once per round, plus at most FAV_BONUS_PER_ROUND favourite entries (each favourite at most
+##   once per round), shuffled with this selector's own RNG (deterministic per seed).
 
 const ACTIVE_MODES := ["playing", "cutscene", "dead", "loading", "title"]
 const FROZEN_MODES := ["cutscene", "dead", "loading"]    # base/combat frozen, authored requests still apply
-const HOLD_KINDS := ["combat", "boss", "ending", "menu"]  # never held past their reason
+const HOLD_KINDS := ["combat", "boss", "ending", "menu", "musicbox"]  # never held past their reason
 const BASE_KINDS := ["safe", "explore", "ambience"]
+const PREVIEW_CONTEXT := "musicbox"
+const PREVIEW_PLAYLIST := "~musicbox"
+const PREVIEW_DEF := {"kind": "musicbox", "priority": 40, "playlist": PREVIEW_PLAYLIST, "mode": "once",
+	"fade": 1.5, "exit_fade": 1.5}
+const FAVOURITE_CONTEXTS := ["haven"]
+const FAVOURITE_KINDS := ["safe", "explore", "ending"]   # also the only kinds a preview may play
+const FAV_BONUS_PER_ROUND := 2
+const FAV_BAG_SUFFIX := "~fav"
 const OVERRIDE_PRIORITY := 80     # contexts at/above this override a track started outside the director
 const LOG_MAX := 50
 const KEEP := "~keep"
@@ -45,6 +65,7 @@ var seed_used: int = 0
 var available: Dictionary = {}    # cue id / layer track -> bool (a missing key counts as available)
 var combat: bool = false          # ordinary combat, after hysteresis
 var debug_log: Array = []         # last LOG_MAX decisions and notes (read through get_debug_log())
+var favourites: Array = []        # Music Box favourites (cue ids, as given; unknown ids are ignored)
 
 var _has_data := false
 var _now := 0.0
@@ -80,12 +101,16 @@ var _last_drawn: Dictionary = {}  # playlist id -> last cue drawn
 var _external := ""
 var _external_t := 0.0
 var _prev: Dictionary = {}
+var _preview_cue := ""            # the Music Box cue of the current / last preview request
 
 
 func setup(data: Dictionary, seed_value: int, tuning_override: Dictionary = {}) -> void:
 	cues = data.get("cues", {})
-	playlists = data.get("playlists", {})
-	contexts = data.get("contexts", {})
+	# own (writable) copies: the Music Box adds its preview context and one-cue playlist
+	var pls: Dictionary = data.get("playlists", {})
+	playlists = pls.duplicate()
+	var cxs: Dictionary = data.get("contexts", {})
+	contexts = cxs.duplicate()
 	areas = data.get("areas", {})
 	area_combat = data.get("area_combat", {})
 	bosses = data.get("bosses", {})
@@ -93,6 +118,8 @@ func setup(data: Dictionary, seed_value: int, tuning_override: Dictionary = {}) 
 	tuning = t.duplicate(true)
 	tuning.merge(tuning_override, true)
 	_has_data = not cues.is_empty() and not contexts.is_empty()
+	if _has_data and not contexts.has(PREVIEW_CONTEXT):
+		contexts[PREVIEW_CONTEXT] = PREVIEW_DEF.duplicate()
 	reseed(seed_value)
 	reset()
 
@@ -133,6 +160,7 @@ func reset() -> void:
 	_external = ""
 	_external_t = 0.0
 	_prev = {}
+	_preview_cue = ""
 
 
 func set_available(avail: Dictionary) -> void:
@@ -201,6 +229,87 @@ func play_failed(cue: String) -> void:
 	_phase = String(_prev.get("phase", "idle"))
 	_layers = []
 	_eff = ""
+	if cue == _preview_cue:
+		_end_preview("its file could not be played")
+
+
+# ---------------------------------------------------------------------------------------------
+# Music Box: preview and favourites
+# ---------------------------------------------------------------------------------------------
+
+## Previews one cue from the Music Box (one pass, then the base music returns). False (nothing changes)
+## when the cue is unknown, known to be unplayable, or not a safe / explore / ending piece (a boss, combat
+## or horror cue never plays at the Music Box's low priority). Asking for another cue while one plays
+## switches at once; asking for the same one again changes nothing. The request lives in `area` like any other.
+func request_preview(cue: String, fade: float = -1.0, area: String = "") -> bool:
+	if not _has_data or not contexts.has(PREVIEW_CONTEXT):
+		return false
+	if not cues.has(cue) or not is_available(cue) \
+			or not FAVOURITE_KINDS.has(String((cues[cue] as Dictionary).get("kind", ""))):
+		_note("music box: '%s' cannot be previewed" % cue)
+		return false
+	_released.erase(PREVIEW_CONTEXT)
+	if _requests.has(PREVIEW_CONTEXT) and cue == _preview_cue:
+		return true
+	_preview_cue = cue
+	playlists[PREVIEW_PLAYLIST] = {"cues": [cue], "fallback": ["keep"]}
+	_bags.erase(PREVIEW_PLAYLIST)
+	_last_drawn.erase(PREVIEW_PLAYLIST)
+	if _eff == PREVIEW_CONTEXT:
+		_eff = ""                 # re-plan now: the new cue replaces the one playing (or the finished one)
+	_requests[PREVIEW_CONTEXT] = {"fade": fade, "area": area, "t": _now}
+	_note("music box preview %s" % cue)
+	return true
+
+
+## Stop pressed (or Krystal left the house): the preview fades out, the Haven music returns after a rest.
+func stop_preview(fade: float = -1.0) -> void:
+	release(PREVIEW_CONTEXT, fade)
+
+
+## The cue the Music Box is previewing ("" when no preview is requested any more).
+func preview_cue() -> String:
+	return _preview_cue if _requests.has(PREVIEW_CONTEXT) else ""
+
+
+func _end_preview(why: String) -> void:
+	if _requests.has(PREVIEW_CONTEXT):
+		_requests.erase(PREVIEW_CONTEXT)
+		_note("music box preview of %s ended: %s" % [_preview_cue, why])
+
+
+## Favourite cue ids (Music Box). Anything not in the catalogue, of the wrong kind or unplayable is
+## ignored when drawing, so a renamed cue never breaks the rotation. Bags restart only on a change.
+func set_favourites(list: Array) -> void:
+	if list == favourites:
+		return
+	var out: Array = []
+	for f in list:
+		if (f is String or f is StringName) and not out.has(String(f)):
+			out.append(String(f))
+	if out == favourites:
+		return
+	favourites = out
+	for k in _bags.keys():
+		if String(k).ends_with(FAV_BAG_SUFFIX):
+			_bags.erase(k)
+	_note("favourites: %s" % str(favourites))
+
+
+## Favourites that may join a rotation: known cues of a safe/explore/ending kind that are playable.
+func usable_favourites() -> Array:
+	var out: Array = []
+	for f in favourites:
+		var c: Dictionary = cues.get(f, {})
+		if not c.is_empty() and FAVOURITE_KINDS.has(String(c.get("kind", ""))) and is_available(String(f)):
+			out.append(String(f))
+	return out
+
+
+## True when context `id` rotates with the favourites mixed in: the Haven, while it is the base context
+## (an authored request for the same context elsewhere, e.g. a remembered fragment, stays unweighted).
+func _favoured(id: String) -> bool:
+	return not favourites.is_empty() and FAVOURITE_CONTEXTS.has(id) and id == _base and not _requests.has(id)
 
 
 func current_track() -> String:
@@ -214,7 +323,8 @@ func current_cue() -> String:
 func state() -> Dictionary:
 	return {"effective": _eff, "base": _base, "candidate": _cand, "cue": _cue, "track": _track,
 		"layers": _layers.duplicate(), "phase": _phase, "combat": combat, "rest_left": _rest_left,
-		"external": _external, "requests": _requests.keys(), "variant": _variant, "seed": seed_used}
+		"external": _external, "requests": _requests.keys(), "variant": _variant, "seed": seed_used,
+		"preview": preview_cue(), "favourites": favourites.duplicate()}
 
 
 func get_debug_log() -> Array:
@@ -229,6 +339,9 @@ func update(ctx: Dictionary, dt: float) -> Dictionary:
 	if not _has_data:
 		return _none("no music data")
 	_now += dt
+	var fv: Variant = ctx.get("favourites")
+	if fv is Array:
+		set_favourites(fv)
 	var mode := String(ctx.get("mode", ""))
 	var area := String(ctx.get("area", ""))
 	_expire_requests(mode, area)
@@ -273,7 +386,7 @@ func _wanted(ctx: Dictionary, dt: float, mode: String, area: String) -> String:
 	var best_p := -1
 	for id in _requests:
 		var sid := String(id)
-		if sid == "title" or not contexts.has(sid):
+		if sid == "title" or sid == PREVIEW_CONTEXT or not contexts.has(sid):
 			continue
 		var p := _priority(sid)
 		if p > best_p and _playable(sid, ctx):
@@ -287,16 +400,32 @@ func _wanted(ctx: Dictionary, dt: float, mode: String, area: String) -> String:
 	if not frozen:
 		_update_combat(bool(ctx.get("threat", false)), dt)
 		_update_base(ctx, dt, area)
+	# Music Box preview: only above the regional base; everything else ends it (never resumed)
+	var preview := _requests.has(PREVIEW_CONTEXT)
+	if preview and not _playable(PREVIEW_CONTEXT, ctx):
+		_end_preview("not playable")
+		preview = false
+	if preview and mode == "dead":
+		_end_preview("Krystal fainted")
+		preview = false
 	if best != "":
+		if preview:
+			_end_preview("%s took over" % best)
 		return best
 	if frozen:
-		return ""
+		return PREVIEW_CONTEXT if preview else ""
 	if _silenced(ctx) and contexts.has("silence"):
+		if preview:
+			_end_preview("horror suppression")
 		return "silence"
 	if combat:
 		var cc := _combat_context(area)
 		if cc != "" and _playable(cc, ctx):
+			if preview:
+				_end_preview("%s took over" % cc)
 			return cc
+	if preview and _priority(PREVIEW_CONTEXT) > _priority(_base):
+		return PREVIEW_CONTEXT
 	return _base
 
 
@@ -395,7 +524,8 @@ func playlist_for(id: String, ctx: Dictionary) -> String:
 
 func _serve(want: String, ctx: Dictionary, dt: float) -> Dictionary:
 	if _external != "":
-		if want == "" or _priority(want) < OVERRIDE_PRIORITY:
+		# (a Music Box preview is Krystal's own choice: it replaces a foreign track too)
+		if want == "" or (_priority(want) < OVERRIDE_PRIORITY and want != PREVIEW_CONTEXT):
 			if want != "" and want != _eff:
 				_eff = want                  # what to play once the foreign track has gone
 			return _none("foreign track '%s' left alone" % _external)
@@ -448,7 +578,9 @@ func _switch(to: String, ctx: Dictionary, dt: float) -> Dictionary:
 		wait = maxf(w, 0.0)
 	var fade := _fade_for(from, to)
 	var entry_rest := _entry_rest(from, to)
-	var boss_recovery := from != "" and _kind(from) == "boss" and _ctx_mode(to) == "rotate" and _phase == "playing"
+	# after a boss (or a stopped Music Box preview) the music settles first, then the area's own mood returns
+	var boss_recovery := from != "" and (_kind(from) == "boss" or from == PREVIEW_CONTEXT) \
+			and _ctx_mode(to) == "rotate" and _phase == "playing"
 	_eff = to
 	var why := "%s -> %s" % [from if from != "" else "-", to]
 	var pl := playlist_for(to, ctx)
@@ -465,6 +597,8 @@ func _switch(to: String, ctx: Dictionary, dt: float) -> Dictionary:
 	var sig := _signature_due(to)
 	if sig == "" and _phase == "playing" and _cue != "" and _cue_in(to, _cue, ctx):
 		_variant = pl
+		if to == PREVIEW_CONTEXT and _piece_loop:
+			_piece_t = 0.0        # previewing the looping piece already playing: one full pass from now
 		return _none("%s continues into %s" % [_cue, to])
 	var cue := sig if sig != "" else _draw_for(to, ctx)
 	if cue == "":
@@ -581,11 +715,11 @@ func _cut_for(from: String, to: String) -> String:
 		return "now"
 	var kt := _kind(to)
 	var kf := _kind(from)
-	if kt in ["boss", "ending", "menu", "horror"]:
+	if kt in ["boss", "ending", "menu", "horror", "musicbox"]:
 		return "now"
 	if kt == "combat":
 		return _cs(to, "cut", "beat")
-	if kf in ["combat", "boss", "ending", "menu", "horror"]:
+	if kf in ["combat", "boss", "ending", "menu", "horror", "musicbox"]:
 		return "now"
 	return _cs(to, "cut", "phrase")
 
@@ -644,6 +778,8 @@ func _cue_in(id: String, cue: String, ctx: Dictionary) -> bool:
 	var p: Dictionary = playlists.get(pl, {})
 	if (p.get("cues", []) as Array).has(cue):
 		return true
+	if _favoured(id) and usable_favourites().has(cue):
+		return true
 	return _first_available(p) == "" and _fallback(p) == cue
 
 
@@ -651,7 +787,7 @@ func _draw_for(id: String, ctx: Dictionary) -> String:
 	var pl := playlist_for(id, ctx)
 	if pl == "":
 		return ""
-	var cue := draw(pl)
+	var cue := draw_favoured(pl) if _favoured(id) else draw(pl)
 	_variant = pl
 	return "" if cue == KEEP else cue
 
@@ -711,6 +847,72 @@ func _refill(avail: Array, avoid: String) -> Array:
 		bag[0] = bag[k]
 		bag[k] = tmp2
 	return bag
+
+
+## draw() with the Music Box favourites mixed in (bounded): a round is every available cue of the playlist
+## once, plus one extra entry for at most FAV_BONUS_PER_ROUND favourites (a favourite of the playlist then
+## plays twice in that round, a favourite from elsewhere joins as a guest once). The playlist's own pieces
+## are always part of every round, so favourites are never the only thing playing. Own RNG only; never the
+## same piece twice in a row. Without usable favourites this is exactly draw().
+func draw_favoured(pl: String) -> String:
+	var p: Dictionary = playlists.get(pl, {})
+	var avail := _available_cues(p)
+	if avail.is_empty():
+		return _fallback(p)
+	var favs := usable_favourites()
+	if favs.is_empty():
+		return _draw_from(pl, avail)
+	var key := pl + FAV_BAG_SUFFIX
+	var bag: Array = []
+	for c in (_bags.get(key, []) as Array):
+		if avail.has(c) or favs.has(c):
+			bag.append(c)
+	if bag.is_empty():
+		bag = _refill_favoured(avail, favs, String(_last_drawn.get(key, "")))
+	var cue := String(bag.pop_front())
+	if cue == _last_played:
+		var j := _index_other(bag, cue)
+		if j < 0 and (_index_other(avail, cue) >= 0 or _index_other(favs, cue) >= 0):
+			bag.append_array(_refill_favoured(avail, favs, cue))   # (only when another piece exists at all)
+			j = _index_other(bag, cue)
+		if j >= 0:
+			var alt := String(bag[j])
+			bag[j] = cue
+			cue = alt
+	_bags[key] = bag
+	_last_drawn[key] = cue
+	return cue
+
+
+func _refill_favoured(avail: Array, favs: Array, avoid: String) -> Array:
+	var pool: Array = favs.duplicate()
+	_shuffle(pool)
+	var bag: Array = avail.duplicate()
+	for i in mini(FAV_BONUS_PER_ROUND, pool.size()):
+		bag.append(pool[i])
+	_shuffle(bag)
+	if bag.size() > 1 and String(bag[0]) == avoid:
+		var k := _index_other(bag, avoid)
+		if k > 0:
+			var tmp: Variant = bag[0]
+			bag[0] = bag[k]
+			bag[k] = tmp
+	return bag
+
+
+func _shuffle(a: Array) -> void:
+	for i in range(a.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp: Variant = a[i]
+		a[i] = a[j]
+		a[j] = tmp
+
+
+func _index_other(a: Array, cue: String) -> int:
+	for i in a.size():
+		if String(a[i]) != cue:
+			return i
+	return -1
 
 
 func _available_cues(p: Dictionary) -> Array:

@@ -1,0 +1,98 @@
+HOLLOWHAVEN - Chapter Two: The Lanterns of Hallowmere
+What's new
+=====================================================
+
+A second chapter for your haven. Everything you made is still there, and a lantern road
+now leads somewhere new - whenever you feel like following it.
+
+PRESS "CONTINUE", NOT "NEW GAME"
+  Continue opens your own save: the same house, furniture, chests, crops, friends and
+  finished story. New Game would start a fresh journey over it (it asks first).
+  The first time this version saves, it tucks an untouched copy of your Chapter One save
+  into  %APPDATA%\Hollowhaven\saves\pre_v2_backup  . The older copy of the game can't read
+  the new save, so keep playing with this one.
+
+STYLE KRYSTAL
+  Soon after you Continue, somewhere calm, a little card says "Your wardrobe is ready".
+  Choose "Open the wardrobe" to change her hair, colours, eyes, outfits and single pieces.
+  Later, any time: Pause (Esc) > Wardrobe, or build a Wardrobe or Vanity Mirror at the
+  Workbench and press E at it. The Ward Stone and a festival mirror in the Lanternwake
+  Commons offer "Change your look" too, once the new road is open.
+  Three preset slots keep favourite looks. Clothes are only for looks: armor still protects
+  her underneath (tick "Show equipped armor" in the wardrobe if you'd like to see it).
+  New outfits are sewn as patterns at the Loom, and some are found along the way.
+
+YOUR FRIENDS FIGHT BESIDE YOU
+  Mochi, Pebble and Lumi now help in fights, and each has a special skill: Mochi's
+  Bloomguard heals, Pebble's Stoneheart shields, Lumi's Glimmerstep quickens your step.
+  They use it when it helps, or press T (companion skill). The ring round their portrait
+  shows when it's ready again.
+  Press E on a friend for their menu: Assist or Stay close, the skill, "Attacks on its own",
+  "Uses its skill on its own", and a home spot. G still asks them to follow or wait.
+  Mochi used to stop at the mine. Tie a Comfort Ribbon (sewn at the Loom) from Mochi's menu,
+  then rest together by the lit lantern at the mine's mouth, and Mochi will come below too.
+  A Companion Bed or Perch at home gives a friend a spot of its own (press E on it).
+
+WHERE THE NEW STORY BEGINS
+  With Chapter One finished, the goal box at the top right says "The Ward Stone has
+  something new to say". Read the Ward Stone in your Haven (E). "Follow the lantern road"
+  begins Chapter Two; "Stay a little longer" changes nothing, and it will ask again next time.
+  The road starts at an old waygate north of the Moonlit Ruin: mend it with 8 wood,
+  4 stone and 2 copper ore, and step through to Hallowmere Reach, a town that never finished
+  its lantern festival.
+
+GOING HOME
+  The waygate where you arrive in the Reach always leads straight back to the woods.
+  Light the lantern arches you find there: at any lit arch, "Travel the Lantern Road" takes
+  you to another arch or home to the Haven, and from home the Ward Stone sends you back.
+  In the woods, Pause > "Return to the Haven" works as before. Your house stays exactly as
+  you built it; the story never moves or adds anything inside it.
+
+NEW GEAR
+  A Furnace (Workbench) turns ore into bars. Queue a few batches; they smelt while you play.
+  Armor for head, body and boots, plus charms: open the backpack (Tab) and drag them onto
+  the Equipped column. Stronger axes, pickaxes and swords, and a Sparkseed Wand.
+  The Loom & Dye Bench (a tailor's cache near the Old Oak shows you how) weaves cloth,
+  sews clothes, mixes dyes and makes a bigger backpack (40, then 48 slots). A storage chest
+  can grow to 40 slots from its own menu, and crafting can "Also use nearby chests".
+  Masteries (Journal > Mastery) grow quietly with gathering, crafting and exploring.
+
+BUILDING
+  The Haven's building ground reaches further now, with lawns to the west and south-west.
+  New: stairs and an upper floor (held up by walls, windows, doorways or porch posts),
+  railings, half walls, arched windows, gable roofs, flower boxes, curtains, bookshelves,
+  a kitchen counter, a cottage bench, a music box and more.
+  In build mode (B): Z takes back your last piece (press twice, full refund), P recolours
+  the piece you point at with dyes from the Loom, N picks a carved pumpkin's face.
+  There is a small cottage plot by the Lanternwake Commons for building in the Reach too.
+
+HALLOWEEN
+  Hallowmere Reach is autumn all year: pumpkin orchards, candlelit paths and a very
+  theatrical manor. Grow pumpkins in a Crop Plot, cook festival food at the new Kitchen
+  Counter, and make carved pumpkins, pumpkin lights, bat bunting, ghost lanterns, a
+  scarecrow and more for your home as their recipes turn up.
+  Settings > Gameplay > "Seasonal decorations" adds a few pumpkins and ribbons along the
+  woodland paths (never inside your home). It starts off.
+
+MUSIC
+  Lots of new music for both chapters: home by day and by night, the woods, the old mine,
+  the Reach's orchard, quarry and candleyard, the manor, fights and the celebration. The old
+  favourites are still there. Settings > Audio > Music sets the volume, and there is a
+  Music Box to build for your home.
+
+COMFORT
+  Arachnophobia mode covers the new creatures too. New in Settings > Comfort:
+  "High-visibility cues" and "Timing assist". In Settings > Gameplay: "Friends join fights"
+  and "Friends use skills on their own".
+
+GOOD TO KNOW
+  - Echo Trial: after the Heartseed Chamber is won, a pale stone by the lantern before it
+    replays that old fight as a memory, for a reward. Nothing on your journey changes.
+  - After the story ends, free play simply carries on in the same save, and a new Workbench
+    recipe, the Expedition Board, gives your home a place to find optional adventures.
+  - New tips appear once each. Settings > Gameplay > "Show tips again" brings them back.
+  - Two small things: the build keys Z, P and N can't be changed in Settings yet, and the
+    older version of the game can't open the new save (the backup above is for that).
+  - All controls: F1. Full guide: How to Play.txt.
+
+For Krystal, from Ali.

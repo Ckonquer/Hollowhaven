@@ -12,6 +12,11 @@ extends Control
 ## Both draw friends, the player's arrow (from the camera yaw) and pulsing rings on every objective target
 ## (`target_ids`, landmark or point ids; an undiscovered target gets a "?" pin instead of its sticker). After
 ## "The Long Way Home" (flag ch2_map_pins_upgraded) the objective pins get a gold ring and a star badge.
+## Mastery map clarity (src/core/mastery.gd, data/mastery.gd), both outdoor maps, read in prepare():
+##   Wayfinding 2  small paper pins with the material's icon where Krystal gathered special materials
+##                 (Mastery.known_spots; same-kind spots closer than PIN_MERGE_M share one pin)
+##   Wayfinding 4  a soft, steady "?" (no pulse) at unfound optional caches in discovered districts (Mastery.cache_hints)
+## The woods map also names Bramblewatch (data/c1x_layout.gd BRAMBLEWATCH_ZONES[0]) once its zone is discovered.
 ## The static helpers below (map kinds, area / place names, room lists) are shared with the tracker, the
 ## journal and the map panel so every screen names places the same way.
 
@@ -21,6 +26,7 @@ const UiUtil := preload("res://src/ui/ui_util.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const Palette := preload("res://src/art/palette.gd")
+const Mastery := preload("res://src/core/mastery.gd")
 
 const REACH_ID := "hallowmere_reach"
 
@@ -85,6 +91,19 @@ const REACH_WAYGATE_NAME := "Waygate home"
 const REACH_LAYOUT_PATH := "res://data/hallowmere_layout.gd"
 ## Flag set by "The Long Way Home" reward ("Your map pins are fancier, too"): gold objective pins.
 const PINS_UPGRADE_FLAG := "ch2_map_pins_upgraded"
+
+## --- Mastery map clarity and Chapter One additions on the woods map ----------------------------------------
+## Resource pins (Wayfinding 2): same-kind spots closer than this (metres) are drawn as one pin.
+const PIN_MERGE_M := 9.0
+const PIN_R := 11.0               # pin disc radius (px)
+const PIN_ICON := 20.0            # material icon size inside a pin (px)
+const HINT_R := 13.0              # cache hint disc radius (px)
+## Bramblewatch (Chapter One optional area, module B7): named once its zone is discovered. Read through the
+## layout's constant map (a missing layout just shows nothing).
+const C1X_LAYOUT_PATH := "res://data/c1x_layout.gd"
+const BRAMBLEWATCH_NAME := "Bramblewatch"
+const BRAMBLEWATCH_ZONE_DEFAULT := "c1x_bramblewatch"
+const BRAMBLEWATCH_LABEL_SIZE := 20
 
 ## --- Areas and rooms ------------------------------------------------------------------------------------
 const AREA_NAMES := {
@@ -169,6 +188,13 @@ var _star := PackedVector2Array()  # upgraded-pin star, built once (drawn throug
 var _star_outline := PackedVector2Array()
 ## "The Long Way Home" reward: objective pins get a gold ring and star (read in prepare()).
 var pins_upgraded := false
+## Mastery pins on this map (read in prepare()): [[world Vector2, kind, item id, spots merged]] / cache hint points.
+var resource_pins: Array = []
+var cache_hint_points: Array = []
+## Bramblewatch on the woods map once discovered (world Vector2), else null (read in prepare()).
+var bramblewatch_at: Variant = null
+var _bramble_label := Vector2.ZERO
+var _bramble_size := Vector2(-1, -1)
 var frames_drawn := 0             # _draw calls (tests: the drawing code really ran)
 
 
@@ -296,10 +322,75 @@ static func map_pins_upgraded() -> bool:
 
 ## A constant of data/hallowmere_layout.gd by name (`fallback` when the layout has no such constant).
 static func _reach_const(const_name: String, fallback: Variant) -> Variant:
-	var s := load(REACH_LAYOUT_PATH) as Script
+	return _layout_const(REACH_LAYOUT_PATH, const_name, fallback)
+
+
+## A constant of a layout data file by name (`fallback` when the file or the constant is missing).
+static func _layout_const(path: String, const_name: String, fallback: Variant) -> Variant:
+	if not ResourceLoader.exists(path):
+		return fallback
+	var s := load(path) as Script
 	if s == null:
 		return fallback
 	return s.get_script_constant_map().get(const_name, fallback)
+
+
+## Where "Bramblewatch" is written on the woods map (its first zone circle, data/c1x_layout.gd), or null while
+## its zone is undiscovered (or the layout is missing).
+static func bramblewatch_pos() -> Variant:
+	var zone := String(_layout_const(C1X_LAYOUT_PATH, "BRAMBLEWATCH_ZONE", BRAMBLEWATCH_ZONE_DEFAULT))
+	if not GameState.is_discovered("surface", zone):
+		return null
+	var zones: Variant = _layout_const(C1X_LAYOUT_PATH, "BRAMBLEWATCH_ZONES", [])
+	if not (zones is Array) or (zones as Array).is_empty() or not ((zones as Array)[0] is Array):
+		return null
+	var first: Array = (zones as Array)[0]
+	if first.is_empty() or not (first[0] is Vector2):
+		return null
+	return first[0]
+
+
+## Recorded resource spots merged for drawing: [[world Vector2, kind, item id, count]]; a spot joins the first
+## pin of its kind closer than PIN_MERGE_M (so a pocket of veins is one pin, never a pile of identical marks).
+static func merged_pins(spots: Array) -> Array:
+	var out: Array = []
+	for sp in spots:
+		var kind := String(sp["kind"])
+		var p: Vector2 = sp["pos"]
+		var joined := false
+		for o in out:
+			if String(o[1]) == kind and (o[0] as Vector2).distance_to(p) < PIN_MERGE_M:
+				o[3] = int(o[3]) + 1
+				joined = true
+				break
+		if not joined:
+			out.append([p, kind, Mastery.spot_item(kind), 1])
+	return out
+
+
+## The outdoor map whose mastery data a map area shows ("surface" for the woods and debug areas).
+static func data_area(area_id: String) -> String:
+	return REACH_ID if area_id == REACH_ID else "surface"
+
+
+## Draws a resource pin (paper disc + material icon) on any CanvasItem (map and legend). `k` scales it.
+static func draw_spot_pin(ci: CanvasItem, c: Vector2, k: float, tex: Texture2D) -> void:
+	ci.draw_circle(c + Vector2(1.0, 1.5) * k, PIN_R * k, Color(0.2, 0.1, 0.1, 0.22), true, -1.0, true)
+	ci.draw_circle(c, PIN_R * k, ThemeFactory.PAPER_LIGHT, true, -1.0, true)
+	ci.draw_arc(c, PIN_R * k, 0.0, TAU, 20, ThemeFactory.INK_SOFT, 1.6, true)
+	if tex != null:
+		var sz := PIN_ICON * k
+		ci.draw_texture_rect(tex, Rect2(c - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), false)
+
+
+## Draws a soft, steady cache hint "?" (smaller and paler than the undiscovered-district pin; never pulses).
+static func draw_hint_pin(ci: CanvasItem, c: Vector2, k: float) -> void:
+	var f := ThemeFactory.font("heading")
+	ci.draw_circle(c, HINT_R * k, Color(ThemeFactory.PAPER_LIGHT, 0.82), true, -1.0, true)
+	ci.draw_arc(c, HINT_R * k, 0.0, TAU, 24, Color(ThemeFactory.GOLD.darkened(0.2), 0.85), 2.0 * k, true)
+	var fs := int(round(19.0 * k))
+	var tw := f.get_string_size("?", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	ci.draw_string(f, c + Vector2(-tw * 0.5, 7.0 * k), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(ThemeFactory.INK_SOFT, 0.9))
 
 
 ## True once the Commons festival board has been read (MAP_ROUTES "flag", ch2_read_festival_map).
@@ -394,6 +485,19 @@ func prepare() -> void:
 		_prepare_surface()
 	_prepared = map_area if map_area == REACH_ID else "surface"
 	_targets_dirty = true
+	_prepare_mastery()
+
+
+## Mastery pins / hints and the Bramblewatch name for this map (never per frame).
+func _prepare_mastery() -> void:
+	var area := data_area(map_area)
+	resource_pins = merged_pins(Mastery.known_spots(area)) if Mastery.resource_pins_on() else []
+	cache_hint_points = []
+	if Mastery.cache_hints_on():
+		for h in Mastery.cache_hints(area):
+			cache_hint_points.append(h["pos"])
+	bramblewatch_at = bramblewatch_pos() if area == "surface" else null
+	_bramble_size = Vector2(-1, -1)
 
 
 ## Resolves the objective targets to world points on this map once (not every frame).
@@ -611,6 +715,7 @@ func _draw_surface() -> void:
 		draw_circle(tp, tr, tree_cols[int(t[2])], true, -1.0, true)
 		draw_arc(tp, tr, 0.0, TAU, 12, Color(0.22, 0.35, 0.2, 0.7), 1.2, true)
 	_forest_frame(r, Color("5f8a45"))
+	_draw_mastery_pins(r)
 	# objective pulse (under the sticker)
 	for tw in _target_world:
 		_pulse(to_map(tw))
@@ -631,6 +736,13 @@ func _draw_surface() -> void:
 		var wc := to_map(Layout.CH2_POINTS["waygate"])
 		draw_arch_pin(self, wc, 1.35, surface_waygate_lit())
 		_name_label(f, WAYGATE_NAME, Vector2(wc.x, wc.y - 24.0), 20, r)
+	# Chapter One additions: Bramblewatch, once found
+	if bramblewatch_at is Vector2:
+		var bc := to_map(bramblewatch_at)
+		draw_circle(bc, 7.0, Palette.FOLIAGE_DARK.darkened(0.15), true, -1.0, true)
+		draw_arc(bc, 7.0, 0.0, TAU, 16, ThemeFactory.INK, 2.0, true)
+		draw_circle(bc + Vector2(-2.0, -2.0), 2.0, Palette.FLOWER_RED, true, -1.0, true)
+		_name_label(f, BRAMBLEWATCH_NAME, bramblewatch_label_at(), BRAMBLEWATCH_LABEL_SIZE, r)
 	_draw_player(r)
 	_compass(r, f)
 
@@ -677,6 +789,7 @@ func _draw_reach() -> void:
 		draw_circle(tp, tr, tree_cols[int(t[2])], true, -1.0, true)
 		draw_arc(tp, tr, 0.0, TAU, 12, Color(0.35, 0.2, 0.12, 0.7), 1.2, true)
 	_forest_frame(r, Color("a35f32"))
+	_draw_mastery_pins(r)
 	var f := ThemeFactory.font("heading")
 	for tw in _target_world:
 		_pulse(to_map(tw))
@@ -831,6 +944,90 @@ func _unknown_pin(c: Vector2, f: Font) -> void:
 	draw_arc(c, 17.0, 0.0, TAU, 24, ThemeFactory.ACCENT.darkened(0.2), 3.0, true)
 	var tw := f.get_string_size("?", HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
 	draw_string(f, c + Vector2(-tw * 0.5, 9.0), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 26, ThemeFactory.INK)
+
+
+# --- Mastery pins and the Bramblewatch name ------------------------------------------------------------------
+
+## Resource pins (under every sticker and name) and cache hints, each only inside the map rectangle.
+func _draw_mastery_pins(r: Rect2) -> void:
+	for pin in resource_pins:
+		var c := to_map(pin[0])
+		if r.grow(-PIN_R).has_point(c):
+			var item := String(pin[2])
+			draw_spot_pin(self, c, 1.0, IconFactory.item_icon(item, 48) if item != "" else null)
+	for hp in cache_hint_points:
+		var hc := to_map(hp)
+		if r.grow(-HINT_R).has_point(hc):
+			draw_hint_pin(self, hc, 1.0)
+
+
+## Screen boxes of the woods map's stickers, names and the waygate pin (+ its name when shown): [[id, Rect2]].
+func surface_blocks() -> Array:
+	var out: Array = []
+	var r := map_rect()
+	var f := ThemeFactory.font("heading")
+	for id in Layout.LANDMARKS:
+		var c := to_map(Layout.LANDMARKS[id]["pos"])
+		var isz := 58.0 if id == "haven" else 50.0
+		out.append([String(id), Rect2(c - Vector2(isz, isz) * 0.5, Vector2(isz, isz))])
+		out.append([String(id), _label_rect(f, String(Layout.LANDMARKS[id]["name"]), Vector2(c.x, c.y + isz * 0.5 + 18.0),
+			22 if id != "haven" else 24, r)])
+	if surface_waygate_visible() and Layout.CH2_POINTS.has("waygate"):
+		var wc := to_map(Layout.CH2_POINTS["waygate"])
+		out.append([WAYGATE_ID, _pin_rect(wc, 1.35)])
+		out.append([WAYGATE_ID, _label_rect(f, WAYGATE_NAME, Vector2(wc.x, wc.y - 24.0), 20, r)])
+	return out
+
+
+## Baseline centre of the Bramblewatch name: the first candidate (above its marker, below, beside, then shifted)
+## whose ink box stays inside the map and clears its marker, every sticker, name and the waygate. Cached per
+## control size.
+func bramblewatch_label_at() -> Vector2:
+	if _bramble_size == size:
+		return _bramble_label
+	_bramble_size = size
+	_bramble_label = Vector2.ZERO
+	if not (bramblewatch_at is Vector2):
+		return _bramble_label
+	var r := map_rect()
+	var f := ThemeFactory.font("heading")
+	var c := to_map(bramblewatch_at)
+	var tw := f.get_string_size(BRAMBLEWATCH_NAME, HORIZONTAL_ALIGNMENT_LEFT, -1, BRAMBLEWATCH_LABEL_SIZE).x
+	var above := Vector2(c.x, c.y - 14.0)
+	var below := Vector2(c.x, c.y + 28.0)
+	var side := tw * 0.5 + 14.0
+	var cands := [above, below, below + Vector2(0, 8), below + Vector2(0, 16), Vector2(c.x - side, c.y + 7.0),
+		Vector2(c.x + side, c.y + 7.0), above - Vector2(side, 0), above + Vector2(side, 0), below - Vector2(side, 0),
+		below + Vector2(side, 0), above - Vector2(0, 16), below + Vector2(side, 16), below - Vector2(side, 16)]
+	var blocks := surface_blocks()
+	var marker := bramblewatch_marker_rect()
+	_bramble_label = above
+	for cand in cands:
+		var lr := _label_rect(f, BRAMBLEWATCH_NAME, cand, BRAMBLEWATCH_LABEL_SIZE, r)
+		var free := r.grow(-12.0).encloses(lr) and not lr.intersects(marker)
+		if free:
+			for b in blocks:
+				if lr.intersects(b[1]):
+					free = false
+					break
+		if free:
+			_bramble_label = cand
+			break
+	return _bramble_label
+
+
+## Screen box of the little Bramblewatch marker (empty while it is not shown).
+func bramblewatch_marker_rect() -> Rect2:
+	if not (bramblewatch_at is Vector2):
+		return Rect2()
+	return Rect2(to_map(bramblewatch_at) - Vector2(9, 9), Vector2(18, 18))
+
+
+## Ink box of the Bramblewatch name (tests: overlap checks).
+func bramblewatch_label_rect() -> Rect2:
+	if not (bramblewatch_at is Vector2):
+		return Rect2()
+	return _label_rect(ThemeFactory.font("heading"), BRAMBLEWATCH_NAME, bramblewatch_label_at(), BRAMBLEWATCH_LABEL_SIZE, map_rect())
 
 
 # --- Shared drawing ------------------------------------------------------------------------------------

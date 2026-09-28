@@ -24,6 +24,7 @@ extends RefCounted
 ## the spawner carries meta "c1x_arena", the arena is in group "c1x_elder_arena").
 ##   Bramblewatch.build(area)
 ##   Bramblewatch.grass_clearings() -> Array
+##   Bramblewatch.make_bramblebacks(parent, area) / make_elder_spawner(parent, area) / elder_params(area)
 
 const L := preload("res://data/c1x_layout.gd")
 const Common := preload("res://src/world/surface/c1x/common.gd")
@@ -40,16 +41,42 @@ static func build(area: Node3D) -> void:
 	var watch := Watch.new()
 	watch.name = "Watch"
 	parent.add_child(watch)
-	Common.make_spawner(parent, area, L.BRAMBLEBACK_SPAWNER)
+	make_bramblebacks(parent, area)
 	var arena := Arena.new()
 	arena.name = "ElderArena"
 	Common.place(parent, arena, area, L.ELDER_ARENA["centre"], 0.0)
 	arena.build_slots(area)
-	var sp := Common.make_spawner(parent, area, L.ELDER_SPAWNER)
+	var sp := make_elder_spawner(parent, area)
 	if sp != null:
 		arena.attach_spawner(sp)
 	arena.repair_reward()
 	_build_decor(parent, area)
+
+
+## The renewable Brambleback group (c1x_sp_bramblebacks); it never pops in within view (layout out_of_view).
+## Null while the brambleback enemy is not available.
+static func make_bramblebacks(parent: Node3D, area: Node) -> Node3D:
+	var sp := Common.make_spawner(parent, area, L.BRAMBLEBACK_SPAWNER)
+	if sp != null:
+		sp.setup(L.spawner_extras(L.BRAMBLEBACK_SPAWNER))
+	return sp
+
+
+## The Knotted Elder's spawner. The Elder fights in THIS arena: its centre (on the ground) and ELDER_ARENA
+## radius reach the Elder through the spawner's enemy_params, so its own roots stay inside the arena the
+## fallback roots use (its data arena_radius is only a fallback). Null while knotted_elder is not available.
+static func make_elder_spawner(parent: Node3D, area: Node) -> Node3D:
+	var sp := Common.make_spawner(parent, area, L.ELDER_SPAWNER)
+	if sp != null:
+		var extra := L.spawner_extras(L.ELDER_SPAWNER)
+		extra["enemy_params"] = elder_params(area)
+		sp.setup(extra)
+	return sp
+
+
+## Setup params the Knotted Elder gets from its spawner (arena_center / arena_radius, knotted_elder.gd setup).
+static func elder_params(area: Node) -> Dictionary:
+	return {"arena_center": Common.ground(area, L.ELDER_ARENA["centre"]), "arena_radius": float(L.ELDER_ARENA["radius"])}
 
 
 static func grass_clearings() -> Array:

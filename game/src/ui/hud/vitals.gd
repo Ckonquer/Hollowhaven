@@ -2,10 +2,18 @@ extends Control
 ## Health and stamina: sticker icons + rounded, framed bars. Values ease toward the real ones, a pale
 ## "ghost" trail shows recent damage, the heart pulses gently at low health and the stamina bar fades
 ## away while it is full.
+## Chapter Two: a transient shield (Pebble's Stoneheart, Events.player_shield_changed) shows as a pale stone
+## segment on the health bar, right after the health fill (over its end when health is full). It eases in and
+## out (never flashes) and is gone at 0. The bar's maximum is Stats.effective_max_hp() when that is larger than
+## the health node's max_hp.
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
 const Palette := preload("res://src/art/palette.gd")
+const Stats := preload("res://src/core/stats.gd")
+
+const SHIELD_COLOR := Color("dde6ee")          # pale stone, reads on the dark track and over the red fill
+const SHIELD_EDGE := Color("8fa3b8")
 
 const BAR_W := 360.0
 const BAR_H := 30.0
@@ -26,6 +34,10 @@ var _t := 0.0
 var _heal_glow := 0.0
 var _first := true
 var _last_sig := Vector4(-1, -1, -1, -1)
+## Current shield (hp it will absorb) and the eased value drawn.
+var shield := 0.0
+var _shown_shield := 0.0
+var _last_shield_sig := -1.0
 
 var _heart: Texture2D
 var _bolt: Texture2D
@@ -37,6 +49,7 @@ var _sb_st: StyleBoxFlat
 var _sb_st_frame: StyleBoxFlat
 var _sb_st_track: StyleBoxFlat
 var _sb_gloss: StyleBoxFlat
+var _sb_shield: StyleBoxFlat
 var _st_frame_bg := Color.WHITE
 var _st_frame_border := Color.WHITE
 var _st_frame_shadow := Color.WHITE
@@ -56,10 +69,18 @@ func _ready() -> void:
 	_sb_st_frame = ThemeFactory.box(Color(ThemeFactory.PAPER_LIGHT, 0.96), 12, 3, Color(ThemeFactory.INK, 0.9), 0, 4, Vector2(0, 2), Color(0.1, 0.05, 0.08, 0.3))
 	_sb_st_track = ThemeFactory.box(Color("5a4650"), 8)
 	_sb_gloss = ThemeFactory.box(Color(1, 1, 1, 0.32), 5)
+	_sb_shield = ThemeFactory.box(Color(SHIELD_COLOR, 0.88), 12, 2, Color(SHIELD_EDGE, 0.95))
 	_st_frame_bg = _sb_st_frame.bg_color
 	_st_frame_border = _sb_st_frame.border_color
 	_st_frame_shadow = _sb_st_frame.shadow_color
 	_st_track_bg = _sb_st_track.bg_color
+	if not Events.player_shield_changed.is_connected(_on_shield_changed):
+		Events.player_shield_changed.connect(_on_shield_changed)
+	shield = Stats.player_shield()
+
+
+func _on_shield_changed(amount: float) -> void:
+	shield = maxf(amount, 0.0)
 
 
 func _process(delta: float) -> void:
@@ -70,6 +91,7 @@ func _process(delta: float) -> void:
 		_shown_hp = hp
 		_ghost_hp = hp
 		_shown_st = stamina
+		_shown_shield = shield
 	# health easing + ghost trail
 	if hp > _shown_hp + 0.5:
 		_heal_glow = 1.0
@@ -83,6 +105,10 @@ func _process(delta: float) -> void:
 	else:
 		_ghost_hold = 0.55
 	_heal_glow = maxf(_heal_glow - delta * 1.6, 0.0)
+	# shield: eases like the health fill, and is simply gone once it has run out
+	_shown_shield = lerpf(_shown_shield, shield, clampf(delta * 10.0, 0.0, 1.0))
+	if shield <= 0.0 and _shown_shield < 0.5:
+		_shown_shield = 0.0
 	# stamina: fade when full
 	_shown_st = lerpf(_shown_st, stamina, clampf(delta * 12.0, 0.0, 1.0))
 	if stamina >= max_stamina - 0.5:
@@ -94,8 +120,10 @@ func _process(delta: float) -> void:
 	# redraw only when something visible changed (bars ease, pulse animates at low health)
 	var low := hp < max_hp * 0.3 and hp > 0.0
 	var sig := Vector4(roundf(_shown_hp * 4.0), roundf(_ghost_hp * 4.0), roundf(_shown_st * 4.0), roundf(_st_alpha * 50.0 + _heal_glow * 20.0))
-	if sig != _last_sig or low:
+	var shield_sig := roundf(_shown_shield * 4.0)
+	if sig != _last_sig or low or shield_sig != _last_shield_sig:
 		_last_sig = sig
+		_last_shield_sig = shield_sig
 		queue_redraw()
 
 
@@ -109,9 +137,15 @@ func _read_values() -> void:
 	if h != null and is_instance_valid(h):
 		hp = float(h.get("hp"))
 		max_hp = maxf(float(h.get("max_hp")), 1.0)
+		# The player's own health node is the source of truth for the shield (a new player after an area
+		# change or a respawn starts without one, and emits nothing about it).
+		var sv0: Variant = h.get("shield")
+		if sv0 is float or sv0 is int:
+			shield = maxf(float(sv0), 0.0)
 	else:
 		hp = float(GameState.player.get("hp", 100.0))
 		max_hp = maxf(float(GameState.player.get("max_hp", 100.0)), 1.0)
+	max_hp = maxf(max_hp, Stats.effective_max_hp())
 	max_stamina = maxf(float(GameState.player.get("max_stamina", 100.0)), 1.0)
 	if p != null and is_instance_valid(p):
 		var sv: Variant = p.get("stamina")
@@ -149,8 +183,13 @@ func _draw() -> void:
 		# glossy highlight along the top of the fill
 		if fw > 16.0:
 			draw_style_box(_sb_gloss, Rect2(inner.position + Vector2(6, 3), Vector2(fw - 12.0, 5)))
+	var shield_rect := shield_segment(inner, _shown_hp, _shown_shield, max_hp)
+	if shield_rect.size.x > 2.0:
+		draw_style_box(_sb_shield, shield_rect)
 	var f := ThemeFactory.font("body_bold")
 	var txt := "%d" % int(ceil(hp))
+	if shield >= 0.5:
+		txt = "%d  +%d" % [int(ceil(hp)), int(ceil(shield))]
 	var tp := Vector2(bar.position.x, bar.position.y + bar.size.y - 7)
 	draw_string_outline(f, tp, txt, HORIZONTAL_ALIGNMENT_RIGHT, bar.size.x - 12.0, 21, 6, Color(ThemeFactory.INK, 0.9))
 	draw_string(f, tp, txt, HORIZONTAL_ALIGNMENT_RIGHT, bar.size.x - 12.0, 21, ThemeFactory.CREAM)
@@ -175,3 +214,15 @@ func _draw() -> void:
 			_sb_st.bg_color = sc
 			draw_style_box(_sb_st, Rect2(si.position, Vector2(sw, si.size.y)))
 		draw_texture_rect(_bolt, Rect2(Vector2(36, 58), Vector2(42, 42)), false, Color(1, 1, 1, a))
+
+
+## Where the pale shield segment sits inside the health bar's inner rect: right after the health fill, as
+## wide as the shield in bar units; when that would run past the end it is pushed back over the end of the
+## fill instead (a full-health shield still shows). Empty Rect2 when there is no shield. Pure; see tests.
+static func shield_segment(inner: Rect2, shown_hp: float, shown_shield: float, bar_max: float) -> Rect2:
+	if shown_shield <= 0.0 or bar_max <= 0.0 or inner.size.x <= 0.0:
+		return Rect2()
+	var w := inner.size.x * clampf(shown_shield / bar_max, 0.0, 1.0)
+	var x := inner.size.x * clampf(shown_hp / bar_max, 0.0, 1.0)
+	x = clampf(x, 0.0, inner.size.x - w)
+	return Rect2(inner.position + Vector2(x, 0.0), Vector2(w, inner.size.y))

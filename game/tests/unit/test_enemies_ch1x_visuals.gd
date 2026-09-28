@@ -27,6 +27,7 @@ func after_each() -> void:
 			n.queue_free()
 	_nodes.clear()
 	Settings.set_value("reduce_flashing", false)
+	Settings.set_value("high_visibility_cues", false)
 	await wait_frames(1)
 
 
@@ -205,3 +206,54 @@ func test_reduce_flashing_keeps_tints_steady() -> void:
 		p._process(0.023)
 		seen[snappedf(pm.albedo_color.a, 0.001)] = true
 	assert_true(seen.size() > 3, "pulses without the comfort option")
+
+
+## R87: Settings high_visibility_cues adds a bold cream outline round every shared ground telegraph (ring, disc,
+## lane, wedge, spots), live on settings_changed, steady, with ONE shared material and cached meshes.
+func test_high_visibility_cues_outline_the_ground_marks_live() -> void:
+	const TelegraphFx := preload("res://src/enemies/telegraph_fx.gd")
+	Settings.set_value("high_visibility_cues", false)
+	var m1: Node3D = TelegraphFx.new()
+	var m2: Node3D = TelegraphFx.new()
+	add_child(m1)
+	add_child(m2)
+	_nodes.append(m1)
+	_nodes.append(m2)
+	m1.show_ring(Vector3.ZERO, 2.0)
+	assert_false(bool(m1.bold_visible()), "off by default: no outline")
+	Settings.set_value("high_visibility_cues", true)
+	assert_true(bool(m1.bold_visible()), "switched on live: the showing mark gains its outline")
+	var b1: MeshInstance3D = m1.get("_bold")
+	assert_true(b1.scale.is_equal_approx(Vector3(2.0, 1.0, 2.0)), "the outline hugs the marked radius")
+	m2.show_lane(Vector3(4, 0, 0), Vector3(4, 0, -6), 1.6, TelegraphFx.DANGER)
+	assert_true(bool(m2.bold_visible()), "a new mark is outlined while the option is on")
+	var b2: MeshInstance3D = m2.get("_bold")
+	assert_eq(b1.material_override, b2.material_override, "one shared outline material")
+	var bm: StandardMaterial3D = b1.material_override
+	assert_true(bm.albedo_color.r > 0.95 and bm.albedo_color.g > 0.9 and bm.albedo_color.b > 0.75, "cream")
+	m2.move_lane(Vector3(4, 0, 0), Vector3(10, 0, 0))
+	assert_almost(b2.scale.z, 6.0, 0.001, "the outline follows a tracked lane")
+	m2.show_arc(Vector3.ZERO, Vector3.FORWARD, 3.0, 150.0, TelegraphFx.WARN)
+	assert_true(bool(m2.bold_visible()), "wedge outlined")
+	var arc_mesh: Mesh = b2.mesh
+	m1.show_arc(Vector3(8, 0, 0), Vector3.BACK, 2.0, 150.0, TelegraphFx.WARN)
+	assert_eq((m1.get("_bold") as MeshInstance3D).mesh, arc_mesh, "outline meshes are cached per shape")
+	m1.show_spots([Vector3(1, 0, 1), Vector3(-1, 0, 1)], 0.75)
+	assert_true(bool(m1.bold_visible()), "each spot gets a ring")
+	var spots_on := 0
+	for s in m1.get("_bold_spots"):
+		if (s as MeshInstance3D).visible:
+			spots_on += 1
+	assert_eq(spots_on, 2, "one outline per marked spot")
+	assert_false((m1.get("_bold") as MeshInstance3D).visible, "no stray wedge outline under the spots")
+	# Steady: the outline is visibility only, the pulse never touches it.
+	var lvl_mat: Material = bm
+	for i in 20:
+		m2._process(0.037)
+	assert_eq(b2.material_override, lvl_mat, "the outline never pulses")
+	Settings.set_value("high_visibility_cues", false)
+	assert_false(bool(m1.bold_visible()) or bool(m2.bold_visible()), "switched off live")
+	m2.hide_mark()
+	Settings.set_value("high_visibility_cues", true)
+	assert_false(bool(m2.bold_visible()), "a hidden mark shows no outline")
+	Settings.set_value("high_visibility_cues", false)

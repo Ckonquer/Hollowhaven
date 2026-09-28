@@ -35,7 +35,9 @@ const ITEM_ICONS := ["log", "stone", "fiber", "berries", "ore", "seeds", "root",
 const EXTRA_ICONS := ["spool", "unknown", "ui_heart", "ui_heart_empty", "ui_stamina", "ui_check", "ui_star",
 	"ui_info", "ui_warn", "ui_bag", "ui_sun", "ui_moon", "ui_lock", "ui_close", "ui_hint", "ui_quest",
 	"ui_save", "ui_speaker", "map_house", "map_ruin", "map_mine", "map_pond", "map_flower", "map_oak",
-	"map_thorn", "map_quarry", "map_glade"]
+	"map_thorn", "map_quarry", "map_glade",
+	# Hallowmere Reach district stickers (src/ui/widgets/map_view.gd REACH_ICONS)
+	"map_lantern", "map_glasshouse", "map_pumpkin", "map_candle", "map_manor", "map_bell"]
 const PORTRAITS := ["mochi", "pebble", "lumi"]
 
 static var _cache: Dictionary = {}
@@ -263,6 +265,12 @@ static func _compose(r: Raster, id: String, c: Color) -> void:
 		"map_thorn": _map_thorn(r)
 		"map_quarry": _stone(r, Palette.STONE)
 		"map_glade": _berries(r, Palette.FLOWER_RED)
+		"map_lantern": _map_lantern(r)
+		"map_glasshouse": _map_glasshouse(r)
+		"map_pumpkin": _map_pumpkin(r)
+		"map_candle": _map_candle(r)
+		"map_manor": _map_manor(r)
+		"map_bell": _map_bell(r)
 		"portrait_mochi": _portrait_mochi(r)
 		"portrait_pebble": _portrait_pebble(r)
 		"portrait_lumi": _portrait_lumi(r)
@@ -1771,6 +1779,109 @@ static func _map_thorn(r: Raster) -> void:
 		r.fill([L([Vector2(48 + cos(a) * 22, 54 + sin(a) * 22), Vector2(48 + cos(a) * 36, 54 + sin(a) * 36)], [3.5, 0.8])], Palette.BARK_DARK)
 	r.fill([C(40, 46, 4.5)], Palette.FLOWER_RED, NO_LINE)
 	r.fill([C(58, 60, 3.5)], Palette.FLOWER_RED, NO_LINE)
+
+
+## Lanternwake Commons: a festival post with a round paper lantern and a little bunting line.
+static func _map_lantern(r: Raster) -> void:
+	_halo(r, 56, 58, 32, Palette.LANTERN_GLOW, 0.5)
+	r.fill([B(30, 84, 12, 4, 2)], Palette.STONE)
+	r.fill([L([Vector2(30, 82), Vector2(30, 14)], 4.5)], Palette.WOOD_DARK)
+	r.fill([L([Vector2(30, 17), Vector2(80, 21)], 1.4)], Palette.UI_INK_SOFT, NO_LINE)
+	var flags := [[42.0, Palette.FLOWER_RED], [56.0, Palette.FLOWER_YELLOW], [70.0, Palette.TEAL]]
+	for fl in flags:
+		var x: float = fl[0]
+		var y := 17.0 + (x - 30.0) * 0.08
+		r.fill([P([Vector2(x - 4.5, y), Vector2(x + 4.5, y + 0.7), Vector2(x, y + 9)], 1.0)], fl[1], {"o": 2.0})
+	r.fill([L([Vector2(30, 36), Vector2(62, 36)], 2.6)], Palette.WOOD_DARK)
+	r.fill([L([Vector2(56, 37), Vector2(56, 43)], 1.3)], Color("5b4a57"))
+	r.fill([E(56, 59, 16, 14)], Color("f29a4a"))
+	r.fill([E(56, 59, 6.5, 14)], Color("ffc978"), NO_LINE)
+	r.fill([B(56, 45, 6.5, 2.4, 1.2), B(56, 73, 6.5, 2.4, 1.2)], Color("5b4a57"))
+	r.fill([L([Vector2(56, 76), Vector2(56, 83)], 1.2)], Palette.FLOWER_RED, NO_LINE)
+	_gloss(r, E(49, 53, 3, 5.5, 10), 0.55)
+
+
+## Ward-Keeper's Conservatory: a small glasshouse with an arched glass roof and green shoots inside.
+static func _map_glasshouse(r: Raster) -> void:
+	var glass := Color("bfe6e6")
+	var frame := Color("f3efe6")
+	r.fill([B(48, 64, 34, 18, 3), E(48, 46, 34, 22)], glass)
+	r.fill([E(34, 72, 9, 7), E(50, 70, 10, 9), E(64, 73, 8, 6)], Palette.FOLIAGE, {"o": 0.0, "back": false, "shade": 0.08})
+	r.fill([C(50, 64, 3.5)], Palette.BLOSSOM, NO_LINE)
+	for x in [26.0, 48.0, 70.0]:
+		r.fill([L([Vector2(x, 82), Vector2(x, 46)], 1.8)], frame, {"o": 1.5, "back": false})
+	r.fill([L([Vector2(14, 58), Vector2(82, 58)], 1.8)], frame, {"o": 1.5, "back": false})
+	var arch: Array = []
+	for i in 7:
+		var a := PI * float(i) / 6.0
+		arch.append(Vector2(48.0 + cos(a) * 31.0, 46.0 - sin(a) * 19.0))
+	r.fill([L(arch, 1.8)], frame, {"o": 1.5, "back": false})
+	r.fill([B(48, 84, 38, 3.5, 1.5)], Palette.STONE)
+	r.fill([C(48, 22, 4)], Palette.LANTERN_GLOW, {"o": 1.8})
+	_gloss(r, E(34, 44, 4, 9, 30), 0.6)
+
+
+## Pumpkintide Orchard: a fat pumpkin in front of a little autumn tree.
+static func _map_pumpkin(r: Raster) -> void:
+	r.fill([L([Vector2(66, 62), Vector2(66, 38)], [5.0, 3.5])], Palette.BARK)
+	r.fill([C(58, 30, 12), C(74, 30, 12), C(66, 21, 12)], Palette.FOLIAGE_AUTUMN)
+	r.fill([C(62, 23, 3.5)], Color("f6c77a"), NO_LINE)
+	var c := Color("f08a3c")
+	r.fill([E(40, 66, 28, 20)], c.darkened(0.14))
+	r.fill([E(28, 66, 12, 19)], c.darkened(0.04))
+	r.fill([E(52, 66, 12, 19)], c.darkened(0.04))
+	r.fill([E(40, 66, 11, 20.5)], c.lightened(0.06))
+	_gloss(r, E(35, 56, 3.5, 6.5, 10), 0.5)
+	r.fill([L([Vector2(40, 47), Vector2(42, 39), Vector2(47, 35)], [4.0, 3.5, 2.8])], Palette.BARK)
+	r.fill([E(30, 42, 8, 4, 20)], Palette.FOLIAGE)
+
+
+## The Candleyard: three candles of different heights on a lilac stone dish, soft flames.
+static func _map_candle(r: Raster) -> void:
+	_halo(r, 48, 38, 34, Palette.LANTERN_GLOW, 0.45)
+	var wax := Color("fff4e0")
+	var stone := Color("bdb3cc")
+	var candles := [[32.0, 50.0, 7.0], [48.0, 36.0, 8.0], [64.0, 56.0, 6.5]]
+	for cd in candles:
+		var x: float = cd[0]
+		var top: float = cd[1]
+		var hw: float = cd[2]
+		r.fill([B(x, (top + 78.0) * 0.5, hw, (78.0 - top) * 0.5, 2.5)], wax)
+		r.fill([E(x + hw * 0.45, top + 5.0, 2.0, 4.0)], wax.darkened(0.08), NO_LINE)
+		r.fill([L([Vector2(x, top), Vector2(x, top - 4)], 1.0)], Palette.UI_INK, NO_LINE)
+		r.fill([E(x, top - 10.0, 4.2, 7.0)], Palette.MINE_LIGHT, {"o": 1.5})
+		r.fill([E(x, top - 8.5, 2.0, 3.6)], Color("fff4c8"), NO_LINE)
+	r.fill([E(48, 80, 36, 8)], stone)
+	r.fill([E(48, 78, 28, 4)], stone.lightened(0.15), NO_LINE)
+
+
+## Moonveil Manor: a tall gothic house with a pointed tower, a glowing crescent window and a moon.
+static func _map_manor(r: Raster) -> void:
+	var wall := Color("c9b8d6")
+	var roof := Color("6c5a86")
+	r.fill([C(76, 18, 9), CUT(C(80, 15, 8))], Palette.MOON.lightened(0.25), {"o": 1.8})
+	r.fill([B(26, 66, 14, 18, 2), B(70, 66, 14, 18, 2)], wall.darkened(0.08))
+	r.fill([P([Vector2(10, 50), Vector2(26, 34), Vector2(42, 50)], 2.0), P([Vector2(54, 50), Vector2(70, 34), Vector2(86, 50)], 2.0)], roof)
+	r.fill([B(48, 58, 13, 26, 2)], wall)
+	r.fill([P([Vector2(32, 34), Vector2(48, 10), Vector2(64, 34)], 2.0)], roof.darkened(0.08))
+	r.fill([C(48, 44, 6), CUT(C(51, 42, 5))], Palette.LANTERN_GLOW, {"o": 1.8})
+	r.fill([B(48, 76, 6, 8, 3)], Palette.WOOD_DARK)
+	r.fill([B(26, 64, 4, 6, 2), B(70, 64, 4, 6, 2)], Palette.LANTERN_GLOW.darkened(0.05), {"o": 1.8})
+
+
+## Sunken Bellhouse: a bronze bell hanging in a small timber arch over a mossy stone step.
+static func _map_bell(r: Raster) -> void:
+	var bronze := Color("d4a24c")
+	r.fill([B(48, 84, 36, 5, 2)], Palette.RUIN_STONE.lightened(0.25))
+	r.fill([E(30, 80, 8, 3)], Palette.RUIN_MOSS, NO_LINE)
+	r.fill([L([Vector2(20, 80), Vector2(20, 22)], 4.5), L([Vector2(76, 80), Vector2(76, 22)], 4.5)], Palette.WOOD_DARK)
+	r.fill([P([Vector2(12, 24), Vector2(48, 11), Vector2(84, 24), Vector2(84, 30), Vector2(12, 30)], 2.5)], Palette.BARK)
+	r.fill([L([Vector2(48, 30), Vector2(48, 36)], 1.6)], Color("5b4a57"))
+	r.fill([P([Vector2(38, 40), Vector2(58, 40), Vector2(64, 64), Vector2(70, 70), Vector2(26, 70), Vector2(32, 64)], 4.0), C(48, 42, 10)], bronze)
+	r.fill([B(48, 70, 22, 2.2, 1.2)], bronze.darkened(0.18), NO_LINE)
+	r.fill([C(48, 74, 4)], bronze.darkened(0.3))
+	_gloss(r, L([Vector2(40, 44), Vector2(36, 62)], 1.8), 0.55)
+	_sparkle(r, 68, 46, 5)
 
 
 # --- Companion portraits (circle backdrop; framed by the UI) ------------------------------------

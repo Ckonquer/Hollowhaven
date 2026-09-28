@@ -201,7 +201,11 @@ const BOSSES := {"weaver_matron": "boss_matron", "count_velour": "velour", "cros
 
 ## Seconds of music silence after a horror event (Events.horror_event). "authored:<id>" moments not
 ## listed use AUTHORED_SILENCE_DEFAULT; other director events rely on the horror state instead.
-const AUTHORED_SILENCE := {"authored:boss": 0.0, "authored:return": 0.0, "silence": 12.0}
+## Short Chapter Two moments get a shorter hush: Tobin's annex echo (a single cozy-eerie beat, 12 s) and the
+## manor's Empty Waltz (the waltz fades, one pair bows, then the room's music returns: 15 s). The Works' hw_*
+## moments keep the default.
+const AUTHORED_SILENCE := {"authored:boss": 0.0, "authored:return": 0.0, "silence": 12.0,
+	"authored:ta_echo": 12.0, "authored:empty_waltz": 15.0}
 const AUTHORED_SILENCE_DEFAULT := 25.0
 
 const TUNING := {

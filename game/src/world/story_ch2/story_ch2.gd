@@ -33,21 +33,29 @@ const FEAST_REWARD := "rw_ch2_feast"
 const FEAST_PATTERN := "pat_lanternwake"              # Lanternwake festival outfit (dress, bodice, crown, ...)
 ## Gothic and cottage furnishing finishes: dye palettes that recolour any tintable furniture in place.
 const FEAST_PALETTES := ["midnight", "cream"]
-## "Continued resources" committed with rw_ch2_feast on top of the final step's own give (Game.chapter_two_rewards).
+## "Continued resources" committed with rw_ch2_feast (Game.chapter_two_rewards merges them per item with max). The
+## final step's give (data/quests_ch2.gd ch2_feast) and data/sources.gd REWARDS rw_ch2_feast list these same
+## amounts next to the candy, so the ledger entry pays the same whichever path grants it first.
 const FEAST_EXTRAS := {"pumpkin": 4, "lantern_wax": 4, "sugarcap": 3, "moonpetal": 3}
 
 # --- Cross-area optional goals (data/optional_goals.gd) ------------------------------------------------------
-## Lore notes found by other modules -> the objective flags of "The Miner Who Came Back".
-const LORE_FLAGS := {"lore_ch2_tobin_note": "c1x_tobin_letter_found", "lore_ch2_hask_note": "ch2_hask_note_found"}
+## Lore notes found by other modules -> the objective flags of "The Miner Who Came Back": Tobin's personal letter
+## (annex locker nine) and Hask's note in the refuge planter. Those modules set the flags themselves; this repairs
+## them from the journal. (Tobin's service note and Hask's rail lamp-post note are other notes: they never tick
+## these objectives. A flag an older build already set from them simply stays set.)
+const LORE_FLAGS := {"lore_ch2_tobin_letter": "c1x_tobin_letter_found", "lore_ch2_hask_refuge_note": "ch2_hask_note_found"}
 ## Flags set by other modules -> the (namespaced) objective flag this module mirrors them to.
 const FLAG_ALIASES := {"mm_balcony_shortcut": "ch2_shortcut_manor"}
 ## "The Harvest Table": different seasonal dishes cooked (one flag each, counted into the counter).
 const SEASONAL_DISHES := ["pumpkin_soup", "pumpkin_biscuit", "roseberry_tart", "moonpetal_tea", "lanternwake_platter"]
 const DISH_FLAG_PREFIX := "ch2_dish_"
 const DISH_COUNTER := "ch2_seasonal_dishes"
-## ... and a table set for the festival (any table: the Lanternwake Table itself is that goal's reward).
-const TABLE_STRUCTURES := ["lanternwake_table", "table"]
+## ... and the festival table dressed: the Kitchen's festival-table choice (Crafting.decorate_table sets the flag and
+## remembers the choice in GameState.stations[TABLE_DECOR_KEY]) or a placed Lanternwake Table. A plain Chapter One
+## table no longer counts (MP 15: choose a table decoration). A flag already set stays set.
+const TABLE_STRUCTURES := ["lanternwake_table"]
 const TABLE_FLAG := "ch2_table_decorated"
+const TABLE_DECOR_KEY := "table_decor"
 ## "A Pumpkin With a Face": a pumpkin grown and harvested from a crop plot.
 const PUMPKIN_CROP := "pumpkin"
 const PUMPKIN_FLAG := "ch2_pumpkin_harvested"
@@ -236,12 +244,9 @@ static func sync_state() -> bool:
 	if dishes > GameState.get_counter(DISH_COUNTER):
 		GameState.set_counter_max(DISH_COUNTER, dishes)
 		changed = true
-	if not flag(TABLE_FLAG):
-		for sid in TABLE_STRUCTURES:
-			if GameState.count_structures(String(sid)) > 0:
-				GameState.set_flag(TABLE_FLAG, true)
-				changed = true
-				break
+	if not flag(TABLE_FLAG) and table_dressed():
+		GameState.set_flag(TABLE_FLAG, true)
+		changed = true
 	if sync_feast_unlocks():
 		changed = true
 	for sid in STEP_FLAG_REPAIRS:
@@ -283,6 +288,17 @@ static func note_structure(structure_id: String) -> void:
 static func note_crop(crop_id: String) -> void:
 	if crop_id == PUMPKIN_CROP and not flag(PUMPKIN_FLAG):
 		GameState.set_flag(PUMPKIN_FLAG, true)
+
+
+## The saved state says the festival table was dressed: a Kitchen decoration choice or a placed Lanternwake Table.
+static func table_dressed() -> bool:
+	var choice: Variant = GameState.stations.get(TABLE_DECOR_KEY, "")
+	if choice is String and String(choice) != "":
+		return true
+	for sid in TABLE_STRUCTURES:
+		if GameState.count_structures(String(sid)) > 0:
+			return true
+	return false
 
 
 ## How many different seasonal dishes have been cooked (one flag each).

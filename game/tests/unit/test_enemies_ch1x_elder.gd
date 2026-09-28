@@ -55,6 +55,7 @@ func after_each() -> void:
 			c.queue_free()
 	Base.clock_override_ms = -1
 	Base.reset_attack_tokens()
+	Settings.set_value("timing_assist", false)
 	Game.area = _saved_area
 	Game.companion_nodes = _saved_companions
 	await wait_frames(2)
@@ -140,6 +141,31 @@ func test_root_sweep_sequence_and_wide_arc() -> void:
 	var rec := _until(e, "chase", 3.0)
 	assert_almost(rec, 1.8, DT * 2.0, "recover data 1.8 s")
 	assert_eq(seen.slice(0, 5), ["chase", "telegraph", "sweep", "recover", "chase"], "sequence (%s)" % str(seen))
+
+
+## R86: elites count as boss mechanics for Settings timing_assist: every wind-up (and recovery) x1.5.
+func test_timing_assist_stretches_its_telegraphs_like_a_boss() -> void:
+	var d := _dummy(Vector3(0, 0, -2.4))
+	Settings.set_value("timing_assist", true)
+	var e := _elder(d)
+	assert_almost(float(Elder.TIMING_ASSIST_MULT), 1.5, 0.001, "same stretch as the Matron / Warden")
+	e.next_attack = "root_sweep"
+	_until(e, "telegraph", 4.0)
+	var m: Node3D = e.mark()
+	assert_eq(m.footprint()["kind"], "arc", "the same readable mark")
+	var tele := _until(e, "sweep", 4.0)
+	assert_almost(tele, 1.3 * 1.5, DT * 2.0, "assisted sweep wind-up 1.95 s")
+	_until(e, "recover", 1.0)
+	var rec := _until(e, "chase", 5.0)
+	assert_almost(rec, 1.8 * 1.5, DT * 2.0, "assisted punish opening 2.7 s")
+	for atk in ["charge", "roots"]:
+		e.set("_def", e.attack_def(atk))
+		assert_almost(float(e.telegraph_duration()), float(e.attack_def(atk)["telegraph"]) * 1.5, 0.001, "%s wind-up x1.5" % atk)
+	Settings.set_value("timing_assist", false)
+	for atk in ["root_sweep", "charge", "roots"]:
+		e.set("_def", e.attack_def(atk))
+		assert_almost(float(e.telegraph_duration()), float(e.attack_def(atk)["telegraph"]), 0.001, "assist off: data %s wind-up" % atk)
+		assert_almost(float(e.recover_duration()), float(e.attack_def(atk)["recover"]), 0.001, "assist off: data %s recovery" % atk)
 
 
 func test_charge_sequence_and_hit() -> void:

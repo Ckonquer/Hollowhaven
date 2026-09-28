@@ -6,6 +6,7 @@ extends "res://tests/unit/test_core_base.gd"
 
 const Story := preload("res://src/world/story_ch2/story_ch2.gd")
 const WardStone := preload("res://src/world/surface/ward_stone.gd")
+const Crafting := preload("res://src/crafting/crafting.gd")
 
 
 class StubUi extends CanvasLayer:
@@ -27,6 +28,7 @@ func setup() -> void:
 	GameState.set_flag("ch2_accepted")
 	opt = GameState.optional_goals
 	_ui_before = Game.ui
+	_suspend_session_tracker()
 	tracker = Story.new_tracker()
 	add_child(tracker)
 
@@ -37,6 +39,17 @@ func teardown() -> void:
 	tracker = null
 	Game.ui = _ui_before
 	await wait_frames(1)
+	if Game.has_method("wire_session_systems"):
+		Game.call("wire_session_systems")     # the session's own tracker is back for the next suite
+
+
+## Game keeps ONE session tracker (Game.wire_session_systems). These tests drive their own, and some need a moment
+## with no tracker at all (an older save), so the session one steps aside (leaving the tree disconnects it).
+func _suspend_session_tracker() -> void:
+	var session: Node = Game.get_node_or_null("StoryCh2Tracker")
+	if session != null:
+		Game.remove_child(session)
+		session.queue_free()
 
 
 func _held(id: String) -> int:
@@ -84,8 +97,16 @@ func test_harvest_table_counts_different_dishes_and_a_table() -> void:
 	assert_eq(GameState.get_counter(Story.DISH_COUNTER), 2)
 	opt.evaluate()
 	assert_false(opt.is_done("opt_harvest_table"), "no table yet")
+	# A plain (Chapter One) table is not a festival table: the goal asks for a table decoration.
 	GameState.add_structure("table", Vector3(2, 0, 2), 0.0)
 	Events.structure_placed.emit("s_test", "table")
+	assert_false(Story.flag(Story.TABLE_FLAG), "a plain table does not count")
+	Story.sync_state()
+	assert_false(Story.flag(Story.TABLE_FLAG), "not from saved state either")
+	opt.evaluate()
+	assert_false(opt.is_done("opt_harvest_table"), "still no festival table")
+	# The Kitchen's festival-table choice dresses it.
+	assert_true(Crafting.decorate_table("candles"))
 	assert_true(Story.flag(Story.TABLE_FLAG))
 	opt.evaluate()
 	assert_true(opt.is_done("opt_harvest_table"))
@@ -121,13 +142,41 @@ func test_harvest_table_from_saved_state_and_round_trip() -> void:
 	assert_true(Story.flag(Story.DISH_FLAG_PREFIX + "moonpetal_tea"), "dish flags are saved")
 
 
+## The festival-table flag is repaired from the Kitchen's saved decoration choice (a save whose flag was lost), and a
+## flag set by an older build (a plain table then counted) stays set: nothing latched is ever taken back.
+func test_festival_table_repaired_from_the_kitchen_choice_and_old_flags_stay() -> void:
+	GameState.stations[Story.TABLE_DECOR_KEY] = "moonpetals"
+	assert_false(Story.flag(Story.TABLE_FLAG))
+	assert_true(Story.sync_state(), "repaired")
+	assert_true(Story.flag(Story.TABLE_FLAG))
+	_reload()
+	assert_eq(String(GameState.stations.get(Story.TABLE_DECOR_KEY, "")), "moonpetals", "the choice is saved")
+	assert_true(Story.flag(Story.TABLE_FLAG))
+	# An older save: a plain table placed and the flag already set by the old rule.
+	GameState.stations.erase(Story.TABLE_DECOR_KEY)
+	GameState.add_structure("table", Vector3(2, 0, 2), 0.0)
+	Story.sync_state()
+	assert_true(Story.flag(Story.TABLE_FLAG), "an already-set flag is never cleared")
+	# A damaged saved choice (not a String) is ignored without an error.
+	GameState.flags.erase(Story.TABLE_FLAG)
+	GameState.stations[Story.TABLE_DECOR_KEY] = 7
+	Story.sync_state()
+	assert_false(Story.flag(Story.TABLE_FLAG), "a damaged choice dresses nothing")
+
+
 func test_miner_who_came_back_from_lore_once() -> void:
-	GameState.discover_lore("lore_ch2_tobin_note")
-	assert_true(Story.flag("c1x_tobin_letter_found"), "Tobin's note (annex)")
-	GameState.lore.append("lore_ch2_hask_note")      # found in a save made before the tracker existed
+	# The other notes of the same people never tick these objectives early.
+	GameState.discover_lore("lore_ch2_tobin_note")        # Tobin's service note (pays rw_c1x_tobin in the annex)
+	GameState.discover_lore("lore_ch2_hask_note")         # Hask's rail lamp-post note (Works room 3)
+	Story.sync_state()
+	assert_false(Story.flag("c1x_tobin_letter_found"), "the service note is not Tobin's letter")
+	assert_false(Story.flag("ch2_hask_note_found"), "the rail note is not Hask's refuge note")
+	GameState.discover_lore("lore_ch2_tobin_letter")
+	assert_true(Story.flag("c1x_tobin_letter_found"), "Tobin's letter (annex locker nine)")
+	GameState.lore.append("lore_ch2_hask_refuge_note")      # found in a save made before the tracker existed
 	assert_false(Story.flag("ch2_hask_note_found"))
 	Story.sync_state()
-	assert_true(Story.flag("ch2_hask_note_found"), "Hask's note (refuge), repaired from state")
+	assert_true(Story.flag("ch2_hask_note_found"), "Hask's note (refuge planter), repaired from state")
 	opt.evaluate()
 	assert_true(opt.is_done("opt_miner_came_back"))
 	assert_eq(_held("miner_lamp"), 1, "the miner's lamp")

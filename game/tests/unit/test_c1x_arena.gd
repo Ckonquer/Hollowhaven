@@ -47,6 +47,11 @@ func after_each() -> void:
 	if _area != null and is_instance_valid(_area):
 		_area.queue_free()
 	_area = null
+	# The real Elder's drops (resin / wood pickups) land under the current scene when no area is loaded: remove
+	# them so they never leak into later suites.
+	for w in get_tree().get_nodes_in_group("world_item"):
+		if is_instance_valid(w):
+			w.queue_free()
 	await wait_frames(2)
 
 
@@ -266,14 +271,20 @@ func test_a_roots_state_or_call_from_a_plain_elder_raises_them() -> void:
 
 
 ## Integration with the enemy module (skipped while its Knotted Elder is not available): the real Elder spawns
-## from c1x_sp_knotted_elder, is recognised as bringing its own roots, and its defeat pays rw_c1x_elder once.
+## from c1x_sp_knotted_elder (built exactly as Bramblewatch.build does), fights in THIS arena (centre + radius
+## handed over through the spawner's enemy_params, R81), is recognised as bringing its own roots, and its
+## defeat pays rw_c1x_elder once.
 func test_real_elder_from_the_spawner_when_available() -> void:
 	const Common := preload("res://src/world/surface/c1x/common.gd")
 	if not Common.enemy_available("knotted_elder"):
 		print("    (skipped: knotted_elder not available yet)")
 		return
-	var sp: Node3D = Common.make_spawner(_area, _area, L.ELDER_SPAWNER)
+	var sp: Node3D = Bramble.make_elder_spawner(_area, _area)
 	assert_not_null(sp, "the Elder's spawner")
+	if sp != null:
+		var ep: Dictionary = sp.get("enemy_params")
+		assert_almost(float(ep.get("arena_radius", 0.0)), float(L.ELDER_ARENA["radius"]), 0.001, "the arena radius goes to the Elder")
+		assert_false(bool(sp.get("out_of_view")), "the one-time Elder is placed in its arena, not hidden")
 	if sp == null:
 		return
 	sp.set("player_override", _player)
@@ -288,6 +299,9 @@ func test_real_elder_from_the_spawner_when_available() -> void:
 		return
 	var e: Node3D = alive[0]
 	assert_eq(_arena.get("elder"), e, "the arena tracks the spawned Elder")
+	assert_almost(float(e.get("arena_radius")), float(L.ELDER_ARENA["radius"]), 0.001, "Elder arena radius = ELDER_ARENA radius (data fallback 12)")
+	var ac: Vector3 = e.get("arena_center")
+	assert_true(Vector2(ac.x - _arena.global_position.x, ac.z - _arena.global_position.z).length() < 0.01, "Elder arena centre = the arena's centre")
 	assert_true(bool(Bramble.Arena.elder_owns_roots(e)) == bool(_arena.get("elder_driven")), "own roots <-> arena roots off")
 	assert_true(e.global_position.distance_to(_arena.global_position) < 2.0, "it spawns in the arena's middle")
 	var resin0 := GameState.count_item("resin")
@@ -301,3 +315,18 @@ func test_real_elder_from_the_spawner_when_available() -> void:
 	assert_true(GameState.count_item("resin") - resin0 >= int(bundle["items"]["resin"]), "the bundle's resin (plus any drops)")
 	assert_false(bool(sp.wave_available()), "the Elder never respawns")
 	assert_eq(_states().count("down"), _walls().size(), "no arena roots left standing")
+
+
+## R82: the renewable Brambleback group never pops in within view; the helper applies the layout's out_of_view.
+func test_bramblebacks_spawner_is_out_of_view() -> void:
+	const Common := preload("res://src/world/surface/c1x/common.gd")
+	assert_true(bool(L.BRAMBLEBACK_SPAWNER.get("out_of_view", false)), "layout: Bramblebacks spawn out of view")
+	if not Common.enemy_available("brambleback"):
+		print("    (skipped: brambleback not available yet)")
+		return
+	var sp: Node3D = Bramble.make_bramblebacks(_area, _area)
+	assert_not_null(sp, "the Brambleback spawner")
+	if sp != null:
+		assert_true(bool(sp.get("out_of_view")), "applied to the real spawner")
+		assert_eq(String(sp.get("spawner_id")), String(L.BRAMBLEBACK_SPAWNER["id"]), "the id is unchanged")
+		assert_eq(int(sp.get("count")), int(L.BRAMBLEBACK_SPAWNER["count"]), "the rest of the def is kept")

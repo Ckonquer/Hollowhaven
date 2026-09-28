@@ -25,9 +25,11 @@ are relative to `game/`. This supplements `docs/ARCHITECTURE.md` § UI and does 
   dial, tracker. TC: boss bar. BC: captions, dialog box, then `gp` vbox (prompt, build bar, hotbar). BL: FPS.
   `gameplay_regions` (TL, TR, gp) fade out in `set_cinematic(true)` (`hud.gd:130`). It is driven by
   `Events.cutscene_changed`, `player_died/respawned` and `area_loaded`. The HUD is tinted `Color(0.84,0.82,0.88)`
-  only when `area == "below"` (`hud.gd:100-105`).
+  only when `area == "below"` (`hud.gd:100-105`; Chapter Two: every underground area, §11).
 
 ## 2. Panel registry & lifecycle
+
+*(Chapter One code as mapped before Wave B; the Chapter Two changes are in §11.)*
 
 `ui_root.gd:23-40`:
 ```gdscript
@@ -92,6 +94,8 @@ Overrides: `setup(p_args)` (call `super.setup`, set `title` and `window_min` her
 
 ## 4. Quest tracker, journal, map
 
+*(Chapter One code as mapped before Wave B; the Chapter Two changes are in §11.)*
+
 **Tracker** (`hud/tracker.gd`): a HudCard 440 wide. `refresh()` (:52) reads `GameState.quests.current_step()` and
 `objective_status()` → `[{label, done, progress, target}]` (`src/core/quest_log.gd:83`). It rebuilds only when the signature
 `"%s|%s|%s|%s" % [step id, str(status), Game.area_id, here]` changes. Triggers: `objectives_changed`, `quest_step_started`
@@ -146,6 +150,8 @@ r20, mine_mouth (54,−74) r14, pond (46,52) r16, meadow (−8,60) r22, old_oak 
   (`UiUtil.ToastModel`).
 
 ## 6. Title → New Game flow
+
+*(Chapter One code as mapped before Wave B; the Chapter Two changes are in §11.)*
 
 `title_screen._on_new_game()` (:294): `_busy` guard → if `SaveSystem.has_save()`: `await _confirm("Start a new
 journey?", …, [["new","Start fresh","AccentButton"],["cancel","Keep my save",""]])`, return unless "new" →
@@ -218,7 +224,112 @@ change. Map trees are seeded once. Icons are cached and warmed one per frame. Th
 `Kit.retween` prevents stacked tweens. Queues are capped (toasts 5, banner 4, dialog 5). `ui_root._wait_tween` polls
 `process_frame` so killed fade tweens never hang awaiting callers.
 
+## 11. Chapter Two (Waves B/C + integration) — as built
+
+Sections 1-10 describe the Chapter One code; this section maps what Waves B/C changed. The code headers are the source of truth
+(`ui_root.gd`, `title_screen.gd`, `screens/creation_screen.gd`, `panels/wardrobe_panel.gd`, `widgets/avatar_preview.gd`,
+`panels/journal_panel.gd`, `hud/tracker.gd`, `widgets/map_view.gd`, `panels/map_panel.gd`, `src/qa/qa_telemetry.gd`).
+
+**New Game flow ("Meet Krystal", B2).** `title_screen._on_new_game()`: overwrite confirm (only with a save) → comfort screen →
+**Meet Krystal** (`screens/creation_screen.gd`: `signal finished`, `var look`, `accepted`, `result` "confirm" | "back";
+`setup({"look"})`, `choose(key, value) -> bool`; only starter pieces can be chosen, earnable ones show how to earn them) →
+fade → `Game.new_game(look)` (tests replace the hand-over with `title_screen.launch_override`). Back / Esc / X on Meet Krystal
+returns to the comfort screen with the draft look kept; Esc there returns to the title. **Nothing is written before Confirm**
+(tested: the old save stays byte-identical, no files are created). `Game.new_game(look)`: `GameState.new_game()` →
+`_apply_new_game_look(look)` → for a non-empty look sets flag `c1x_look_chosen` and `GameState.wardrobe["notice_shown"] = true`
+(integration R01; `CreationScreen.arm_new_journey_marks()` sets the same two marks through `Events.appearance_changed`, a
+harmless second path). The title footer and the Continue line follow the save's chapter (`static footer_text(save_data)`).
+
+**Panel registry additions (B2).** `"wardrobe"` is in `PANELS`, `FULLSCREEN` and `GAMEPLAY_PANELS` (no hotkey yet: deferred D02,
+needs `Settings.DEFAULT_BINDINGS`). `ui_root.has_panel(name) -> bool` says whether a panel is registered (the Ward Stone asks for
+"wardrobe" before offering it). Openers: pause menu "Wardrobe", Ward Stone option, the wardrobe / vanity mirror furniture
+(`src/building/structures/wardrobe.gd`, owned by B2: `Game.open_panel("wardrobe", {"source": structure_id})`).
+`wardrobe_panel.gd`: args `{"category", "source"}`; inner classes `Looks` (pure look / ownership / preset logic:
+`can_choose`, `how_to_earn`, `with_choice`, `with_outfit`, `merge_edit`, `wear`, `reset_to_legacy`, `save_preset/rename_preset/
+apply_preset` (3 slots, names ≤ `PRESET_NAME_MAX` 40), `missing_names`) and `LookEditor` (category tabs + option grid; Q/E or
+PageUp/PageDown switch category, `<` `>` or a mouse drag turn the preview). Changes are worn at once and free; "Undo changes"
+returns to the look at open; only the keys the player changed are written, so ids from a newer version survive (named under the
+editor). Wearing a changed look or resetting sets `c1x_look_chosen`. `widgets/avatar_preview.gd`: own `World3D`, transparent,
+redraws only while visible, drives the real avatar in "live" mode (`apply_look` / `set_show_armor`), freed on close.
+
+**Wardrobe notice (existing saves).** `wardrobe_notice_pending()`: a loaded journey whose `GameState.wardrobe.notice_shown` is
+false. `tick_wardrobe_notice(delta)` polls at 4 Hz (`WARDROBE_NOTICE_POLL` 0.25 s) and opens the card after
+`WARDROBE_NOTICE_SAFE_SECONDS` (3 s) of **continuous** safe play: `wardrobe_notice_safe_now()` = gameplay input allowed, no fade,
+no death / ending screen, **nothing in `overlay_layer`** (chapter cards, the Chapter Two card other modules add there), no boss,
+and `Game.can_manual_save().ok` or standing in a safe zone. `show_wardrobe_notice()` marks it shown at once (it never returns,
+whatever the answer; "Open the wardrobe" opens it). Switched off (`wardrobe_notice_enabled = false`) in headless runs and when any
+of `NOTICE_OFF_ARGS` (`cams, shot-dir, shots, area, preview, player-demo, no-wardrobe-notice`) is on the command line;
+`--ui-show=wardrobe_notice` shows it on demand.
+
+**Focus after close.** `close()` defers `_focus_top()`, which focuses whatever panel is on top when it runs (a hotkey may have
+opened another panel in the same frame, e.g. switching away from the wardrobe opened over the pause menu). Known quirk kept: a
+gameplay hotkey from the wardrobe over the pause menu opens that panel with pause still underneath (like the controls overlay).
+
+**Endings.** `show_ending()` (Chapter One, unchanged) and `show_chapter_two_ending()` (integration R14) share `_play_ending(params)`:
+closes menus, cinematic HUD, `EndingScreen` (variant `"chapter_two"` for Chapter Two, owned by C9) on `overlay_layer`, and keeps
+`_ending` set the whole time, so `_input`, hotkeys and the wardrobe notice are blocked exactly like the Chapter One ending. The
+Chapter Two ending makes no music call (the director plays the celebration on `Events.chapter2_completed`). A second call while it
+shows waits for the same ending. `Game._show_chapter_two_ending()` prefers it (fallbacks: `show_ending(variant)`, a bare
+EndingScreen on `overlay_layer`, else the chapter card + ending line). Debug: `--ui-show=ending2`.
+
+**Pause menu (B2 + R17).** The unstuck entry is per area: `static unstuck_label(area_id)` ("Return to the Haven" legacy,
+"Return to safety" in Chapter Two areas, "Leave the trial" in `echo_trial`), `unstuck_tooltip`, `unstuck_spawn(area_id, player_state,
+defaults)` (legacy results unchanged), `unstuck_target()` (uses `Game.return_point()` and only returns spawns the area registers).
+In the Echo Trial the option leaves the trial back to its origin checkpoint (progress intact). The subtitle uses
+`GameState.current_objective()`.
+
+**Tracker (`hud/tracker.gd`, B11).** `static objective_view() -> {kind, header, title, text, hint, rows, parts, step_id, group,
+optional, targets}` with `kind` = `legacy` (Chapter One chain until `chapter_one_complete`) | `pointer` ("The Ward Stone has something
+new to say", or "The lantern road will keep" once `read_ward_ch2`) | `chapter2` (the current step; the three lamps shown together,
+done ones ticked, any order) | `signpost` (after Chapter Two: one pending optional goal under **"SOMETHING TO DO"**, Chapter Two
+goals first — lead decision R136 i) | `done` | `hidden`. The legacy "OPTIONAL GOALS" header never appears once Chapter One is
+complete. `pending_targets(view)`, `is_at(t, area, pos, zone)`, `where_text(view, area, pos, zone)` (per-area "where to" line, also
+for goals in another area). Quest banner: a line already queued or on screen is not repeated.
+
+**Journal (B11).** Five tabs (child node names): **Story, Optional, Friends, Lore, Mastery**; `args.tab` / `select_tab(name)`
+(aliases `TAB_ALIASES`: "goals" → story, "optional goals" → optional, "masteries" → mastery), `tab_names()`, `reopen(args)` switches
+the tab when already open. Story: current objective + both chapters' progress (current chapter first). Optional: visible goals only,
+grouped by chapter, pending before done, legacy free_play goals included. Lore: `LoreDB` (arachnophobia-aware), grouped by
+`lore_chapter(id)` = `LoreDB.chapter_of(id)` (by source file: Tobin's annex notes are Chapter One although their ids start with
+`lore_ch2_`; integration R24). Mastery: rank, XP to next, every rank reward, names from `ItemDB.mastery_track_info(track)` (R21).
+Pages rebuild only when their content signature changes. The expedition board opens `{"tab": "optional"}`.
+
+**Map (B11 + integration).** `MapView.map_kind(area_id)` → `"surface"` (the Woods drawing, unchanged and pinned by a test; a waygate
+pin once `ch2_accepted`, lit after `ch2_waygate_repaired`) | `"reach"` (Hallowmere Reach: only DISCOVERED landmarks, arches — lit
+ones glow, unlit ones once their district is known — and the waygate home) | `"rooms"` (manor, Works, annex: a list of rooms found,
+from `MapView.ROOMS`) | `"none"` (the Below, trials: a message). **Room display names live only in `MapView.ROOMS`** (lead decision
+R136 h; the annex names "Side-Door Landing", "Shift Lockers", "The Old Sump" and the alt name "Rooted Winch" are official).
+**Festival roads**: once `ch2_read_festival_map` is set the Reach map draws the revealed roads from the layout's `MAP_ROUTES` (read
+defensively), undiscovered branch districts get a nameless "?" pin, trees along known roads are cleared, and a road replaces the
+dashed footpath it covers (`REACH_PATH_ROADS` links the first five footpaths to arrival/main/west/east/north roads; C1 keeps those ids
+stable). Road lines are projected only when the map size changes. After "The Long Way Home" (`ch2_map_pins_upgraded`) objective pins
+get a gold ring + star badge (steady glint, no flashing). `map_panel.gd`: args `{"area"}`, `show_area(id)`, `reopen(args)`, an
+outdoor toggle (Woods ↔ Reach) once the Reach was visited, `goal_marks(map_area)`, `way_to(target_area, map_area)` (a goal in another
+area is marked at the way there: waygate, manor door, Bellhouse stair). Map glyphs `map_lantern / map_glasshouse / map_pumpkin /
+map_candle / map_manor / map_bell` are in `icon_factory.gd` (R20). Mastery map rewards (Wayfinding 2 resource pins, Wayfinding 4 cache
+hints) read `Mastery.known_spots(area)` / `Mastery.cache_hints(area)` (R22); a Bramblewatch label appears on the Woods map once
+`c1x_bramblewatch` is discovered (R23).
+
+**HUD (integration).** Health bar shows Pebble's transient shield from `Events.player_shield_changed` (pale segment, no flashing;
+bar max = `Stats.effective_max_hp()` when larger; R11). The build bar shows a scrolling window over every placeable with key caps and
+undo / face / storey state (R12). Underground look (tint + lantern day dial) for every underground area through
+`UiUtil.is_underground_area(area)` = `companion_logic.UNDERGROUND_AREAS` (below, tobin_annex, hushed_works; R13). Companion badge:
+skill cooldown ring + ready flash (B4, `reduce_flashing` respected). Settings rows (R10): gameplay tab `companion_auto_attack`,
+`companion_autocast`, `seasonal_decor`; comfort tab `high_visibility_cues`, `timing_assist` (kept by a settings reset).
+
+**QA telemetry (B11, read-only).** `progress_snapshot()` (refreshed every `PROGRESS_INTERVAL`, merged into each line) adds keys
+`area_info` {area, zone, safe, map, discovered}, `chapter2` {available, active, finished, chapter, current, title, done}, `tracker`
+{kind, title, step, targets}, `optional` {done, pending, done_count}, `equipment`, `companion_skills` (per befriended companion:
+skill, cooldown, ready_at, left, ready, active, mode[, node]) and `music` {cue, director}; message kinds `quest` (Chapter Two step
+started/completed, optional goal completed), `discover`, `music`, `skill`, `equip`. The QA bot does not read them yet (deferred D11).
+
 ## Extension recipes
+
+*Status after Waves B/C:* (a) is built as `screens/creation_screen.gd`, (b) as `panels/wardrobe_panel.gd` + the equipment
+column of the inventory panel (B3), (c) as the companion panel skill row / badge ring (B4, `get_skill_state()`), (d) as the
+five journal tabs + `tracker.objective_view()`, (e) in `ward_stone.gd` (A3), (f) as the furnace queue inside the crafting panel
+(`Game.open_panel("crafting", {"station": "furnace", "uid": uid})`, not a separate panel), (g) as `MapView.map_kind()` + the
+per-area map. The recipes stay for history; §11 describes the current code.
 
 **(a) "Meet Krystal" creation screen (title-side, cancel-safe).**
 1. New `src/ui/screens/character_screen.gd` extending panel_base: `signal finished`, `var accepted := false`,
@@ -233,8 +344,8 @@ change. Map trees are seeded once. Icons are cached and warmed one per frame. Th
    `await cs.finished`, and `if not cs.accepted: return` (or loop back to comfort). Only then `_busy = true`, fade, and start.
 4. Persisting: `GameState.new_game()` runs inside `Game.new_game()` after the title is gone, so pass the profile in. That needs
    integrator changes: `Game.new_game(profile := {})` applying `GameState.player_name` plus new appearance fields
-   (GameState/save format are foundation). Avatar colours are Palette consts, and baked meshes are shared through the static
-   `_bake_cache` keyed by node path and material class, so recolouring needs the player module to include appearance in that key or use per-instance materials.
+   (GameState/save format are foundation). *(Resolved in Wave B: the avatar's `_bake_cache` is keyed by content incl. colour,
+   see player_avatar.md §7, so a preview and the player never share recoloured meshes.)*
 5. Update `_debug_show("newgame")` and add a title test for Esc on the creation screen (no game started, `_busy` false).
    If it should be reachable in-game too, register it in `PANELS` + `FULLSCREEN`.
 
@@ -309,8 +420,9 @@ returns Haven spawns and the label says "Return to the Haven". Update `hud.gd`'s
   step ids breaks the resolved title, which falls back to `step_title`.
 - `order`, `panels` and the `_paused_by_ui` bookkeeping assume each panel pushes and pops exactly once. Don't call
   `Game.push_ui/set_paused` from panels.
-- Hard-coded Chapter One text: title footer (title_screen.gd:158), journal (:140), ending screen (`ending_screen.gd:42,51,58`),
-  `Game.new_game` chapter card, and ui_root debug.
+- Hard-coded Chapter One text: `Game.new_game` chapter card and the ui_root debug card (the title footer, journal and ending
+  screen now follow the chapter, §11). New Chapter Two panels must also pass `test_every_panel_builds_and_closes` with empty
+  args (the wardrobe does) and the layout tests (Meet Krystal min 1660×877, wardrobe 1816×899, journal 1520×≤835, Reach map 1663×944).
 - Hotkey panels and `open()` ignore the mode for direct calls. `_hotkey` requires `Game.mode=="playing"`, so new modes
   (e.g. a "creation" mode) disable hotkeys.
 - Lambdas connected to `Events` inside **static** builders leak unless they go through `Kit.listen`.

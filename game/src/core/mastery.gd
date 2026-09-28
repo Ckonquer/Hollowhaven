@@ -5,7 +5,8 @@ extends RefCounted
 ##   {"gathering": xp, "hearthcraft": xp, "wayfinding": xp,
 ##    "seen": {track: ["<rule>:<id>", ...]},             first-time kinds already rewarded (never repeat)
 ##    "daily": {"day": int, "xp": {"<track>:<rule>": n}},  repeatable xp used today (capped per in-game day)
-##    "legacy_credit": false | {"applied": true, "at": total_minutes, "xp": {track: n}}}
+##    "legacy_credit": false | {"applied": true, "at": total_minutes, "xp": {track: n}},
+##    "spots": {area: {kind: [[x, z], ...]}}}           harvested resource spots (bounded, data SPOT_*)
 ## Numbers (xp per rule, caps, rank thresholds, rewards, legacy formula) are data: data/mastery.gd via ItemDB.
 ##
 ##   const Mastery := preload("res://src/core/mastery.gd")
@@ -15,6 +16,9 @@ extends RefCounted
 ##   Mastery.gather_power() / bonus_yield_chance() / furnace_queue_bonus() / station_time_mult() /
 ##   meal_buff_bonus() / sprint_stamina_save()        small effects for Stats / stations / food (data values)
 ##   Mastery.apply_legacy_credit() -> {track: xp}     once per save (recorded), conservative, capped
+##   Mastery.known_spots(area) -> [{"kind", "pos": Vector2}]   recorded resource spots (Wayfinding 2 map pins)
+##   Mastery.cache_hints(area) -> [{"id", "pos": Vector2, "district"}]   unfound caches in discovered districts
+##   Mastery.resource_pins_on() / cache_hints_on() / highlight_radius()   rank rewards the map / world read
 ##
 ## Exploit resistance (MP 5.3): first-time rules dedupe on "<rule>:<id>" (re-placing a dismantled piece,
 ## re-crafting, reloading never repeat them); repeatable rules are capped per in-game day; nothing listens to
@@ -40,6 +44,7 @@ static var _fx_code := -1
 static var _fx_cache: Dictionary = {}
 static var _last_harvest_frame := -1
 static var _last_harvest_pos := Vector3.INF
+static var _hint_pos: Dictionary = {}   # "layout|const|key" -> Vector2 or null (resolved once; values only)
 
 
 # --- Wiring ----------------------------------------------------------------------------------------
@@ -202,6 +207,142 @@ static func yield_chance_cap() -> float:
 	return float(MasteryData.YIELD_CHANCE_CAP)
 
 
+## Wayfinding 2: the map pins the recorded resource spots.
+static func resource_pins_on() -> bool:
+	return _truthy(effect("map_resource_pins", false))
+
+
+## Wayfinding 4: the map hints at unfound caches in discovered districts.
+static func cache_hints_on() -> bool:
+	return _truthy(effect("map_cache_hints", false))
+
+
+## Gathering 4: radius (metres) of the nearby-material sparkle; 0 = off.
+static func highlight_radius() -> float:
+	return maxf(float(effect("highlight_radius", 0.0)), 0.0)
+
+
+# --- Map clarity: resource spots and cache hints (data/mastery.gd SPOT_* / MAP_CACHE_HINTS) ---------------
+
+## Remembers where a node of `kind` was fully harvested (the Events.harvested listener calls it). Only in
+## SPOT_AREAS, never for SPOT_SKIP_KINDS; a spot within SPOT_MIN_DIST of a known one of the same kind is the same
+## spot; at most SPOT_MAX_PER_KIND per kind and area (the oldest is forgotten). Returns true when a spot was added.
+static func record_spot(area_id: String, kind: String, pos: Vector3) -> bool:
+	if not GameState.active or kind == "" or not MasteryData.SPOT_AREAS.has(area_id) \
+			or MasteryData.SPOT_SKIP_KINDS.has(kind) or not pos.is_finite():
+		return false
+	var list := _spot_list(area_id, kind)
+	var p := Vector2(snappedf(pos.x, 0.1), snappedf(pos.z, 0.1))
+	var min_d2 := float(MasteryData.SPOT_MIN_DIST) * float(MasteryData.SPOT_MIN_DIST)
+	for e in list:
+		var q: Variant = _spot_vec(e)
+		if q is Vector2 and (q as Vector2).distance_squared_to(p) < min_d2:
+			return false
+	list.append([p.x, p.y])
+	while list.size() > int(MasteryData.SPOT_MAX_PER_KIND):
+		list.remove_at(0)
+	return true
+
+
+## Recorded resource spots of an area: [{"kind", "pos": Vector2 (x, z metres)}], kinds in name order, each in
+## recording order. Read-only (a damaged record reads as empty; bad entries are skipped).
+static func known_spots(area_id: String) -> Array:
+	var out: Array = []
+	var spots: Variant = _state().get("spots")
+	if not (spots is Dictionary):
+		return out
+	var per_area: Variant = (spots as Dictionary).get(area_id)
+	if not (per_area is Dictionary):
+		return out
+	var kinds: Array = (per_area as Dictionary).keys()
+	kinds.sort()
+	for k in kinds:
+		var kind := String(k)
+		var list: Variant = (per_area as Dictionary)[k]
+		if MasteryData.SPOT_SKIP_KINDS.has(kind) or not (list is Array):
+			continue
+		for e in list:
+			var q: Variant = _spot_vec(e)
+			if q is Vector2:
+				out.append({"kind": kind, "pos": q})
+	return out
+
+
+## The item a spot pin shows for a node kind (its main drop in data/sources.gd NODES; "" when unknown).
+static func spot_item(kind: String) -> String:
+	var drops: Variant = ItemDB.node_kind(kind).get("drops", [])
+	if drops is Array and not (drops as Array).is_empty() and (drops as Array)[0] is Dictionary:
+		return String(((drops as Array)[0] as Dictionary).get("item", ""))
+	return ""
+
+
+## Optional caches the map may hint at in an area: [{"id", "pos": Vector2, "district"}] for every MAP_CACHE_HINTS
+## entry whose district is discovered and whose owner flag is not set yet (position read from the owner's layout
+## constant; entries whose layout or constant is missing are skipped). Independent of rank: the map also checks
+## cache_hints_on().
+static func cache_hints(area_id: String) -> Array:
+	var out: Array = []
+	for h in MasteryData.MAP_CACHE_HINTS:
+		var hint: Dictionary = h
+		if String(hint.get("area", "")) != area_id:
+			continue
+		if _truthy(GameState.get_flag(String(hint.get("flag", "")))):
+			continue
+		var district := String(hint.get("district", ""))
+		if district != "" and not GameState.is_discovered(area_id, district):
+			continue
+		var pos: Variant = cache_hint_pos(hint)
+		if pos is Vector2:
+			out.append({"id": String(hint.get("id", "")), "pos": pos, "district": district})
+	return out
+
+
+## Position of a MAP_CACHE_HINTS entry, read from its layout constant (null when unavailable).
+static func cache_hint_pos(hint: Dictionary) -> Variant:
+	var path := String(hint.get("layout", ""))
+	var key := String(hint.get("key", ""))
+	var cache_key := "%s|%s|%s" % [path, String(hint.get("const", "")), key]
+	if _hint_pos.has(cache_key):
+		return _hint_pos[cache_key]
+	var v: Variant = null
+	if path != "" and ResourceLoader.exists(path):
+		var sc := load(path) as Script
+		if sc != null:
+			v = sc.get_script_constant_map().get(String(hint.get("const", "")))
+	if key != "" and v is Dictionary:
+		v = (v as Dictionary).get(key)
+	var out: Variant = v if v is Vector2 else null
+	_hint_pos[cache_key] = out
+	return out
+
+
+## [x, z] (JSON arrays of numbers) -> Vector2, else null.
+static func _spot_vec(e: Variant) -> Variant:
+	if e is Array and (e as Array).size() >= 2:
+		var x: Variant = (e as Array)[0]
+		var z: Variant = (e as Array)[1]
+		if (x is float or x is int) and (z is float or z is int) and is_finite(float(x)) and is_finite(float(z)):
+			return Vector2(float(x), float(z))
+	return null
+
+
+## GameState.mastery["spots"][area][kind] (created; a damaged container is replaced, never an error).
+static func _spot_list(area_id: String, kind: String) -> Array:
+	var spots: Variant = GameState.mastery.get("spots")
+	if not (spots is Dictionary):
+		spots = {}
+		GameState.mastery["spots"] = spots
+	var per_area: Variant = (spots as Dictionary).get(area_id)
+	if not (per_area is Dictionary):
+		per_area = {}
+		(spots as Dictionary)[area_id] = per_area
+	var list: Variant = (per_area as Dictionary).get(kind)
+	if not (list is Array):
+		list = []
+		(per_area as Dictionary)[kind] = list
+	return list
+
+
 # --- Awarding --------------------------------------------------------------------------------------------
 
 ## Awards xp for `kind_id` ("<rule>" or "<rule>:<id>") on `track`. Rules come from data/mastery.gd XP:
@@ -349,6 +490,7 @@ static func _has_progress() -> bool:
 static func _on_harvested(kind: String, item_id: String, _count: int, pos: Vector3) -> void:
 	if not GameState.active:
 		return
+	record_spot(String(Game.area_id), kind, pos)   # map pins (Wayfinding 2); deduped by distance
 	award("gathering", "first_node_kind:" + kind)
 	award("gathering", "first_material:" + item_id)
 	# One node emits one signal per dropped item type in the same frame: count it once.

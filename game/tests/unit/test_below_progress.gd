@@ -139,6 +139,78 @@ func test_foreman_key_is_guaranteed_and_never_duplicated() -> void:
 	assert_true(GameState.lore.has("foreman_order"), "note discovered")
 
 
+## R73: an old save that lost the Foreman's Key after Chapter One can still open the Reach service gate:
+## the hook offers it again while that gate is revealed (lamps linked) and shut - never while it is held.
+func test_foreman_key_returns_for_the_reach_service_gate() -> void:
+	GameState.set_flag("lower_gate_open", true)
+	GameState.set_flag("foreman_key_taken", true)
+	var desk: Node3D = Desk.new()
+	area = desk
+	add_child(desk)
+	await wait_frames(1)
+	assert_false(Desk.key_available(), "lower gate open, service gate not revealed yet: not offered")
+	assert_true(desk._key_text().is_empty(), "no prompt")
+	# Branch 2: lamps linked, the service gate still shut, key lost -> the hook offers it again.
+	GameState.set_flag("ch2_lamps_linked", true)
+	assert_true(Desk.key_available(), "service gate revealed and shut: key comes back")
+	assert_eq(String(desk._key_text().get("text", "")), "Take the Foreman's Key", "prompt shown")
+	desk._take_key(null)
+	assert_eq(GameState.count_item("foreman_key"), 1, "key taken")
+	desk._take_key(null)
+	assert_eq(GameState.count_item("foreman_key"), 1, "never duplicated on a second take")
+	assert_false(Desk.key_available(), "not offered while held (service-gate branch)")
+	_round_trip()
+	assert_false(Desk.key_available(), "still not offered after save/load while held")
+	assert_eq(GameState.count_item("foreman_key"), 1, "exactly one after save/load")
+	# Once the service gate is open, a lost key is never needed again.
+	GameState.set_flag("ch2_service_gate_open", true)
+	GameState.take_item("foreman_key", 1)
+	assert_false(Desk.key_available(), "not offered once the service gate is open")
+	# Branch 1 (legacy) is unchanged: lower gate shut + key not held -> offered, whatever the Chapter Two flags.
+	GameState.set_flag("lower_gate_open", false)
+	assert_true(Desk.key_available(), "legacy branch: lower gate shut -> offered")
+	GameState.give_item("foreman_key", 1)
+	assert_false(Desk.key_available(), "legacy branch: not offered while held")
+
+
+## R72: only the Weaver Matron opens the Heartseed cocoon; Chapter Two bosses emit boss_defeated too.
+func test_cocoon_opens_only_for_the_weaver_matron() -> void:
+	var cocoon: Node3D = load("res://src/world/below/heartseed_cocoon.gd").new()
+	area = cocoon
+	add_child(cocoon)
+	await wait_frames(1)
+	assert_false(bool(cocoon.opened), "closed on a fresh save")
+	for other in ["crossing_matron", "count_velour", "borrowed_choir", "quarry_warden", ""]:
+		Events.boss_defeated.emit(other)
+		assert_false(bool(cocoon.opened), "'%s' does not open the cocoon" % other)
+	Events.boss_defeated.emit("weaver_matron")
+	assert_true(bool(cocoon.opened), "the Weaver Matron's defeat opens it")
+
+
+## R74: the legacy lower gate keeps recording "lower_gate_tried"; other gates built from lower_gate.gd
+## (the Reach service gate) record "<their flag>_tried" instead.
+func test_tried_flag_is_per_gate() -> void:
+	var Gate: GDScript = load("res://src/world/below/lower_gate.gd")
+	var legacy: Node3D = Gate.new()
+	var service: Node3D = Gate.new()
+	service.setup({"flag": "ch2_service_gate_open", "key": "foreman_key", "locked_text": "The service gate is locked."})
+	var holder := Node3D.new()
+	area = holder
+	add_child(holder)
+	holder.add_child(legacy)
+	holder.add_child(service)
+	await wait_frames(1)
+	assert_eq(String(legacy.tried_flag()), "lower_gate_tried")
+	assert_eq(String(service.tried_flag()), "ch2_service_gate_open_tried")
+	service.interact(null)
+	assert_true(bool(GameState.get_flag("ch2_service_gate_open_tried")), "service gate records its own tried flag")
+	assert_false(bool(GameState.get_flag("lower_gate_tried")), "the legacy flag is untouched by the service gate")
+	assert_false(bool(GameState.get_flag("ch2_service_gate_open")), "still locked without the key")
+	legacy.interact(null)
+	assert_true(bool(GameState.get_flag("lower_gate_tried")), "legacy gate: legacy flag, unchanged")
+	assert_false(bool(GameState.get_flag("lower_gate_open")), "still locked without the key")
+
+
 func test_checkpoint_lighting_saves_and_persists() -> void:
 	area = await _make_area()
 	var cp: Node = area.checkpoints["office"]

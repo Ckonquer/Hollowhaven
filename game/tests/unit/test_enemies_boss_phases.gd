@@ -272,16 +272,103 @@ func test_late_phase_two_release_is_capped_per_intensity() -> void:
 			assert_true(bool(params["no_drops"]) and bool(params["alert"]))
 		if level == 0:
 			assert_almost(float((spawned[0] as Node).get_meta("params")["speed_scale"]), 0.75, 0.001, "Gentle: one slower minion")
-		# No second release, however long the phase lasts.
-		for i in 400:
+		# No second release, however long the phase lasts. Gentle: no drop while its (fresh, reachable) minion
+		# lives - 15 s here, inside MINION_DROP_GATE (a stale / unreachable one: see the drop-gate test).
+		for i in 300:
 			b.tick(DT)
-		assert_eq(int(b.field.released_count), cap, "only one release per attempt")
 		if level == 0:
 			assert_false(log.has("telegraph"), "Gentle: no drop while its minion lives (%s)" % str(log))
+		for i in 100:
+			b.tick(DT)
+		assert_eq(int(b.field.released_count), cap, "only one release per attempt")
 		b.queue_free()
 		for m in spawned:
 			(m as Node).queue_free()
 		await wait_frames(1)
+
+
+## R90: Gentle's "no drop while its minion lives" never stalls the fight: a minion out longer than
+## MINION_DROP_GATE s, or out of reach (off the arena floor, up on a ledge), no longer holds the drop back.
+func test_gentle_drop_gate_ignores_a_stale_or_unreachable_minion() -> void:
+	var d := _dummy(Vector3(0, 0, 3))
+	var b := _boss(d, _braziers(), 0)
+	var spawned: Array = []
+	_minions_to(b, spawned)
+	_in_phase(b, 2, 100.0)
+	b.field.minion_cap = 3
+	b.field.spawn_minion(Vector3(6, 0, 0))
+	assert_eq(spawned.size(), 1, "one minion out")
+	assert_false(bool(b.call("_drop_allowed")), "Gentle: a fresh minion on the floor holds the drop back")
+	b.field.tick(Boss.MINION_DROP_GATE - 1.0, null)
+	assert_false(bool(b.call("_drop_allowed")), "still fresh just under the gate")
+	b.field.tick(1.5, null)
+	assert_true(bool(b.call("_drop_allowed")), "a minion out longer than %.0f s no longer holds it back" % Boss.MINION_DROP_GATE)
+	assert_eq(int(b.field.alive_minions()), 1, "(it is not removed: it simply stops blocking)")
+	(spawned[0] as Node).queue_free()
+	await wait_frames(1)
+	b.field.spawn_minion(Vector3(30, 0, 0))
+	assert_true(bool(b.call("_drop_allowed")), "a fresh minion outside the arena does not block")
+	b.field.spawn_minion(Vector3(4, 5, 0))
+	assert_true(bool(b.call("_drop_allowed")), "nor one stuck up on a ledge")
+	b.field.spawn_minion(Vector3(-4, 0, 2))
+	assert_false(bool(b.call("_drop_allowed")), "a fresh reachable one still does")
+	var s := _dummy(Vector3(0, 0, 3))
+	var std := _boss(s, _braziers(), 1)
+	var sp2: Array = []
+	_minions_to(std, sp2)
+	_in_phase(std, 2, 100.0)
+	std.field.spawn_minion(Vector3(6, 0, 0))
+	assert_true(bool(std.call("_drop_allowed")), "Standard never had the minion gate")
+
+
+## R91: freed mid-fight without an area change, it releases the encounter once (bar hidden, boss gate off) and
+## its minions leave with it; a reset or finished fight emits nothing more.
+func test_freed_mid_fight_releases_the_encounter_once() -> void:
+	var bars: Array = []
+	var on_bar := func(id: String, hp: float, _mx: float) -> void:
+		if id == Boss.BOSS_ID:
+			bars.append(hp)
+	Events.boss_health_changed.connect(on_bar)
+	var d := _dummy(Vector3(0, 0, 3))
+	var b := _boss(d, _braziers())
+	var spawned: Array = []
+	_minions_to(b, spawned)
+	_tick_until(b, "cling", 6.0)
+	assert_true(bool(b.fight_started), "fight on")
+	assert_true((Game.get("_bosses") as Dictionary).has(Boss.BOSS_ID), "the encounter gates saving / travel")
+	b.field.minion_cap = 2
+	b.field.spawn_minion(Vector3(6, 0, 0))
+	_encounter.clear()
+	bars.clear()
+	b.queue_free()
+	await wait_frames(2)
+	assert_eq(_encounter, [[Boss.BOSS_ID, false]], "encounter released exactly once")
+	assert_eq(bars, [-1.0], "bar hidden exactly once")
+	assert_false((Game.get("_bosses") as Dictionary).has(Boss.BOSS_ID), "Game.boss_active() no longer held by it")
+	assert_false(is_instance_valid(spawned[0]) and not (spawned[0] as Node).is_queued_for_deletion(), "its minion left with it")
+	# Reset first (the reset already released it): freeing it later emits nothing more.
+	var b2 := _boss(d, _braziers())
+	_tick_until(b2, "cling", 6.0)
+	b2.reset_fight()
+	_encounter.clear()
+	bars.clear()
+	b2.queue_free()
+	await wait_frames(2)
+	assert_eq(_encounter.size(), 0, "a reset fight is not released twice")
+	assert_eq(bars.size(), 0)
+	# Defeated (gone): nothing more either.
+	var b3 := _boss(d, _braziers())
+	_in_phase(b3, 3, 10.0)
+	b3.call("_begin_defeat")
+	await wait_frames(1)
+	assert_true(bool(b3.get("_gone")), "defeated")
+	_encounter.clear()
+	bars.clear()
+	b3.queue_free()
+	await wait_frames(2)
+	assert_eq(_encounter.size(), 0, "a finished fight is not released twice")
+	assert_eq(bars.size(), 0)
+	Events.boss_health_changed.disconnect(on_bar)
 
 
 # --- Phase 3 ------------------------------------------------------------------------------------------------

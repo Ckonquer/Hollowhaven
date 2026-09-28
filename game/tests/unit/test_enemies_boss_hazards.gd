@@ -410,6 +410,86 @@ func test_high_visibility_cues_outline_every_hazard_live() -> void:
 	assert_false(bool(fan2.bold_visible()) or bool(th.bold_visible()), "and off again")
 
 
+## R89: every strikeable floor hazard (trip-line, sac, thread) carries meta "boss_hazard" (the director and
+## auto-aim tell them from real enemies).
+func test_strikeable_hazards_are_marked_boss_hazard() -> void:
+	var f := _field()
+	var d := _dummy(Vector3(0, 0, 9))
+	var line: Node = (f.begin_trips(1, 0.0, d.global_position) as Array)[0]
+	var sac: Node = (f.begin_sacs(1, 3.0, d.global_position) as Array)[0]
+	var th: Node = f.begin_thread(Vector3(0, 8, 0), Vector3(6.1, 1.5, 3.5))
+	for h in [line, sac, th]:
+		assert_true((h as Node).is_in_group("enemy"), "%s can be struck" % String(h.name))
+		assert_true(bool((h as Node).get_meta("boss_hazard", false)), "%s is marked boss_hazard" % String(h.name))
+
+
+# --- R88: the field's slow is its own, a cleanse frees her, jumps are never slowed ------------------------------
+
+func test_field_slow_is_tagged_and_only_its_own_is_erased() -> void:
+	var f := _field()
+	var d := _dummy(Vector3(0, 0, -4))
+	f.begin_fan(CENTER, d.global_position, 0.0)
+	_run(f, d, 0.3)
+	assert_eq(String(_slow().get("source", "")), Field.SLOW_SOURCE, "the zone slow is tagged as the field's")
+	f.clear_all(false)
+	assert_true(_slow().is_empty(), "its own slow ends with the hazards")
+	# Another source's slow (a clod, a trap...) is never overwritten, stacked or cleared by the field.
+	GameState.add_buff("slow", 0.8, 2.0)
+	f.begin_fan(CENTER, d.global_position, 0.0)
+	_run(f, d, 0.5)
+	assert_almost(float(_slow().get("mult", 1.0)), 0.8, 0.001, "the other slow is untouched (not deepened)")
+	assert_false(_slow().has("source"), "and not re-tagged")
+	f.apply_slow(0.5, 1.0)
+	assert_almost(float(_slow().get("mult", 1.0)), 0.8, 0.001, "apply_slow never overwrites another source")
+	assert_false(bool(f.slow_immune()), "no chain builds on someone else's slow")
+	f.clear_all(false)
+	assert_false(_slow().is_empty(), "clear_all leaves another source's slow alone")
+	GameState.buffs.erase("slow")
+
+
+func test_a_cleanse_in_the_sheet_starts_the_break_free_window() -> void:
+	var f := _field()
+	var d := _dummy(Vector3(0, 0, -4))
+	f.begin_fan(CENTER, d.global_position, 0.0)
+	_run(f, d, 0.3)
+	assert_false(_slow().is_empty(), "slowed in the sheet")
+	GameState.buffs.erase("slow")                   # Mochi's Bloomguard cleanse (player.clear_slow)
+	_run(f, d, DT)
+	assert_true(_slow().is_empty(), "the cleanse is not undone on the next frame")
+	assert_true(bool(f.slow_immune()), "it starts the break-free window")
+	_run(f, d, Field.SLOW_IMMUNE - 0.2)
+	assert_true(_slow().is_empty(), "free for the whole window while still standing in the sheet")
+	_run(f, d, 0.4)
+	assert_false(_slow().is_empty(), "the sheet slows again once the window is over")
+	# Walking out lets the linger run out: that is not a cleanse (no window).
+	var g := _field()
+	var d2 := _dummy(Vector3(0, 0, -4))
+	g.begin_fan(CENTER, d2.global_position, 0.0)
+	_run(g, d2, 0.3)
+	d2.global_position = Vector3(4.0, 0, -4)
+	GameState.buffs.erase("slow")
+	_run(g, d2, 0.2)
+	assert_false(bool(g.slow_immune()), "leaving the sheet is not a cleanse")
+
+
+func test_the_fan_sheet_never_slows_mid_jump() -> void:
+	var f := _field()
+	var d := _dummy(Vector3(0, 1.1, -4))             # airborne over the sheet
+	var fan: Node = f.begin_fan(CENTER, Vector3(0, 0, -4), 0.0)
+	assert_true(bool(fan.contains(d.global_position)), "above the wedge")
+	assert_false(bool(fan.slows(d.global_position)), "but a jump is never slowed")
+	_run(f, d, 1.0)
+	assert_true(_slow().is_empty(), "no slow while airborne")
+	d.global_position = Vector3(0, 0.2, -4)          # landing
+	_run(f, d, 0.1)
+	assert_false(_slow().is_empty(), "feet on the sheet: slowed")
+	d.global_position = Vector3(0, 0.9, -4)
+	GameState.buffs.erase("slow")
+	_run(f, d, 0.5)
+	assert_true(_slow().is_empty(), "jumping again: nothing re-applied mid-air")
+	assert_false(bool(f.slow_immune()), "(losing it mid-air is not a cleanse window)")
+
+
 # --- Performance -------------------------------------------------------------------------------------------------
 
 ## A full phase-2 floor (cap hazards, two sacs, a thread) ticks cheaply: well under a tenth of a

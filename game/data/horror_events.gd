@@ -14,6 +14,9 @@ extends RefCounted
 ##   sound       sound name played (Audio); alt_sound when arachnophobia is ON
 ##   caption     caption text shown when captions are enabled
 ##   spider      true = spider-themed (uses alt visuals/sounds when arachnophobia is ON)
+##   needs_companion  optional companion id that must be following (e.g. Lumi notices)
+##   absent_companion optional companion id that must NOT be following: an imitation of her (wrong_mochi)
+##                    would fool nobody while the real one walks beside Krystal (integration R70)
 
 const INTENSITY := {
 	0: {"name": "Gentle", "desc": "Fewer scares, no ambushes, softer sounds. Enemies deal less damage.", "event_rate": 0.45, "damage_mult": 0.6, "allow_major": false, "stinger_db": -12.0, "darkness": 0.75},
@@ -40,7 +43,7 @@ const EVENTS := {
 	"footsteps_behind": {"kind": "sound", "zones": ["mine", "ruins"], "states": ["unease", "anticipation"], "weight": 2.0, "cooldown": 80.0, "major": false, "min_intensity": 1, "anchor": "", "sound": "dir_footsteps", "caption": "[footsteps behind you]"},
 	"pebbles_fall": {"kind": "sound", "zones": ["mine", "ruins", "silk"], "states": ["calm", "unease", "anticipation"], "weight": 2.5, "cooldown": 35.0, "major": false, "min_intensity": 0, "anchor": "", "sound": "dir_pebbles", "caption": "[pebbles trickle down]"},
 	"whisper": {"kind": "sound", "zones": ["ruins", "silk"], "states": ["unease", "anticipation"], "weight": 1.5, "cooldown": 90.0, "major": false, "min_intensity": 1, "anchor": "sound", "sound": "dir_whisper", "caption": "[a faint whisper]"},
-	"wrong_mochi": {"kind": "wrong_sound", "zones": ["ruins", "silk"], "states": ["unease", "anticipation"], "weight": 1.0, "cooldown": 400.0, "major": false, "min_intensity": 1, "anchor": "sound", "sound": "dir_wrong_squeak", "caption": "[a familiar squeak... from somewhere deep below]", "once": true},
+	"wrong_mochi": {"kind": "wrong_sound", "zones": ["ruins", "silk"], "states": ["unease", "anticipation"], "weight": 1.0, "cooldown": 400.0, "major": false, "min_intensity": 1, "anchor": "sound", "sound": "dir_wrong_squeak", "caption": "[a familiar squeak... from somewhere deep below]", "once": true, "absent_companion": "mochi"},
 	"lantern_flicker": {"kind": "flicker", "zones": ["mine", "ruins", "silk"], "states": ["unease", "anticipation"], "weight": 2.0, "cooldown": 45.0, "major": false, "min_intensity": 0, "anchor": "", "sound": "dir_flicker", "caption": ""},
 	"far_glimpse": {"kind": "glimpse", "zones": ["mine", "ruins"], "states": ["anticipation"], "weight": 1.5, "cooldown": 120.0, "major": false, "min_intensity": 1, "anchor": "doorway", "sound": "", "caption": ""},
 	"lumi_notices": {"kind": "notice", "zones": ["mine", "ruins", "silk"], "states": ["unease", "anticipation"], "weight": 2.0, "cooldown": 70.0, "major": false, "min_intensity": 0, "anchor": "doorway", "sound": "lumi_warn", "caption": "[Lumi chimes softly]", "needs_companion": "lumi"},

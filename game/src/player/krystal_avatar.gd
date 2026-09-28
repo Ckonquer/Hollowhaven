@@ -4,9 +4,12 @@ extends Node3D
 ## The model faces +Z in its own space (the player rotates this node to its facing).
 ## Driven every frame by the player controller (speed, grounded, swing/roll phases ...), or standalone
 ## on the preview stage through play_anim(name):
-##   idle, walk, run, jump, roll, axe, pickaxe, sword, hands, gather, lantern, lantern_walk,
+##   idle, walk, run, jump, roll, axe, pickaxe, sword, hands, gather, wand, lantern, lantern_walk,
 ##   wave, cheer, flinch, sleep, eat, hurt, death
 ## Right hand = -X side (tools), left hand = +X side (lantern).
+## WAND (Chapter Two, MP 5.1): set_held_tool("wand") while a wand is selected on the hotbar shows a small wand in the
+## right hand between swings (src/player/avatar/wand_builder.gd, built lazily on first use so an avatar that never
+## holds a wand keeps the exact Chapter One meshes); swing_kind "wand" plays a short flick-and-point cast pose.
 ##
 ## APPEARANCE (Chapter Two, MP 4; docs/CHAPTER_TWO_SPEC.md 4.1 / 8). The body is built from a look dictionary
 ## (GameState.appearance, ids from data/appearance.gd) in slot units - skin, eyes, hair (+ brows), hat,
@@ -43,6 +46,7 @@ const GarmentBuilder := preload("res://src/player/avatar/garment_builder.gd")
 const AccessoryBuilder := preload("res://src/player/avatar/accessory_builder.gd")
 const ArmorBuilder := preload("res://src/player/avatar/armor_builder.gd")
 const SkirtRig := preload("res://src/player/avatar/skirt_rig.gd")
+const WandBuilder := preload("res://src/player/avatar/wand_builder.gd")
 
 const OUTLINE := 0.011
 ## Render layer (12) used by Krystal's meshes: her own lantern ignores it as a shadow caster so her body
@@ -116,7 +120,19 @@ const SWING_KEYS := {
 		"el_x": [-0.15, -0.6, -0.2, -0.4, -0.15], "sp_x": [0.0, 0.12, 0.45, 0.4, 0.0], "sp_y": [0.0, -0.1, 0.05, 0.0, 0.0],
 		"lsh_x": [0.0, -0.3, -0.7, -0.6, 0.0], "lel_x": [-0.15, -0.5, -0.3, -0.35, -0.15],
 		"knee": [0.05, 0.3, 0.7, 0.65, 0.05], "body_y": [0.0, -0.05, -0.14, -0.13, 0.0], "head_x": [0.0, 0.1, 0.3, 0.25, 0.0]},
+	# Wand cast (player_logic CAST_TIME 0.45 s, the spark leaves at CAST_RELEASE 0.16 s = t 0.36): a quick flick up by
+	# the shoulder, then the arm snaps forward and points the wand at the target for a moment.
+	"wand": {"t": [0.0, 0.2, 0.36, 0.56, 1.0],
+		"sh_x": [0.0, -2.45, -1.5, -1.35, 0.0], "sh_y": [0.0, -0.2, 0.22, 0.18, 0.0], "sh_z": [-0.1, -0.25, -0.08, -0.1, -0.1],
+		"el_x": [-0.15, -1.35, -0.05, -0.2, -0.15], "sp_x": [0.0, -0.06, 0.1, 0.08, 0.0], "sp_y": [0.0, -0.22, 0.16, 0.12, 0.0],
+		"lsh_x": [0.0, -0.3, 0.2, 0.15, 0.0], "lel_x": [-0.15, -0.55, -0.4, -0.35, -0.15],
+		"knee": [0.05, 0.1, 0.2, 0.16, 0.05], "body_y": [0.0, 0.0, -0.02, -0.015, 0.0], "head_x": [0.0, -0.08, 0.05, 0.03, 0.0]},
 }
+## Normalized cast time when the spark leaves the wand (the tip pulses around it).
+const WAND_RELEASE_T := 0.36
+const WAND_TIP_PULSE := 0.7
+## Actions during which a held wand is put away (the right hand is busy or Krystal is lying down).
+const HELD_HIDDEN_ACTIONS := ["eat", "sleep", "death"]
 
 ## Roll: points on the head + hair silhouette (HeadCenter space) that must stay above the floor.
 ## Hats, buns, helms and ponytails add their own silhouette points on top of these (see _head_hull).
@@ -172,7 +188,9 @@ var _mouth_smile: MeshInstance3D
 var _mouth_open: MeshInstance3D
 var _scarf_ends: Array = []          # [[seg0, seg1], ...] (explorer scarf; empty for other garments)
 var _braid: Array[Node3D] = []       # segments of the first hair chain (the Chapter One braid)
-var _tools: Dictionary = {}           # kind -> Node3D (in the right hand)
+var _tools: Dictionary = {}           # kind -> Node3D (in the right hand); "wand" only once one was held / cast
+var _held_tool: String = ""           # tool carried between swings ("wand" or "")
+var _wand_tip: Node3D = null
 var _tool_anchor: Node3D
 var _lantern: Node3D
 var _lantern_belt: Node3D
@@ -251,6 +269,8 @@ func _ready() -> void:
 		_set_look(ItemDB.legacy_look())
 	_apply_debug_look()
 	_build()
+	if _held_tool != "":
+		show_tool(_rest_tool(), 0.0)
 	_blink_timer = randf_range(1.5, 4.0)
 	if _following():
 		_connect_state()
@@ -387,12 +407,48 @@ func set_food_color(c: Color) -> void:
 		_food.material_override = Mat.outlined(Mat.toon(c, {"rim": 0.5}), 0.006)
 
 
-## Shows the tool for a swing kind ("axe", "pickaxe", "sword"; anything else = empty hands).
+## Shows the tool for a swing kind ("axe", "pickaxe", "sword", "wand"; anything else = empty hands) for `seconds`,
+## then the held tool (set_held_tool) comes back. The wand model is built the first time it is needed.
 func show_tool(kind: String, seconds: float = 0.9) -> void:
+	if kind == "wand":
+		_ensure_wand()
 	_shown_tool = kind if _tools.has(kind) else ""
 	_tool_timer = seconds
 	for k in _tools:
 		(_tools[k] as Node3D).visible = (k == _shown_tool)
+
+
+## The tool Krystal carries in her right hand between swings: "wand" while a wand is selected on the hotbar, ""
+## (empty hand, the Chapter One behaviour) otherwise. A swing still shows its own tool and hands it back after.
+func set_held_tool(kind: String) -> void:
+	var k := "wand" if kind == "wand" else ""
+	if k == _held_tool:
+		return
+	_held_tool = k
+	if _tool_timer <= 0.0 and _body_root != null:
+		show_tool(_rest_tool(), 0.0)
+
+
+func held_tool() -> String:
+	return _held_tool
+
+
+## The tool shown while no swing shows one: the held tool, put away while the hand is busy (eating, sleeping).
+func _rest_tool() -> String:
+	if _held_tool == "" or HELD_HIDDEN_ACTIONS.has(_action):
+		return ""
+	return _held_tool
+
+
+## Builds the wand model on first use (never for an avatar that holds no wand: legacy meshes stay identical).
+func _ensure_wand() -> void:
+	if _tools.has("wand") or _tool_anchor == null:
+		return
+	var w := WandBuilder.build(_tool_anchor)
+	_bake_subtree(w)
+	_set_layers(w)
+	_tools["wand"] = w
+	_wand_tip = w.get_node_or_null(WandBuilder.TIP_NAME) as Node3D
 
 
 func set_body_visible(v: bool) -> void:
@@ -1303,8 +1359,15 @@ func _pose_swing(dt: float) -> void:
 	if _tool_timer > 0.0:
 		_tool_timer -= dt
 		if _tool_timer <= 0.0:
-			show_tool("", 0.0)
+			show_tool(_rest_tool(), 0.0)
 	var w := _swing_w
+	if _wand_tip != null:
+		# The seed at the tip swells briefly as the spark leaves it.
+		var pulse := 0.0
+		if w >= 0.01 and _last_swing_kind == "wand":
+			var u := (_last_swing_t - WAND_RELEASE_T) / 0.09
+			pulse = exp(-u * u) * w
+		_wand_tip.scale = Vector3.ONE * (1.0 + WAND_TIP_PULSE * pulse)
 	if w < 0.01:
 		return
 	var d: Dictionary = SWING_KEYS[_last_swing_kind]
@@ -1650,6 +1713,10 @@ func _update_skirt(dt: float) -> void:
 
 
 func _update_props(dt: float) -> void:
+	if _held_tool != "" and _tool_timer <= 0.0:
+		var rest := _rest_tool()
+		if rest != _shown_tool:
+			show_tool(rest, 0.0)
 	var raised := lantern_on and roll_t < 0.0
 	if _lantern != null:
 		_lantern.visible = raised
@@ -1673,14 +1740,14 @@ func _update_props(dt: float) -> void:
 func _run_demo(dt: float) -> void:
 	_demo_t += dt
 	match _demo:
-		"axe", "pickaxe", "sword", "hands", "gather", "swing":
+		"axe", "pickaxe", "sword", "hands", "gather", "swing", "wand":
 			var kind := "axe" if _demo == "swing" else _demo
 			var cycle := 0.5 + 0.45
 			var t := fmod(_demo_t, cycle)
 			if t < 0.5:
 				swing_kind = kind
 				swing_t = t / 0.5
-				if _shown_tool != kind and _tools.has(kind):
+				if _shown_tool != kind and (_tools.has(kind) or kind == "wand"):
 					show_tool(kind, 0.9)
 				_tool_timer = 0.5
 			else:

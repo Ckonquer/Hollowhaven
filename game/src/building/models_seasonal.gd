@@ -12,7 +12,11 @@ const Shapes := preload("res://src/building/shapes.gd")
 const Batch := preload("res://src/building/batch.gd")
 
 const PUMPKIN_FACES := ["friendly", "sleepy", "toothy", "cat", "moon", "ghost"]
-const PUMPKIN_R := 0.26                 # body radius (front surface)
+## Festival carvings (data/structures.gd FESTIVAL_FACES, unlocked by the Lanternwake). The model carves any known
+## id; WHICH faces a pumpkin may show is decided by src/building/pumpkin_faces.gd (the structure passes the
+## resolved face in its model options).
+const FESTIVAL_CARVINGS := ["starry", "lanternwake"]
+const PUMPKIN_R := 0.26                # body radius (front surface)
 const PUMPKIN_Y := 0.24                 # body centre height
 static var BRASS: Color = Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04)
 static var PUMPKIN: Color = Color("f08a2e")
@@ -124,7 +128,7 @@ static func thread_veil(root: Node3D, alt: bool) -> Dictionary:
 ## Pumpkin body + the carved `face` glowing warmly (unknown / "" = the first face). Parts: "flame" (a candle
 ## glow inside, hidden by the body), "light_pos", "face" (the carving node).
 static func pumpkin_lantern(root: Node3D, face: String = "") -> Dictionary:
-	var fid := face if PUMPKIN_FACES.has(face) else String(PUMPKIN_FACES[0])
+	var fid := face if (PUMPKIN_FACES.has(face) or FESTIVAL_CARVINGS.has(face)) else String(PUMPKIN_FACES[0])
 	var body := U.baked("pumpkin_lantern", func(b: Batch) -> void:
 		b.cyl(0.2, 0.22, 0.03, Vector3(0, 0.015, 0), Palette.WOOD_DARK, Vector3.ZERO, 14)
 		for k in 8:
@@ -211,6 +215,26 @@ static func _carve(b: Batch, face: String) -> void:
 				_cut(b, -0.055 + 0.055 * float(k), -0.1, Vector2(0.06, 0.05))
 			for sx in [-1.0, 1.0]:
 				_cut(b, 0.1 * sx, -0.01, Vector2(0.06, 0.03), 25.0 * sx)
+		"starry":
+			# Festival face: twinkling star eyes (three short crossed strokes each), a soft smile, a sparkle on each cheek.
+			for sx in [-1.0, 1.0]:
+				var e := Vector2(0.09 * sx, 0.065)
+				for k in 3:
+					var a := PI * float(k) / 3.0 + PI * 0.5
+					var d := Vector2(cos(a), sin(a)) * 0.03
+					_stroke(b, e - d, e + d, 0.016)
+				_cut(b, 0.155 * sx, -0.015, Vector2(0.022, 0.022), 45.0)
+			for k in 5:
+				var t := lerpf(-1.0, 1.0, float(k) / 4.0)
+				_cut(b, t * 0.075, -0.07 - 0.028 * (1.0 - t * t), Vector2(0.042, 0.03))
+		"lanternwake":
+			# Festival face: little flame-shaped eyes and a smile of round festival lanterns.
+			for sx in [-1.0, 1.0]:
+				_cut(b, 0.085 * sx, 0.05, Vector2(0.05, 0.055))
+				_cut(b, 0.085 * sx + 0.006 * sx, 0.092, Vector2(0.024, 0.04), -12.0 * sx)
+			for k in 5:
+				var t := lerpf(-1.0, 1.0, float(k) / 4.0)
+				_cut(b, t * 0.12, -0.05 - 0.05 * (1.0 - t * t), Vector2(0.038, 0.042))
 		_:     # friendly
 			for sx in [-1.0, 1.0]:
 				_cut(b, 0.09 * sx, 0.06, Vector2(0.06, 0.07))

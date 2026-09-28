@@ -3,7 +3,8 @@ extends Node3D
 ## A small floating bat-masked figure in an oversized velvet cape, a flamboyant collar and a tiny crown; he
 ## hovers, his cape sways and he bows when spoken to. No branching dialogue: each talk says the next line
 ## of data/manor_layout.gd RESIDENT_LINES (the first is MP §17 verbatim). Never in group "enemy".
-##   setup({"lines": [...], "greet": true})   # greet = say the first line on appearing (right after the win)
+##   setup({"lines": [...], "greet": true})   # greet = say the first line on appearing (right after the win),
+##                                              GREET_DELAY s of unpaused time later
 
 signal spoke(line_index: int)
 
@@ -17,6 +18,7 @@ const MASK := Color("2a1830")
 const SKIN := Color("d9c8e8")
 const GOLD := Color("e2bd5e")
 const GLOVE := Color("f6efe6")
+const GREET_DELAY := 1.2
 
 var lines: Array = Layout.RESIDENT_LINES
 var greet: bool = false
@@ -41,7 +43,8 @@ func _ready() -> void:
 	add_to_group("mm_resident")
 	_build()
 	if greet:
-		get_tree().create_timer(1.2).timeout.connect(_greet)
+		# Pause-aware (process_always = false): the greeting never fires behind the pause menu.
+		get_tree().create_timer(GREET_DELAY, false).timeout.connect(_greet)
 
 
 func _greet() -> void:

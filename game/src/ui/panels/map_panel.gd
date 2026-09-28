@@ -8,6 +8,8 @@ extends "res://src/ui/panels/panel_base.gd"
 ## Chapter Two step target, the Haven for the Ward Stone pointer); a goal in another area points at the way
 ## there (the waygate, the manor door, the Bellhouse stair). Once the Reach has been visited, a toggle shows
 ## either outdoor map (Krystal and her friends are drawn only on the map of the area she is in).
+## Mastery map clarity (Wayfinding 2 resource pins, Wayfinding 4 cache hints) gets a legend row on an outdoor map
+## while it has something to show there (legend_extras).
 ## args: {"area": map area to show (optional; default = the area Krystal is in)}.
 
 const MapView := preload("res://src/ui/widgets/map_view.gd")
@@ -15,6 +17,10 @@ const Tracker := preload("res://src/ui/hud/tracker.gd")
 const Layout := preload("res://data/world_layout.gd")
 const Reach := preload("res://data/hallowmere_layout.gd")
 const Palette := preload("res://src/art/palette.gd")
+const Mastery := preload("res://src/core/mastery.gd")
+
+const LEGEND_PINS := "Where you gathered"
+const LEGEND_HINTS := "A hidden cache, maybe"
 
 const REACH_ID := "hallowmere_reach"
 
@@ -235,11 +241,22 @@ func _build_outdoor() -> void:
 		lg.add_child(_legend_ctrl(_arch_swatch(true), "Lit lantern arch"))
 		lg.add_child(_legend_ctrl(_arch_swatch(false), "Unlit arch"))
 		lg.add_child(_legend_ctrl(_unknown_swatch(), "Not found yet"))
+		for ex in legend_extras(shown_area):
+			lg.add_child(_legend_ctrl(_extra_swatch(ex), String(ex["text"])))
 	else:
 		side.add_child(_legend_row(_arrow_icon(), "You (pointing where you look)"))
 		side.add_child(_legend_row(IconFactory.icon("ui_star", Color.WHITE, 48), "Your current goal"))
 		side.add_child(_legend_row(IconFactory.portrait("mochi"), "Your friends"))
 		side.add_child(_legend_row(IconFactory.glyph("diamond", 40, 40, Palette.WOOD), "Bridges and stepping stones"))
+		var extras := legend_extras(shown_area)
+		if not extras.is_empty():
+			# one row for both (the woods window stays inside the 1080 canvas)
+			var eg := GridContainer.new()
+			eg.columns = 2
+			eg.add_theme_constant_override("h_separation", 14)
+			side.add_child(eg)
+			for ex in extras:
+				eg.add_child(_legend_ctrl(_extra_swatch(ex), String(ex["text"])))
 	side.add_child(Kit.spacer(0, 4))
 	side.add_child(section_title("Places"))
 	var grid := GridContainer.new()
@@ -259,6 +276,20 @@ func _build_outdoor() -> void:
 		var total := Reach.LANDMARKS.size()
 		var found := place_ids(REACH_ID).size()
 		side.add_child(Kit.label("%d of %d places found" % [found, total] if found < total else "Every place found!", "Muted"))
+
+
+## Mastery legend rows for an outdoor map: [{"kind": "pins" | "hints", "text", "item"}] - resource pins while
+## Wayfinding 2 is reached and a spot is recorded there, cache hints while Wayfinding 4 is reached and a hint shows.
+static func legend_extras(area_id: String) -> Array:
+	var out: Array = []
+	var area := MapView.data_area(area_id)
+	if Mastery.resource_pins_on():
+		var spots: Array = Mastery.known_spots(area)
+		if not spots.is_empty():
+			out.append({"kind": "pins", "text": LEGEND_PINS, "item": Mastery.spot_item(String(spots[0]["kind"]))})
+	if Mastery.cache_hints_on() and not Mastery.cache_hints(area).is_empty():
+		out.append({"kind": "hints", "text": LEGEND_HINTS, "item": ""})
+	return out
 
 
 ## Landmark ids listed under "Places" (the Reach lists discovered ones only, in layout order).
@@ -326,6 +357,22 @@ func _arch_swatch(lit: bool) -> Control:
 	c.custom_minimum_size = Vector2(34, 34)
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	c.draw.connect(func() -> void: MapView.draw_arch_pin(c, c.size * 0.5 + Vector2(0, 2), 1.0, lit))
+	return c
+
+
+## Legend swatch drawn exactly like the map's own resource pin / cache hint.
+func _extra_swatch(ex: Dictionary) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(34, 34)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var item := String(ex.get("item", ""))
+	var tex: Texture2D = IconFactory.item_icon(item, 48) if item != "" else null
+	var pins := String(ex.get("kind", "")) == "pins"
+	c.draw.connect(func() -> void:
+		if pins:
+			MapView.draw_spot_pin(c, c.size * 0.5, 1.3, tex)
+		else:
+			MapView.draw_hint_pin(c, c.size * 0.5, 1.15))
 	return c
 
 

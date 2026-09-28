@@ -1593,11 +1593,14 @@ func _on_enemy_killed(_enemy_id: String, pos: Vector3) -> void:
 
 # --- Threats -------------------------------------------------------------------------------------------------
 
+## Enemies the companions react to (shared, refreshed at most every 0.4 s). Boss hazards (meta "boss_hazard":
+## the Matron's trip-lines and egg sacs are in group "enemy" so Krystal can cut / pop them) are left out, so no
+## companion ever notices (Lumi), hides from (Mochi), charges (Pebble) or targets one.
 func _enemies() -> Array:
 	var now := Time.get_ticks_msec()
 	if now - _enemy_cache_ms > 400 and is_inside_tree():
 		_enemy_cache_ms = now
-		_enemy_cache = get_tree().get_nodes_in_group("enemy")
+		_enemy_cache = CombatCtl.without_hazards(get_tree().get_nodes_in_group("enemy"))
 	return _enemy_cache
 
 

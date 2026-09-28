@@ -57,6 +57,8 @@ const NO_XP := ["dismantle", "rebuild_same_structure", "move_items_between_chest
 ##   furnace_queue_bonus (+jobs) / station_time_mult (x job time) / meal_buff_bonus (fraction longer food buffs)
 ##                       modest workshop conveniences
 ##   sprint_stamina_save fraction less sprint stamina; map_* map clarity options
+##   map_resource_pins   the map pins recorded resource spots (SPOT_* below; Mastery.known_spots)
+##   map_cache_hints     the map shows a soft "?" for unfound caches in discovered districts (MAP_CACHE_HINTS)
 const REWARDS := {
 	"gathering": {
 		1: {"gather_power": 0.05, "text": "Gathering takes 5% less effort."},
@@ -74,12 +76,46 @@ const REWARDS := {
 	},
 	"wayfinding": {
 		1: {"sprint_stamina_save": 0.05, "text": "Sprinting costs 5% less stamina."},
-		2: {"map_resource_pins": true, "text": "The map remembers gathered resource spots."},
+		2: {"map_resource_pins": true, "text": "The map remembers where you gathered special materials."},
 		3: {"sprint_stamina_save": 0.1, "text": "Sprinting costs 10% less stamina."},
-		4: {"map_cache_hints": true, "text": "The map hints at optional caches you have glimpsed."},
+		4: {"map_cache_hints": true, "text": "The map hints at hidden caches in places you have found."},
 		5: {"sprint_stamina_save": 0.15, "text": "Sprinting costs 15% less stamina."},
 	},
 }
+
+## --- Map clarity (Wayfinding 2 / 4) and the material sparkle (Gathering 4), MP 5.3 / 16 -------------------------
+## Resource spots: Mastery records where Krystal fully harvested a node (Events.harvested) in GameState.mastery
+## ["spots"][area][kind] = [[x, z], ...] (JSON-safe), only in SPOT_AREAS (the painted outdoor maps), never for the
+## everyday SPOT_SKIP_KINDS (they grow everywhere: pinning them would drown the map in identical marks), a spot
+## closer than SPOT_MIN_DIST to a known one of the same kind is the same spot, and at most SPOT_MAX_PER_KIND per
+## kind and area are kept (the oldest is forgotten first). Recorded from the start (small and bounded), so reaching
+## Wayfinding 2 shows what she already gathered; the map draws them only while map_resource_pins is in effect.
+const SPOT_AREAS := ["surface", "hallowmere_reach"]
+const SPOT_SKIP_KINDS := ["tree", "rock", "stick", "stone", "grass", "rubble"]
+const SPOT_MIN_DIST := 6.0
+const SPOT_MAX_PER_KIND := 24
+
+## Optional caches the map hints at once map_cache_hints is in effect: a soft, steady "?" at the cache once its
+## `district` (landmark id of `area`) is discovered, gone for good once the owner module's `flag` is set. Positions
+## are read (never copied) from the owner's layout constant: script `layout`, constant `const`, and `key` when the
+## constant is a Dictionary. A missing file / constant simply shows no hint.
+const MAP_CACHE_HINTS := [
+	{"id": "tailor_cache", "area": "surface", "district": "old_oak", "flag": "c1x_tailor_cache",
+		"layout": "res://data/c1x_layout.gd", "const": "TAILOR_CACHE", "key": "pos"},
+	{"id": "witch_hat", "area": "hallowmere_reach", "district": "hr_candleyard", "flag": "ch2_witch_hat_found",
+		"layout": "res://data/reach_west.gd", "const": "HAT", "key": "pos"},
+	{"id": "festival_pouch", "area": "hallowmere_reach", "district": "hr_pools", "flag": "hr_chime_trail_done",
+		"layout": "res://data/reach_west.gd", "const": "POUCH"},
+	{"id": "candleyard_pattern", "area": "hallowmere_reach", "district": "hr_candleyard", "flag": "ch2_candleyard_pattern",
+		"layout": "res://data/reach_west.gd", "const": "PATTERN_SPOT"},
+]
+
+## Gathering 4 (highlight_radius): a steady sparkle (never blinking) over the nearest non-depleted harvestables,
+## at most HIGHLIGHT_MAX, refreshed every HIGHLIGHT_REFRESH seconds from a registry (never a per-frame group scan).
+## Special materials come first; trees (big and obvious) and quest rubble never sparkle.
+const HIGHLIGHT_MAX := 12
+const HIGHLIGHT_REFRESH := 0.5
+const HIGHLIGHT_SKIP_KINDS := ["tree", "rubble"]
 
 ## Combined non-combat caps (mastery + charms), kept modest and visible.
 const GATHER_BONUS_CAP := 0.25

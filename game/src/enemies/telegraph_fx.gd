@@ -11,7 +11,9 @@ extends Node3D
 ## by every instance (static cache) and scaled per use; the pulse swaps between LEVELS cached alpha materials
 ## instead of animating a per-instance material, so a mark allocates nothing per frame.
 ## Comfort: with Settings reduce_flashing the mark does not pulse; it firms up steadily as the wind-up
-## completes. The numbers of the footprint (radius, width, arc) are the SAME numbers the attack resolves with,
+## completes. With Settings "high_visibility_cues" every mark adds a BOLD cream outline just outside its footprint
+## (ring / disc rim, lane sides, wedge rim + edges, a ring round each spot), steady (never pulsing), toggled live
+## on Events.settings_changed; the outline meshes and their one material are shared (static cache). The numbers of the footprint (radius, width, arc) are the SAME numbers the attack resolves with,
 ## so what is marked is what hits (tests compare them through footprint()).
 ##   var m := enemy.mark(); m.show_lane(a, b, 1.6, TelegraphFx.DANGER); m.set_progress(k, locked); m.hide_mark()
 
@@ -22,6 +24,8 @@ const WARN := Color(1.0, 0.7, 0.28)          # sweeps and swings
 const COOL := Color(0.72, 0.87, 1.0)         # ground scrapes (a different colour from the swing)
 const ROOT := Color(0.64, 0.86, 0.42)        # roots / plant hazards
 const PALE := Color(0.93, 0.92, 0.84)        # pale marks (arachnophobia-friendly leap mark)
+const BOLD := Color("fff1c9")                # Settings "high_visibility_cues": bold cream outline (as the bosses)
+const BOLD_WIDTH := 0.12                     # outline band, as a fraction of the mark's radius / width
 const LEVELS := 8
 const Y_OFFSET := 0.06
 const MAX_SPOTS := 8
@@ -47,6 +51,9 @@ var _fill: MeshInstance3D
 var _edge: MeshInstance3D
 var _head: MeshInstance3D
 var _spots: Array = []
+var _bold: MeshInstance3D                    # high_visibility_cues outline of ring / disc / lane / arc
+var _bold_spots: Array = []                  # ...and one bold ring per spot
+var high_vis := false                        # Settings "high_visibility_cues" (live)
 var _fill_mats: Array = []
 var _edge_mats: Array = []
 var _level: int = -1
@@ -61,12 +68,26 @@ func _ready() -> void:
 	_clear()
 
 
+func _enter_tree() -> void:
+	high_vis = bool(Settings.get_value("high_visibility_cues"))
+	if not Events.settings_changed.is_connected(_on_settings_changed):
+		Events.settings_changed.connect(_on_settings_changed)
+	_apply_bold()
+
+
+func _exit_tree() -> void:
+	if Events.settings_changed.is_connected(_on_settings_changed):
+		Events.settings_changed.disconnect(_on_settings_changed)
+
+
 func _ensure_parts() -> void:
 	if _fill != null:
 		return
 	_fill = _new_part()
 	_edge = _new_part()
 	_head = _new_part()
+	_bold = _new_part()
+	_bold.material_override = _bold_mat()
 
 
 func _new_part() -> MeshInstance3D:
@@ -86,6 +107,7 @@ func show_ring(at: Vector3, r: float, col: Color = DANGER) -> void:
 	global_transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * Y_OFFSET)
 	_set_part(_fill, _disc_mesh(), Vector3(r, 1.0, r), Vector3.ZERO)
 	_set_part(_edge, _ring_mesh(), Vector3(r, 1.0, r), Vector3(0.0, 0.004, 0.0))
+	_set_bold(_bold_ring_mesh(), Vector3(r, 1.0, r))
 	_finish_show()
 
 
@@ -95,6 +117,7 @@ func show_disc(at: Vector3, r: float, col: Color = DANGER) -> void:
 	radius = r
 	global_transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * Y_OFFSET)
 	_set_part(_edge, _disc_mesh(), Vector3(r, 1.0, r), Vector3.ZERO)
+	_set_bold(_bold_ring_mesh(), Vector3(r, 1.0, r))
 	_finish_show()
 
 
@@ -112,6 +135,7 @@ func show_lane(a: Vector3, b: Vector3, w: float, col: Color = DANGER) -> void:
 	_set_part(_edge, _quad_frame_mesh(), Vector3(w, 1.0, maxf(length, 0.01)), Vector3(0.0, 0.004, 0.0))
 	var head_len := minf(w * 0.8, maxf(length * 0.4, 0.05))
 	_set_part(_head, _arrow_mesh(), Vector3(w * 0.9, 1.0, head_len), Vector3(0.0, 0.006, -(length - head_len)))
+	_set_bold(_bold_lane_mesh(), Vector3(w, 1.0, maxf(length, 0.01)))
 	_finish_show()
 
 
@@ -128,6 +152,7 @@ func move_lane(a: Vector3, b: Vector3) -> void:
 	global_transform = Transform3D(_basis_toward(facing), a + Vector3.UP * Y_OFFSET)
 	_fill.scale = Vector3(width, 1.0, maxf(length, 0.01))
 	_edge.scale = _fill.scale
+	_bold.scale = _fill.scale
 	var head_len := minf(width * 0.8, maxf(length * 0.4, 0.05))
 	_head.scale = Vector3(width * 0.9, 1.0, head_len)
 	_head.position = Vector3(0.0, 0.006, -(length - head_len))
@@ -156,6 +181,7 @@ func show_arc(at: Vector3, dir: Vector3, r: float, arc: float, col: Color = WARN
 	global_transform = Transform3D(_basis_toward(facing), at + Vector3.UP * Y_OFFSET)
 	_set_part(_fill, _sector_mesh(arc_deg), Vector3(r, 1.0, r), Vector3.ZERO)
 	_set_part(_edge, _sector_rim_mesh(arc_deg), Vector3(r, 1.0, r), Vector3(0.0, 0.004, 0.0))
+	_set_bold(_bold_sector_mesh(arc_deg), Vector3(r, 1.0, r))
 	_finish_show()
 
 
@@ -170,7 +196,12 @@ func show_spots(at: Array, r: float, col: Color = ROOT) -> void:
 			if i >= at.size():
 				break
 			_spots.append(_new_part())
+			var bs := _new_part()
+			bs.mesh = _bold_ring_mesh()
+			bs.material_override = _bold_mat()
+			_bold_spots.append(bs)
 		var mi: MeshInstance3D = _spots[i]
+		var bmi: MeshInstance3D = _bold_spots[i]
 		if i < at.size() and at[i] is Vector3:
 			var p: Vector3 = at[i]
 			points.append(p)
@@ -178,6 +209,8 @@ func show_spots(at: Array, r: float, col: Color = ROOT) -> void:
 			mi.position = p + Vector3.UP * Y_OFFSET
 			mi.scale = Vector3(r, 1.0, r)
 			mi.visible = true
+			bmi.position = p + Vector3.UP * (Y_OFFSET + 0.008)
+			bmi.scale = Vector3(r, 1.0, r)
 		else:
 			mi.visible = false
 	_finish_show()
@@ -195,6 +228,19 @@ func hide_mark() -> void:
 
 func is_showing() -> bool:
 	return kind != ""
+
+
+## True while the high_visibility_cues outline of the current mark is shown (tests).
+func bold_visible() -> bool:
+	if kind == "spots":
+		return not _bold_spots.is_empty() and (_bold_spots[0] as MeshInstance3D).visible
+	return _bold != null and _bold.visible
+
+
+## Settings "high_visibility_cues" on/off for this mark (normally driven by Events.settings_changed).
+func set_high_vis(on: bool) -> void:
+	high_vis = on
+	_apply_bold()
 
 
 ## The marked area as numbers (tests compare it with the area the attack resolves with).
@@ -296,6 +342,7 @@ func _finish_show() -> void:
 	set_process(true)
 	_level = -1
 	_apply_level(0)
+	_apply_bold()
 
 
 func _clear() -> void:
@@ -305,11 +352,13 @@ func _clear() -> void:
 	points = []
 	visible = false
 	set_process(false)
-	for mi in [_fill, _edge, _head]:
+	for mi in [_fill, _edge, _head, _bold]:
 		if mi != null:
 			(mi as MeshInstance3D).visible = false
 			(mi as MeshInstance3D).mesh = null
 	for mi in _spots:
+		(mi as MeshInstance3D).visible = false
+	for mi in _bold_spots:
 		(mi as MeshInstance3D).visible = false
 
 
@@ -318,6 +367,28 @@ func _set_part(mi: MeshInstance3D, mesh: Mesh, scl: Vector3, pos: Vector3) -> vo
 	mi.scale = scl
 	mi.position = pos
 	mi.visible = true
+
+
+## The outline part of the current mark (shown only while high_vis is on).
+func _set_bold(mesh: Mesh, scl: Vector3) -> void:
+	_bold.mesh = mesh
+	_bold.scale = scl
+	_bold.position = Vector3(0.0, 0.008, 0.0)
+
+
+## Shows / hides the bold outline(s) for the current mark (cheap: visibility only; no material work).
+func _apply_bold() -> void:
+	if _bold == null:
+		return
+	var on := high_vis and kind != ""
+	_bold.visible = on and kind != "spots" and _bold.mesh != null
+	for i in _bold_spots.size():
+		(_bold_spots[i] as MeshInstance3D).visible = on and kind == "spots" and i < points.size()
+
+
+func _on_settings_changed(key: String) -> void:
+	if key == "high_visibility_cues":
+		set_high_vis(bool(Settings.get_value("high_visibility_cues")))
 
 
 static func _basis_toward(dir: Vector3) -> Basis:
@@ -345,6 +416,82 @@ static func _mat_levels(col: Color, edge: bool) -> Array:
 		out.append(m)
 	_mats[key] = out
 	return out
+
+
+## The one bold outline material (shared by every mark): cream, unshaded, drawn over the fills.
+static func _bold_mat() -> Material:
+	if _mats.has("bold"):
+		return _mats["bold"]
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.disable_receive_shadows = true
+	m.render_priority = 2
+	m.albedo_color = Color(BOLD.r, BOLD.g, BOLD.b, 0.95)
+	_mats["bold"] = m
+	return m
+
+
+## Bold band just outside a unit circle (rings, discs, spots).
+static func _bold_ring_mesh() -> Mesh:
+	if _meshes.has("bold_ring"):
+		return _meshes["bold_ring"]
+	var m := _annulus(1.0, 1.0 + BOLD_WIDTH, -PI, PI, FAN_SEGMENTS)
+	_meshes["bold_ring"] = m
+	return m
+
+
+## Bold side bands just outside the unit lane (x in [-0.5, 0.5], z from 0 to -1), full length.
+static func _bold_lane_mesh() -> Mesh:
+	if _meshes.has("bold_lane"):
+		return _meshes["bold_lane"]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	for side in [-1.0, 1.0]:
+		var x0: float = side * 0.5
+		var x1: float = side * (0.5 + BOLD_WIDTH)
+		var p := [Vector3(x0, 0, 0), Vector3(x1, 0, 0), Vector3(x1, 0, -1), Vector3(x0, 0, -1)]
+		for i in [0, 2, 1, 0, 3, 2]:
+			st.add_vertex(p[i])
+	var m := st.commit()
+	_meshes["bold_lane"] = m
+	return m
+
+
+## Bold outline of a wedge of `arc` degrees (radius 1): a band outside the arc plus a band outside each
+## straight edge (cached per whole degree, like the sector meshes).
+static func _bold_sector_mesh(arc: float) -> Mesh:
+	var deg := clampi(int(round(arc)), 1, 360)
+	var key := "bold_sector|%d" % deg
+	if _meshes.has(key):
+		return _meshes[key]
+	var half := deg_to_rad(float(deg)) * 0.5
+	var segs := maxi(4, int(float(FAN_SEGMENTS) * float(deg) / 360.0) + 2)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	for i in segs:
+		var a0 := -half + 2.0 * half * float(i) / float(segs)
+		var a1 := -half + 2.0 * half * float(i + 1) / float(segs)
+		var p0 := _fan_point(a0, 1.0)
+		var p1 := _fan_point(a1, 1.0)
+		var q0 := _fan_point(a0, 1.0 + BOLD_WIDTH)
+		var q1 := _fan_point(a1, 1.0 + BOLD_WIDTH)
+		for v in [p0, q0, q1, p0, q1, p1]:
+			st.add_vertex(v)
+	if deg < 360:
+		for side in [-1.0, 1.0]:
+			var a: float = half * float(side)
+			var tip := _fan_point(a, 1.0 + BOLD_WIDTH)
+			# outward normal of this straight edge (away from the wedge), BOLD_WIDTH long
+			var out := _fan_point(a + float(side) * PI * 0.5, BOLD_WIDTH)
+			for v in [Vector3.ZERO, tip, tip + out, Vector3.ZERO, tip + out, out]:
+				st.add_vertex(v)
+	var m := st.commit()
+	_meshes[key] = m
+	return m
 
 
 static func _disc_mesh() -> Mesh:

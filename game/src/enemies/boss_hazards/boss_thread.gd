@@ -41,6 +41,7 @@ func setup(p: Dictionary) -> void:
 func _ready() -> void:
 	top_level = true
 	add_to_group("enemy")
+	set_meta("boss_hazard", true)     # a strikeable hazard, not a threat (director / auto-aim skip it, like the sacs)
 	health = Health.new()
 	health.name = "Health"
 	health.max_hp = 1.0

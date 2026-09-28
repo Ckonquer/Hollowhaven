@@ -119,6 +119,104 @@ Perception 0.2 s; separation cache every 20 physics frames; `light_at` group cac
 - Boss/stalker have no physics body: Krystal walks through them; melee LOS ignores them.
 - `give_drop` introspects `world_item.spawn` arity (>= 3 args).
 
+## 11. Chapter Two (Waves B/C + integration) — as built
+
+Sections 1-10 map the Chapter One code; the recipes below (d) companion attacks and (e) armor/shields are built. Source of truth:
+the headers of `src/core/stats.gd`, `src/player/player_health.gd`, `src/combat/projectile.gd`, `src/combat/combat.gd`,
+`src/enemies/enemy_base.gd`, `telegraph_fx.gd`, `enemy_spawner.gd`, `enemy_factory.gd`.
+
+**Stats (`src/core/stats.gd`, static, pure over saved state; B3).** Recomputed from GameState on every call (loading twice can't
+stack a bonus). `damage_reduction()` (armor pieces add, then armor × Pebble passive × charms multiply, cap `REDUCTION_CAP` 45%;
+20% armor + Pebble = 28%), `combine(a, b, c, d)`, `mitigate(raw)`, `armor_reduction()`, `player_shield()` (the shield on
+`Game.player.health`; there is no GameState shield), `base_max_hp()` (= saved base 100) / `effective_max_hp()` / `max_hp_bonus()`,
+`move_bonus()` / `slow_mult()` (never below `SLOW_FLOOR` 0.5) / `move_mult()` (+30% cap, × slow), `heal_mult()`,
+`stamina_cost_mult(action)` ("sprint" | "dodge" | "swing" | "wand"), `gather_bonus()`, `bonus_yield_chance()`,
+`harvest_power(tool)`, `best_tool(kind, min_tier)`, `best_melee_weapon()` (never a wand), `best_wand()`, `melee_damage/reach/dps`,
+`wand_stats/damage/dps`, `best_weapon_tier()`, `companion_damage_mult()`, `apply_food_buff(item)` (same family: stronger replaces,
+weaker only refreshes, never stacks), `meal_buff_mult()`, `lantern_radius_mult()`, `present_companion()` / `companion_value` /
+`companion_passive` (only `GameState.active_companion` when `Game.companion_present(id)`: same area, ≤ 25 m), `equipped_effect`,
+`mastery_value`, `buff_value`, `stat_rows()` / `companion_lines()` (inventory stats card). Legacy numbers unchanged (Copper Sword 18,
+stone tools 9, walk 4.2 / sprint 7.0, dodge 0.3 s i-frames / cost 20, a 15-damage hit leaves 85 HP).
+
+**Player damage order (`src/player/player_health.gd` extends health.gd; spec §9).** Processed exactly once per `apply_damage()`:
+1. dead / invulnerable / amount ≤ 0 / inside i-frames → 0, nothing else (i-frames BEFORE damage);
+2. reduction `Stats.damage_reduction()`;
+3. shield (transient, `add_shield(amount, seconds, source) -> float`: never stacks, the larger wins, cap `MAX_SHIELD` 60; timer runs
+   only while the tree runs; not saved) absorbs what is left AFTER mitigation;
+4. Health (the rest; `damaged` reports the HP actually lost, `Events.player_damaged` follows it).
+A hit the shield swallows completely returns 0 (the "blocked" convention: no knockback, no hurt), grants `SHIELD_BLOCK_IFRAMES` 0.3 s
+and emits `shield_hit` / `Events.player_shield_changed` — **not** `Events.player_damaged` (lead decision R136 d: that is a
+damage-taken event). `heal(amount)` applies `Stats.heal_mult()` itself (callers never scale; bed / respawn full heals unscaled).
+`last_hit` = {raw, reduction, mitigated, absorbed, dealt} for tests. Special damage never silently bypasses armor.
+
+**Player (B3).** `add_shield(...)`, `shield_amount()`, `apply_slow(mult, seconds, source) -> bool` (bounded: ≥ 0.5, ≤ 3 s, then
+`SLOW_IMMUNITY` 2 s), `clear_slow()` / `cleanse_slow()`, `is_slowed()`, `resist_knockback(count, seconds)` (alias
+`add_knockback_resist`), `move_mult()`, `refresh_stats()`, `selected_wand()`, `wand_cooldown_left()`, `last_bolt`. Area-aware checks in
+`player_logic.gd`: `is_outdoor(area)` (surface, hallowmere_reach), `is_interior(area)`, `world_half_extents`, `in_world_bounds`,
+`kill_y_for(area)` (hushed_works −60), `recovery_reason_bounds`, `lantern_tint(area)` (warm in interiors). Jumps: while airborne the top
+speed uses at most +10% of the movement bonus, slows apply fully (R102). Enemies slow Krystal through `EnemyBase.apply_slow(t, ...)`,
+which routes to the player's own `apply_slow` (limits + immunity).
+
+**Wand (B3 + R100/R101).** With a wand selected on the hotbar, attack (or the use key) casts: stamina × `stamina_cost_mult("wand")`,
+data cooldown, the target is picked by ONE scan of group "enemy" at cast time (`_ranged_target`: alive, in range, LOS, in the aim cone;
+boss hazards score ×3 worse so a stunned boss beats a nearby trip-line), a spark leaves at `Logic.CAST_RELEASE` through the shared
+projectile; never while eating, dodging or building; the wand is never picked for melee or mining. The avatar holds the wand and plays
+a "wand" cast pose (`krystal_avatar.set_held_tool("wand")`, `wand_builder.gd`).
+
+**Shared projectile (`src/combat/projectile.gd`, static `fire(params) -> Node3D`, null when refused).** Pooled (`MAX_LIVE` 32,
+`POOL_MAX` 24, ≤ `MAX_LIGHTS` 4 with lights), straight flight, one ray per physics tick over the travelled segment (world \| structure
+stops it), hits the first node of its target groups the segment touches, respects `health` / `can_be_hit_by` / `on_hit_blocked` /
+`knockback` / `hit_radius` / `get_aim_point`. Params: shooter, from, dir \| target \| target_pos, damage, speed (16), range (14), radius,
+lifetime, groups (["enemy"]), **`only_target`** (only that node can be hit; other bodies are passed through; a freed value hits nothing),
+**`filter`** (Callable(candidate) -> bool), knockback, los_mask, color, light, max_per_shooter, parent, on_hit, hitstop, impact_fx, kind
+(R60). Also `live_count(shooter)`, `pool_size()`, `stop_all()`, `invalidate_targets()`, `segment_distance(...)`.
+
+**Combat (`combat.gd`).** `can_hit(target, attacker)` (melee respects `can_be_hit_by`), `INTENSITY_SCALED_AREAS := ["below",
+"tobin_annex", "hushed_works"]`, `damage_mult_for_area(area)`, `intensity_damage_mult(level)`, `current_intensity()`.
+
+**enemy_base.gd hooks (B8; additive — with the defaults every legacy enemy behaves exactly as before).** Properties
+`committed_states` (custom attack states that keep the attack token, count as threatening, are never flinched), `needs_clear_shot`,
+`defeat_flag` (setup key: flag set once on defeat), `damage_scale`, `target_override`. Hooks: `attack_reach()`, `_choose_attack()`,
+`_telegraph_finished()`, `attack_def(id)` / `attack_telegraph(def)` / `attack_recover(def)` / `attack_damage_for(def)` (data
+`attacks`), `can_be_hit_by(source)`, `can_stagger(amount, source)`, `_is_uninterruptible()`, `_stagger(...)`, `_on_alert()`,
+`_on_telegraph_start()`, `_on_attack_start()`, `_on_attack_resolved(hits)`, `_on_hurt()`, `_tick_extra()`, `_st_custom()`,
+`_perceive_extra()`, `_can_start_attack()`, `_speed_scale()`, `_knockback_scale()`, `_body_radius/_height()`. Helpers: `mark()` /
+`hide_mark()` (this enemy's telegraph_fx), `charge_begin/charge_step/charge_lane_end`, `leap_begin/leap_target/leap_step/leap_land_hit`,
+`lane_clip`, `lane_hits`, `pulse_hits`, `deal_damage_to`, `fire_projectile` / `projectile_in_flight`, static `apply_slow(t, mult,
+seconds, immunity, source)` (bounded by `SLOW_MIN_MULT` 0.5 / `SLOW_MAX_SECONDS` 3), `announce_tell(def, caption)` (captions for
+tells). `threat_damage_mult()` follows WHERE the enemy fights (R80): in a real, non-transient area `Combat.damage_mult_for_area(
+Game.area_id)` (underground areas scale by horror intensity; surface, Reach and interiors never); in the Echo Trial and without an area
+(tests) the data rule (`underground` / area "below"). Legacy enemies still use `attack_damage()` (data area), numbers unchanged.
+Lead decisions: elites count as boss mechanics for Settings `timing_assist` (×1.5 wind-ups and recoveries: Matron, Quarry Warden,
+Knotted Elder, R86); `brood_skitter` telegraph 1.0 s in data (R83).
+
+**Ground telegraphs (`telegraph_fx.gd`, B8).** One lazily created top-level node per enemy (`enemy.mark()`), reused for every wind-up:
+`show_ring(at, r, col)`, `show_disc`, `show_lane(a, b, w, col)` + `move_lane`, `show_arc(at, dir, r, arc, col)` + `move_arc`,
+`show_spots(points, r, col)` (≤ `MAX_SPOTS` 8), `set_progress(k, lock)`, `hide_mark()`, `is_showing()`, `footprint()` (the SAME numbers the
+attack resolves with; tests compare them), statics `closest_on_segment`, `segment_distance`, `segment_hit`, `in_sector`. Colours
+`DANGER` / `WARN` / `COOL` / `ROOT` / `PALE`. Shared unit meshes + `LEVELS` cached alpha materials: nothing allocated per frame.
+Comfort: `reduce_flashing` = no pulse (steady firming); `high_visibility_cues` = a bold cream outline (`BOLD`) around rings / discs /
+lanes / arcs, switched live on `Events.settings_changed` (R87).
+
+**Spawner params (`enemy_spawner.gd`).** Besides the legacy keys: `"enemy_params"` (Dictionary merged into every enemy's
+`Factory.spawn` params; the spawner's own home / wander_radius / spawner keys win; e.g. Bramblewatch passes the Knotted Elder
+`{"arena_center", "arena_radius": 10.0}`, R81) and `"out_of_view"` (default false: candidate points inside the current camera
+frustum with a clear line of sight are rejected when a point is chosen — never per frame; if every candidate is in plain view the
+wave waits for the next update; used by the moth pocket and the Bramblebacks, R82). `EnemyFactory.can_spawn(id)` (script exists AND
+compiles) guards every area's spawn; a missing enemy never crashes (areas keep completability fallbacks, e.g. the annex Drudge, the
+quarry Warden: kept, R136 s). All Chapter Two ids are registered in `EnemyFactory.SCRIPTS`.
+
+**Bosses and hazards.** Bosses emit `Events.boss_encounter_changed(id, active)` / `boss_phase_changed(id, phase)` /
+`boss_health_changed` and `boss_defeated(id)` (listeners must check the id: `heartseed_cocoon` only reacts to `weaver_matron`, R72).
+`weaver_boss._exit_tree` releases a live encounter (hides the bar, `boss_encounter_changed(id, false)`) when the node is freed
+mid-fight (R91). Matron floor hazards (`src/enemies/boss_hazards/*`: web fan / trip lines / egg sacs / threads, arachnophobia
+alternates drifting root / veil / pale pods) carry **meta `boss_hazard`** (R89): strikeable by Krystal but skipped by companions'
+threat scans (R61), the director's threat scan (R71) and ranked low by wand auto-aim (R101). The hazard field's zone slow is tagged
+`"source": "matron_field"`, erases only its own slow, starts its break-free window after a cleanse, and the fan sheet never slows her
+mid-jump (R88). Gentle: the Matron's drop gate ignores a minion out > `MINION_DROP_GATE` 20 s or unreachable (R90); Gentle minions keep
+both damage reductions (intensity ×0.6 × minion ×0.8 ≈ 3.4 damage; intended, R136 c). The Chapter Two bosses (Velour, Crossing
+Matron, Borrowed Choir) were still being built during the integration pass (contracts: deferred D07).
+
 ## Extension recipes
 
 ### (a) New ordinary enemy with distinct telegraphs

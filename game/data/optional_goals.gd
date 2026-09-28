@@ -22,7 +22,9 @@ extends RefCounted
 ## | opt_gardeners_afternoon | c1x_found_new_crops (wild sunflax/roseberries), c1x_grew_new_crop          | farming / world          |
 ## | opt_tobins_shift        | c1x_annex_entered, c1x_drudge_defeated, c1x_tobin_shift (note read; the     | Tobin's annex            |
 ## |                         | Miner's Lamp unlock flag), ta_hatch_open                                  |                          |
-## | opt_upstairs            | placed wood_stairs, placed upper_floor                                    | building                 |
+## | opt_upstairs            | placed wood_stairs, placed upper_floor, c1x_upstairs_reachable (stairs    | building                 |
+## |                         | that really lead onto a reachable upper floor: set / repaired on load by  | (build_ops.gd            |
+## |                         | build_ops.update_upstairs_flag; never cleared)                            | update_upstairs_flag)    |
 ## | opt_pumpkin_face        | ch2_pumpkin_harvested (a pumpkin CROP harvested; also derived by the      | farming / story tracker  |
 ## |                         | story tracker from Events.crop_harvested), placed pumpkin_lantern (a      | building                 |
 ## |                         | carved pumpkin always has a face: data.face, default the first face)      |                          |
@@ -34,14 +36,21 @@ extends RefCounted
 ## |                         | tracker from the manor's mm_balcony_shortcut), ch2_refuge_shortcut        | (+ story tracker)        |
 ## | opt_harvest_table       | counter ch2_seasonal_dishes (distinct seasonal dishes cooked: the story    | story tracker (crafted)  |
 ## |                         | tracker keeps one ch2_dish_<id> flag each and set_counter_max; a kitchen  | + crafting (kitchen)     |
-## |                         | module may raise it too), ch2_table_decorated (a table or Lanternwake     | story tracker (placed) / |
-## |                         | Table placed; a table-decoration choice may set it too)                   | building                 |
+## |                         | module may raise it too), ch2_table_decorated (the Kitchen's festival-    | crafting (kitchen:       |
+## |                         | table choice, Crafting.decorate_table; or a Lanternwake Table placed; a   | decorate_table) + story  |
+## |                         | plain table does not count; sync_state repairs it from the saved choice)  | tracker (placed / load)  |
 ## | opt_room_for_friends    | a companion record with home_spot; placed companion_bed or companion_perch | companions / building    |
-## | opt_miner_came_back     | c1x_tobin_letter_found, ch2_hask_note_found: set by the story tracker when | annex / works lore       |
-## |                         | lore lore_ch2_tobin_note (annex) / lore_ch2_hask_note (refuge) is found   | (+ story tracker)        |
-## |                         | (or directly by those modules)                                            |                          |
+## | opt_miner_came_back     | c1x_tobin_letter_found (Tobin's letter, annex locker nine), ch2_hask_note_ | annex / works lore       |
+## |                         | found (Hask's note in the refuge planter): set directly by those modules;  | (+ story tracker)        |
+## |                         | the story tracker repairs them from lore lore_ch2_tobin_letter /          |                          |
+## |                         | lore_ch2_hask_refuge_note (NOT the service note / rail lamp-post note)    |                          |
 ## | opt_legacy_bond         | counter max_bond >= 5 (legacy)                                            | GameState.add_bond       |
 ## | opt_legacy_heartbloom   | placed heartbloom_lamp (legacy)                                           | building                 |
+## Other flags those modules set that NO goal reads (their own world state; listed so nobody reuses the names):
+##   Tobin's annex (src/world/areas_ch2/tobin_annex_world.gd): c1x_lantern_mark_seen (the scrawled lantern mark,
+##   the early Chapter Two clue), ta_moment_echo (its once-per-save authored moment), spawner_cleared_ta_sp_drudge
+##   (the Drudge spawner's own clear flag, beside c1x_drudge_defeated), cp_lit_ta_lantern (its checkpoint lantern),
+##   and the legacy mine_comfort_seen (the Below comfort notice, shown once at the mine mouth OR the annex side door).
 ## The five cross-area goals (pumpkin face, long way home, harvest table, room for friends, miner who came back) are
 ## owned by the story module C9: src/world/story_ch2/activity_tracker.gd derives their flags from other modules'
 ## events and repairs them from saved state on load (src/world/story_ch2/story_ch2.gd sync_state).
@@ -111,7 +120,8 @@ const GOALS := [
 		"visible_if": [{"type": "placed", "structure": "workbench", "count": 1}],
 		"objectives": [
 			{"type": "placed", "structure": "wood_stairs", "count": 1, "label": "Build stairs"},
-			{"type": "placed", "structure": "upper_floor", "count": 1, "label": "Add an upper floor you can reach"}],
+			{"type": "placed", "structure": "upper_floor", "count": 1, "label": "Add an upper floor"},
+			{"type": "flag", "flag": "c1x_upstairs_reachable", "label": "Walk up your stairs onto the upper floor"}],
 		"reward": {"give": {"wood_railing": 4}, "message": "Some railings, for the view from upstairs."}},
 	# --- Chapter Two: side activities (MP §15) --------------------------------------------------------
 	{"id": "opt_pumpkin_face", "chapter": 2, "title": "A Pumpkin With a Face",
@@ -147,11 +157,11 @@ const GOALS := [
 			"label": "Open three shortcuts home"}],
 		"reward": {"flags": ["ch2_map_pins_upgraded"], "message": "You know every way home now. Your map pins are fancier, too."}},
 	{"id": "opt_harvest_table", "chapter": 2, "title": "The Harvest Table",
-		"text": "Cook two different seasonal dishes (pumpkin soup, biscuits, roseberry tart, moonpetal tea or a platter) and set a table for the festival.",
+		"text": "Cook two different seasonal dishes (pumpkin soup, biscuits, roseberry tart, moonpetal tea or a platter) and choose how to dress the festival table at your kitchen counter.",
 		"visible_if": CH2_VISIBLE,
 		"objectives": [
 			{"type": "counter", "counter": "ch2_seasonal_dishes", "count": 2, "label": "Cook different seasonal dishes"},
-			{"type": "flag", "flag": "ch2_table_decorated", "label": "Set a table for the festival"}],
+			{"type": "flag", "flag": "ch2_table_decorated", "label": "Dress the festival table (kitchen counter)"}],
 		"reward": {"flags": ["ch2_harvest_table"], "message": "New recipes: festival candy and the Lanternwake Table."}},
 	{"id": "opt_room_for_friends", "chapter": 2, "title": "A Room for Friends",
 		"text": "Your friends would love a spot of their own at home. Any room shape will do.",

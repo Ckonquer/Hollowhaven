@@ -756,9 +756,18 @@ func attack_damage_for(def: Dictionary) -> float:
 	return float(def.get("damage", data.get("damage", 10.0))) * threat_damage_mult() * damage_scale
 
 
-## Horror-intensity damage multiplier: enemies marked "underground" in data (and legacy "below" ones) scale
-## like the Below threats (Gentle 0.6 / Standard 1.0 / Intense 1.15); surface enemies never do.
+## Horror-intensity damage multiplier (Gentle 0.6 / Standard 1.0 / Intense 1.15) for the attacks above.
+## It follows WHERE the enemy fights (spec 9: underground areas scale, the surface / Reach / interiors never):
+## while Game.area_id is a real area (Game.AREAS) other than a transient one (the Echo Trial replays every
+## area's fights), Combat.damage_mult_for_area(Game.area_id) decides, so a Hollow Drudge in the Reach's
+## candle yard hits like a surface threat and a Brood Skitter in the Works like an underground one.
+## In the Echo Trial and without a real area (tests, previews) the data rule stays: enemies marked
+## "underground" in data (and legacy "below" ones) scale, everything else does not.
+## Legacy enemies are untouched: their attacks go through attack_damage() (data area), not this.
 func threat_damage_mult() -> float:
+	var here: String = Game.area_id
+	if here != "" and Game.AREAS.has(here) and not Game.TRANSIENT_AREAS.has(here):
+		return Combat.damage_mult_for_area(here)
 	if bool(data.get("underground", false)) or String(data.get("area", "")) == "below":
 		return Combat.intensity_damage_mult(Combat.current_intensity())
 	return 1.0

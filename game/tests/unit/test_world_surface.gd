@@ -6,6 +6,7 @@ const SurfaceWorld := preload("res://src/world/surface/surface_world.gd")
 const Vegetation := preload("res://src/world/surface/vegetation.gd")
 const Terrain := preload("res://src/world/surface/terrain.gd")
 const Layout := preload("res://data/world_layout.gd")
+const WaygateScript := preload("res://src/world/surface/waygate.gd")
 
 var _w: Node3D = null
 
@@ -383,6 +384,127 @@ func test_ruin_quest_cannot_stall_without_enemy_module() -> void:
 	w.landmarks._build_spawners("res://does/not/exist.gd")
 	assert_true(bool(GameState.get_flag("ruin_cleared")), "no spawner script -> the ruin counts as cleared (no softlock)")
 	GameState.flags.erase("ruin_cleared")
+
+
+## The expanded Haven (extra build regions + 4 m) is the "haven" zone in the real world too (Haven music, not the
+## woods), while every landmark centre and the waygate's own zone are unchanged.
+func test_expanded_haven_is_the_haven_zone() -> void:
+	var w: Node3D = await _world()
+	for p in [Vector2(-9, 22), Vector2(4, -25), Vector2(-19, -9), Vector2(-24, 1)]:
+		var pos := Vector3(p.x, 0, p.y)
+		assert_true(Vector2(p.x, p.y).length() > 20.0, "%s lies outside the legacy 20 m haven circle" % str(p))
+		assert_true(w.is_safe_zone(pos), "%s is safe" % str(p))
+		assert_eq(String(w.get_zone_at(pos)), "haven", "%s is the Haven, not the woods" % str(p))
+	for id in Layout.LANDMARKS:
+		var lp: Vector2 = Layout.LANDMARKS[id]["pos"]
+		assert_eq(String(w.get_zone_at(Vector3(lp.x, 0, lp.y))), String(id), "zone at landmark %s unchanged" % id)
+	var wp: Vector2 = Layout.CH2_POINTS["waygate"]
+	assert_eq(String(w.get_zone_at(Vector3(wp.x, 0, wp.y + 1.5))), "ch2_waygate", "the waygate zone is unchanged")
+	assert_eq(String(w.get_zone_at(Vector3(30, 0, 0))), "", "the woods beyond the Haven stay the woods")
+
+
+## The Haven's Lanternwake keepsake is built by the surface annex loader, so it is back after a reload of a
+## finished save (and absent before the ending); legacy vegetation stays the golden plan.
+func test_lanternwake_keepsake_returns_with_the_surface() -> void:
+	const KEEPSAKE := "res://src/world/story_ch2/haven_dressing.gd"
+	var Annexes: Script = load("res://src/world/surface/annexes.gd")
+	assert_true((Annexes.call("all_scripts") as Array).has(KEEPSAKE), "the annex loader runs the Haven keepsake")
+	var s: Script = load(KEEPSAKE)
+	assert_true(s != null and s.can_instantiate() and s.has_method("build"), "the keepsake has a static build(area)")
+	var node_name := String(s.get_script_constant_map().get("NODE_NAME", ""))
+	# Before the ending: the shared world (built from a fresh state) has no keepsake.
+	var w: Node3D = await _world()
+	assert_null(w.get_node_or_null(node_name), "nothing before chapter_two_complete")
+	var plan_before: Dictionary = w.vegetation.plan_data
+	var veg_count := 0
+	for k in ["trees", "rocks", "ores", "bushes", "tufts", "sticks", "stones"]:
+		veg_count += (plan_before[k] as Array).size()
+	# "Reload" a finished save: a new surface world built with the flag set.
+	_w.queue_free()
+	_w = null
+	await wait_frames(4)
+	fresh_state()
+	GameState.set_flag("chapter_two_complete", true)
+	var w2: Node3D = SurfaceWorld.new()
+	add_child(w2)
+	await wait_physics(2)
+	var keep := w2.get_node_or_null(node_name)
+	assert_not_null(keep, "the keepsake is back after the reload")
+	var count := 0
+	for c in w2.get_children():
+		if String(c.name) == node_name:
+			count += 1
+	assert_eq(count, 1, "exactly one keepsake")
+	if keep is Node3D:
+		var stone := Vector2.ZERO
+		for b in Layout.BUILD_AREA["blocked"]:
+			if String((b as Dictionary).get("name", "")) == "Ward Stone":
+				stone = (b as Dictionary)["center"]
+		var kp: Vector3 = (keep as Node3D).global_position
+		assert_true(Vector2(kp.x, kp.z).distance_to(stone) < 1.0, "it floats at the Ward Stone (%s)" % str(kp))
+	# Running the loader again (e.g. the story tracker's ensure) never doubles it.
+	Annexes.call("_run_annex", w2, KEEPSAKE)
+	var count2 := 0
+	for c in w2.get_children():
+		if String(c.name) == node_name:
+			count2 += 1
+	assert_eq(count2, 1, "idempotent")
+	# Golden guard (same record as test_c1x_world / test_flow_ch2_areas): the legacy plan is untouched.
+	var parts: PackedStringArray = []
+	var veg2 := 0
+	for k in ["trees", "rocks", "ores", "bushes", "tufts", "sticks", "stones"]:
+		veg2 += (w2.vegetation.plan_data[k] as Array).size()
+		for e in w2.vegetation.plan_data[k]:
+			var p: Vector3 = e["pos"]
+			parts.append("%s:%.1f,%.1f" % [e["id"], p.x, p.z])
+	assert_eq(veg2, veg_count, "the legacy vegetation plan is the same with the keepsake built")
+	assert_eq("|".join(parts).md5_text(), "bd86320366013834cd23feefa16c4703", "legacy vegetation golden hash with the keepsake built")
+	GameState.flags.erase("chapter_two_complete")
+	w2.queue_free()
+	await wait_frames(8)
+
+
+## Near a REPAIRED surface waygate (<= 25 m) the Reach is prefetched exactly once (timing only; the call is skipped
+## when Game has no prefetch_area). Never before the repair, never from farther away, never from the Reach side.
+func test_waygate_prefetches_the_reach_once_when_near_and_lit() -> void:
+	fresh_state()
+	var rec := GDScript.new()
+	rec.source_code = "extends RefCounted\nvar calls: Array = []\nfunc prefetch_area(area_id: String) -> void:\n\tcalls.append(area_id)\n"
+	rec.reload()
+	var recorder: Object = rec.new()
+	var holder := Node3D.new()
+	add_child(holder)
+	var g: Node3D = WaygateScript.new()
+	g.setup({"side": "surface", "target_area": "hallowmere_reach", "target_spawn": "waygate_arrival"})
+	holder.add_child(g)
+	g.position = Vector3(10, 0, 10)
+	g.set("prefetcher", recorder)
+	assert_false(g.check_prefetch(Vector3(10, 0, 12)), "not while the gate is cold")
+	GameState.set_flag("chapter_one_complete", true)
+	GameState.set_flag("ch2_accepted", true)
+	assert_eq(String(g.state()), "woken")
+	assert_false(g.check_prefetch(Vector3(10, 0, 12)), "not before the repair")
+	GameState.set_flag("ch2_waygate_repaired", true)
+	assert_false(g.check_prefetch(Vector3(10, 0, 10 + WaygateScript.PREFETCH_RADIUS + 0.5)), "not from farther away")
+	assert_eq(recorder.get("calls"), [], "nothing requested yet")
+	assert_true(g.check_prefetch(Vector3(10 + 18.0, 3.0, 10 + 16.0)), "within 25 m of the lit gate")
+	assert_false(g.check_prefetch(Vector3(10, 0, 11)), "only once")
+	assert_eq(recorder.get("calls"), ["hallowmere_reach"], "Game.prefetch_area('hallowmere_reach') once")
+	assert_true(bool(g.has_prefetched()))
+	# Without a prefetch_area method (Game before R05) the check is a silent no-op.
+	var g2: Node3D = WaygateScript.new()
+	g2.setup({"side": "surface", "target_area": "hallowmere_reach", "target_spawn": "waygate_arrival"})
+	holder.add_child(g2)
+	g2.set("prefetcher", RefCounted.new())
+	assert_true(g2.check_prefetch(Vector3(0, 0, 1)), "guarded call, no error")
+	var mirror: Node3D = WaygateScript.new()
+	mirror.setup({"side": "reach"})
+	holder.add_child(mirror)
+	mirror.set("prefetcher", recorder)
+	assert_false(mirror.check_prefetch(Vector3(0, 0, 1)), "the Reach side never prefetches")
+	assert_eq((recorder.get("calls") as Array).size(), 1)
+	holder.queue_free()
+	await wait_frames(2)
 
 
 func test_zz_cleanup() -> void:

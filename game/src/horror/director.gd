@@ -369,12 +369,16 @@ func _update_linger(ppos: Vector3, dt: float) -> float:
 
 ## Counts enemies hunting Krystal within THREAT_RADIUS. Idle dungeon enemies that close (a room's own
 ## encounter that has not started yet) are counted separately in _enemies_nearby.
+## Boss floor hazards (egg sacs, trip lines, threads: meta "boss_hazard") are in group "enemy" only so
+## Krystal can hit them; they are neither threats nor a room's encounter, so they are skipped (R71).
 func _scan_threats(ppos: Vector3) -> int:
 	var n := 0
 	var idle := 0
 	var nearest := INF
 	for e in get_tree().get_nodes_in_group("enemy"):
 		if not is_instance_valid(e) or not (e is Node3D) or not e.has_method("is_threatening"):
+			continue
+		if bool((e as Node).get_meta("boss_hazard", false)):
 			continue
 		var d := (e as Node3D).global_position.distance_to(ppos)
 		if d > THREAT_RADIUS:

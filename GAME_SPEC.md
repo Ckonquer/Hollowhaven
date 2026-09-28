@@ -1,4 +1,4 @@
-# Hollowhaven — For Krystal · Game Spec (Chapter One: "The Dimming Ward")
+# Hollowhaven — For Krystal · Game Spec (Chapter One: "The Dimming Ward" · Chapter Two: "The Lanterns of Hallowmere")
 
 A small, complete 3D survival-adventure. Cozy storybook woodland on top (~70%), adventure and friendly
 combat (~20%), and a restrained, fair horror dungeon below (~10%). Target: 45–90 min first playthrough,
@@ -115,3 +115,83 @@ limiter on master). Companions each have a distinct voice (Mochi squeaks, Pebble
 WASD move · Mouse look · Space jump · Shift sprint · Ctrl/V dodge · LMB attack/gather · RMB/Q eat/use ·
 E interact · F lantern · Tab/I inventory · C crafting · B build (R rotate, X dismantle) · J journal ·
 M map · G companion follow/wait · 1–8 hotbar · Wheel zoom · Esc pause · F1 controls · F12 screenshot.
+
+## Chapter Two: "The Lanterns of Hallowmere" (a continuation of the same save)
+Design: `Hollowhaven_Part2_Master_Prompt.md`. Implementation contract (wins where they differ):
+`docs/CHAPTER_TWO_SPEC.md`. Save schema v2 and rollback: `docs/SAVE_MIGRATION.md`. Player note:
+`docs/player/Chapter Two - What's New.txt`. Everything above stays true; Chapter Two only adds. Build status
+(what is still being built or verified): the Chapter Two section of `KNOWN_ISSUES.md`.
+
+**Continuity.** Continue loads the Chapter One save unchanged: house, chests, crops, companions, flags, quest
+index, lore and clock. Migration only adds sections; the untouched v1 file is copied once to
+`saves/pre_v2_backup/`; a save from a newer version is refused, never overwritten. Chapter Two is a separate
+stable-id quest layer (`data/quests_ch2.gd`) beside the untouched legacy chain; every reward is granted once
+through a reward ledger. The game never builds or places anything inside Krystal's house.
+
+**Start by choice.** After `chapter_one_complete` the tracker says "The Ward Stone has something new to say".
+The stone's new inscription offers "Follow the lantern road" / "Stay a little longer" (asked again later).
+Declining hides nothing: the wardrobe, gear, building and companion upgrades are available either way.
+
+**Story (short).** A waygate north of the Moonlit Ruin (8 wood, 4 stone, 2 copper ore) opens the way to
+**Hallowmere Reach**, an autumn festival town whose Lanternwake never finished. Krystal lights the Commons arch,
+wakes three festival lamps in any order (Pumpkintide Orchard, Ashbell Quarry and its Quarry Warden, Moonveil
+Manor and the theatrical vampire **Count Velour**), links them at the Ward-Keeper's Conservatory and goes down
+the Sunken Bellhouse (the Foreman's Key opens it, and is not used up) into the **Hushed Works**: Hask's rail,
+the miners' refuge garden, three ward lines (water, bell, light), **Weaver's Crossing** where the escaped
+Matron returns (arachnophobia: The Hollow Crossing / Hollow Mother), a house that isn't, and the final
+**Borrowed Choir**. The roads relight, the Ward Stone welcomes her home ("Light kept. Roads found. Welcome
+home, Krystal."), the Lanternwake is celebrated, and free play continues in the same save.
+
+**New places.** Hollowhaven Woods gains Tobin's side door and annex by the mine mouth, the Tailor's Cache near
+the Old Oak, Bramblewatch (Bramblebacks and the Knotted Elder), wild sunflax and roseberries in the Sunny
+Meadow, sap stumps, Mochi's courage lantern, lantern moths near Mirror Pond at dusk and a bigger Haven build
+area. New areas: `tobin_annex`, `hallowmere_reach` (Commons, Conservatory, Orchard, Thimblebrook Pools,
+Candleyard, Quarry, Manor grounds, Bellhouse), `moonveil_manor` (five rooms), `hushed_works` (14 rooms) and
+`echo_trial`. Return is always open: the Reach waygate leads home, lit arches form the **Lantern Road** (fast
+travel between arches and to the Haven; also from the Ward Stone), never while chased or in a boss fight.
+
+**Expression.** New Game opens "Meet Krystal" (hair style and colour, skin, eyes, outfits, single pieces,
+colours). Existing saves get a one-time "Your wardrobe is ready" card; later the Wardrobe is in the pause
+menu, at a built Wardrobe or Vanity Mirror, at the Ward Stone and at the Commons festival mirror. Three
+presets. Clothes are cosmetic only; armor protects whether or not "Show equipped armor" is ticked.
+
+**Companions fight.** Each friend has a passive, a basic attack and a signature skill on a shared cooldown:
+Mochi (Bloomguard, heal over time), Pebble (Stoneheart, shield), Lumi (Glimmerstep, speed and a light pulse
+that exposes Gloomlings). Autocast when it helps, or the Companion Skill key (T). Their menu (E) sets Assist /
+Stay close, automatic attacks, autocast, a home spot (Companion Bed / Perch) and ribbons; bond perks at 2 / 3 / 5
+hearts.
+Mochi comes underground after the Comfort Ribbon and a rest by the lit lantern at the mine's mouth.
+
+**Progression.** Furnace (queued bars: copper, iron, moonsteel), Loom & Dye Bench (cloth, clothing patterns,
+dyes, backpack 40 / 48), Kitchen Counter (festival food). Tools and weapons in stone, copper, ironwood and
+moonsteel tiers; padded, copperwood, ironwood and moonsteel armor; charms; the Sparkseed Wand. Chests upgrade
+to 40 slots; crafting can draw on nearby chests. New crops: sunflax, roseberry, pumpkin. Three small masteries
+(gathering, hearthcraft, wayfinding) with modest bonuses and conservative credit for old saves; no rank ever
+gates the story.
+
+**Building.** Two storeys (stairs, upper floors held up by full walls, windows, doorways or porch posts; nothing
+collapses), railings, half walls, arched windows, gable roofs, curtains, bookshelves and more; Halloween decor
+(carved pumpkins with selectable faces, pumpkin lights, bat bunting, ghost lanterns, a scarecrow, gothic trim);
+recolour with Loom dyes (P), undo the last pieces (Z, press twice, exact refund), pumpkin face (N). A small
+cottage plot at the Commons allows building in the Reach (no beds there).
+
+**Enemies.** Chapter One additions: Brambleback, Lantern Moth, Hollow Drudge, Brood Skitter (arachnophobia:
+Pale Sprout), elite Knotted Elder; the Weaver Matron fight has three phases. Chapter Two: Pumpkin Mimic,
+Patchwalker, Velvet Wing, Bellcap Sentry, Borrowed Wisp, elite Quarry Warden; bosses Count Velour, the
+Matron at Weaver's Crossing and the Borrowed Choir. Design rule for all: readable tells, fair recovery windows.
+
+**Replay & optional.** Optional goals for both chapters (Journal > Optional; the Expedition Board, a Workbench
+recipe after the Choir, opens them at home). Echo Trials replay a won boss fight as a memory from its checkpoint,
+never touching story flags (first clear: a unique pattern; later clears: renewable resources); built so far:
+the Weaver Matron's, by the lantern before the Heartseed Chamber. Velour / Choir trials (`data/trials.gd`) and
+hand-authored Lanternwake Expeditions (`data/expeditions.gd`) are in progress. The optional fourth friend
+Pipkin is not implemented.
+
+**Music & comfort.** 27 cues (`data/music.gd`, m01-m27) chosen by area, zone, time of day, combat and bosses,
+keeping the Chapter One favourites. New comfort options: high-visibility cues, timing assist; gameplay options:
+friends join fights, friends use skills on their own, seasonal decorations (off by default, never indoors).
+Onboarding tips for the new systems appear once per save (`src/world/story_ch2/onboarding_hints.gd`), one at a
+time, never in cutscenes, boss fights, Echo Trials, ordinary fights or horror moments, and respect "Show hints".
+
+**Chapter Two controls (defaults).** T companion skill · E on a friend: their menu · Build mode: Z undo,
+P recolour, N pumpkin face (these three build-mode keys are not rebindable yet; T is).

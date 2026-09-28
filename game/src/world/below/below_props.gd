@@ -187,6 +187,16 @@ static func _tint() -> Material:
 	return Mat.toon(Color.WHITE, {"vertex_color": true, "noise": 0.10, "rim": 0.22})
 
 
+## Public wrappers for other prop modules (Tobin's annex, R75): the shared, cached torus mesh and the
+## vertex-colour tint material batches use. Same objects as the private helpers - no behaviour change.
+static func torus_mesh() -> Mesh:
+	return _torus_mesh()
+
+
+static func tint() -> Material:
+	return _tint()
+
+
 ## A small plank table.
 static func table(b: Builder, pos: Vector3, yaw: float = 0.0, w: float = 1.4, d: float = 0.8) -> void:
 	var basis := Basis(Vector3.UP, deg_to_rad(yaw))

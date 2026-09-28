@@ -475,3 +475,46 @@ func test_ui_preview_widget_drives_the_real_avatar() -> void:
 	pv.call("set_show_armor", false)
 	assert_true((av.get("_unit_boxes")["armor"] as Array).is_empty())
 	fresh_state()
+
+
+## Chapter Two wand (src/player/avatar/wand_builder.gd, B3 review): built lazily the first time a wand is held, so an
+## avatar that never holds one keeps the exact Chapter One snapshot; the model is data-coloured, on Krystal's render
+## layer and never adds collision.
+func test_wand_is_built_lazily_and_keeps_the_legacy_snapshot() -> void:
+	const Legacy := preload("res://tests/unit/test_avatar_look_legacy.gd")
+	const WandBuilder := preload("res://src/player/avatar/wand_builder.gd")
+	var av := _avatar(ItemDB.legacy_look())
+	av.call("set_held_tool", "")
+	av.call("show_tool", "sword", 0.5)
+	av.call("show_tool", "hands", 0.0)
+	assert_false((av.get("_tools") as Dictionary).has("wand"), "no wand model without a wand")
+	assert_eq(Legacy.golden_diff(Legacy.fingerprint(av)), [], "no wand held: exactly the Chapter One meshes")
+	assert_eq(int(av.call("draw_call_estimate")), Legacy.GOLDEN_DRAWS)
+	av.call("set_held_tool", "wand")
+	assert_false(Legacy.golden_diff(Legacy.fingerprint(av)).is_empty(), "control: the fingerprint sees the wand")
+	for m in _all_meshes(av):
+		assert_eq((m as MeshInstance3D).layers, AvatarScript.AVATAR_LAYER, "the wand is on the avatar layer too")
+	av.call("set_held_tool", "")
+	assert_eq(int(av.call("draw_call_estimate")), Legacy.GOLDEN_DRAWS, "put away: legacy draw calls again")
+	# colours come from the wand item (cap = item colour, glow = its spark colour)
+	var st := WandBuilder.style("sparkseed_wand")
+	var it := ItemDB.item("sparkseed_wand")
+	assert_eq(st["cap"], it["color"])
+	assert_eq(st["glow"], (it["projectile"] as Dictionary)["color"])
+	var tip: Node3D = ((av.get("_tools") as Dictionary)["wand"] as Node3D).get_node("Tip")
+	var glows: Array = []
+	for c in tip.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).material_override is StandardMaterial3D:
+			glows.append(((c as MeshInstance3D).material_override as StandardMaterial3D).albedo_color)
+	assert_eq(glows, [st["glow"]], "the seed glows in the spark colour")
+	assert_eq(WandBuilder.style("no_such_wand")["glow"], WandBuilder.GLOW_DEFAULT, "unknown ids fall back safely")
+	# held with every outfit and armor: still no collision
+	for oid in AppearanceData.OUTFITS:
+		av.call("apply_look", _look_for_outfit(oid))
+		av.call("apply_armor", true, ItemDB.armor_set("moonsteel")["pieces"])
+		av.call("set_held_tool", "wand")
+		var stack: Array = [av]
+		while not stack.is_empty():
+			var n: Node = stack.pop_back()
+			stack.append_array(n.get_children())
+			assert_false(n is CollisionObject3D or n is CollisionShape3D, "the wand never adds collision (%s)" % oid)

@@ -273,6 +273,12 @@ const HAVEN_SAFE_BUFFER := 4.0
 func is_safe_zone(pos: Vector3) -> bool:
 	if super.is_safe_zone(pos):
 		return true
+	return in_expanded_haven(pos)
+
+
+## True inside any buildable region of the (expanded) Haven plus HAVEN_SAFE_BUFFER: the legacy 16 m circle and
+## every BUILD_AREA "extra" region. Shared by is_safe_zone and get_zone_at so the two always agree.
+static func in_expanded_haven(pos: Vector3) -> bool:
 	var p := Vector2(pos.x, pos.z)
 	var ba: Dictionary = Layout.BUILD_AREA
 	if p.distance_to(ba["center"]) <= float(ba["radius"]) + HAVEN_SAFE_BUFFER:
@@ -282,6 +288,17 @@ func is_safe_zone(pos: Vector3) -> bool:
 		if p.distance_to(r["center"]) <= float(r["radius"]) + HAVEN_SAFE_BUFFER:
 			return true
 	return false
+
+
+## Zone at a position: the legacy/annex circle zones first (smallest containing wins, exactly as before); where
+## none contains the point but it is inside the expanded Haven (build regions + buffer, the same test as
+## is_safe_zone), it is "haven" - so the Haven's music, map discovery and "already home" checks cover the whole
+## buildable home and not only the legacy 20 m circle. Landmark centres keep their own zone.
+func get_zone_at(pos: Vector3) -> String:
+	var z := super.get_zone_at(pos)
+	if z == "" and in_expanded_haven(pos):
+		return "haven"
+	return z
 
 
 ## Saved positions must be on solid ground, inside the boundary and not under water. A bridge deck or

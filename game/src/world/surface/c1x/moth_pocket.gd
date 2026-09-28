@@ -3,7 +3,8 @@ extends RefCounted
 ## quiet east shore where Lantern Moths gather ONLY at dusk and at night (data/c1x_layout.gd MOTH_HOURS, wrapping
 ## midnight). Far from the Haven and the peaceful Berry Glade (more than the moths' leash + zone radius away).
 ## Spawner c1x_sp_moths (NEW id) through the shared EnemySpawner/EnemyFactory; built only when the lantern_moth
-## script is available (another module builds it). The Pocket node gates the spawner by the clock once a second:
+## script is available (another module builds it). It never pops in within view (layout "out_of_view": at dusk
+## the moths gather somewhere her camera does not see). The Pocket node gates the spawner by the clock once a second:
 ##   awake  -> the spawner runs normally (its own 45 m / safe-zone / cooldown rules)
 ##   asleep -> the spawner stops at once (no new moth by day); living ones stay while one of them is in a
 ##             fight, then flutter off (a small sparkle puff where each one was).
@@ -31,6 +32,7 @@ static func build(area: Node3D) -> void:
 	pocket.build_blooms(xforms)
 	var sp := Common.make_spawner(parent, area, L.MOTH_SPAWNER)
 	if sp != null:
+		sp.setup(L.spawner_extras(L.MOTH_SPAWNER))     # out_of_view: moths never pop in where she is looking
 		pocket.attach_spawner(sp)
 
 

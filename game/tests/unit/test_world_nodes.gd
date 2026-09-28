@@ -6,6 +6,8 @@ const ResourceNode := preload("res://src/world/common/resource_node.gd")
 const WorldItem := preload("res://src/world/common/world_item.gd")
 const MineEntrance := preload("res://src/world/surface/mine_entrance.gd")
 const WardStone := preload("res://src/world/surface/ward_stone.gd")
+const GatherSparkle := preload("res://src/world/common/gather_sparkle.gd")
+const MasteryData := preload("res://data/mastery.gd")
 
 var _holder: Node3D
 
@@ -110,6 +112,88 @@ func test_berry_bush_keeps_bush_and_regrows() -> void:
 	assert_true(visual.visible, "the bush itself stays")
 	GameState.total_minutes += 721.0
 	assert_true(b.can_respawn_now())
+
+
+## A depleted node with a `regrow_text` setup key shows that text (greyed) instead of "<name> (regrowing)";
+## without it the legacy prompts are unchanged.
+func test_regrow_text_replaces_the_depleted_prompt() -> void:
+	var b := _node({"node_id": "test_bush_rt", "kind": "bush", "regrow_text": "The berries are still ripening."})
+	assert_true(bool(b.get_interaction(null)["enabled"]), "ripe: the normal prompt")
+	assert_ne(String(b.get_interaction(null)["text"]), "The berries are still ripening.")
+	b.interact(null)
+	assert_true(b.depleted)
+	assert_eq(b.get_interaction(null), {"text": "The berries are still ripening.", "enabled": false})
+	var plain := _node({"node_id": "test_bush_plain", "kind": "bush"})
+	plain.interact(null)
+	assert_eq(String(plain.get_interaction(null)["text"]), "Berry Bush (regrowing)", "no key: legacy text")
+	var s := _node({"node_id": "test_stick_rt", "kind": "stick", "regrow_text": "Nothing left here."})
+	s.interact(null)
+	assert_eq(String(s.get_interaction(null).get("text", "")), "Nothing left here.")
+	var empty := _node({"node_id": "test_stick_rt2", "kind": "stick", "regrow_text": ""})
+	empty.interact(null)
+	assert_eq(empty.get_interaction(null), {}, "an empty regrow_text keeps the legacy (no prompt) behaviour")
+
+
+## Gathering rank 4 sparkle: resource nodes register in a static registry while in the tree; one helper picks
+## at most 12 nearby, non-depleted harvestables (special materials first, never trees), only at rank 4+.
+func test_gathering_sparkle_registry_and_selection() -> void:
+	var before := ResourceNode.registry().size()
+	var ore := _node({"node_id": "", "kind": "ore"})
+	ore.position = Vector3(6, 0, 0)
+	var tree := _node({"node_id": "", "kind": "tree"})
+	tree.position = Vector3(2, 0, 0)
+	var grass := _node({"node_id": "", "kind": "grass"})
+	grass.position = Vector3(1, 0, 0)
+	var picked := _node({"node_id": "", "kind": "bush"})
+	picked.position = Vector3(1, 0, 1)
+	var far := _node({"node_id": "", "kind": "ore"})
+	far.position = Vector3(40, 0, 0)
+	assert_eq(ResourceNode.registry().size(), before + 5, "nodes register on entering the tree")
+	assert_true(ResourceNode.registry().has(ore))
+	picked.interact(null)
+	assert_true(picked.depleted)
+	await wait_frames(2)
+	var helper: Node = ResourceNode.sparkler()
+	assert_not_null(helper, "one sparkle helper exists")
+	if helper == null:
+		return
+	assert_eq(helper.get_parent(), get_tree().root, "the helper lives under the tree root")
+	var radius := float(MasteryData.REWARDS["gathering"][4]["highlight_radius"])
+	# below rank 4: nothing sparkles
+	GameState.mastery["gathering"] = int(MasteryData.RANK_XP[3])
+	helper.refresh(Vector3.ZERO)
+	assert_eq(helper.shown.size(), 0, "rank 3: no sparkle")
+	assert_eq(helper.visible_count(), 0)
+	GameState.mastery["gathering"] = int(MasteryData.RANK_XP[4])
+	helper.refresh(Vector3.ZERO)
+	assert_eq(helper.shown, [ore, grass], "special material first, then everyday; never trees, depleted or far nodes")
+	assert_eq(helper.visible_count(), 2)
+	var sp: Vector3 = ore.sparkle_point()
+	assert_true(sp.y > ore.global_position.y and Vector2(sp.x, sp.z).distance_to(Vector2(6, 0)) < 0.01, "sparkle floats above the node")
+	# cap
+	for i in 20:
+		var st := _node({"node_id": "", "kind": "stone"})
+		st.position = Vector3(-3, 0, float(i) * 0.5)
+	helper.refresh(Vector3.ZERO)
+	assert_eq(helper.shown.size(), MasteryData.HIGHLIGHT_MAX, "capped")
+	assert_eq(helper.shown[0], ore, "the special material keeps its place")
+	assert_eq(helper.visible_count(), MasteryData.HIGHLIGHT_MAX)
+	assert_eq(GatherSparkle.candidates(ResourceNode.registry(), Vector3(40, 0, 0), radius, 12), [far], "pure selection")
+	# leaving the tree unregisters
+	_holder.remove_child(far)
+	assert_false(ResourceNode.registry().has(far))
+	far.free()
+	_holder.queue_free()
+	_holder = null
+	await wait_frames(2)
+	assert_eq(ResourceNode.registry().size(), before, "freed nodes left the registry")
+	helper.refresh(Vector3.ZERO)
+	assert_eq(helper.visible_count(), 0, "nothing left to sparkle")
+	# the helper frees itself once the registry is empty (throttled tick, 0.5 s)
+	if before == 0:
+		await wait_seconds(float(MasteryData.HIGHLIGHT_REFRESH) + 0.3)
+		assert_false(is_instance_valid(helper), "the idle helper freed itself")
+		assert_null(ResourceNode.sparkler())
 
 
 func test_drop_table_ranges() -> void:

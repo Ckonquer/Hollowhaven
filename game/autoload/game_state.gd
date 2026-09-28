@@ -463,6 +463,22 @@ func unlock_pattern(pattern_id: String) -> bool:
 	return true
 
 
+## Adds a dye palette id to `wardrobe.palettes` (a crafted dye, a reward's furnishing finish). True when it is
+## newly owned (then emits Events.appearance_changed so wardrobes, swatches and tinted pieces refresh); false for
+## "" or a palette already owned. Ids are not checked against the catalogue (a newer build's palette is kept).
+func unlock_palette(palette_id: String) -> bool:
+	if palette_id == "":
+		return false
+	var cur: Variant = wardrobe.get("palettes", [])
+	var palettes: Array = cur if cur is Array else []
+	if palettes.has(palette_id):
+		return false
+	palettes.append(palette_id)
+	wardrobe["palettes"] = palettes
+	Events.appearance_changed.emit()
+	return true
+
+
 # --- Map landmarks (schema v2) -----------------------------------------------------------------------
 
 ## Records a discovered map landmark. True when it is new (emits Events.landmark_discovered).

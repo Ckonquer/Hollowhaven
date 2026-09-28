@@ -368,6 +368,28 @@ func test_needs_companion() -> void:
 	assert_eq(String(lf[0]["anchor"]["name"]), "door")
 
 
+## R70: the "wrong Mochi" squeak is an imitation - it never plays while the real (brave) Mochi follows Krystal.
+func test_absent_companion_blocks_the_imitation() -> void:
+	assert_eq(String(HorrorData.EVENTS["wrong_mochi"].get("absent_companion", "")), "mochi", "data marks the imitation")
+	var t := EAGER.duplicate()
+	t["anticipation_after"] = 1.0e9      # stay in unease (wrong_mochi's state)
+	var events := _only(["wrong_mochi"])
+	var anchors := [_anchor("echo", "sound", "ruins", 18.0, false)]
+	var m := _core(1, {"tuning": t, "events": events})
+	var ds := _run(m, 10, _ctx({"zone": "ruins", "companion": "mochi", "anchors": anchors}))
+	assert_eq(_fired(ds).size(), 0, "no imitation while Mochi herself is following")
+	var why := _reason_for(ds[ds.size() - 1], "wrong_mochi")
+	assert_true(why.contains("companion mochi is following"), "rejection explained: " + why)
+	assert_false(m.fired_once.has("wrong_mochi"), "a refused imitation does not use up the once-only event")
+	for comp in ["", "lumi", "pebble"]:
+		var c := _core(1, {"tuning": t, "events": events})
+		var f := _fired(_run(c, 10, _ctx({"zone": "ruins", "companion": comp, "anchors": anchors})))
+		assert_eq(f.size(), 1, "Mochi away (companion '%s') -> the imitation may play" % comp)
+	# The same core fires it later once Mochi is no longer following (e.g. sent home).
+	var f2 := _fired(_run(m, 10, _ctx({"zone": "ruins", "companion": "", "anchors": anchors})))
+	assert_eq(f2.size(), 1, "fires after Mochi leaves the party")
+
+
 func test_threat_budget_blocks_spawns() -> void:
 	var budget := int(HorrorData.DIRECTOR["max_active_threats"])
 	var spawn := _simple_event({"kind": "spawn", "anchor": "spawn", "enemy": "gloomling", "count": [1, 2]})

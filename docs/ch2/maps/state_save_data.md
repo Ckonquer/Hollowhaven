@@ -508,3 +508,50 @@ T is currently unbound. The only mention is in `test_core_settings.gd` L265, whe
 - **Completion detection.** Renaming the completion flags or changing `is_chapter_complete` breaks `persistence.py` and the title screen's meta.
 - **Double grants.** Moving reward grants out of `QuestLog._complete` risks granting twice, because the `from_dict` repair assumes earlier steps were already rewarded.
 - **Slow migration.** A heavy `migrate()` runs on every save validation and every title-screen peek.
+
+## 14. Chapter Two state, data and tests (Waves A-C + integration) — as built
+
+Sections 1-13 map the Chapter One code. Schema v2, the new GameState sections, ChapterLog / OptionalLog, the reward ledger and the
+data catalogue are in `docs/ch2/WAVE_A_REPORT.md` and spec §3/§4; this section adds what Waves B/C and the integration pass stored
+or changed. Source of truth: `autoload/game_state.gd`, the module headers named below, `data/*.gd` headers.
+
+**Saved keys added by Wave B/C modules** (all inside existing v2 sections or records, so migration needed nothing new; extra keys
+survive load):
+| where | keys | owner |
+|---|---|---|
+| `GameState.appearance` | the look dict (spec §4.1; unknown ids kept, shown as defaults) | B1/B2 |
+| `GameState.wardrobe` | `owned`, `palettes` (`GameState.unlock_palette(id) -> bool`, emits `appearance_changed`; R07), `presets` (3), `notice_shown`, `show_armor` | B2/B5 |
+| `GameState.companions[id]` | `combat_mode`, `skill_ready_at`, `home_spot`, `ribbon`, `home_task` (spec §3) + `home_nook`, `home_log` {day, task: n}, `cairn` | B4 |
+| `GameState.structures[uid].data` | `queue`, `output`, `held_jobs` (furnace); `slots`, `upgrade_refunded` (chest); `tint`, `face`, `level` (building) | B5/B6 |
+| `GameState.stations` | `use_chests` (bool), `table_decor` (festival table choice) | B5 |
+| `GameState.mastery` | track xp, `seen`, `daily` {day, xp}, `legacy_credit`, `spots` {area: {kind: [[x, z]...]}} (bounded) | B5 + R22 |
+| flags | story/objective flags per `data/quests_ch2.gd` header + `data/optional_goals.gd` table (the rewards & flags rule, WAVE_A_REPORT); local flags (`hr_*`, `hw_*`, `mm_*`, `ta_*`, `cp_lit_*`, `spawner_cleared_*`); moment flags `ch2_moment_pumpkin_*`, `ch2_moment_empty_waltz`, `ta_moment_echo`, `moment_hw_*` (names kept, R136 r); `c1x_look_chosen`, `c1x_mochi_courage`, `c1x_upstairs_reachable` (repaired on load, R36), `<gate flag>_tried` (R74) | modules |
+`GameState.player["max_hp"]` stays the BASE 100 (effective max = `Stats.effective_max_hp()`); the shield and slows' immunity are
+transient (not saved); slows are timed buffs (`add_buff`, saved, ticked while unpaused).
+
+**Rewards (unchanged rule, WAVE_A_REPORT).** Content modules grant only their `"by": "content"` bundles with `grant_once`; the
+integration pass added the missing bundles to `data/sources.gd` REWARDS: `rw_hr_chime_trail` (Pools pouch, R30),
+`rw_hw_throat_supplies` (Bell Throat supplies, R31), `rw_hw_lightwell_alcove` (Light Well keepsake: decor `bat_bunting` ×2 +
+`crescent_window`, no pattern — every pattern already has its own unique source, R32), and made `rw_ch2_feast` honest (candy 6 +
+pumpkin 4, lantern_wax 4, sugarcap 3, moonpetal 3, identical in the `ch2_feast` step and REWARDS; totals paid unchanged, R33). Game's
+Chapter Two grant passes no message, so the ending shows one toast (R06).
+
+**Lore.** `src/core/lore_db.gd` (static): `get_lore(id) -> {title, text}` (arachnophobia-aware), `has_lore(id)`, `ids()`,
+**`chapter_of(id) -> 1 | 2`** (by source file: legacy `lore.gd` and `data/lore_ch2_annex.gd` = 1 — Tobin's annex is Chapter One
+optional content although its ids carry `lore_ch2_`; the other files = 2; an unknown id falls back to its prefix; R24), `reload()`
+(tests). Files: `data/lore_ch2_{annex,reach,manor,works,story}.gd` (`ORDER` + `LORE`, optional `alt_title` / `alt_text`); no duplicate
+ids (the Works note is `lore_ch2_sluice_chalk`). `UiUtil.lore_entry(id)` delegates to LoreDB (R16).
+
+**ItemDB additions (integration).** `mastery_track_info(track) -> {name, desc}` (R21). Data text fixes: `swiftstep_charm` description
+matches the equipment rule (sprint, roll, swing, wand; R40); `data/equipment.gd` names `Stats.player_shield()` (R41).
+
+**Debug CLI additions** (debug builds only unless noted): avatar preview `--avatar-outfit/-hair/-hair-color/-skin/-eyes/-hat/-armor`
+(krystal_avatar.gd), `--title-show=creation` (Meet Krystal), `--ui-show=wardrobe_notice|ending2`, `--no-wardrobe-notice` (switches the
+automatic notice off; also every arg in `ui_root.NOTICE_OFF_ARGS`). Commands: AGENTS.md.
+
+**Test infrastructure (integration R09).** `tests/runner.gd`: `--filter` takes several comma-separated fragments (a file runs when
+ANY matches; for bisecting order-dependent failures). Isolation between test FILES: after each file the runner frees stray nodes it
+left, restores Game's flow state (mode, area, player, UI root, director, companions, boss encounters, a Chapter Two ending or trip in
+flight), unpauses, restores Settings and re-wires the session listeners (`Game.wire_session_systems()`); each repair is printed as
+`ISOLATION <suite>: ...` so the leaking suite can be fixed. The full suite (~2,200 tests) takes 15-25 min (`tools/test.sh`, limit
+`HH_TEST_SECONDS`, default 2400 s).

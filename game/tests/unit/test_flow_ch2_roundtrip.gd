@@ -23,18 +23,25 @@ func before_each() -> void:
 	fresh_state()
 	_runner = get_tree().current_scene
 	_saved_mode = Game.mode
+	_reset_game()
+	SaveSystem.delete_test_saves()     # every test starts without a save file
 	var ph := Node.new()
 	ph.name = "Ch2Placeholder"
 	get_tree().root.add_child(ph)
 	get_tree().current_scene = ph
 
 
-func after_each() -> void:
+## Game's flow state as if nothing had run before: no UI root, area, player or trip in flight. A trip another
+## suite left suspended (change_area awaiting a fade) is superseded (_travel_seq) so it can never save into this
+## suite's save file ("entering a trial doesn't save" once saw a stray "surface" save after test_flow_ch2_areas).
+func _reset_game() -> void:
 	if Game.ui != null and is_instance_valid(Game.ui):
 		Game.ui.queue_free()
 	Game.ui = null
 	Game._ui_stack.clear()
 	Game._transitioning = false
+	Game._travel_seq += 1
+	Game._ch2_ending_running = false
 	Game.area = null
 	Game.player = null
 	Game.area_id = ""
@@ -42,8 +49,12 @@ func after_each() -> void:
 	Game.director = null
 	Game.zone_id = ""
 	Game.in_safe_zone = true
-	Game.mode = _saved_mode
 	Game._bosses.clear()
+
+
+func after_each() -> void:
+	_reset_game()
+	Game.mode = _saved_mode
 	var cs := get_tree().current_scene
 	if cs != null and cs != _runner and is_instance_valid(cs):
 		cs.queue_free()
@@ -54,6 +65,7 @@ func after_each() -> void:
 	get_tree().current_scene = _runner
 	get_tree().paused = false
 	GameState.active = false
+	SaveSystem.delete_test_saves()
 	if Audio.has_method("stop_all"):
 		Audio.stop_all()
 	await wait_frames(4)
@@ -275,7 +287,7 @@ func test_interiors_rest_points_and_the_trial() -> void:
 	assert_true(await _arrived("hushed_works"), "down into the Works")
 	assert_true(_near_spawn("service_landing"), "at the service landing")
 	assert_eq(_respawn(), ["hushed_works", "service_landing"])
-	assert_true(Game.director == null, "no horror director in the placeholder Works (hook: DIRECTOR_AREAS)")
+	assert_true(Game.director != null, "the Works has its horror director (Game.DIRECTOR_AREAS)")
 	# Rest at the lockers: respawn + save + Continue there.
 	var rest: Node = Game.area.get_node_or_null("RestPoint_works_lockers")
 	assert_not_null(rest, "rest point")

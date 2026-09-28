@@ -2,7 +2,7 @@ extends "res://tests/test_case.gd"
 ## Every Chapter Two structure has its own procedural model that builds and fits its footprint (wall-mounted
 ## pieces hug the back edge), the stair ramp is walkable, lazily mapped behaviour scripts load safely (a
 ## missing one falls back to the base structure), the Thread Veil has its arachnophobia drape, pumpkin faces
-## differ, and no decoration is ever an enemy.
+## differ (the Lanternwake festival faces too, offered only once unlocked), and no decoration is ever an enemy.
 
 const Models := preload("res://src/building/structure_models.gd")
 const Factory := preload("res://src/building/structure_factory.gd")
@@ -216,6 +216,142 @@ func test_every_pumpkin_face_is_its_own_carving() -> void:
 	var p2: Dictionary = Seasonal.pumpkin_lantern(root2, "not-a-face")
 	assert_eq((p2["face"] as MeshInstance3D).mesh, seen.keys()[0], "unknown face ids fall back to the first")
 	root2.free()
+
+
+func _tris(n: Node) -> int:
+	var t := 0
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
+		var m: Mesh = (n as MeshInstance3D).mesh
+		for si in m.get_surface_count():
+			var arr := m.surface_get_arrays(si)
+			var ix: Variant = arr[Mesh.ARRAY_INDEX]
+			t += (ix as PackedInt32Array).size() / 3 if ix != null else (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
+	for c in n.get_children():
+		t += _tris(c)
+	return t
+
+
+## MP §17 "carved-lantern patterns": two festival faces, each its own carving within the pumpkin's triangle
+## budget, defined in data next to (never inside) the six MP §9 faces and unlocked by ch2_feast.
+func test_festival_faces_are_their_own_carvings_within_budget() -> void:
+	var SD := preload("res://data/structures.gd")
+	assert_eq(SD.FESTIVAL_FACES.keys(), Seasonal.FESTIVAL_CARVINGS, "every festival face in data has a carving")
+	for fid in SD.FESTIVAL_FACES:
+		assert_eq(String(SD.FESTIVAL_FACES[fid]), "ch2_feast", "%s is unlocked by the Lanternwake" % fid)
+		assert_false(SD.PUMPKIN_FACES.has(fid), "%s is not one of the always-available faces" % fid)
+	assert_eq(ItemDB.structure("pumpkin_lantern")["faces"], SD.PUMPKIN_FACES, "the structure's own face list is unchanged")
+	assert_ne(ItemDB.unlock_setter("ch2_feast"), "", "ch2_feast is a documented unlock flag (data/unlocks.gd)")
+	var seen := {}
+	var heaviest_base := 0
+	var report: PackedStringArray = []
+	for fid in SD.PUMPKIN_FACES + SD.FESTIVAL_FACES.keys():
+		var root := Node3D.new()
+		add_child(root)
+		var parts: Dictionary = Seasonal.pumpkin_lantern(root, String(fid))
+		var fnode := parts["face"] as MeshInstance3D
+		assert_false(seen.has(fnode.mesh), "%s has its own carving" % fid)
+		seen[fnode.mesh] = fid
+		var carve := _tris(fnode)
+		var total := _tris(root)
+		var meshes := root.find_children("*", "GeometryInstance3D", true, false).size()
+		report.append("%s=%d/%d" % [fid, carve, total])
+		if SD.PUMPKIN_FACES.has(fid):
+			heaviest_base = maxi(heaviest_base, carve)
+		else:
+			assert_true(carve <= heaviest_base, "%s carving (%d tris) is no heavier than the busiest MP face (%d)" % [fid, carve, heaviest_base])
+			assert_true(total < 9000, "%s pumpkin stays within the structure budget (%d)" % [fid, total])
+			assert_true(meshes <= 8, "%s uses %d mesh instances" % [fid, meshes])
+		root.free()
+	assert_eq(seen.size(), 8, "six faces plus two festival faces")
+	print("    pumpkin carving tris (face/total): ", ", ".join(report))
+
+
+## Locked festival faces are never offered; unlocked ones join the end of the cycle; a saved face that is locked
+## or unknown is SHOWN as the first face and the save keeps it untouched.
+func test_festival_faces_follow_the_unlock_and_never_rewrite_saves() -> void:
+	var Faces := preload("res://src/building/pumpkin_faces.gd")
+	var def := ItemDB.structure("pumpkin_lantern")
+	GameState.flags.erase("ch2_feast")
+	assert_eq(Faces.unlocked_faces(def), def["faces"], "before the Lanternwake: the six faces")
+	assert_true(Faces.unlocked_faces(ItemDB.structure("table")).is_empty(), "festival faces never give a table a face")
+	var locked_uid := GameState.add_structure("pumpkin_lantern", Vector3(0.5, 0, 0.5), 0)
+	GameState.structures[locked_uid]["data"]["face"] = "lanternwake"      # e.g. a save from before a flag repair
+	var n := Factory.spawn_structure(_area, locked_uid)
+	assert_eq(String(n.face()), "friendly", "a locked saved face shows the first face")
+	assert_eq(String(GameState.structures[locked_uid]["data"]["face"]), "lanternwake", "the save is not rewritten")
+	var friendly_mesh: Mesh = (n.parts["face"] as MeshInstance3D).mesh
+	assert_eq(String(n.next_face()), "sleepy")
+	n.set_face("starry")
+	assert_eq(String(GameState.structures[locked_uid]["data"]["face"]), "lanternwake", "a locked face cannot be carved")
+	var odd_uid := GameState.add_structure("pumpkin_lantern", Vector3(2.5, 0, 0.5), 0)
+	GameState.structures[odd_uid]["data"]["face"] = "not-a-face"
+	var odd := Factory.spawn_structure(_area, odd_uid)
+	assert_eq(String(odd.face()), "friendly", "an unknown saved face shows the first face")
+	assert_eq(String(GameState.structures[odd_uid]["data"]["face"]), "not-a-face", "and stays in the save")
+	# The Lanternwake: the festival faces join the end of the cycle.
+	GameState.set_flag("ch2_feast", true)
+	var list: Array = n.faces()
+	assert_eq(list.size(), 8)
+	assert_eq(list.slice(6), ["starry", "lanternwake"], "festival faces come after the six")
+	assert_eq(String(n.face()), "lanternwake", "the saved festival face shows once unlocked")
+	n.rebuild_model()
+	assert_ne((n.parts["face"] as MeshInstance3D).mesh, friendly_mesh, "and is carved")
+	assert_eq(String(n.next_face()), "friendly", "the cycle wraps after the last festival face")
+	n.set_face("starry")
+	assert_eq(String(GameState.structures[locked_uid]["data"]["face"]), "starry", "an unlocked festival face can be carved")
+	assert_true(String(n.get_interaction(null)["text"]).contains("Lanternwake"), "offers the next festival face")
+	GameState.flags.erase("ch2_feast")
+	n.free()
+	odd.free()
+
+
+## Build mode offers only unlocked faces before placing, and a festival face is saved like any other.
+func test_build_mode_cycles_only_unlocked_faces() -> void:
+	var prev_mode: String = Game.mode
+	var ground := StaticBody3D.new()
+	ground.collision_layer = 1
+	var cs := CollisionShape3D.new()
+	var sh := BoxShape3D.new()
+	sh.size = Vector3(40, 1, 40)
+	cs.shape = sh
+	ground.add_child(cs)
+	ground.position = Vector3(0, -0.5, 0)
+	_area.add_child(ground)
+	await wait_physics(2)
+	var bm: Node = load("res://src/building/build_mode.gd").new()
+	_area.add_child(bm)
+	Game.mode = "playing"
+	var hints: Array = []
+	var on_hint := func(id: String, _text: String) -> void: hints.append(id)
+	Events.hint.connect(on_hint)
+	GameState.flags.erase("ch2_feast")
+	GameState.give_item("pumpkin_lantern", 2)
+	bm.begin("pumpkin_lantern")
+	var seen: Array = [bm.selected_face()]
+	for i in 6:
+		bm.cycle_variant()
+		seen.append(bm.selected_face())
+	assert_eq(seen, ["friendly", "sleepy", "toothy", "cat", "moon", "ghost", "friendly"], "locked: the six faces only")
+	assert_false(hints.has("build_pumpkin_festival_faces"), "no festival hint before the Lanternwake")
+	bm.end()
+	GameState.set_flag("ch2_feast", true)
+	bm.begin("pumpkin_lantern")
+	assert_true(hints.has("build_pumpkin_festival_faces"), "a one-time hint names the new carvings")
+	for i in 7:
+		bm.cycle_variant()
+	assert_eq(bm.selected_face(), "lanternwake", "unlocked: the festival faces follow the six")
+	assert_eq(String(bm.get_state()["face"]), "lanternwake")
+	bm.debug_cursor = Vector3(6.5, 0, 6.5)
+	bm._update(0.016)
+	var uid: String = bm.try_place()
+	assert_ne(uid, "", "placed")
+	if uid != "":
+		assert_eq(String(GameState.structures[uid]["data"]["face"]), "lanternwake", "saved in data.face")
+	bm.end()
+	Events.hint.disconnect(on_hint)
+	GameState.flags.erase("ch2_feast")
+	Game.mode = prev_mode
+	await wait_frames(2)
 
 
 func test_decorations_are_never_hostile() -> void:

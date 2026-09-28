@@ -23,6 +23,8 @@ const MANOR_ZONES := ["mm_cloakroom", "mm_hall", "mm_ballroom", "mm_gallery", "m
 ## MP §17, verbatim.
 const MP_ENDING_CARD := "The lanterns shine beyond the trees. The quiet below is quiet again. There are pumpkins to plant, walls to raise, and friends waiting by the fire. The road will keep. Tonight is yours."
 const MP_RETURN := "Light kept. Roads found. Welcome home, Krystal."
+## The Lanternwake's items (step ch2_feast give = data/sources.gd rw_ch2_feast = Game.chapter_two_rewards()).
+const FEAST_TOTALS := {"candy": 6, "pumpkin": 4, "lantern_wax": 4, "sugarcap": 3, "moonpetal": 3}
 ## Spider-like wording (a metaphorical "thread of true light" is fine; "threads" spanning a bridge are not).
 const SPIDERY := ["spider", "web", "weav", "matron", "threads", "silk", "skitter"]
 
@@ -111,6 +113,15 @@ func test_step_rewards_follow_mp_11() -> void:
 	assert_eq(home["flags"], ["ch2_homecoming"], "home decoration pattern (Wardlight recipe) unlock")
 	var feast: Dictionary = _step("ch2_feast")["on_complete"]
 	assert_eq(feast["flags"], ["ch2_feast"], "the Lanternwake outfit pattern unlock")
+	# Honest data: the step's give, the catalogue bundle and the ending's reward list are the same items.
+	assert_deep_eq(json_norm(feast["give"]), json_norm(FEAST_TOTALS), "ch2_feast gives the festival treats and continued resources")
+	assert_deep_eq(json_norm(SourcesData.REWARDS["rw_ch2_feast"]["items"]), json_norm(FEAST_TOTALS), "data/sources.gd rw_ch2_feast lists them all")
+	for id2 in Story.FEAST_EXTRAS:
+		assert_eq(int(feast["give"].get(id2, 0)), int(Story.FEAST_EXTRAS[id2]), "step give = FEAST_EXTRAS for " + String(id2))
+		var listed := false
+		for src in ItemDB.sources(String(id2)):
+			listed = listed or (String(src["kind"]) == "reward" and String(src.get("reward", "")) == "rw_ch2_feast")
+		assert_true(listed, String(id2) + " lists rw_ch2_feast as a source")
 	# Every step reward is a real item and mirrors data/sources.gd REWARDS where that catalogue lists it.
 	for s in Quests.STEPS:
 		var rid := "rw_" + String(s["id"])
@@ -130,6 +141,7 @@ func test_step_rewards_follow_mp_11() -> void:
 
 func test_lanternwake_reward_list() -> void:
 	var r: Dictionary = Game.chapter_two_rewards()
+	assert_deep_eq(json_norm(r), json_norm(FEAST_TOTALS), "the ending's totals are exactly the Lanternwake list")
 	assert_eq(int(r.get("candy", 0)), 6, "the final step's festival treats")
 	for id in Story.FEAST_EXTRAS:
 		assert_eq(int(r.get(id, 0)), int(Story.FEAST_EXTRAS[id]), "continued resource " + String(id))
@@ -173,8 +185,16 @@ func test_cross_area_goals() -> void:
 	for d in Story.SEASONAL_DISHES:
 		assert_true(ItemDB.has_item(String(d)) and String(ItemDB.item(String(d)).get("cat", "")) == "food", String(d))
 	assert_false(Story.SEASONAL_DISHES.has("candy"))
-	# The table that completes the goal never depends on the goal's own reward.
-	assert_true(Story.TABLE_STRUCTURES.has("table") and not ItemDB.structure("table").is_empty())
+	# The table that completes the goal never depends on the goal's own reward: the Kitchen's festival-table choice
+	# (Crafting.decorate_table) needs only a kitchen counter, whose recipe has no unlock. A plain Chapter One table
+	# does not count (MP 15: choose a table decoration); the Lanternwake Table (the reward) also counts.
+	assert_false(Story.TABLE_STRUCTURES.has("table"), "a plain table is not a festival table")
+	assert_true(Story.TABLE_STRUCTURES.has("lanternwake_table"))
+	var crafting: Script = load("res://src/crafting/crafting.gd")
+	assert_false((crafting.get_script_constant_map().get("TABLE_DECOR", {}) as Dictionary).is_empty(), "the Kitchen offers table decorations")
+	assert_eq(String(ItemDB.recipe("kitchen_counter").get("unlock", "x")), "", "the kitchen counter needs no unlock")
+	assert_eq(String(ItemDB.station_structure("kitchen")), "kitchen_counter")
+	assert_true(String(_goal("opt_harvest_table")["text"]).contains("kitchen"), "the goal text says where to dress the table")
 
 
 func test_story_lore_and_mp_lines_verbatim() -> void:

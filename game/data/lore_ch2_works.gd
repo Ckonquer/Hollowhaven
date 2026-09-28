@@ -5,11 +5,12 @@ extends RefCounted
 ## lore_ch2_bell_throat_note (Bell Throat, room 13) and lore_ch2_before_choir (above the Choir Vault) by id.
 ## The MP §17 lines are used verbatim: Hask's rail note (lore_ch2_hask_note, room 3), the Foreman's refuge record
 ## (lore_ch2_refuge_record, room 7) and "Before the Choir". Tobin's MP §17 note itself belongs to Tobin's annex
-## (data/lore_ch2_annex.gd lore_ch2_tobin_note: reading it there pays rw_c1x_tobin and the story tracker maps it
-## to c1x_tobin_letter_found), so the Works never places or redefines that id; the Sluice Gallery carries its
-## context instead (lore_ch2_sluice_chalk: Hask's chalk note about bringing Tobin down to the garden).
-## Story tracker (src/world/story_ch2/story_ch2.gd LORE_FLAGS): lore_ch2_hask_note -> ch2_hask_note_found; the
-## refuge planter note (lore_ch2_hask_refuge_note) sets that flag directly ("Find Hask's note in the refuge").
+## (data/lore_ch2_annex.gd lore_ch2_tobin_note: reading it there pays rw_c1x_tobin; "The Miner Who Came Back" asks
+## for Tobin's separate letter, lore_ch2_tobin_letter), so the Works never places or redefines that id; the Sluice
+## Gallery carries its context instead (lore_ch2_sluice_chalk: Hask's chalk note about bringing Tobin down).
+## "Find Hask's note in the refuge" (ch2_hask_note_found) is the refuge planter note lore_ch2_hask_refuge_note: it
+## sets that flag directly, and the story tracker (src/world/story_ch2/story_ch2.gd LORE_FLAGS) repairs it from
+## that lore id. Hask's rail lamp-post note (lore_ch2_hask_note, room 3) is lore only and ticks no objective.
 
 const ORDER := [
 	"lore_ch2_service_notice", "lore_ch2_service_diagram", "lore_ch2_lockers_note", "lore_ch2_hask_note",

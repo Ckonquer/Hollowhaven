@@ -238,6 +238,82 @@ func test_item_stat_lines_come_from_item_db() -> void:
 	assert_eq(UiUtil.category_name("placeable"), "Buildable")
 
 
+## Chapter Two: food buff lines (Moonpetal Tea's slow_resist), gear lines on request (the crafting card) and
+## never the same gear line twice - also for the item slot / backpack card, which still append
+## equipment_stat_lines themselves to the default lines.
+func test_item_stat_lines_cover_food_buffs_and_gear() -> void:
+	var tea := UiUtil.item_stat_lines("moonpetal_tea")
+	var buff: Dictionary = ItemDB.item("moonpetal_tea").get("buff", {})
+	if buff.has("slow_resist"):
+		var pct := int(round((1.0 - float(buff["slow_resist"])) * 100.0))
+		var found := false
+		for l in tea:
+			if String(l).contains("%d%%" % pct) and String(l).contains("slow"):
+				found = true
+		assert_true(found, "slow_resist line: %s" % str(tea))
+	assert_eq(UiUtil._duration(90.0), "1 min 30 s")
+	assert_eq(UiUtil._duration(120.0), "2 min")
+	assert_eq(UiUtil._duration(45.0), "45 s")
+	const ItemSlot := preload("res://src/ui/widgets/item_slot.gd")
+	var any_gear := false
+	for id in ItemDB.all_item_ids():
+		var gear: Array = ItemSlot.equipment_stat_lines(String(id))
+		var base := UiUtil.item_stat_lines(String(id))
+		for g in gear:
+			assert_false(base.has(g), "%s: default lines leave gear lines to the slot tooltip (%s)" % [id, g])
+		var full := UiUtil.item_stat_lines(String(id), true)
+		for g2 in gear:
+			assert_true(full.has(g2), "%s: with_gear includes %s" % [id, g2])
+			any_gear = true
+		var seen := {}
+		for l2 in full:
+			assert_false(seen.has(l2), "%s: '%s' printed once" % [id, l2])
+			seen[l2] = true
+		# what the item slot tooltip shows today: default lines + its own gear lines, each once
+		var slot_lines := base.duplicate()
+		slot_lines.append_array(gear)
+		var seen2 := {}
+		for l3 in slot_lines:
+			assert_false(seen2.has(l3), "%s tooltip: '%s' printed once" % [id, l3])
+			seen2[l3] = true
+	assert_true(any_gear, "some item has gear lines")
+	assert_eq(UiUtil.item_stat_lines("berries", true), UiUtil.item_stat_lines("berries"), "no gear lines for food")
+	assert_eq(UiUtil.gear_stat_lines("no_such_item"), [])
+
+
+## Chapter Two lore reads through LoreDB (every chapter's notes, arachnophobia-aware).
+func test_lore_entry_reads_chapter_two_notes_through_lore_db() -> void:
+	const LoreDB := preload("res://src/core/lore_db.gd")
+	var ch2 := ""
+	for id in LoreDB.ids():
+		if String(id).begins_with("lore_ch2_"):
+			ch2 = String(id)
+			break
+	if ch2 == "":
+		return   # no Chapter Two lore files in this build: the fallback test covers lore_entry
+	var want: Dictionary = LoreDB.get_lore(ch2)
+	var e := UiUtil.lore_entry(ch2)
+	if String(want["title"]).strip_edges() != "":
+		assert_eq(String(e["title"]), String(want["title"]), "title of " + ch2)
+	if String(want["text"]).strip_edges() != "":
+		assert_eq(String(e["text"]), String(want["text"]), "text of " + ch2)
+	var faded := UiUtil.lore_entry("lore_ch2_zz_missing")
+	assert_eq(String(faded["text"]), "The page is too faded to read.", "unknown ids keep the faded page")
+
+
+## One shared list decides the underground HUD look (spec section 9 area classes).
+func test_underground_areas_share_one_list() -> void:
+	for a in ["below", "tobin_annex", "hushed_works"]:
+		assert_true(UiUtil.is_underground_area(a), a)
+		assert_ne(UiUtil.hud_tint(a), Color.WHITE, a + " is tinted")
+	for a2 in ["surface", "hallowmere_reach", "moonveil_manor", "echo_trial", "arena", ""]:
+		assert_false(UiUtil.is_underground_area(a2), a2)
+		assert_eq(UiUtil.hud_tint(a2), Color.WHITE, a2 + " untinted")
+	const Combat := preload("res://src/combat/combat.gd")
+	for a3 in Combat.INTENSITY_SCALED_AREAS:
+		assert_true(UiUtil.is_underground_area(String(a3)), "combat's underground list agrees: " + String(a3))
+
+
 func test_lore_entry_always_returns_readable_text() -> void:
 	var e := UiUtil.lore_entry("miners_last_note_zz_unknown")
 	assert_true(String(e["title"]) != "", "has a title")

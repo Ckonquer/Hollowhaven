@@ -124,3 +124,47 @@ arachnophobia visuals on the final build; 1080p fullscreen perf profile; gamepad
 
 ## 8. Later changes (after the release playthrough)
 The credits text changed to "For Krystal / from Ali" (commit 9512a0d) and a headless code audit produced further fixes. These later builds were verified by the automated test suite (headless) only, not by a new real-input playthrough (the owner needed the PC). Details and the final suite result: `docs/Hollowhaven_Technical_Handoff.md` section 9 and the git log.
+
+## 9. Chapter Two — integration pass after Waves B/C (2026-09-28) — [auto] only
+Chapter Two is still in development. Everything in this section is **[auto]** (headless unit tests on the owner's PC, same
+environment as above). **No Chapter Two content has been checked [visual] or [interactive] yet**: the pending visual and real-input
+checks are listed in `KNOWN_ISSUES.md` ("Chapter Two (in development)"), the debug/visual-QA commands to run them are in `AGENTS.md`,
+and the decisions of the pass are in `docs/ch2/INTEGRATION_WAVE_BC.md`.
+
+The pass ran as twelve parallel fixer groups; the Wave D modules and the three Chapter Two boss modules were also still being
+written, so each full run below is a snapshot of files that were changing while it ran. Command for every row:
+`tools/godot.sh --headless --path game res://tests/runner.tscn -- --filter=<f> --results=<json> --max-seconds=2400` (what
+`tools/test.sh` runs), results kept outside the repo.
+
+| When | Run | Result | Observed failures |
+|---|---|---|---|
+| before the pass (lead) | full suite | 2164 tests, 11 failed, 738 s | 8 order-dependent (pass alone): two companion stuck-recovery tests, one companion nav test, five world-item tests in `test_world_nodes`; per the integration plan the other three came from the audio-name scanner's false positives (R42) and the stale Wave A flow assertions (R08); all three causes were addressed in the pass (R08, R09 runner isolation, R42) |
+| 03:08-03:22 | full suite | 2279 tests, 20 failed, 834 s | taken while other groups were mid-edit: 11 map/UI tests hit map_panel / map_view halfway through the map-reward change (`data_area`, `resource_pins` not yet in the loaded scripts); the new festival pumpkin faces over the triangle budget (being modelled); 5 `test_world_nodes` world-item tests (order-dependent; `tests/runner.gd` with the new isolation was still being changed at 03:14, after this run had started); the Echo Trial unstuck label (see below); one flaky blink test; one scratch probe file that failed to load |
+| 03:24 | the 19 failed tests' suites together (`test_world_nodes, test_ui_map_areas, test_ui_root, test_audit_ui_input_layout, test_player_avatar, parse_all`) | 67 tests, 0 failed, 39 s | — (the edits above had settled) |
+| 03:23-03:37 | full suite | **2334 tests, 4 failed, 810 s** | `test_enemies_ch2_mimic.test_dormant_is_decor_that_twitches_in_pairs` (known timing flake, deferred D05); `test_music_box_selector.test_unknown_and_unplayable_favourites_are_ignored` and a load failure of `test_expeditions_zz_probe.gd` (Wave D modules still being written, not part of the pass); `test_ui_appearance_wardrobe.test_unstuck_labels_and_targets_per_area` still expects "Return to safety" in the Echo Trial, where the lead decision R17 now says "Leave the trial" (the test needs that one expectation updated) |
+| both full runs | `test_zz_parse_all.test_all_scripts_compile` | PASS | every script compiles |
+
+Isolation evidence (second full run, runner R09): 22 `ISOLATION <suite>: ...` repairs were printed — stray projectiles / particles
+left by enemy, wand and companion suites, `Game._bosses` left set by the boss suites, a leftover zone / safe-zone flag in two
+progression audits, world items left by `test_reach_west_orchard` — and none of the formerly order-dependent tests failed. Those
+suites should eventually clean up after themselves.
+
+### 9.1 Integration test run after the pass (2026-09-28 03:44-04:35) — [auto] only
+Same command as above (`tools/test.sh`, full suite; `tools/test.sh parse_all`). Boss, Chapter Two enemy and QA-input modules and
+the Wave D modules (expeditions, trials, music box, onboarding hints) were still being edited by other agents during these runs.
+Logs: `qa/tmp/full_integration_bc.log` (first run), `qa/tmp/full_integration_bc_final.log` (final run), `qa/tmp/timing_suites_3x.log`.
+
+| When | Run | Result | Observed failures / notes |
+|---|---|---|---|
+| 03:43 | `parse_all` | 1 tests, 0 failed | — |
+| 03:44-03:58 | full suite | 2407 tests, 3 failed, 823 s | `test_expeditions_templates.test_the_reach_gets_a_runner_and_groups_stand_on_its_ground`, `test_expeditions_ui.test_setting_aside_at_the_cache_says_the_cache_stays_closed`: the Wave D expedition files (`src/expeditions/*`, `data/expeditions.gd`, the panel and these tests) were rewritten 03:51-03:53, while the run reached them; 39/39 pass at 04:01 and 3/3 re-runs pass. `test_ui_appearance_wardrobe.test_unstuck_labels_and_targets_per_area`: outdated expectation (R17) — fixed in the test |
+| 04:02-04:18 | the 33 suites that measure time (`get_ticks_msec/usec`), three times in a row | 393 tests, 0 failed ×3 (315 s, 309 s, 312 s) | no flaky timing test found |
+| 04:18 | `test_enemies_ch2_mimic` + `test_expeditions` ×3 | 49 tests, 0 failed ×3 | the D05 mimic flake did not reproduce (still deferred: busy file) |
+| 04:21-04:35 | full suite (final) | **2407 tests, 0 failed, 820 s** | 20 `ISOLATION` repairs (was 22: the two progression audits now restore Game's zone / safe-zone state themselves) |
+| 04:36 | `parse_all` | 1 tests, 0 failed | — |
+
+Test changes of this pass: `test_ui_appearance_wardrobe` (Echo Trial label follows lead decision R17: "Leave the trial"; the
+product requirement changed on purpose), `test_player_avatar.test_idle_head_height_and_blink` (deterministic: after the forced
+blink the test pushes the next blink out of its window, so the random 18% double blink can no longer land inside it; product code
+unchanged), `test_audit_progression_comfort` / `test_audit_progression_reentry` (restore `Game.zone_id` / `Game.in_safe_zone` in
+`after_each`).

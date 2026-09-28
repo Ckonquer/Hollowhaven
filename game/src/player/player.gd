@@ -15,6 +15,13 @@ extends CharacterBody3D
 ##     shared stamina, cooldown, LOS, at most WAND_RULES.max_projectiles_alive in flight.
 ##   * Support API for other modules: add_shield(), apply_slow() / clear_slow(), resist_knockback().
 ##   * Area-aware recovery (outdoor bounds + under-terrain for surface and the Reach) and lantern look.
+## Chapter Two integration (lead decisions):
+##   * Airborne, the speed bonus is capped (Logic.air_move_mult: +10% at most; slows apply fully) and a jump's
+##     take-off keeps only that capped share (Logic.jump_takeoff), so buffs never stretch jumps unpredictably
+##     (MP 6.2). Ground speed keeps the full Stats.move_mult().
+##   * The wand prefers real foes over boss floor hazards (meta "boss_hazard": score x Logic.WAND_HAZARD_SCORE_MULT).
+##   * Holding a wand on the hotbar shows it in Krystal's hand (avatar.set_held_tool); casts play the wand pose.
+##   * The Companion Skill action with no follower in the area shows a gentle hint (at most every 10 s).
 
 const Logic := preload("res://src/player/player_logic.gd")
 const AvatarScript := preload("res://src/player/krystal_avatar.gd")
@@ -40,6 +47,8 @@ const LANTERN_RANGE := 7.0              # the avatar's lantern OmniLight range w
 const STATS_REFRESH := 0.1              # seconds between cached Stats refreshes (move mult, sprint cost)
 const KB_RESIST_WINDOW_MS := 250        # one resisted knockback covers every push of that same hit
 const WAND_KNOCKBACK := 1.5
+const SKILL_HINT_COOLDOWN := 10.0       # seconds between "no follower" hints for the Companion Skill action
+const NO_FOLLOWER_TEXT := "No friend is following you right now."
 
 # --- Contract ----------------------------------------------------------------------------------------
 var health: Node                         # src/combat/health.gd
@@ -176,6 +185,8 @@ func _ready() -> void:
 	Events.build_mode_changed.connect(_on_build_mode_changed)
 	Events.stats_changed.connect(refresh_stats)
 	Events.equipment_changed.connect(_on_equipment_changed)
+	Events.hotbar_selected.connect(_on_hotbar_selected)
+	Events.inventory_changed.connect(_refresh_held_tool)
 	_facing_yaw = rotation.y
 	_cur_yaw = _facing_yaw
 	_prev_yaw = _facing_yaw
@@ -470,6 +481,16 @@ func _on_equipment_changed(_slot: String, _item_id: String) -> void:
 	_refresh_owned()
 
 
+func _on_hotbar_selected(_index: int) -> void:
+	_refresh_held_tool()
+
+
+## Shows the selected wand in Krystal's hand (nothing changes for the Chapter One tools: they appear per swing).
+func _refresh_held_tool() -> void:
+	if avatar != null:
+		avatar.set_held_tool("wand" if selected_wand() != "" else "")
+
+
 ## The wand selected on the hotbar ("" when the selected item is not a wand).
 func selected_wand() -> String:
 	var slot: Variant = GameState.selected_slot()
@@ -542,7 +563,9 @@ func _physics_process(delta: float) -> void:
 			hv = _dodge_dir * Logic.dodge_speed(k)
 	if _dodge_t < 0.0:
 		var top := Logic.SPRINT_SPEED if _sprinting else Logic.WALK_SPEED
-		top *= _move_mult       # the ONE movement multiplier (Stats.move_mult: companions, Glimmerstep, charms, slows)
+		# The ONE movement multiplier (Stats.move_mult: companions, Glimmerstep, charms, slows). In the air the bonus
+		# is capped (slows still apply fully) so jumps stay predictable (MP 6.2).
+		top *= _move_mult if grounded else Logic.air_move_mult(_move_mult)
 		if _swing.active:
 			top *= 0.35
 		if _eat_lock > 0.0:
@@ -562,6 +585,8 @@ func _physics_process(delta: float) -> void:
 		_jump_held = false
 	if can_act and _dodge_t < 0.0 and not _swing.active and _eat_lock <= 0.0 and _jump.try_consume():
 		_do_jump()
+		if _stagger <= 0.0:
+			hv = Logic.jump_takeoff(hv, _move_mult)     # a knockback's push is never trimmed
 	velocity.x = hv.x
 	velocity.z = hv.z
 	move_and_slide()
@@ -664,6 +689,7 @@ func _refresh_owned() -> void:
 				l.light_color = Logic.lantern_tint(Game.area_id, Palette.LANTERN_GLOW)
 	if lantern_on and not owned:
 		set_lantern(false)
+	_refresh_held_tool()
 
 
 func _hspeed() -> float:
@@ -778,6 +804,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_toggle_lantern()
 	elif event.is_action_pressed("companion_command"):
 		_companion_command()
+	elif InputMap.has_action("companion_skill") and event.is_action_pressed("companion_skill"):
+		_companion_skill_pressed()
 	else:
 		for i in HOTBAR_ACTIONS.size():
 			if event.is_action_pressed(HOTBAR_ACTIONS[i]):
@@ -1082,7 +1110,9 @@ func _aim_point_of(t: Node3D) -> Vector3:
 
 
 ## The wand's target: one scan of group "enemy" at cast time (never per frame): alive, within range, inside
-## the aim cone, accepting hits (can_be_hit_by) and in line of sight. Closest to the aim line wins.
+## the aim cone, accepting hits (can_be_hit_by) and in line of sight. Closest to the aim line wins; boss floor
+## hazards (meta "boss_hazard": egg sacs / pods, trip lines) count as Logic.WAND_HAZARD_SCORE_MULT times farther,
+## so a stunned boss behind them is preferred (they are still targeted when nothing else is near the aim).
 func _ranged_target(max_range: float, aim: Vector3) -> Node3D:
 	if not is_inside_tree():
 		return null
@@ -1114,6 +1144,8 @@ func _ranged_target(max_range: float, aim: Vector3) -> Node3D:
 			if not combat.has_line_of_sight(space, origin, ap, [self, t]):
 				continue
 		var score := d * (1.0 + (1.0 - dot) * 3.0)
+		if Logic._truthy(t.get_meta("boss_hazard", false), false):
+			score *= Logic.WAND_HAZARD_SCORE_MULT
 		if score < best_score:
 			best = t
 			best_score = score
@@ -1351,6 +1383,27 @@ func _companion_command() -> void:
 	_notify("%s is following you again." % _companion_name(best_id), "info", "comp_cmd", 0.5)
 	if avatar != null:
 		avatar.play_action("wave")
+
+
+## The Companion Skill action belongs to the follower (src/companions/companion.gd answers it, with its own
+## reasons when the skill can't be used). With no follower in this area nothing would happen at all, so Krystal
+## gets a gentle hint instead - at most once every SKILL_HINT_COOLDOWN seconds.
+func _companion_skill_pressed() -> void:
+	if has_follower_here():
+		return
+	_notify(NO_FOLLOWER_TEXT, "info", "skill_no_follower", SKILL_HINT_COOLDOWN)
+
+
+## True when the active companion's node is in this area and following Krystal (duck-typed `mode`).
+func has_follower_here() -> bool:
+	var id := GameState.active_companion
+	if id == "":
+		return false
+	var c: Variant = Game.companion_nodes.get(id)
+	if not is_instance_valid(c) or not (c is Node) or not (c as Node).is_inside_tree():
+		return false
+	var m: Variant = (c as Node).get("mode")
+	return not (m is String) or String(m) == "follow"
 
 
 ## companion.command() returns {"ok": bool, ...}; anything else (older/other implementations) counts as ok.

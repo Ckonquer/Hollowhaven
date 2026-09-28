@@ -4,6 +4,18 @@ extends "res://tests/unit/test_companions_fixture.gd"
 ## test room without being teleported; the boss-room rule for recoveries.
 
 
+## The boss-room rule reads Game.boss_active(): an encounter left over from an earlier suite (a boss freed
+## mid-fight) would block every recovery here, so each test starts and ends without one.
+func before_each() -> void:
+	Game._bosses.clear()
+	await super()
+
+
+func after_each() -> void:
+	Game._bosses.clear()
+	await super()
+
+
 ## Grid helper: `blocked` holds Vector2i cells that are walls; floors at height 0.
 func _walk_fn(blocked: Dictionary, size: int) -> Callable:
 	return func(i: int, j: int) -> Variant:

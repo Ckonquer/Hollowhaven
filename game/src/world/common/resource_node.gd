@@ -38,6 +38,8 @@ extends Node3D
 ##   verb: String             prompt verb for hand harvesting ("Pick up", "Pull", "Pick", "Gather")
 ##   min_tier: int            lowest tool tier that can harvest it (stone 1, copper 2, ironwood 3, moonsteel 4;
 ##                            ItemDB.item_tier). 0 = any tool of the right kind (every legacy kind).
+##   regrow_text: String      greyed prompt while depleted (replaces "<name> (regrowing)"); only shown where the
+##                            depleted node stays focusable (bush-like kinds keep their interact collider)
 ## Chapter Two (equipment module):
 ##   * kinds from data/sources.gd NODES that are not legacy kinds ("iron_vein", "moon_crystal_vein",
 ##     "sap_stump", "sunflax_patch", ...) take tool / min_tier / hits / drops / respawn / name / verb from the
@@ -48,6 +50,10 @@ extends Node3D
 ##   * a tool below min_tier (stored in `required_tier`) only wobbles the node and explains which tier is needed.
 ##   * Gathering mastery's bonus_yield_chance may add +1 of the main drop (never when the chance is 0, so
 ##     legacy drop rolls are unchanged).
+## Gathering mastery rank 4 ("highlight_radius"): every resource node in the tree is kept in a static registry
+## (enter / exit tree, no group scans); ONE throttled helper (gather_sparkle.gd, created with the first node)
+## refreshes every 0.5 s and shows a steady sparkle over at most 12 nearby non-depleted harvestables
+## (sparkle_point()).
 ## Signals: harvested_out(node) when fully harvested by the player; respawned(node).
 
 const NodeVisuals := preload("res://src/world/common/node_visuals.gd")
@@ -55,6 +61,7 @@ const Fx := preload("res://src/world/common/fx.gd")
 const Palette := preload("res://src/art/palette.gd")
 const StatsLayer := preload("res://src/core/stats.gd")
 const EquipmentRules := preload("res://data/equipment.gd")
+const GatherSparkle := preload("res://src/world/common/gather_sparkle.gd")
 
 const LAYER_WORLD := 1
 const LAYER_INTERACT := 16
@@ -115,6 +122,11 @@ const META_DEFAULTS := {
 
 signal harvested_out(node: Node3D)
 signal respawned(node: Node3D)
+
+## Every resource node currently in the scene tree (the Gathering-sparkle helper reads it; never copied).
+static var _registry: Array = []
+## The one Gathering-sparkle helper (gather_sparkle.gd), created lazily; frees itself when the registry empties.
+static var _sparkler: Node = null
 
 var node_id: String = ""
 var kind: String = "rock"
@@ -190,6 +202,44 @@ func _resolve_kind() -> void:
 		d["name"] = data["alt_name"]
 	d["min_tier"] = int(data.get("min_tier", 0))
 	_def = d
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		_registry.append(self)
+		_ensure_sparkler()
+	elif what == NOTIFICATION_EXIT_TREE:
+		_registry.erase(self)
+
+
+## Live resource nodes (the static registry itself; read-only for callers).
+static func registry() -> Array:
+	return _registry
+
+
+## The Gathering-sparkle helper of this run (null before the first node entered the tree or after it freed itself).
+static func sparkler() -> Node:
+	return _sparkler if is_instance_valid(_sparkler) else null
+
+
+## Creates the one sparkle helper under the tree root (deferred: the tree may be busy adding this node).
+func _ensure_sparkler() -> void:
+	if is_instance_valid(_sparkler) and not _sparkler.is_queued_for_deletion():
+		return
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+	var helper: Node = GatherSparkle.new()
+	helper.name = "GatherSparkle"   # tests/runner.gd KEEP_ROOT_NODES knows this self-managing helper
+	helper.set("registry", _registry)
+	_sparkler = helper
+	tree.root.add_child.call_deferred(helper)
+
+
+## Where the Gathering-mastery sparkle floats: a little above the node's top (world space).
+func sparkle_point() -> Vector3:
+	var h := clampf(float(_meta("fx_height")) * absf(scale.y), 0.25, 1.8)
+	return global_position + Vector3.UP * (h + 0.3)
 
 
 func _ready() -> void:
@@ -345,6 +395,9 @@ func get_harvest_info() -> Dictionary:
 
 func get_interaction(_player: Node = null) -> Dictionary:
 	if depleted:
+		var regrow := String(params.get("regrow_text", ""))
+		if regrow != "":
+			return {"text": regrow, "enabled": false}
 		if base_kind == "bush":
 			return {"text": "%s (regrowing)" % display_name, "enabled": false}
 		return {}

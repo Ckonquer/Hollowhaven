@@ -221,6 +221,37 @@ func test_records_round_trip_and_unknown_goals_are_kept() -> void:
 	assert_true(GameState.optional_goals.records.has("opt_from_the_future"))
 
 
+## "A House With an Upstairs" needs stairs that really lead up (c1x_upstairs_reachable, set / repaired by
+## build_ops.update_upstairs_flag), not just a staircase and a floor piece somewhere; a latched goal stays done.
+func test_upstairs_needs_a_reachable_upper_floor() -> void:
+	GameState.add_structure("workbench", Vector3(9, 0, 9), 0.0)
+	var g: Dictionary = opt.goal("opt_upstairs")
+	var flags: Array = []
+	for o in g["objectives"]:
+		if String(o["type"]) == "flag":
+			flags.append(String(o["flag"]))
+	assert_eq(flags, ["c1x_upstairs_reachable"], "the reachability objective")
+	GameState.add_structure("wood_stairs", Vector3(0, 0, 4), 0.0)
+	GameState.add_structure("upper_floor", Vector3(20, 3, 20), 0.0)   # a floor piece nowhere near the stairs
+	opt.evaluate()
+	assert_false(opt.is_done("opt_upstairs"), "stairs and a floor that do not meet are not an upstairs")
+	assert_eq(opt.objective_status(g).map(func(s): return s["done"]), [true, true, false])
+	GameState.set_flag("c1x_upstairs_reachable")
+	opt.evaluate()
+	assert_true(opt.is_done("opt_upstairs"))
+	assert_eq(_held("wood_railing"), 4, "its railings, once")
+	# Latched: taking the building apart later never un-completes it or pays again.
+	GameState.flags.erase("c1x_upstairs_reachable")
+	for uid in GameState.structures.keys():
+		GameState.remove_structure(String(uid))
+	opt.evaluate()
+	assert_true(opt.is_done("opt_upstairs"), "latched")
+	GameState.from_dict(json_norm(GameState.to_dict()))
+	GameState.optional_goals.evaluate()
+	assert_true(GameState.optional_goals.is_done("opt_upstairs"), "latched across a reload")
+	assert_eq(_held("wood_railing"), 4)
+
+
 func test_room_for_friends_uses_companion_home_spots() -> void:
 	GameState.set_flag("chapter_one_complete")
 	var g: Dictionary = opt.goal("opt_room_for_friends")

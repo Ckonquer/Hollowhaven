@@ -146,6 +146,7 @@ var fights: Dictionary = {}
 var mood_zone: String = ""
 var build_times: Dictionary = {}
 var deep_spawn_fallbacks: Array = []    # deep spawn ids that got the hub fallback
+var echo_entry: Node3D = null          # the Choir's Echo Trial stone at the Bell Throat (src/world/trial/trial_entry.gd)
 
 var _moods: Dictionary = {}
 var _ambience: Dictionary = {}
@@ -203,6 +204,7 @@ func _ready() -> void:
 	builder.finish()
 	_mark("finish")
 	_ensure_deep_spawns()
+	_place_echo_trial()
 	moments = Moments.new()
 	moments.setup(self)
 	add_child(moments)
@@ -942,6 +944,41 @@ func _refresh_conduits() -> void:
 func _on_flag_set(flag: String, _v: Variant) -> void:
 	if _conduit_nodes.has(flag):
 		_refresh_conduits()
+	if flag == ECHO_TRIAL_FLAG:
+		_place_echo_trial()
+
+
+# --- Echo Trial entry (echo trial module D1: the Choir's trial starts at the Bell Throat, spec §1) ----------------------
+
+const ECHO_TRIAL_ID := "choir"
+const ECHO_TRIAL_FLAG := "ch2_choir_defeated"
+const ECHO_ENTRY_SCRIPT := "res://src/world/trial/trial_entry.gd"
+const TRIALS_DATA := "res://data/trials.gd"
+
+
+## Places the echo stone beside the Bell Throat checkpoint once the Choir is beaten (on load, or live when the flag
+## is set). Position: data/trials.gd TRIALS.choir.entry. The stone (prompt, trial menu, travel) is the module's.
+func _place_echo_trial() -> void:
+	if echo_entry != null and is_instance_valid(echo_entry):
+		return
+	if not bool(GameState.get_flag(ECHO_TRIAL_FLAG)):
+		return
+	var es := _load_script(ECHO_ENTRY_SCRIPT)
+	var ds := _load_script(TRIALS_DATA)
+	if es == null or ds == null:
+		return
+	var t: Variant = (ds.get_script_constant_map().get("TRIALS", {}) as Dictionary).get(ECHO_TRIAL_ID)
+	if not (t is Dictionary) or not ((t as Dictionary).get("entry") is Dictionary):
+		return
+	var entry: Dictionary = (t as Dictionary)["entry"]
+	var origin: Dictionary = (t as Dictionary).get("origin", {})
+	var n: Node3D = es.new()
+	n.setup({"trial": ECHO_TRIAL_ID, "origin_area": area_id, "origin_spawn": String(origin.get("spawn", "bell_throat")), "solid": false})
+	n.name = "EchoTrialEntry"
+	add_child(n)
+	n.position = entry.get("pos", Vector3.ZERO)
+	n.rotation.y = deg_to_rad(float(entry.get("yaw_deg", 0.0)))
+	echo_entry = n
 
 
 # --- Lore ------------------------------------------------------------------------------------------------------------------

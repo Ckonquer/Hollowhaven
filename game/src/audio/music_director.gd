@@ -20,9 +20,13 @@ extends Node
 ##   refresh_availability(), scan_threat(player) -> bool, gather_context() -> Dictionary.
 ## Tests/QA: setup({"seed", "tuning", "fade_scale", "tick_s", "ctx", "available"}) before add_child;
 ##   `ctx_override` entries replace gathered context keys; `enabled` switches the director off.
+## Music Box (src/audio/music_box.gd, MP 18.3): preview(cue, fade := 1.5) -> bool, stop_preview(fade := 1.5),
+##   preview_cue() -> String (a low-priority "musicbox" context: see music_selector.gd); the context carries
+##   the saved favourites (ctx "favourites", read from GameState through the helper) for the Haven rotation.
 
 const MusicData := preload("res://data/music.gd")
 const Selector := preload("res://src/audio/music_selector.gd")
+const MusicBox := preload("res://src/audio/music_box.gd")
 ## Chapter Two finished (Game.CH2_COMPLETE_FLAG, set by Game.complete_chapter_two): the Haven's day
 ## rotation then also includes Every Road Leads Home (m27).
 const CH2_COMPLETE_FLAG := "chapter_two_complete"
@@ -170,6 +174,31 @@ func current_cue() -> String:
 	return String(selector.current_cue()) if selector != null else ""
 
 
+## Music Box preview of one cue (one pass; boss / horror / combat / authored music end it). False when the
+## cue is unknown or unplayable (nothing changes then).
+func preview(cue: String, fade: float = 1.5) -> bool:
+	if selector == null or not enabled:
+		return false
+	if not _avail_done:
+		refresh_availability()
+	var ok := bool(selector.request_preview(cue, fade, _area_id()))
+	if ok:
+		tick_now()
+	return ok
+
+
+func stop_preview(fade: float = 1.5) -> void:
+	if selector == null or selector.preview_cue() == "":
+		return
+	selector.stop_preview(fade)
+	tick_now()
+
+
+## The cue being previewed ("" = none).
+func preview_cue() -> String:
+	return String(selector.preview_cue()) if selector != null else ""
+
+
 func state() -> Dictionary:
 	var s: Dictionary = selector.state() if selector != null else {}
 	s["enabled"] = enabled
@@ -231,6 +260,7 @@ func gather_context() -> Dictionary:
 	ctx["boss_phase"] = int((_bosses[b] as Dictionary).get("phase", 1)) if b != "" else 1
 	ctx["horror_state"] = _horror_state
 	ctx["silence"] = _silence_hold or Time.get_ticks_msec() < _silence_until_ms
+	ctx["favourites"] = MusicBox.favourites_view()     # the saved list itself (no copy per tick)
 	var audio := _audio()
 	if audio != null:
 		# while a phrase-aligned start is scheduled, report the track as already ours

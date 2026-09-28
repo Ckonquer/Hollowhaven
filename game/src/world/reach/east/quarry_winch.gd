@@ -11,7 +11,10 @@ extends Node3D
 ##          "raised_deg": float, "deck_min": Vector2 (U, V), "deck_max": Vector2, "deck_y": float,
 ##          "crane": Vector3, "frame": Callable(uv: Vector2) -> Vector2 world XZ})  (world coordinates;
 ##   the node itself stands at the drum)
-##   is_repaired(), missing_materials(), cost_text(), repair() -> bool, gangway_enabled(), set_lowered(on, animate)
+##   is_repaired(), missing_materials(), cost_text(), repair() -> bool, gangway_enabled(), gangway_solid(),
+##   is_lowering(), set_lowered(on, animate)
+## The gangway's collider (R112) switches on only when the plank has finished lowering (LOWER_SECONDS after the
+## repair; at once on load / animate=false), so there is never an invisible walkway ahead of the moving plank.
 
 signal repaired
 
@@ -46,6 +49,8 @@ var _chain_hold: MeshInstance3D     # boom tip -> gangway end
 var _boom_tip := Vector3.ZERO       # local
 var _angle: float = 0.0             # current tilt (deg, + = foot down)
 var _busy := false
+var _lowered := false               # logical pose: down (or on its way down) vs hoisted
+var _repairing := false             # repair() is setting the flag itself (its own animated lowering follows)
 var _hinted := false
 var _tw: Tween
 var _cue: MeshInstance3D            # Settings high_visibility_cues: a bold ring over the drum until repaired
@@ -84,8 +89,19 @@ func is_repaired() -> bool:
 	return bool(GameState.get_flag(Q.FLAG_WINCH))
 
 
+## The way up is open: the gangway is down or on its way down (see gangway_solid() for its collider).
 func gangway_enabled() -> bool:
+	return _lowered
+
+
+## The lowered gangway's collider is on (walkable right now): false while the plank is still lowering.
+func gangway_solid() -> bool:
 	return _gang_body != null and _gang_body.collision_layer != 0
+
+
+## The plank is moving (the prompt is hidden meanwhile).
+func is_lowering() -> bool:
+	return _busy
 
 
 ## Items still missing for the repair: {item_id: missing count} (empty = everything is there).
@@ -162,7 +178,10 @@ func repair() -> bool:
 				GameState.give_item(String(t[0]), int(t[1]))
 			Events.notify.emit("The winch couldn't be repaired right now.", "warn")
 			return false
+	# the flag first (save-safe), without _on_flag_set snapping the gangway down: it lowers visibly below
+	_repairing = true
 	GameState.set_flag(Q.FLAG_WINCH, true)
+	_repairing = false
 	set_lowered(true, is_inside_tree())
 	Events.notify.emit(Q.TEXT["winch_repaired"], "success")
 	Events.caption.emit(Q.TEXT["winch_caption"])
@@ -173,7 +192,7 @@ func repair() -> bool:
 
 
 func _on_flag_set(flag: String, _value: Variant) -> void:
-	if flag == Q.FLAG_WINCH and is_repaired() and not gangway_enabled():
+	if flag == Q.FLAG_WINCH and not _repairing and is_repaired() and not _lowered:
 		set_lowered(true, false)
 
 
@@ -187,18 +206,22 @@ func _update_cue() -> void:
 		_cue.visible = not is_repaired() and bool(Settings.get_value("high_visibility_cues"))
 
 
-## Lowered = walkable gangway (collider on). The collider switches at once; the visual can animate.
+## Lowered = walkable gangway. Hoisting (on=false) or animate=false switches the collider at once; an animated
+## lowering switches it on when the plank arrives (the tween's end), never while it is still moving.
 func set_lowered(on: bool, animate: bool) -> void:
-	if _gang_body != null:
-		_gang_body.collision_layer = 1 if on else 0
+	_lowered = on
+	var target := slope_deg if on else -raised_deg
+	if not is_inside_tree() or absf(_angle - target) < 0.01:
+		animate = false
+	_set_solid(on and not animate)
 	_gear_broken.visible = not on
 	_gear_fixed.visible = on
 	_chain_slack.visible = not on
 	_chain_taut.visible = on
 	_update_cue()
-	var target := slope_deg if on else -raised_deg
 	if _tw != null and _tw.is_valid():
 		_tw.kill()
+	_busy = false
 	if not animate:
 		_set_angle(target)
 		return
@@ -210,8 +233,14 @@ func set_lowered(on: bool, animate: bool) -> void:
 	_tw.tween_method(_set_angle, _angle, target, LOWER_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_tw.tween_callback(func() -> void:
 		_busy = false
+		_set_solid(_lowered)
 		if is_inside_tree():
 			Fx.burst(get_parent(), to_global(_foot_local()), "dust", 1.4))
+
+
+func _set_solid(on: bool) -> void:
+	if _gang_body != null:
+		_gang_body.collision_layer = 1 if on else 0
 
 
 func _set_angle(deg: float) -> void:

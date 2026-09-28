@@ -12,7 +12,12 @@ extends Node3D
 ## clear_all() removes it at once (phase transition, reset, defeat).
 ## The SLOW goes through GameState buff "slow" (docs/CHAPTER_TWO_SPEC.md section 9): the multiplier never
 ## drops below SLOW_FLOOR, a buff never outlasts SLOW_MAX_SECONDS, and after SLOW_CHAIN_CAP seconds of
-## continuous slowing Krystal pulls free for SLOW_IMMUNE seconds (no permanent chaining).
+## continuous slowing Krystal pulls free for SLOW_IMMUNE seconds (no permanent chaining). It is a bounded ZONE
+## slow refreshed while she stands in a sheet, so it writes the buff directly, tagged "source": SLOW_SOURCE:
+## the field only ever refreshes or erases ITS OWN slow (another source's slow is never overwritten, stacked or
+## cleared). A cleanse while she is still in a sheet (Mochi's Bloomguard removes the buff) starts the same
+## SLOW_IMMUNE break-free window, so the sheet cannot re-apply it on the next frame. A sheet never slows her
+## while she is airborne (a jump over / through it; web_fan.slows()).
 ## Arachnophobia: every hazard swaps to the pale veil / root / pod look live (settings_changed).
 ## High-visibility cues (Settings "high_visibility_cues"): every hazard adds a bold cream outline, live.
 ## Pure helpers used by tests: default_posts, default_chords, route_exists, cap_for.
@@ -50,6 +55,8 @@ const SLOW_LINGER := 0.5
 const SLOW_MAX_SECONDS := 1.5
 const SLOW_CHAIN_CAP := 3.0
 const SLOW_IMMUNE := 2.0
+const SLOW_SOURCE := "matron_field"   # tag of the field's own slow buff (only this one is refreshed / erased)
+const CLEANSE_MARGIN := 0.05          # own slow missing although this much of it was left = removed (a cleanse)
 const POST_RADIUS_FRAC := 0.62
 const POST_COUNT := 6
 const ENTRANCE_CLEAR := 3.0       # no line within this of the entrance point
@@ -64,6 +71,8 @@ const ROUTE_CLEARANCE := 0.35
 const CENTRE_OBSTACLE := 1.0
 const DIRS := [[1, 0], [-1, 0], [0, 1], [0, -1]]
 const ESCAPE_RAYS := 72
+const MINION_REACH_MARGIN := 1.5  # a minion farther than radius + this from the centre is out of reach
+const MINION_REACH_RISE := 1.5    # ...or this far above / below the floor (a ledge, a hole)
 
 var boss: Node = null
 var center := Vector3.ZERO
@@ -95,6 +104,8 @@ var _post_nodes: Array = []
 var _ring_r: float = -1.0          # posts on a ring (default layout): its radius; else -1 (flood fill)
 var _slow_chain: float = 0.0
 var _slow_immune: float = 0.0
+var _own_left: float = 0.0          # seconds left on the field's own slow at the end of the last tick (0 = none)
+var _clock: float = 0.0             # seconds this field has been ticked (minion ages)
 var _target: Node3D = null
 var _target_pos := Vector3.ZERO
 
@@ -152,6 +163,9 @@ static func cap_for(phase: int, level: int) -> int:
 
 ## target: Krystal (or the test dummy); null = nobody to affect.
 func tick(delta: float, target: Node3D) -> void:
+	# The field's own slow vanished although plenty of it was left: something removed it (a cleanse).
+	var cleansed := _own_left > delta + CLEANSE_MARGIN and own_slow_left() <= 0.0
+	_clock += delta
 	_target = target if target != null and is_instance_valid(target) else null
 	var has_t := _target != null
 	if has_t:
@@ -167,7 +181,7 @@ func tick(delta: float, target: Node3D) -> void:
 			continue
 		if h.kind == "fan":
 			h.tick(delta, _target_pos, has_t)
-			if has_t and h.contains(_target_pos):
+			if has_t and h.slows(_target_pos):
 				want = minf(want, float(h.slow_mult))
 		else:
 			h.tick(delta, _target_pos, has_t, lantern)
@@ -177,34 +191,43 @@ func tick(delta: float, target: Node3D) -> void:
 			hazards.remove_at(i)
 			h.queue_free()
 		i -= 1
-	_update_slow(delta, want)
+	_update_slow(delta, want, cleansed)
+	_own_left = own_slow_left()
 	_tick_sacs(delta)
 	if thread != null and is_instance_valid(thread):
 		thread.tick(delta)
 
 
-func _update_slow(delta: float, want: float) -> void:
+func _update_slow(delta: float, want: float, cleansed: bool = false) -> void:
 	if _slow_immune > 0.0:
 		_slow_immune = maxf(_slow_immune - delta, 0.0)
 		return
 	if want >= 1.0:
 		_slow_chain = maxf(_slow_chain - delta * 2.0, 0.0)
 		return
+	if cleansed:
+		# Cleansed while still in a sheet: she is free for SLOW_IMMUNE s (the cleanse is never undone next frame).
+		_slow_chain = 0.0
+		_slow_immune = SLOW_IMMUNE
+		return
+	if foreign_slow():
+		return                  # another source's slow already holds her: never stacked, never chained on
 	_slow_chain += delta
 	apply_slow(want, SLOW_LINGER)
 	if _slow_chain >= SLOW_CHAIN_CAP:
 		_break_free()
 
 
-## Krystal tears loose after a long slow: the buff ends and nothing can slow her for SLOW_IMMUNE s.
+## Krystal tears loose after a long slow: the field's slow ends and nothing can slow her for SLOW_IMMUNE s.
 func _break_free() -> void:
 	_slow_chain = 0.0
 	_slow_immune = SLOW_IMMUNE
-	GameState.buffs.erase("slow")
+	_erase_own_slow()
 	Events.caption.emit("[Krystal tears free of the veil]" if alt else "[Krystal tears free of the silk]")
 
 
-## Bounded slow: never below SLOW_FLOOR, never longer than SLOW_MAX_SECONDS, refreshed in place.
+## Bounded slow: never below SLOW_FLOOR, never longer than SLOW_MAX_SECONDS, refreshed in place. Only the
+## field's own (tagged) slow is refreshed; while another source's slow is on her nothing is written.
 func apply_slow(mult: float, seconds: float) -> void:
 	if _slow_immune > 0.0:
 		return
@@ -213,14 +236,39 @@ func apply_slow(mult: float, seconds: float) -> void:
 	var b: Variant = GameState.buffs.get("slow")
 	if b is Dictionary:
 		var d := b as Dictionary
+		if String(d.get("source", "")) != SLOW_SOURCE:
+			return
 		d["mult"] = clampf(minf(float(d.get("mult", 1.0)), m), SLOW_FLOOR, 1.0)
 		d["remaining"] = clampf(maxf(float(d.get("remaining", 0.0)), s), 0.0, SLOW_MAX_SECONDS)
 	else:
 		GameState.add_buff("slow", m, s)
+		(GameState.buffs["slow"] as Dictionary)["source"] = SLOW_SOURCE
 
 
 func slow_immune() -> bool:
 	return _slow_immune > 0.0
+
+
+## Seconds left on the field's OWN slow buff (0 when there is none, or the slow belongs to someone else).
+func own_slow_left() -> float:
+	var b: Variant = GameState.buffs.get("slow")
+	if b is Dictionary and String((b as Dictionary).get("source", "")) == SLOW_SOURCE:
+		return maxf(float((b as Dictionary).get("remaining", 0.0)), 0.0)
+	return 0.0
+
+
+## True while a slow from another source (an enemy's clod, a trap...) is on her.
+func foreign_slow() -> bool:
+	var b: Variant = GameState.buffs.get("slow")
+	return b is Dictionary and String((b as Dictionary).get("source", "")) != SLOW_SOURCE
+
+
+## Removes the field's own slow only (never another source's).
+func _erase_own_slow() -> void:
+	var b: Variant = GameState.buffs.get("slow")
+	if b is Dictionary and String((b as Dictionary).get("source", "")) == SLOW_SOURCE:
+		GameState.buffs.erase("slow")
+	_own_left = 0.0
 
 
 func _snag(line: Node) -> void:
@@ -554,12 +602,38 @@ func spawn_minion(pos: Vector3) -> Node:
 	if m == null:
 		return null
 	m.set_meta("matron_minion", true)
+	m.set_meta("matron_minion_born", _clock)
 	minions.append(m)
 	released_count += 1
 	if m.has_method("pop_in"):
 		m.call("pop_in")
 	minion_spawned.emit(m)
 	return m
+
+
+## Seconds minion `m` has been out (field clock; 0 for one this field did not release).
+func minion_age(m: Node) -> float:
+	if m == null or not is_instance_valid(m):
+		return 0.0
+	return maxf(_clock - float(m.get_meta("matron_minion_born", _clock)), 0.0)
+
+
+## Can Krystal reach minion `m` on the arena floor? (not off the floor's edge, not up on a ledge / down a hole)
+func minion_reachable(m: Node) -> bool:
+	if not (m is Node3D) or not is_instance_valid(m):
+		return false
+	var p := (m as Node3D).global_position
+	return _flat(p, center) <= radius + MINION_REACH_MARGIN and absf(p.y - floor_y) <= MINION_REACH_RISE
+
+
+## Living minions that still count for the boss's Gentle drop gate: out for at most `max_age` seconds and
+## reachable. A minion stuck somewhere (or ignored) for longer, or out of reach, never stalls the fight.
+func blocking_minions(max_age: float) -> int:
+	var n := 0
+	for m in minions:
+		if _minion_alive(m) and minion_age(m) <= max_age and minion_reachable(m):
+			n += 1
+	return n
 
 
 ## The minions scatter into the dark (phase 3, reset, defeat): freed, no drops, no kill events.
@@ -615,7 +689,7 @@ func clear_all(fx: bool = true) -> void:
 	if not fx:
 		sacs.clear()
 	end_thread()
-	GameState.buffs.erase("slow")
+	_erase_own_slow()
 	_slow_chain = 0.0
 	_slow_immune = 0.0
 

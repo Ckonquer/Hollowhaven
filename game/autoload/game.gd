@@ -59,6 +59,26 @@ const DIRECTOR_SCRIPT := "res://src/horror/director.gd"
 const TEST_AREAS := {"arena": "res://tests/preview/arena.tscn"}   # debug builds only
 const FALLBACK_PLAYER := "res://tests/preview/fallback_player.gd"
 const FALLBACK_UI := "res://tests/preview/fallback_ui.gd"
+## Session-wide listeners wired once in _ready(): small masteries (static Events listeners, src/core/mastery.gd)
+## and the Chapter Two story / cross-area activity tracker (one node under this autoload).
+const MASTERY_SCRIPT := "res://src/core/mastery.gd"
+const STORY_TRACKER_SCRIPT := "res://src/world/story_ch2/activity_tracker.gd"
+const STORY_TRACKER_NODE := "StoryCh2Tracker"
+## "A Look of Your Own" (data/optional_goals.gd): a look confirmed at creation counts as chosen.
+const LOOK_CHOSEN_FLAG := "c1x_look_chosen"
+## A saved position this far above where it validated before the structures existed was on an upper storey.
+const UPPER_STOREY_RESTORE := 1.0
+## Cold-load warm-up (prefetch_area): scripts an area builds or spawns soon after arriving, compiled on loader
+## threads behind the fade together with the area scene. The Reach districts warm themselves up (district
+## warm_up()); other modules may pass extra paths to prefetch_area(). EnemyFactory is loaded on the main thread
+## BEFORE any worker could compile a script that preloads it (the quarry's deadlock-avoidance rule).
+const ENEMY_FACTORY_SCRIPT := "res://src/enemies/enemy_factory.gd"
+const AREA_WARMUP := {
+	"surface": ["res://src/enemies/brambleback.gd", "res://src/enemies/knotted_elder.gd", "res://src/enemies/lantern_moth.gd"],
+	"tobin_annex": ["res://src/enemies/hollow_drudge.gd"],
+	"hushed_works": ["res://src/world/works/rooms_deep.gd", "res://src/enemies/hollow_drudge.gd", "res://src/enemies/bellcap_sentry.gd"],
+	"moonveil_manor": ["res://src/enemies/velvet_wing.gd"],
+}
 
 var mode: String = "boot"          # boot | title | playing | dead | cutscene | loading
 var player: Node3D = null          # the player CharacterBody3D (src/player/player.gd)
@@ -85,6 +105,9 @@ var _closing := false
 var _bosses: Dictionary = {}        # boss id -> true while its encounter is active (saving/travel)
 var _ch2_ending_running := false
 var _travel_seq := 0                # change_area() calls; a newer trip supersedes an older one's bookkeeping
+var _prefetching: Dictionary = {}   # path -> true: threaded load requested by prefetch_area(), not collected yet
+var _warm_refs: Dictionary = {}     # path -> Resource: collected warm-up scripts, kept so they stay compiled
+var _enemy_factory: Script = null   # EnemyFactory, loaded on the main thread before any warm-up request
 
 
 func _ready() -> void:
@@ -99,6 +122,32 @@ func _ready() -> void:
 	Events.boss_health_changed.connect(_on_boss_health_changed)
 	Events.boss_defeated.connect(_on_boss_defeated)
 	Events.area_exiting.connect(_on_area_exiting_bosses)
+	wire_session_systems()
+
+
+## Wires the session-wide listeners exactly once (idempotent: the test runner calls it again between suites
+## so a suite that shut one down never changes what the next suite sees):
+##   * small masteries (src/core/mastery.gd init(): its static Events listeners award mastery xp);
+##   * the Chapter Two story / cross-area activity tracker (src/world/story_ch2/activity_tracker.gd), one node
+##     under this autoload: ch2_returned_to_reach, the cross-area goal mirrors, the acceptance chapter card and
+##     the Haven keepsake after a reload.
+## A missing or broken module is skipped (with an error from _safe_load), never a crash.
+func wire_session_systems() -> void:
+	var mastery: Script = _safe_load(MASTERY_SCRIPT)
+	if mastery != null and mastery.has_method("init"):
+		mastery.call("init")
+	var tracker: Node = get_node_or_null(STORY_TRACKER_NODE)
+	if tracker == null or tracker.is_queued_for_deletion():
+		var st: Script = _safe_load(STORY_TRACKER_SCRIPT)
+		if st != null:
+			tracker = st.new()
+			tracker.name = STORY_TRACKER_NODE
+			add_child(tracker)
+
+
+## The session's story tracker node (null if the story module is missing).
+func story_tracker() -> Node:
+	return get_node_or_null(STORY_TRACKER_NODE)
 
 
 func _process(delta: float) -> void:
@@ -228,13 +277,20 @@ func goto_title() -> void:
 		ui = null
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(TITLE_SCENE)
+	# New Game and most Continues arrive in the Woods: start compiling them while the title is up.
+	prefetch_area.call_deferred("surface")
 
 
 ## Starts a new journey. `look` (optional) is the appearance chosen on the creation screen
-## (data/appearance.gd look dictionary); it is stored in GameState before the first save.
+## (data/appearance.gd look dictionary); it is stored in GameState before the first save. A confirmed look
+## also counts for "A Look of Your Own" (c1x_look_chosen) and makes the one-time wardrobe notice unnecessary
+## (CreationScreen.arm_new_journey_marks() sets the same two marks through Events.appearance_changed).
 func new_game(look: Dictionary = {}) -> void:
 	GameState.new_game()
 	_apply_new_game_look(look)
+	if not look.is_empty():
+		GameState.set_flag(LOOK_CHOSEN_FLAG, true)
+		GameState.wardrobe["notice_shown"] = true
 	await load_area("surface", "haven_start", false)
 	# Save straight away (quietly) so Continue exists from the first minute.
 	if GameState.active and area_id == "surface":
@@ -301,6 +357,14 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	_bosses.clear()       # a freshly loaded area never starts inside a boss encounter
 	var prev_mode := mode
 	mode = "loading"
+	var scene_path: String = AREAS.get(target_area, "")
+	if scene_path == "" and Debug.is_cheat_allowed():
+		scene_path = TEST_AREAS.get(target_area, "")
+	if scene_path == "":
+		scene_path = AREAS["surface"]
+		target_area = "surface"
+	# The destination's scene and heavy scripts compile on loader threads while the screen fades out.
+	prefetch_area(target_area)
 	if ui != null and ui.has_method("fade_out"):
 		await ui.fade_out(0.45)
 	if area_id != "":
@@ -309,13 +373,7 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	_ui_stack.clear()
 	Events.ui_stack_changed.emit(0)
 	_free_gameplay_nodes()
-	var scene_path: String = AREAS.get(target_area, "")
-	if scene_path == "" and Debug.is_cheat_allowed():
-		scene_path = TEST_AREAS.get(target_area, "")
-	if scene_path == "":
-		scene_path = AREAS["surface"]
-		target_area = "surface"
-	var err := get_tree().change_scene_to_file(scene_path)
+	var err := _change_to_area_scene(scene_path)
 	if err != OK:
 		push_error("Game: cannot load area %s (%s)" % [target_area, error_string(err)])
 	await get_tree().process_frame
@@ -332,6 +390,8 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	area.add_child(player)
 	var use_saved := use_saved_position and OUTDOOR_AREAS.has(target_area)
 	var had_spawn: bool = area.get("spawns") is Dictionary and area.spawns.has(spawn_id)
+	# The saved spot as written (GameState.player["pos"] is overwritten with the validated one below).
+	var saved_pos: Variant = _saved_position() if use_saved else null
 	var xform := _spawn_transform(spawn_id, use_saved)
 	if player.has_method("read_from_state"):
 		player.read_from_state()
@@ -354,6 +414,11 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 			var late: Transform3D = area.get_spawn(spawn_id)
 			player.teleport(late)
 			GameState.player["pos"] = [late.origin.x, late.origin.y, late.origin.z]
+		# A spot saved upstairs was validated before the house existed (the ground under it won): now that the
+		# structures stand, validate it again and put Krystal back on her upper floor.
+		if saved_pos is Vector3 and (saved_pos as Vector3).y > xform.origin.y + UPPER_STOREY_RESTORE:
+			await get_tree().physics_frame      # the new structure colliders are in the physics space
+			_restore_saved_position(saved_pos as Vector3, xform)
 	director = null
 	if DIRECTOR_AREAS.has(target_area):
 		var ds: Script = _safe_load(DIRECTOR_SCRIPT)
@@ -376,11 +441,115 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	Events.area_loaded.emit(target_area)
 	GameState.request_quest_eval()
 	_transitioning = false
+	_collect_warmups()
 	if ui != null and ui.has_method("fade_in"):
 		await ui.fade_in(0.6)
 	if prev_mode == "title":
 		pass
 	_pause_if_focus_lost()
+
+
+## GameState.player["pos"] as a Vector3 (null when there is none).
+func _saved_position() -> Variant:
+	var p: Variant = GameState.player.get("pos")
+	if p is Array and (p as Array).size() == 3:
+		return Vector3(float(p[0]), float(p[1]), float(p[2]))
+	return null
+
+
+## Upper storeys on Continue: re-validates the saved spot once the area's structures exist and moves Krystal
+## there when it is valid now (keeping the placed facing). Returns true when she was moved.
+func _restore_saved_position(saved: Vector3, placed: Transform3D) -> bool:
+	if area == null or not is_instance_valid(area) or not area.has_method("validate_position"):
+		return false
+	if player == null or not is_instance_valid(player) or not player.is_inside_tree():
+		return false
+	var ok: Variant = area.validate_position(saved)
+	if not (ok is Vector3):
+		return false
+	var p: Vector3 = ok
+	player.teleport(Transform3D(placed.basis, p))
+	GameState.player["pos"] = [p.x, p.y, p.z]
+	return true
+
+
+# --- Cold-load warm-up ----------------------------------------------------------------------------------
+
+## Starts compiling an area on loader threads: its scene (with every script the scene preloads), the
+## AREA_WARMUP scripts it builds or spawns early and any `extra` resource paths. Idempotent and never blocks:
+## paths already cached, collected or requested are skipped. load_area() calls it before its fade-out and takes
+## the scene with load_threaded_get(); goto_title() prefetches the Woods; other modules may call it (behind a
+## has_method guard) when Krystal nears a way into an area. Returns how many new requests were started.
+func prefetch_area(target_area: String, extra: Array = []) -> int:
+	var paths: Array = []
+	var scene: String = String(AREAS.get(target_area, ""))
+	if scene == "" and Debug.is_cheat_allowed():
+		scene = String(TEST_AREAS.get(target_area, ""))
+	if scene != "":
+		paths.append(scene)
+	var warm: Variant = AREA_WARMUP.get(target_area, [])
+	if warm is Array:
+		paths.append_array(warm as Array)
+	paths.append_array(extra)
+	if paths.is_empty():
+		return 0
+	_collect_warmups()
+	# Main thread first: no loader thread may be compiling EnemyFactory when a script that preloads it
+	# (spawners, arenas) is requested (the quarry's deadlock-avoidance rule).
+	if _enemy_factory == null and ResourceLoader.exists(ENEMY_FACTORY_SCRIPT):
+		var f: Variant = load(ENEMY_FACTORY_SCRIPT)
+		if f is Script:
+			_enemy_factory = f
+	var started := 0
+	for p in paths:
+		if _request_prefetch(String(p)):
+			started += 1
+	return started
+
+
+## True while `path` has an outstanding prefetch request (tests / diagnostics).
+func is_prefetching(path: String) -> bool:
+	return _prefetching.has(path)
+
+
+func _request_prefetch(path: String) -> bool:
+	if path == "" or _prefetching.has(path) or _warm_refs.has(path):
+		return false
+	if not ResourceLoader.exists(path) or ResourceLoader.has_cached(path):
+		return false
+	if ResourceLoader.load_threaded_request(path, "", false) != OK:
+		return false
+	_prefetching[path] = true
+	return true
+
+
+## Changes to an area scene, using the prefetched PackedScene when there is one (waits only if a loader thread
+## is still compiling it), else the plain change_scene_to_file().
+func _change_to_area_scene(scene_path: String) -> Error:
+	if _prefetching.has(scene_path):
+		_prefetching.erase(scene_path)
+		if ResourceLoader.load_threaded_get_status(scene_path) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			var ps: Variant = ResourceLoader.load_threaded_get(scene_path)
+			if ps is PackedScene and get_tree().change_scene_to_packed(ps as PackedScene) == OK:
+				return OK
+	return get_tree().change_scene_to_file(scene_path)
+
+
+## Collects finished warm-up scripts without waiting (they are kept in _warm_refs so they stay compiled until an
+## enemy or builder uses them). Area scenes stay requested until load_area() takes them.
+func _collect_warmups() -> void:
+	for key in _prefetching.keys():
+		var path := String(key)
+		if AREAS.values().has(path) or TEST_AREAS.values().has(path):
+			continue
+		var st := ResourceLoader.load_threaded_get_status(path)
+		if st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			continue
+		_prefetching.erase(path)
+		if st == ResourceLoader.THREAD_LOAD_LOADED or st == ResourceLoader.THREAD_LOAD_FAILED:
+			var r: Variant = ResourceLoader.load_threaded_get(path)
+			if r is Resource:
+				_warm_refs[path] = r
 
 
 ## Loads a script, returning null (with an error) instead of crashing if it is missing or broken.
@@ -906,6 +1075,10 @@ func complete_chapter_two(rewards: Dictionary = {}) -> bool:
 		GameState.set_flag(CH2_COMPLETE_FLAG, true)
 	if was_complete and not granted:
 		return false
+	# The final step (ch2_feast) completes now, before the commit save: its "gifts" toast is the ending's one
+	# reward toast, and a reload after a crash during the ending never announces the gifts a second time.
+	if GameState.chapter2 != null and GameState.chapter2.has_method("evaluate"):
+		GameState.chapter2.evaluate()
 	SaveSystem.save_game(true)
 	if was_complete:
 		return false
@@ -991,6 +1164,8 @@ func chapter_two_rewards() -> Dictionary:
 ## on_complete give, flags = chapter_two_complete + the final step's flags (e.g. ch2_feast, a recipe
 ## unlock). Uses the reward ledger (GameState.grant_once) when the core-save module provides it; without
 ## it chapter_two_complete itself is the ledger entry (set first, then the items are given).
+## Silent: the one reward toast is the ch2_feast step's on_complete message (ChapterLog), shown when the step
+## completes right after this; the ending screen itself says "Chapter Two complete".
 ## Returns true when the rewards were granted by this call.
 func _grant_chapter_two_rewards(rewards: Dictionary) -> bool:
 	var oc := _feast_step_rewards()
@@ -1008,8 +1183,7 @@ func _grant_chapter_two_rewards(rewards: Dictionary) -> bool:
 			if not flag_list.has(String(f)):
 				flag_list.append(String(f))
 	if GameState.has_method("grant_once"):
-		return bool(GameState.call("grant_once", CH2_REWARD_ID, items, flag_list,
-			"Chapter Two complete. The Lanternwake's gifts are yours."))
+		return bool(GameState.call("grant_once", CH2_REWARD_ID, items, flag_list, ""))
 	if bool(GameState.get_flag(CH2_COMPLETE_FLAG)):
 		return false
 	for f in flag_list:

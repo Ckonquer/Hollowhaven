@@ -9,9 +9,15 @@ extends Node3D
 ## is spawned through EnemyFactory with boss_params() (guarded: a missing script never crashes).
 ## Events.boss_defeated("borrowed_choir") -> set ch2_choir_defeated FIRST (the quest layer then pays its
 ## rewards), then the exit opens, the vault becomes a safe zone, the respawn moves to vault_exit and the
-## game saves - before any ending presentation (MP §13.3).
+## game saves - before any ending presentation (MP §13.3). The vault's ambience also calms from the
+## Choir's loop (Layout.AMBIENCE, amb_boss) to CALM_AMBIENCE: re-registered with the Works area at the
+## victory (and played at once when she stands in the vault); rooms_deep.gd registers vault_ambience() on
+## every later build of a won save.
 ## Without the boss script (content still completable): raising the lantern at all three anchors and
-## waking both resonators banishes the empty echo. debug_mark_cleared() (debug builds / tests).
+## waking both resonators banishes the empty echo. The same fallback takes over when a spawned Choir
+## vanishes without a defeat (a later-wave script failing / freeing itself mid-encounter): the arena
+## re-enables its anchors and resonators (the boss may have left the plates disabled) - never a softlock.
+## debug_mark_cleared() (debug builds / tests).
 ##
 ## API for the borrowed_choir boss module (positions global):
 ##   arena_center() -> Vector3, arena_radius() -> float, perimeter_radius() -> float, floor_y() -> float
@@ -39,6 +45,9 @@ const Factory := preload("res://src/enemies/enemy_factory.gd")
 const BOSS_ID := "borrowed_choir"
 const CLEAR_FLAG := "ch2_choir_defeated"
 const RESONATOR_IDS := ["hw_resonator_west", "hw_resonator_east"]
+const VAULT_ZONE := "hw_vault"
+## The quiet vault after the victory: the same gentle water loop as the Bell Throat above (an existing loop).
+const CALM_AMBIENCE := "amb_stream"
 
 var area: Node3D = null
 var controller: Node = null
@@ -170,6 +179,13 @@ static func boss_available() -> bool:
 	return Factory.can_spawn(BOSS_ID)
 
 
+## The vault zone's ambience loop: the Choir's (Layout.AMBIENCE) until ch2_choir_defeated, then calm.
+static func vault_ambience() -> String:
+	if bool(GameState.get_flag(CLEAR_FLAG)):
+		return CALM_AMBIENCE
+	return String(Layout.AMBIENCE.get(VAULT_ZONE, ""))
+
+
 # --- Encounter ------------------------------------------------------------------------------------------
 
 func check(p: Node3D) -> void:
@@ -182,6 +198,15 @@ func check(p: Node3D) -> void:
 		start_encounter()
 	elif active and (d > arena_radius() + 2.0 or pos.y > c.y + 3.0):
 		stop_encounter("left")
+	elif active and _boss_lost():
+		_enter_fallback()
+
+
+## A spawned Choir whose node is gone without a defeat (its script failed or freed itself mid-encounter).
+func _boss_lost() -> bool:
+	if fallback:
+		return false
+	return not is_instance_valid(boss) or (boss as Node).is_queued_for_deletion()
 
 
 func start_encounter() -> void:
@@ -209,6 +234,13 @@ func start_encounter() -> void:
 
 func _enter_fallback() -> void:
 	fallback = true
+	boss = null
+	# A vanished boss may have left its phase state on the props (plates disabled outside Phase B): the
+	# fallback needs every anchor and resonator usable again. Woken resonators stay woken.
+	for r in _resonators:
+		(r as Node).set("enabled", true)
+	for a in _anchors:
+		(a as Node).set("enabled", true)
 	Art.caption("[borrowed voices echo around the empty centre]")
 	Events.hint.emit("hw_choir_anchors", "Raise your lantern at the three anchors and wake both resonators.")
 	_check_fallback_clear()
@@ -254,12 +286,25 @@ func clear_encounter() -> void:
 	if was:
 		return
 	_apply_exit(true, true)
+	_calm_ambience()
 	Art.director_suppress(area, 240.0)
 	encounter_cleared.emit()
 	if area != null and Game.area == area:
 		Game.set_respawn(Layout.AREA_ID, "vault_exit")     # a reliable way out: wake beside the exit lift
 	if save_on_clear and Game.player != null and is_instance_valid(Game.player) and (area == null or Game.area == area):
 		SaveSystem.save_game()
+
+
+## The victory quiets the vault: the Works area's hw_vault ambience becomes CALM_AMBIENCE (same light mood),
+## and when Krystal is standing in the vault right now the loop crossfades at once (the area only replays a
+## zone's ambience on entering it).
+func _calm_ambience() -> void:
+	if area == null or not is_instance_valid(area) or not area.has_method("register_mood"):
+		return
+	area.call("register_mood", VAULT_ZONE, (Layout.MOODS[VAULT_ZONE] as Dictionary).duplicate(), CALM_AMBIENCE)
+	var mz: Variant = area.get("mood_zone")
+	if Game.area == area and mz is String and String(mz) == VAULT_ZONE and Audio.has_method("play_ambience"):
+		Audio.play_ambience(CALM_AMBIENCE, 3.0)
 
 
 func debug_mark_cleared() -> bool:

@@ -14,7 +14,8 @@ extends RefCounted
 ##      e.g. 20% ironwood armor with Pebble's 10% passive = 1 - 0.8 * 0.9 = 28%, not 30%
 ##   4. reduction = min(reduction, REDUCTION_CAP)                       (45%)
 ##   5. mitigated = raw * (1 - reduction). No damage type bypasses armor in this release (BYPASS_ARMOR is empty).
-##   6. the transient shield (GameState.player_shield(), Pebble's Stoneheart) absorbs `mitigated` AFTER mitigation
+##   6. the transient shield (Stats.player_shield() in src/core/stats.gd: Pebble's Stoneheart, which lives on the
+##      player's health node) absorbs `mitigated` AFTER mitigation
 ##   7. Health.apply_damage(what is left)
 ## Movement: move_mult = 1 + min(sum of move bonuses (Lumi passive, Glimmerstep, charm), MOVE_CAP). Bonuses add.
 

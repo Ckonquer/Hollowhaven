@@ -10,7 +10,8 @@ extends Node3D
 ##   * a gentle camera shot whose viewpoint is VALIDATED against her buildings and the world (clear line of
 ##     sight to the focus, nothing solid around the lens, open sky above it, above the ground); if no
 ##     candidate is clear the player's own camera is kept (the simple safe shot).
-## play() is awaitable (DURATION s, any key / click skips after SKIP_AFTER s); the ending screen then plays over
+## play() is awaitable (DURATION s, any key press / mouse click skips after SKIP_AFTER s - never the mouse wheel or a
+## held key's repeat); the ending screen then plays over
 ## the still-glowing scene; finish() restores the camera and removes everything.
 ## Companions celebrate through Game (react("celebrate")); music is the director's (m27 on chapter2_completed).
 
@@ -23,6 +24,8 @@ const FestivalLights := preload("res://src/world/story_ch2/festival_lights.gd")
 
 const DURATION := 9.0
 const SKIP_AFTER := 1.2
+## Mouse buttons that never skip (is_skip_input).
+const WHEEL_BUTTONS := [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]
 const RING_COUNT := 28
 const HAVEN_RING_MIN := 17.5
 const HAVEN_RING_MAX := 34.0
@@ -383,11 +386,22 @@ func _process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if not _playing:
 		return
-	var pressed := (event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo) \
-		or (event is InputEventMouseButton and (event as InputEventMouseButton).pressed)
-	if pressed and _t >= SKIP_AFTER:
+	if _t >= SKIP_AFTER and is_skip_input(event):
 		get_viewport().set_input_as_handled()
 		skip()
+
+
+## A deliberate press that may skip the celebration: a key press (not a held key's echo) or a mouse button press.
+## The mouse wheel (and its horizontal tilt) never skips: a scroll to look around or a stray wheel tick must not
+## cut the moment short.
+static func is_skip_input(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		var k := event as InputEventKey
+		return k.pressed and not k.echo
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		return mb.pressed and not WHEEL_BUTTONS.has(mb.button_index)
+	return false
 
 
 ## Restores the player's camera and removes the celebration (called after the ending screen).

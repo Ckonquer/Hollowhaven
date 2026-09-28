@@ -15,7 +15,9 @@ extends "res://src/enemies/enemy_base.gd"
 ##                       (6 s) and can be cut ("Cut the root", E or a swing). At most MAX_ROOTS alive, a new
 ##                       ring only once the old one is gone. Nothing else is ever spawned.
 ## Elite rules: ordinary hits never stagger it; enough damage in a short time (POISE) breaks its poise for a
-## short stun (which also cancels a wind-up). Its health bar shows while it is engaged
+## short stun (which also cancels a wind-up). Comfort: elites count as boss mechanics for Settings
+## "timing_assist" (like the Matron and the Quarry Warden): every wind-up and every recovery (the punish
+## opening, also after a bonk) lasts TIMING_ASSIST_MULT longer. Its health bar shows while it is engaged
 ## (Events.boss_health_changed "knotted_elder", -1 hides it). On defeat it grants the content reward
 ## "rw_c1x_elder" once (resin + flag c1x_elder_defeated; setup key "reward_id", "" = none).
 ## Stats: data/enemies.gd "knotted_elder". Sounds (existing names only): dir_root_creak (sweep tell / alert),
@@ -47,6 +49,7 @@ const POISE_WINDOW := 5.0
 const POISE_STUN := 1.2
 const POISE_IMMUNITY := 8.0
 const LANE_REFRESH := 0.1
+const TIMING_ASSIST_MULT := 1.5      # Settings timing_assist: wind-ups and recoveries (as the Matron / Warden)
 const BAR_ID := "knotted_elder"
 const REWARD_ID := "rw_c1x_elder"
 const BARK_CHIPS := Color("7a5a40")
@@ -299,11 +302,16 @@ func _choose_attack() -> void:
 
 
 func telegraph_duration() -> float:
-	return attack_telegraph(_def)
+	return attack_telegraph(_def) * assist_mult()
 
 
 func recover_duration() -> float:
-	return attack_recover(_def)
+	return attack_recover(_def) * assist_mult()
+
+
+## Settings "timing_assist" ("removes tight timing windows from ... boss mechanics"; elites count): x1.5.
+func assist_mult() -> float:
+	return TIMING_ASSIST_MULT if bool(Settings.get_value("timing_assist")) else 1.0
 
 
 func _on_telegraph_start() -> void:

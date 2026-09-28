@@ -9,6 +9,7 @@ extends RefCounted
 
 const SkillsData := preload("res://data/companion_skills.gd")
 const Logic := preload("res://src/companions/companion_logic.gd")
+const Stats := preload("res://src/core/stats.gd")
 
 const RIBBON_BOND := "bond_ribbon"           # the cosmetic ribbon earned at the 5-heart perk (derived, not an item)
 const RIBBON_FLAG := "c1x_ribbon_given"      # optional goal Brave Little Steps (data/optional_goals.gd)
@@ -117,16 +118,9 @@ static func _setting_true(key: String) -> bool:
 
 
 ## Krystal's best owned weapon tier (weapons and wands in the backpack; 1 = stone / none). Stable: never the
-## tool she happens to hold.
+## tool she happens to hold. One source of truth: Stats.best_weapon_tier() (src/core/stats.gd).
 static func gear_tier() -> int:
-	var best := 1
-	for s in GameState.inventory.slots:
-		if s == null or not ItemDB.has_item(String(s["id"])):
-			continue
-		var d: Dictionary = ItemDB.item(String(s["id"]))
-		if String(d.get("cat", "")) in ["weapon", "wand"]:
-			best = maxi(best, ItemDB.item_tier(String(s["id"])))
-	return best
+	return Stats.best_weapon_tier()
 
 
 static func gear_damage_mult() -> float:

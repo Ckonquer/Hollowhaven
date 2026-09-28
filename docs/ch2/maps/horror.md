@@ -294,13 +294,20 @@ Common skeleton: Node, `setup(area)`, 0.1 s tick skipping `cutscene/loading`, pu
   lunges). Suppress on note read (`Interactable` handler). Optional director event
   `{"kind":"scratch","zones":["works_winch"],"anchor":"ceiling","spider":true,"alt_sound":"shade_drift","alt_caption":"[dust drifts down from above]"}`.
 - **Turning pumpkin (surface, new region)**: no director exists there (`Game.director == null`; guard calls). Region
-  controller: flag `moment_pumpkin_seen` when on screen (`cam.is_position_in_frustum`), rotate only while off
-  screen after the player left and returned, set `moment_pumpkin_turned`; on load build it already rotated
-  from the flag. Must not be a crop/structure and must be outside the home safe area. Gentle wobble + caption;
-  Intense: a far (>25 m) face turns once, no volume spike.
+  controller: flag `ch2_moment_pumpkin_seen` when on screen (`cam.is_position_in_frustum`), rotate only while off
+  screen after the player left and returned, set `ch2_moment_pumpkin_turned` (stem lesson: `ch2_moment_pumpkin_twitched`);
+  on load build it already rotated from the flag. Must not be a crop/structure and must be outside the home safe area.
+  Gentle wobble + caption; Intense: a distant face turns once while watched, no volume spike.
+  **As built** (C2, `src/world/reach/west/pumpkin_moment.gd`, constants in `data/reach_west.gd` `FLAG_MOMENT_*` /
+  `MOMENT_*`): the flags carry the `ch2_` prefix (not `moment_pumpkin_*`); the Intense on-screen turn happens only while
+  she watches from **>= 16 m** (`MOMENT_INTENSE_MIN := 16.0`), not the > 25 m suggested here. **Lead decision (integration
+  R135/R136 o): 16 m is kept** — it is still clearly distant (the pumpkin is ~0.8 m across, a small figure at 16 m) and the
+  turn is silent and slow (2.4 s tween, then perfectly still), so it stays unsettling without a jump scare or volume spike.
+  It emits `Events.horror_event("authored:pumpkin_turned", {pos})` so Mochi shelters from the real pumpkin.
 - **Empty waltz cloaks (manor)**: on waltz stop (music end), after a delay (Gentle: longer preview while music
   plays; Intense: later), tween one cloak pair; near candle/lantern light (`Combat.light_at > 0.4`) reveal support
-  wires. Non-damaging; flag `moment_empty_waltz`.
+  wires. Non-damaging; flag `ch2_moment_empty_waltz` (as built by C4: `data/manor_layout.gd` `FLAG_WALTZ`, set FIRST,
+  once per save; `src/world/manor/waltz_moment.gd`; authored silence event `authored:empty_waltz`).
 
 ### (c) Suppressing during bosses/puzzles
 - Boss: on start emit `authored:<boss>` + `Game.director.suppress(9999)`; on leave/victory/death call
@@ -324,6 +331,10 @@ shade_whisper, shade_shriek. Cover with a test like `test_below_arachno.gd:82` a
 - Save flags: `horror_once_*`, `moment_threshold/crossing/silk_intro/nursery/return`, `crossing_clue_seen`,
   `imitation_seen/folded`, `reached_silk_hollows` (quest), `weaver_defeated`. Renaming replays moments in old saves
   and breaks `test_below_progress`, `test_audit_persistence_below`, `test_below_flow`.
+- Chapter Two moment flags (saved, once per save): `ch2_moment_pumpkin_seen/turned/twitched` (Reach west),
+  `ch2_moment_empty_waltz` (manor), `ta_moment_echo` (Tobin's annex), `moment_hw_knock`, `moment_hw_wrong_door`,
+  `moment_hw_winch`, `moment_hw_porch` (Hushed Works). The prefixes are inconsistent on purpose: the lead kept the local
+  names (integration R136 r) because renaming saved flags later is riskier than the inconsistency.
 - Editing existing `EVENTS`/`DIRECTOR`/`INTENSITY` values or adding events in `mine/ruins/silk` shifts RNG and
   pacing: breaks `test_do_nothing_frequency_30_minutes` ranges, `test_intensity_scales_cooldowns` (14/90/60),
   `test_zone_eligibility`, `test_state_eligibility`, `test_min_intensity_gentle_excludes_majors`,

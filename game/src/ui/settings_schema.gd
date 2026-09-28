@@ -13,6 +13,9 @@ const ROWS := [
 	{"key": "fov", "tab": "gameplay", "type": "slider", "label": "Field of view", "desc": "Wider shows more of the world around Krystal.", "min": 55.0, "max": 95.0, "step": 1.0, "fmt": "deg"},
 	{"key": "camera_distance", "tab": "gameplay", "type": "slider", "label": "Camera distance", "desc": "Default zoom. The mouse wheel adjusts it while playing.", "min": 2.5, "max": 8.0, "step": 0.1, "fmt": "m"},
 	{"key": "show_hints", "tab": "gameplay", "type": "toggle", "label": "Show hints", "desc": "Friendly tips the first time you meet something new."},
+	{"key": "companion_auto_attack", "tab": "gameplay", "type": "toggle", "label": "Friends join fights", "desc": "Your companion helps against enemies you're fighting. Their comfort and support work either way."},
+	{"key": "companion_autocast", "tab": "gameplay", "type": "toggle", "label": "Friends use skills on their own", "desc": "Your companion uses their special skill by themselves when it helps. When off, they wait for you to ask."},
+	{"key": "seasonal_decor", "tab": "gameplay", "type": "toggle", "label": "Seasonal decorations", "desc": "A few pumpkins and ribbons along the woodland paths. Never inside your home."},
 	{"key": "fullscreen", "tab": "video", "type": "toggle", "label": "Fullscreen", "desc": "Play in a window or fill the screen."},
 	{"key": "vsync", "tab": "video", "type": "toggle", "label": "V-Sync", "desc": "Smooth frames without tearing."},
 	{"key": "max_fps", "tab": "video", "type": "option", "label": "Frame rate limit", "desc": "Cap the frame rate to keep your computer cool and quiet.", "options": [[0, "Unlimited"], [30, "30"], [60, "60"], [120, "120"], [144, "144"]]},
@@ -29,7 +32,13 @@ const ROWS := [
 	{"key": "reduce_shake", "tab": "comfort", "type": "toggle", "label": "Reduce camera shake", "desc": "Softens the camera shake from impacts and scares."},
 	{"key": "reduce_flashing", "tab": "comfort", "type": "toggle", "label": "Reduce flashing", "desc": "Makes screen flashes faint and slow, and calms the low-health pulse."},
 	{"key": "captions", "tab": "comfort", "type": "toggle", "label": "Captions", "desc": "Short text for important sounds, like [a faint whisper]."},
+	{"key": "high_visibility_cues", "tab": "comfort", "type": "toggle", "label": "High-visibility cues", "desc": "Bolder outlines, markers and shapes on puzzle and boss cues, so nothing depends on colour alone."},
+	{"key": "timing_assist", "tab": "comfort", "type": "toggle", "label": "Timing assist", "desc": "Longer warnings and roomier timing in puzzles and boss fights. Nothing is skipped or taken away."},
 ]
+
+## The Comfort tab's toggles, in order (the horror intensity picker comes first). Every "comfort" toggle row
+## above must be listed here, so each one the game honours can also be found in the menu.
+const COMFORT_TOGGLES := ["arachnophobia", "reduce_shake", "reduce_flashing", "captions", "high_visibility_cues", "timing_assist"]
 
 
 static func rows_for(tab: String) -> Array:

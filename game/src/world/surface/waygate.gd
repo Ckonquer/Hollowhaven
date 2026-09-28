@@ -10,6 +10,8 @@ extends Node3D
 ##   lit     - ch2_waygate_repaired: "Travel to Hallowmere Reach" -> Game.change_area(target)
 ## The Reach side is always lit and always leads home ("Return to Hollowhaven Woods"), so Krystal can
 ## never be trapped across the boundary. Travel only ever happens from interact(): never automatically.
+## Prefetch (timing only): while the surface gate is lit and Krystal comes within PREFETCH_RADIUS, it asks
+## Game.prefetch_area(target_area) ONCE per gate node (only if Game has that method), so the Reach loads faster.
 ##   setup({"side": "surface"|"reach", "target_area": String, "target_spawn": String})
 
 const Palette := preload("res://src/art/palette.gd")
@@ -29,6 +31,9 @@ const PILLAR_SIZE := Vector3(0.85, 3.1, 0.75)
 const GLOW := Color("ffc978")
 ## Radius of the ground the gate occupies (pillars + plinths); used by placement checks.
 const FOOTPRINT_RADIUS := 2.4
+## Krystal within this many metres (XZ) of a lit surface gate -> prefetch the target area once.
+const PREFETCH_RADIUS := 25.0
+const PREFETCH_CHECK_SECONDS := 0.5
 
 var side: String = "surface"
 var target_area: String = "hallowmere_reach"
@@ -43,6 +48,10 @@ var _glow := 0.0             # 0 = cold, ~0.35 = woken shimmer, 1 = lit
 var _t := 0.0
 var _busy := false
 var _tw: Tween
+var _prefetched := false
+var _prefetch_t := 0.0
+## Who receives prefetch_area() (null = the Game autoload; tests pass a recorder).
+var prefetcher: Object = null
 
 
 func setup(params: Dictionary) -> void:
@@ -328,9 +337,36 @@ func _apply_glow(pulse: float) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	if not _prefetched and side == "surface":
+		_prefetch_t += delta
+		if _prefetch_t >= PREFETCH_CHECK_SECONDS:
+			_prefetch_t = 0.0
+			var p: Variant = Game.get("player")
+			if p is Node3D and is_instance_valid(p) and (p as Node3D).is_inside_tree() and is_inside_tree():
+				check_prefetch((p as Node3D).global_position)
 	if _glow <= 0.001:
 		return
 	_apply_glow(0.5 + 0.5 * sin(_t * 1.4))
+
+
+## Prefetch hook (timing only): the first time Krystal is within PREFETCH_RADIUS of this LIT surface gate, asks
+## Game.prefetch_area(target_area) when Game provides it. Returns true when this call made the request (once per
+## gate node; a missing Game.prefetch_area still counts as done, so nothing is retried every frame).
+func check_prefetch(player_pos: Vector3) -> bool:
+	if _prefetched or side != "surface" or target_area == "" or state() != "lit":
+		return false
+	var here := global_position if is_inside_tree() else position
+	if Vector2(player_pos.x - here.x, player_pos.z - here.z).length() > PREFETCH_RADIUS:
+		return false
+	_prefetched = true
+	var to: Object = prefetcher if prefetcher != null else Game
+	if to != null and to.has_method("prefetch_area"):
+		to.call("prefetch_area", target_area)
+	return true
+
+
+func has_prefetched() -> bool:
+	return _prefetched
 
 
 func _play_light_up() -> void:

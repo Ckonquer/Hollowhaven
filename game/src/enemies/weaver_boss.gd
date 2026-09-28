@@ -57,7 +57,8 @@ extends Node3D
 ##     (240 HP, phase 1, cold braziers, all anchors).
 ##   * Won progression is never touched: "weaver_defeated" is never reset; the trial never writes it.
 ## Gentle: slower, softer (x0.6), longer stuns and warnings, fewer hazards, one slower minion and no
-## drop while it is alive. Intense: repositions ("stalks") more, slightly shorter pauses - never shorter
+## drop while it is alive (unless it has been out longer than MINION_DROP_GATE s or is out of reach: a stuck or
+## ignored minion never stalls the fight). Intense: repositions ("stalks") more, slightly shorter pauses - never shorter
 ## warnings than 1.1 s.
 ## Comfort settings: "timing_assist" stretches every warning, opening, recovery beat and the channel by
 ## TIMING_ASSIST_MULT (no tight windows); "high_visibility_cues" adds bold cream outlines to the drop /
@@ -110,6 +111,7 @@ const T_INTRO := 2.2
 # --- Phases 2-3 ------------------------------------------------------------------------------------
 const PHASE_AT := [1.0, 0.6, 0.3]         # HP fraction at (or below) which phase 1 / 2 / 3 runs
 const LATE_PHASE2_AT := 0.45              # the one minion release happens once HP <= this (late phase 2)
+const MINION_DROP_GATE := 20.0            # Gentle: a minion out longer than this (or unreachable) no longer holds drops back
 const T_PHASE_SHRIEK := 2.0
 const T_FAN_TELE := [1.4, 1.2, 1.1]       # web fan warning
 const T_TRIP_TELE := [1.4, 1.2, 1.1]      # trip-lines form (harmless) for this long
@@ -194,6 +196,7 @@ var _channel_cd: float = 0.0
 var _channel_brazier: Node = null
 var _brazier_burned: Dictionary = {}   # brazier instance id -> true once its anchor burned
 var _retry := false                     # the encounter was reset once (explains the retry rule on re-entry)
+var _exit_released := false             # _exit_tree released the encounter (only once)
 
 static var _pending_seed: Node3D = null
 
@@ -431,6 +434,21 @@ static func ensure_heartseed(parent: Node, pos: Vector3) -> Node:
 
 func _process(delta: float) -> void:
 	tick(delta)
+
+
+## Freed mid-fight without an area change (e.g. a scripted removal, a trial torn down): nothing else would
+## ever release the encounter, so Game.boss_active() would stay true (no saving, no travel). Release it once:
+## hide the bar and end the encounter; minions it released leave with it (no drops, no kill events).
+func _exit_tree() -> void:
+	if not fight_started or _gone or _exit_released:
+		return
+	_exit_released = true
+	Events.boss_health_changed.emit(boss_id, -1.0, float(health.max_hp) if health != null else 1.0)
+	Events.boss_encounter_changed.emit(boss_id, false)
+	if field != null and is_instance_valid(field):
+		for m in field.minions:
+			if is_instance_valid(m) and not (m as Node).is_queued_for_deletion():
+				(m as Node).queue_free()
 
 
 func tick(delta: float) -> void:
@@ -691,13 +709,14 @@ func _choose_phase3() -> void:
 
 
 ## No drop/pounce while a sac is still shaking (a release never overlaps the main pounce); on Gentle
-## also not while its minion is alive.
+## also not while its minion is alive - as long as it is fresh (<= MINION_DROP_GATE s) and reachable, so a
+## minion stuck on a ledge or left alone never freezes the fight into fans only.
 func _drop_allowed() -> bool:
 	if field == null:
 		return true
 	if field.sacs_pending():
 		return false
-	if _i() == 0 and field.alive_minions() > 0:
+	if _i() == 0 and field.blocking_minions(MINION_DROP_GATE) > 0:
 		return false
 	return true
 

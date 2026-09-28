@@ -52,7 +52,7 @@ const LORE := {
 	},
 	"lore_ch2_groundskeeper_2": {
 		"title": "Groundskeeper's Second Note",
-		"text": "If I don't get round to it, would you? The empty dish by the west wall. The moon won't mind whose hand lights it. A little light is all it wants.",
+		"text": "If I don't get round to it, would you? The empty dish by the south-west wall. The moon won't mind whose hand lights it. A little light is all it wants.",
 	},
 	"lore_ch2_quarry_log": {
 		"title": "Ashbell Winch Log",

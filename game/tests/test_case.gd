@@ -5,7 +5,8 @@ extends Node
 ##       assert_eq(inv.add("wood", 120), 0)
 ## Methods named test_* run in file order. before_each()/after_each() wrap every test.
 ## Tests may `await` (e.g. await wait_frames(2)). Never touch the real save folder:
-## the runner points SaveSystem at user://test_saves/<suite> before each suite.
+## the runner points SaveSystem at user://test_saves/run_<pid>/<suite> before each suite (one folder per runner
+## process, so parallel test runs never share save files).
 
 var _failures: Array = []
 

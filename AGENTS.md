@@ -21,6 +21,23 @@ Read first: `GAME_SPEC.md` (design) and `docs/ARCHITECTURE.md` (code contracts).
 * Area screenshots (debug only):    `... -- --area=surface --cams="x,y,z,yaw,pitch;..." --shot-dir=<abs dir>`
 * Preview one visual script:        `... -- --preview=res://src/companions/mochi.gd --shot-dir=<abs dir>`
 * Release build + zip:              `powershell -ExecutionPolicy Bypass -File tools/build_release.ps1`
+* Chapter Two visual-QA commands (debug builds only; `...` = `tools/godot.sh --path game --resolution 1600x900`; always
+  bound them with `--quit-at` / `--max-seconds` or `timeout`; look at the PNGs afterwards). Suggested by the Wave B/C
+  modules, not yet run on screen (the pending checks are listed in `KNOWN_ISSUES.md`):
+  * Avatar looks (preview stage, non-driven avatar): `... -- --windowed --preview=res://src/player/krystal_avatar.gd
+    --avatar-outfit=<outfit id> [--avatar-hair=<id> --avatar-hair-color=<id> --avatar-skin=<id> --avatar-eyes=<id>
+    --avatar-hat=<id> --avatar-armor=<armor set id>] --preview-anim=walk --shot-dir=<abs dir>` (ids: `data/appearance.gd`,
+    armor sets: `data/equipment.gd`; other `--preview-anim` names: idle, run, jump, roll, wave, cheer, sleep, wand ...).
+  * "Meet Krystal" creation screen: `... -- --windowed --title-show=creation --shots=<abs dir> --shot-times=3 --quit-at=6`
+    (other `--title-show=` values: comfort, settings, credits, continue, newgame, confirm).
+  * Wardrobe panel: `... -- --windowed --area=surface --ui-open=wardrobe --shots=<abs dir> --shot-times=4 --quit-at=6`.
+  * One-time wardrobe notice: `... -- --windowed --area=surface --ui-show=wardrobe_notice --shots=<abs dir> --shot-times=4 --quit-at=6`
+    (debug boots switch the automatic notice off, `ui_root.NOTICE_OFF_ARGS`; `--ui-show` shows it on demand; the QA bot passes
+    `-- --no-wardrobe-notice` when continuing a v1 save). Chapter Two ending screen: `--ui-show=ending2`.
+  * Journal / map: `... -- --windowed --area=hallowmere_reach --ui-open=map` or `--ui-open=journal --ui-args={"tab":"mastery"}`
+    (tabs: story, optional, friends, lore, mastery).
+  * Hushed Works deep rooms: `... -- --windowed --area=hushed_works --spawn=crossing_gate
+    --flags=ch2_line_water,ch2_line_bell,ch2_line_light --give=lantern` (other spawns: `bell_throat`, `vault_exit`, see spec §1).
 * Drive a running build with real OS input: `tools/winctl.ps1 -ProcId <pid> -Action seq -Seq "W:800,E:80"`
 * Second-monitor QA playthrough (the owner keeps full use of monitor 1; virtual input, no SendInput, no focus):
   `python tools/qa/playthrough.py --second-monitor --mute --out qa/tmp/e2e/sm1` (packaged build; same flags for

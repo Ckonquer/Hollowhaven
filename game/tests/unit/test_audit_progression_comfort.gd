@@ -11,11 +11,15 @@ var _saved_mode: String = ""
 var _runner: Node = null
 var _saved_allow: bool = true
 var _saved_confirmed: Variant = null
+var _saved_zone: String = ""
+var _saved_safe: bool = true
 
 
 func before_each() -> void:
 	fresh_state()
 	_saved_mode = Game.mode
+	_saved_zone = Game.zone_id
+	_saved_safe = Game.in_safe_zone
 	_runner = get_tree().current_scene
 	_saved_allow = UiUtil.allow_settings_save
 	UiUtil.allow_settings_save = false          # never write the player's settings file
@@ -37,6 +41,8 @@ func after_each() -> void:
 	Game.director = null
 	Game.companion_nodes = {}
 	Game.mode = _saved_mode
+	Game.zone_id = _saved_zone          # the loaded surface's zone poll changed these (runner ISOLATION note)
+	Game.in_safe_zone = _saved_safe
 	get_tree().paused = false
 	Audio.stop_all()
 	GameState.active = false

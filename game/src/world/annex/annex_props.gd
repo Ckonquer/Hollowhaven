@@ -226,7 +226,7 @@ static func sluice_gate(b: Builder, parent: Node3D, pos: Vector3, facing: Vector
 		b.vbox(pos + facing * 0.12 + Vector3(0, y, 0), Vector3(width + 0.05, 0.08, 0.03), BelowProps.IRON, basis, NO_SHADOW)
 	# the wheel and its spindle
 	var wheel_c := pos + facing * 0.34 + Vector3(0, 2.75, 0)
-	b.batch(_torus(), BelowProps._tint(), Transform3D((basis * Basis(Vector3(1, 0, 0), PI * 0.5)).scaled_local(Vector3(0.42, 0.4, 0.42)), wheel_c), BelowProps.IRON)
+	b.batch(_torus(), BelowProps.tint(), Transform3D((basis * Basis(Vector3(1, 0, 0), PI * 0.5)).scaled_local(Vector3(0.42, 0.4, 0.42)), wheel_c), BelowProps.IRON)
 	for i in 3:
 		b.vbox(wheel_c, Vector3(0.78, 0.04, 0.04), BelowProps.IRON, basis * Basis(Vector3(0, 0, 1), float(i) * PI / 3.0), NO_SHADOW)
 	b.vcyl(pos + facing * 0.22 + Vector3(0, 2.75, 0), 0.04, 0.3, BelowProps.IRON, basis * Basis(Vector3(1, 0, 0), PI * 0.5), NO_SHADOW)
@@ -242,7 +242,7 @@ static func sluice_gate(b: Builder, parent: Node3D, pos: Vector3, facing: Vector
 
 
 static func _torus() -> Mesh:
-	return BelowProps._torus_mesh()
+	return BelowProps.torus_mesh()
 
 
 ## A ladder against a wall: rails from `foot` up to `top_y`, rungs every 0.34 m, facing `facing`.

@@ -19,24 +19,25 @@ extends "res://src/world/areas_ch2/placeholder_area.gd"
 ## after a win) and defeat (Game respawns at the respawn point) both return to that checkpoint; a save
 ## never resumes inside a trial (Game.continue_game). The entry pad is safe and outside the engage
 ## radius; walking back onto it makes the Matron stand down.
-## Other trials (Velour, Choir) can be added to TRIALS with their own builder later.
+##
+## MORE TRIALS (module D1): the table is data/trials.gd (TRIALS; the Matron entry is unchanged). Count Velour
+## ("velour", "Echo Trial: The Last Waltz", from the manor's ballroom rest candles) and the Borrowed Choir ("choir",
+## "Echo Trial: The Borrowed Song", from the Hushed Works' Bell Throat) are built by their arena builders
+## (src/world/trial/velour_trial.gd, choir_trial.gd: `static func build(area) -> Dictionary`), which spawn the REAL
+## boss scripts in "trial" mode with fresh, isolated props (no persist flags, no story listeners). Same flow, same
+## pale door, same rules. The Matron keeps her own room below (_build_room / _build_encounter), exactly as before.
+## Trial-scoped ledger: GameState.trials[id] also keeps "last_seconds", "repeat_paid" (repeat clears paid) and
+## "paid" ({item: total} from repeat clears). The trial menu (src/world/trial/trial_entry.gd) shows menu_text(id):
+## the memory text, the record (clears, best time) and what a clear leaves.
 
 const Brazier := preload("res://src/enemies/boss_brazier.gd")
 const BelowLayout := preload("res://src/world/below/below_layout.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
+const TrialsData := preload("res://data/trials.gd")
 const BOSS_SCRIPT := "res://src/enemies/weaver_boss.gd"
 
 const TRIAL_MATRON := "matron"
-const TRIALS := {
-	"matron": {
-		"title": "Echo Trial: The Thread Above", "alt_title": "Echo Trial: The Hollow Above",
-		"subtitle": "a remembered challenge", "boss": "weaver_matron", "requires_flag": "weaver_defeated",
-		"first_reward": "rw_trial_matron_first",
-		"first_message": "The echo remembers you. The Moon Moth Shawl pattern can now be sewn at the Loom.",
-		"repeat": {"silk": 3, "glowcap": 2}, "bonus_every": 3, "bonus": {"echo_shard": 1},
-		"origin": {"area": "below", "spawn": "cp_arena"},
-	},
-}
+const TRIALS := TrialsData.TRIALS
 const ARENA_RADIUS := 11.0
 const WALL_RADIUS := 11.8
 const WALL_SEGMENTS := 32
@@ -57,9 +58,12 @@ var result: String = ""          # "" | "won" | "lost" | "left"
 var fighting := false
 var elapsed: float = 0.0
 var last_clear: Dictionary = {}
+var arena: Dictionary = {}           # what the trial's arena builder returned (non-Matron trials; tests read it)
+var record_label: Label3D = null     # the trial's record under the title plate
 
 var _return_t: float = -1.0
 var _ended := false
+var _fade_t: float = -1.0
 
 
 # --- Static API (used by below_world.gd and tests) ------------------------------------------------------
@@ -100,8 +104,34 @@ static func record(id: String) -> Dictionary:
 	return (r as Dictionary) if r is Dictionary else {"clears": 0, "best_seconds": 0.0}
 
 
+## The first-clear content bundle of a trial: data/sources.gd REWARDS (ItemDB) when catalogued there, else the
+## trial table's own copy (data/trials.gd FIRST_REWARDS). {} when the trial has none.
+static func first_bundle(id: String) -> Dictionary:
+	var rid := String(trial_info(id).get("first_reward", ""))
+	if rid == "":
+		return {}
+	var b: Dictionary = ItemDB.reward_bundle(rid)
+	if b.is_empty():
+		b = TrialsData.FIRST_REWARDS.get(rid, {})
+	return b
+
+
+## True once the trial's first-clear reward is in the ledger.
+static func first_clear_paid(id: String) -> bool:
+	var rid := String(trial_info(id).get("first_reward", ""))
+	return rid != "" and GameState.has_reward(rid)
+
+
+## Display name of the trial's first-clear pattern (the catalogue's, else the table's fallback name).
+static func pattern_name(id: String) -> String:
+	var t := trial_info(id)
+	var p: Dictionary = ItemDB.pattern(String(t.get("pattern", "")))
+	return String(p.get("name", t.get("pattern_name", "")))
+
+
 ## Records a clear in the trial's own state and pays its reward: the first clear grants the content
-## bundle (once, through the reward ledger); later clears give modest renewable resources.
+## bundle (once, through the reward ledger); later clears give modest renewable resources (recorded in the
+## trial's own ledger: repeat_paid, paid).
 ## Returns {"first": bool, "clears": int, "best_seconds": float, "items": {id: n}}.
 static func record_clear(id: String, seconds: float) -> Dictionary:
 	var t := trial_info(id)
@@ -112,35 +142,99 @@ static func record_clear(id: String, seconds: float) -> Dictionary:
 	if seconds > 0.0 and (best <= 0.0 or seconds < best):
 		best = seconds
 	r["best_seconds"] = best
+	r["last_seconds"] = maxf(seconds, 0.0)
 	GameState.trials[id] = r
 	var out := {"first": false, "clears": clears, "best_seconds": best, "items": {}}
 	var rid := String(t.get("first_reward", ""))
 	if rid != "" and not GameState.has_reward(rid):
-		var bundle: Dictionary = ItemDB.reward_bundle(rid)
+		var bundle := first_bundle(id)
 		var items: Dictionary = bundle.get("items", {})
 		var flags: Array = bundle.get("flags", [])
-		if GameState.grant_once(rid, items, flags, String(t.get("first_message", ""))):
+		# The Loom line only when the pattern really is in the catalogue (else just the remembered clear).
+		var msg := String(t.get("first_message", ""))
+		if String(t.get("pattern", "")) != "" and ItemDB.pattern(String(t["pattern"])).is_empty():
+			msg = "The echo remembers you."
+		if GameState.grant_once(rid, items, flags, msg):
 			out["first"] = true
 			out["items"] = items.duplicate()
 			return out
-	var give: Dictionary = (t.get("repeat", {}) as Dictionary).duplicate()
-	var every := int(t.get("bonus_every", 0))
-	if every > 0 and clears % every == 0:
-		var bonus: Dictionary = t.get("bonus", {})
-		for k in bonus:
-			give[k] = int(give.get(k, 0)) + int(bonus[k])
+	var give := TrialsData.repeat_items(id, clears)
 	var given: Dictionary = {}
 	for k in give:
 		if ItemDB.has_item(String(k)) and int(give[k]) > 0:
 			GameState.give_item(String(k), int(give[k]))
 			given[String(k)] = int(give[k])
 	out["items"] = given
+	# The trial-scoped ledger: how many repeat clears were paid, and what they paid in total.
+	var paid: Dictionary = (r.get("paid") as Dictionary).duplicate() if r.get("paid") is Dictionary else {}
+	for k in given:
+		paid[k] = int(paid.get(k, 0)) + int(given[k])
+	r["paid"] = paid
+	r["repeat_paid"] = int(r.get("repeat_paid", 0)) + 1
+	GameState.trials[id] = r
 	if not given.is_empty():
 		var parts: Array = []
 		for k in given:
 			parts.append("%s x%d" % [ItemDB.display_name(String(k)), int(given[k])])
 		Events.notify.emit("The echo leaves something behind: " + ", ".join(parts), "item")
 	return out
+
+
+## "Cleared 3 times - best time 2:31" / "Not cleared yet." (the trial's own record).
+static func record_line(id: String) -> String:
+	var r := record(id)
+	var clears := int(r.get("clears", 0))
+	if clears <= 0:
+		return "Not cleared yet."
+	return "Cleared %d %s - best time %s" % [clears, "time" if clears == 1 else "times",
+		TrialsData.format_time(float(r.get("best_seconds", 0.0)))]
+
+
+## What the next clear leaves: the first-clear pattern, else the modest renewable resources of a repeat.
+static func reward_line(id: String) -> String:
+	var t := trial_info(id)
+	if not first_clear_paid(id) and String(t.get("first_reward", "")) != "":
+		# Only promise the pattern when the catalogue really has it (data/appearance.gd).
+		if ItemDB.pattern(String(t.get("pattern", ""))).is_empty():
+			return "First clear: the echo will remember you."
+		return "First clear: the %s pattern, to sew at the Loom." % pattern_name(id)
+	var parts: Array = []
+	for k in t.get("repeat", {}):
+		if ItemDB.has_item(String(k)):
+			parts.append("%s x%d" % [ItemDB.display_name(String(k)), int(t["repeat"][k])])
+	var every := int(t.get("bonus_every", 0))
+	var line := "Each clear leaves a little: " + ", ".join(parts) + "."
+	if every > 0 and not (t.get("bonus", {}) as Dictionary).is_empty():
+		var bonus: Array = []
+		for k in t["bonus"]:
+			if ItemDB.has_item(String(k)):
+				bonus.append(ItemDB.display_name(String(k)))
+		line += " Every %s clear adds %s." % [_ordinal(every), " and ".join(bonus)]
+	return line
+
+
+static func _ordinal(n: int) -> String:
+	match n:
+		2:
+			return "second"
+		3:
+			return "third"
+		4:
+			return "fourth"
+	return "%dth" % n
+
+
+## The trial menu: {"title", "body", "record", "reward"} (the entry stone shows it in a confirm dialog).
+static func menu_text(id: String) -> Dictionary:
+	var t := trial_info(id)
+	if t.is_empty():
+		return {}
+	var memory := String(t.get("memory", ""))
+	if memory.contains("%s"):
+		memory = memory % ItemDB.enemy_display_name(String(t.get("boss", "")))
+	var rec := record_line(id)
+	var rew := reward_line(id)
+	return {"title": entry_text(id), "body": "%s\n\n%s\n%s" % [memory, rec, rew], "record": rec, "reward": rew}
 
 
 # --- Area ---------------------------------------------------------------------------------------------------
@@ -152,6 +246,11 @@ func _ready() -> void:
 	if pending_trial != "" and TRIALS.has(pending_trial):
 		trial_id = pending_trial
 	pending_trial = ""
+	if trial_id != TRIAL_MATRON:
+		ambience = String(trial_info(trial_id).get("ambience", ambience))
+		if _build_from_builder():
+			_connect_flow()
+			return
 	bounds = Rect2(-WALL_RADIUS, -WALL_RADIUS, WALL_RADIUS * 2.0, CORRIDOR_END + WALL_RADIUS)
 	build_environment({"bg": Color("0b0a12"), "ambient": Color("6d6590"), "ambient_energy": 0.42,
 		"lamps": [[Vector3(0, 3.2, PAD_Z + 0.5), Color("ffe2a8"), 0.9, 7.0], [Vector3(0, 9.0, 0), Color("b6a4f0"), 0.5, 20.0]]})
@@ -159,16 +258,72 @@ func _ready() -> void:
 	place_spawn("trial_start", Vector3(0, floor_y, PAD_Z + 0.8), 0.0)
 	add_zone("trial", Vector3(0, floor_y, 5.0), 22.0, false)
 	add_safe_spot(Vector3(0, floor_y, PAD_Z + 0.8), 2.8)
-	var door := add_exit("leave", {"text": "Leave the echo (back to the chamber door)", "use_respawn": true, "style": "stair"},
+	var door := add_exit("leave", {"text": String(trial_info(trial_id).get("exit_text", "Leave the echo (back to the chamber door)")), "use_respawn": true, "style": "stair"},
 		Vector3(0, floor_y, CORRIDOR_END - 0.6), PI)
 	door.set_meta("trial_exit", true)
 	var plate := add_label(entry_text(trial_id).replace(" (", "\n("), Vector3(0, 3.3, PAD_Z - 1.2), 40)
 	plate.modulate = Color(0.85, 0.8, 1.0, 0.85)
+	_add_record_label(Vector3(0, 2.55, PAD_Z - 1.2))
 	_build_encounter()
+	_connect_flow()
+
+
+func _connect_flow() -> void:
 	if not Events.player_died.is_connected(_on_player_died):
 		Events.player_died.connect(_on_player_died)
 	if not Events.area_exiting.is_connected(_on_area_exiting):
 		Events.area_exiting.connect(_on_area_exiting)
+
+
+## Velour / Choir (data/trials.gd "builder"): the builder builds the environment, the arena, its props and the
+## real boss in trial mode, and returns {"pad": Vector3, "exit": Vector3, "exit_yaw": float, "bounds": Rect2,
+## "zone_center": Vector3, "zone_radius": float, "plate": Vector3, "boss": Node or null, ...props}. The area adds
+## the shared parts: the trial_start spawn on the safe pad, the "trial" zone, the pale door, the title plate.
+## False when the builder is missing / broken (the Matron room then stands in, without an encounter: a quiet
+## memory whose pale door still leads home - never a softlock).
+func _build_from_builder() -> bool:
+	var path := String(trial_info(trial_id).get("builder", ""))
+	if path == "" or not ResourceLoader.exists(path):
+		return false
+	var s: Variant = load(path)
+	if not (s is Script) or not (s as Script).can_instantiate():
+		push_warning("EchoTrial: arena builder failed to load: " + path)
+		return false
+	var got: Variant = (s as Script).call("build", self)
+	if not (got is Dictionary) or not (got as Dictionary).has("pad"):
+		push_warning("EchoTrial: arena builder returned no layout: " + path)
+		return false
+	arena = got
+	var pad: Vector3 = arena["pad"]
+	bounds = arena.get("bounds", Rect2())
+	place_spawn("trial_start", pad, 0.0)
+	add_zone("trial", arena.get("zone_center", Vector3.ZERO), float(arena.get("zone_radius", 30.0)), false)
+	add_safe_spot(pad, 2.8)
+	var door := add_exit("leave", {"text": String(trial_info(trial_id).get("exit_text", "Leave the echo")), "use_respawn": true, "style": "stair"},
+		arena.get("exit", pad + Vector3(0, 0, 2.5)), float(arena.get("exit_yaw", PI)))
+	door.set_meta("trial_exit", true)
+	var plate_pos: Vector3 = arena.get("plate", pad + Vector3(0, 3.3, -2.0))
+	var plate := add_label(entry_text(trial_id).replace(" (", "\n("), plate_pos, 40)
+	plate.modulate = Color(0.85, 0.8, 1.0, 0.85)
+	_add_record_label(plate_pos + Vector3(0, -0.75, 0))
+	var b: Variant = arena.get("boss")
+	if b is Node and is_instance_valid(b):
+		boss = b
+		_wire_boss()
+	return true
+
+
+## The trial's own record under the title plate (clears, best time).
+func _add_record_label(pos: Vector3) -> void:
+	record_label = add_label(record_line(trial_id), pos, 26)
+	record_label.modulate = Color(0.85, 0.8, 1.0, 0.7)
+
+
+func _wire_boss() -> void:
+	if boss.has_signal("defeated") and not boss.is_connected("defeated", _on_boss_defeated):
+		boss.connect("defeated", _on_boss_defeated)
+	if boss.has_signal("state_changed") and not boss.is_connected("state_changed", _on_boss_state):
+		boss.connect("state_changed", _on_boss_state)
 
 
 func get_zone_at(_pos: Vector3) -> String:
@@ -178,6 +333,10 @@ func get_zone_at(_pos: Vector3) -> String:
 func _process(delta: float) -> void:
 	if fighting and result == "":
 		elapsed += delta
+	if _fade_t >= 0.0:
+		_fade_t -= delta
+		if _fade_t < 0.0:
+			Events.say.emit("", String(trial_info(trial_id).get("fade", "The echo fades.")), 5.0)
 	if _return_t >= 0.0:
 		_return_t -= delta
 		if _return_t < 0.0:
@@ -187,7 +346,7 @@ func _process(delta: float) -> void:
 func on_player_spawned(player: Node3D) -> void:
 	super.on_player_spawned(player)
 	Events.trial_started.emit(trial_id)
-	Events.say.emit("Echo Trial", "A memory of the Heartseed Chamber. Nothing here can change what really happened - the true chamber stays at peace. Leave through the pale door whenever you like.", 7.0)
+	Events.say.emit("Echo Trial", String(trial_info(trial_id).get("intro", "A memory. Nothing here can change what really happened. Leave through the pale door whenever you like.")), 7.0)
 	Events.hint.emit("echo_trial", "Echo Trials are remembered challenges: your journey, flags and Heartseed are never touched. Clear it for a reward.")
 
 
@@ -248,7 +407,15 @@ func _on_boss_defeated() -> void:
 	fighting = false
 	last_clear = record_clear(trial_id, elapsed)
 	_end(true)
-	Events.say.emit("", "The echo fades. The chamber is only a memory again.", 5.0)
+	if record_label != null and is_instance_valid(record_label):
+		record_label.text = record_line(trial_id)
+	# The Matron's line comes at once (as it always has); Velour / Choir let the boss's own farewell (the Count's
+	# line, the Choir's chimes) play first.
+	var delay := float(trial_info(trial_id).get("fade_delay", 0.0))
+	if delay <= 0.0:
+		Events.say.emit("", String(trial_info(trial_id).get("fade", "The echo fades. The chamber is only a memory again.")), 5.0)
+	else:
+		_fade_t = delay
 	_return_t = RETURN_DELAY
 
 

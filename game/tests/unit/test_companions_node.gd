@@ -14,6 +14,7 @@ var _say_cb: Callable
 var _floor: StaticBody3D
 var player: CharacterBody3D
 var _saved_area_id := ""
+var _saved_area: Node = null
 
 
 class FakePlayer extends CharacterBody3D:
@@ -59,6 +60,11 @@ func before_each() -> void:
 	Events.say.connect(_say_cb)
 	_saved_area_id = Game.area_id
 	Game.area_id = ""
+	# Recovery never pops a pet into a boss fight (Game.boss_active()): no encounter or boss arena may be left
+	# over from an earlier suite (a boss freed mid-encounter, an area with fight_active).
+	_saved_area = Game.area if is_instance_valid(Game.area) else null
+	Game.area = null
+	Game._bosses.clear()
 	_floor = StaticBody3D.new()
 	_floor.collision_layer = 1
 	var cs := CollisionShape3D.new()
@@ -85,6 +91,9 @@ func after_each() -> void:
 	Game.player = null
 	Game.companion_nodes = {}
 	Game.area_id = _saved_area_id
+	Game.area = _saved_area if is_instance_valid(_saved_area) else null
+	_saved_area = null
+	Game._bosses.clear()
 	if is_instance_valid(player):
 		player.queue_free()
 	if is_instance_valid(_floor):

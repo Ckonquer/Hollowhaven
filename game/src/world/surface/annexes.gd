@@ -10,7 +10,11 @@ extends RefCounted
 ##      facing home; a small safe zone "ch2_waygate" (never containing a landmark centre) covers both.
 ##   2. Optional annex scripts (ANNEX_SCRIPTS): each, if the file exists, is a script with
 ##      `static func build(area: Node3D) -> void` (Chapter One extras owned by other modules).
-##   3. Fallback spawns "annex_door" / "annex_hatch" (Tobin's side door, spec §1) if no annex script
+##   3. Chapter Two story dressings (STORY_SCRIPTS, same contract and the same safe loader, run after the eight
+##      Chapter One slots): the Haven's Lanternwake keepsake (story_ch2/haven_dressing.gd), which builds nothing
+##      until chapter_two_complete and so returns on every load of a finished save. Kept apart from the
+##      ANNEX_SCRIPTS slots, whose count/order other suites pin; nothing here touches legacy vegetation.
+##   4. Fallback spawns "annex_door" / "annex_hatch" (Tobin's side door, spec §1) if no annex script
 ##      registered them: the legacy mine-mouth spawns, so travel from tobin_annex always lands safely.
 
 const Layout := preload("res://data/world_layout.gd")
@@ -26,6 +30,10 @@ const ANNEX_SCRIPTS := [
 	"res://src/world/surface/c1x/moth_pocket.gd",
 	"res://src/world/surface/c1x/seasonal_decor.gd",
 ]
+## Chapter Two story dressings built by the same loader after ANNEX_SCRIPTS (static build(area); idempotent).
+const STORY_SCRIPTS := [
+	"res://src/world/story_ch2/haven_dressing.gd",
+]
 
 const WAYGATE_SPAWN := "waygate"
 const WAYGATE_ZONE := "ch2_waygate"
@@ -39,9 +47,16 @@ static func build(area: Node3D) -> void:
 	if area == null:
 		return
 	build_waygate(area)
-	for path in ANNEX_SCRIPTS:
+	for path in all_scripts():
 		_run_annex(area, String(path))
 	_ensure_fallback_spawns(area)
+
+
+## Every optional script the loader runs, in order: the Chapter One slots, then the story dressings.
+static func all_scripts() -> Array:
+	var out: Array = ANNEX_SCRIPTS.duplicate()
+	out.append_array(STORY_SCRIPTS)
+	return out
 
 
 ## Clears grass under annex footprints. surface_world calls this BEFORE Grass is built (after the
@@ -52,7 +67,7 @@ static func clear_grass(terrain: RefCounted) -> void:
 		return
 	var wp := waygate_site()
 	terrain.clear_grass(wp.x, wp.y, WAYGATE_SAFE_RADIUS)
-	for path in ANNEX_SCRIPTS:
+	for path in all_scripts():
 		if not ResourceLoader.exists(String(path)):
 			continue
 		var s: Script = load(String(path))

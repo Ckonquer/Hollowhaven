@@ -22,6 +22,8 @@ const KINDS := ["gather", "crop", "recipe", "station", "drop", "reward", "pickup
 const TOOLS := ["hand", "axe", "pickaxe"]
 ## Flags that world / story systems set outside the reward bundles (spec flags and legacy ones).
 const WORLD_FLAGS := ["ward_restored", "ch2_winch_repaired", "ch2_choir_defeated", "chapter_one_complete", "weaver_defeated"]
+## "Already paid" markers a content bundle sets for its own module (never recipe unlocks, read by nobody else).
+const CONTENT_MARKER_FLAGS := {"rw_hr_chime_trail": ["hr_chime_trail_done"], "rw_hw_throat_supplies": ["hw_throat_supplies"]}
 const ZONE_PREFIX := {"hallowmere_reach": "hr_", "hushed_works": "hw_", "tobin_annex": "ta_", "moonveil_manor": "mm_"}
 const CHAPTER_ONE_AREAS := ["surface", "below"]
 
@@ -445,7 +447,8 @@ func test_reward_bundles_set_every_story_unlock_once() -> void:
 			assert_true(ItemDB.has_item(it) and int(b["items"][it]) > 0, "%s item %s" % [rw, it])
 		for f in b["flags"]:
 			if own:   # the quest layer / optional log may also set their own non-recipe flags (e.g. map pins)
-				assert_true(UnlocksData.UNLOCK_FLAGS.has(f) or WORLD_FLAGS.has(f), "%s flag %s is known" % [rw, f])
+				var marker: bool = String(b.get("by", "")) == "content" and (CONTENT_MARKER_FLAGS.get(rw, []) as Array).has(f)
+				assert_true(UnlocksData.UNLOCK_FLAGS.has(f) or WORLD_FLAGS.has(f) or marker, "%s flag %s is known" % [rw, f])
 			set_by_reward[f] = true
 		for p in b.get("patterns", []):
 			assert_false(ItemDB.pattern(String(p)).is_empty(), "%s pattern %s" % [rw, p])

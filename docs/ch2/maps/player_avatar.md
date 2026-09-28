@@ -1,8 +1,10 @@
 # Map: player_avatar (player controller, Krystal avatar, camera)
 
 Scope: `game/src/player/{player.gd, player_logic.gd, krystal_avatar.gd, interaction_probe.gd, player_demo.gd, qa_dummy.gd}`,
-`game/src/camera/camera_rig.gd`, tests `game/tests/unit/test_player_{node,logic,avatar}.gd`.
-This file adds to docs/ARCHITECTURE.md ("Player", "Interaction contract"); it does not repeat it. Line numbers are for the Chapter 1 release.
+`game/src/player/avatar/*` (Chapter Two appearance builders), `game/src/camera/camera_rig.gd`, tests
+`game/tests/unit/test_player_{node,logic,avatar}.gd` and `test_avatar_look_{legacy,build,motion}.gd`.
+This file adds to docs/ARCHITECTURE.md ("Player", "Interaction contract"); it does not repeat it. Line numbers are for the Chapter 1 release
+(sections 7, 11 and 12(a) were rewritten after Wave B and name functions instead of lines).
 All paths below are relative to `game/`.
 
 ## 1. Runtime construction
@@ -118,45 +120,76 @@ ray (mask 16|1|32, only if `cam.current`); owners via `resolve_owner()` (≤ 6 p
 companion +1.2); LOS ray mask 1|32; `{"depleted": true}` harvests ignored. Public: `focus`, `focus_interaction`, `focus_harvest`, `prompt`,
 `focused_harvestable()`, `clear()`, `enabled`, `max_dist`; calls optional `set_focused(bool)`.
 
-## 7. krystal_avatar.gd — how Krystal is built
+## 7. krystal_avatar.gd — how Krystal is built (Chapter Two: slot units, module B1)
 
-`extends Node3D`, `signal footstep(foot: int)` (0 left, 1 right). `_ready` → `_pose.resize(13)`, `_build()` (324), random blink timer.
-All parts are mesh-cached `Kit` primitives (sphere/capsule/cylinder/box/cone/torus/prism/blob → SphereMesh, CapsuleMesh, CylinderMesh,
-BoxMesh, TorusMesh, PrismMesh, icosphere ArrayMesh) placed with `_part(parent, mi, pos, rot_deg, scale, shadow=true)` (317).
-Materials: `_m(c, outline=true, thick=OUTLINE 0.011)` (299) = `Mat.toon(c, {"rim":0.42,"noise":0.04,"emission":c,"emission_energy":FILL 0.07})`
-+ `Mat.outlined(base, thick)`; `_flat(c)` (304) = rim 0, noise 0, same fill, no outline; `Mat.glow` for eye highlights and the lit lantern glass.
-Colours: `Palette.K_SKIN f0c6a0, K_HAIR 7a3b2e, K_JACKET 3fa7a0, K_SCARF f2c14e, K_SHIRT f3e6c8, K_PANTS 5a4a6e, K_BOOTS 6b4428,
-K_BAG b07a4f`, plus local consts EYE_DARK 2e2233, EYE_WARM 7a4632, BLUSH f4a0ab, MOUTH 8f3e4f, HAIR_DARK 5e2c22, JACKET_DARK 2e8781,
-SCARF_DARK d9a53a, BOOT_LIGHT 8a5a36, BRASS e0b85a, LEATHER 6e4a33.
+`extends Node3D`, `signal footstep(foot: int)` (0 left, 1 right). `_ready`: `_pose.resize(13)`; a driven avatar that follows
+GameState (`driven and follow_game_state`) reads `GameState.appearance`, `wardrobe.show_armor` and `equipment` (`_read_state`);
+any other avatar starts from `ItemDB.legacy_look()` unless a look was set before `add_child`; debug-only `_apply_debug_look()`
+(below); `_build()`; blink timer; followers connect `Events.appearance_changed` / `equipment_changed` / `game_loaded` →
+`refresh_from_state()`. **The source of truth is the header of krystal_avatar.gd and the builders' headers**; this section maps them.
 
-Hierarchy (joint = entry in `_joints[J_*]`; side 0 = +X = **left**, side 1 = −X = **right**/tool hand):
-```
-Body (_body_root; squash scale) > RollPivot (_roll, y 0.5) > Rig (_body, y -0.5 + _body_off)
-  Hips J_HIPS (y 0.6): pelvis sphere .155 K_PANTS
-    Leg0/1 J_LEG (x ±.092): thigh capsule .078/.3 > Knee0/1 J_KNEE (y -.235): shin capsule .066/.24,
-        boot shaft cyl .078/.084 K_BOOTS, cuff torus BOOT_LIGHT, toe sphere .088, sole cyl LEATHER (no shadow)
-    Spine J_SPINE (y .02): jacket capsule .168/.5 + A-line hem cyl (K_JACKET), shirt V prism, 4 brass buttons,
-        pocket flaps, Patch (back, z -.142), strap torus K_BAG, Satchel (.2,0,-.07) > BeltLantern (_lantern_belt, scale .8)
-      Chest (y .36, not posed): scarf 2 tori + knot, ScarfEnd0/1 > Tip (spring chains, _scarf_ends)
-        Shoulder0/1 J_SH (x ±.195): sphere+capsule K_JACKET > Elbow J_EL (y -.195): capsule + cuff torus
-          > Hand J_HAND (y -.2): skin sphere + thumb
-             right: ToolAnchor > Axe | Pickaxe | Sword (_tools), _food sphere BERRY (hidden)
-             left:  Lantern (_lantern, lit glass)
-        Head J_HEAD (y .04) > HeadCenter (_head_c, y .23): skull sphere .25 (24x32), Eye0/1 nodes (scaled for blink),
-             Brow0/1, blush, nose, _mouth_smile (_arc_mesh), _mouth_open; hair: cap .268, back .21, 5 fringe spheres,
-             2 side locks + 2 side puffs, 5 nape locks, curl (_arc_mesh), Braid > B0..B5 (r .058→.038, _braid) > Tie, FlowerClip
-LanternLight (OmniLight3D, child of the avatar root, NOT Body): LANTERN_GLOW, energy 1.25, range 7, atten 1.5, shadows,
-  bias .08, specular .25, shadow_caster_mask = ~AVATAR_LAYER
-```
-Tools (`_build_tools` 568): axe (rot x 2.3 rad; WOOD handle, STONE blob head, MEADOW_GOLD lashing), pickaxe, copper sword
-(rot x 2.75; COPPER toon rim .8 specular .6). Lantern mesh `_build_lantern_mesh(root, lit)` (601), shadows off.
+**Rig** (`_build`): the avatar itself only builds the joints and the always-present pieces: Body > RollPivot > Rig > Hips
+(J_HIPS) > Leg0/1 > Knee0/1, Spine > Chest > Shoulder0/1 > Elbow > Hand (arms `_build_arm`), Head > HeadCenter (`_head_c`;
+face `_build_face`: eyes, brows, mouth shapes), the tools on the right hand's ToolAnchor, the raised lantern on the left hand and
+LanternLight (child of the avatar root, not Body; same light settings as Chapter One). Every joint clothing can sit on is a
+**host** in `_hosts` (keys `hips, leg0, leg1, knee0, knee1, spine, chest, sh0, sh1, el0, el1, hand0, hand1, head_c, eye0, eye1,
+brow0, brow1`; 0 = +X = her left, 1 = −X = right / tool hand). Then `_rebuild_units(true)` builds the look.
 
-**Draw-call baking** (365-467): after building, `_bake_tree(_body_root)` merges, per Node3D, all direct MeshInstance3D children that are
-visible, childless, use the TOON shader and share outline thickness/rim/noise/specular/cast_shadow into one vertex-coloured `ArrayMesh`
-("Baked") with material `Mat.toon(WHITE, {vertex_color, emission: FILL_TINT, ...})`; originals are **freed**. Excluded: `_mouth_smile`,
-`_mouth_open`, `_food`, invisible parts, glow (StandardMaterial3D) parts. Merged meshes are cached in `static var _bake_cache` keyed by
-`"<path from Body>|<material class>"` — **colour is not in the key**. ~190 → ~70 draw calls. Finally `_set_layers(_body_root)` sets
-`layers = AVATAR_LAYER (1 << 11)` on every VisualInstance3D (only layer 12).
+**Slot units** (`UNITS`, rebuilt independently, in this order): `skin, eyes, hair, hat, hair_acc, upper, lower, shoes, back, armor`.
+Each unit builds into its own **slot container** Node3D per host (`_box(host_key, unit)`: named after `UNIT_BOX`, meta
+`avatar_slot`, identity transform, so a part's position is in the host joint's space). The builders are static files in
+`src/player/avatar/`; each receives a context `{box: Callable(host_key) -> container, col, look, id, hides_hair, hat}` and
+returns a result Dictionary:
+
+| file | builds | returns |
+|---|---|---|
+| `avatar_kit.gd` | shared toon / flat / metal / softglow materials (`Mat` caches, never mutated), `node/part/part_xf/mesh_part`, lantern mesh, `arc_mesh`, closed outward-facing cloth `panel_mesh`, `chain(kind, segs, rest, k, d, amp, side)` spring records | — |
+| `look_colors.gd` | `resolve(look)`: every colour of a look (hair, skin, eyes, palette channels, leg channel) through ItemDB | colour dict incl. `palette_key` |
+| `hair_builder.gd` | the 8 hairstyles + brows (`side_braid` = the Chapter One hair exactly) | `{chains, hull: "" / "direct", hull_nodes}` |
+| `garment_builder.gd` | upper / lower (skirts and dresses on panel pivots) / shoes; the explorer pieces part for part | upper `{chains: scarf ends, patch}`; lower `{skirt: {pivots, theta, radius, y0, length, base, max}}` |
+| `accessory_builder.gd` | hats, hair accessories, back items (satchel, capes / shawls, wings) | hat / hair_acc `{hull}`; back `{chains, belt, cape: bool}` |
+| `armor_builder.gd` | hood / helm (replaces the hat, hides crown hair), vest / mail + shoulder pieces, boots; tier-coloured | head `{hull: "all"}` |
+| `skirt_rig.gd` | skirt sway maths (pure, packed arrays, no per-frame allocation) | — |
+| `wand_builder.gd` | the Sparkseed wand in the right hand, built lazily the first time a wand is held or cast (integration R100) | — |
+
+A unit is rebuilt only when its **signature** changes (`_signatures(col)`: its ids + palette key + the inputs it depends on, e.g.
+hair depends on `hides_hair`, shoes on boots armor and the leg colour). `apply_look()` returns the rebuilt unit names (`[]` for the
+same look). Unknown ids show the slot's safe default (`ItemDB.sanitize_look`), are listed by `missing_ids()` and warned once; the
+saved look is never modified. Armor: `_armor_id(slot)` is non-empty only while "show armor" is on and that slot holds armor of that
+slot; head armor replaces the hat and hides crown hair, body armor is its own unit, boots armor replaces the shoes.
+
+**Baking** (draw calls): parts that never move relative to their joint are merged per host and material class (outline thickness,
+rim, noise, specular, shadow casting; glowing cloth, the mouth shapes, food and eye nodes stay separate). `_rebake_host(host)`
+merges the parts of **every unit container on that host** into one vertex-coloured mesh per class ("Baked", material
+`Mat.toon(WHITE, {vertex_color, emission FILL_TINT, ...})`); the source parts are detached and kept per container (`_detached`,
+freed with the container) so the host can be re-merged when a single unit changes. Nodes inside a container (satchel, patch,
+spring segments, hats) are baked on their own (`_bake_subtree`). Merged meshes are cached in `static var _bake_cache` keyed by
+**content** (`_merged_instance`: material class + md5 of every part's mesh id, transform and albedo), so the **merge cache includes
+colour**: two avatars with different looks never share a mesh, identical looks do. The cache is cleared when it reaches
+`BAKE_CACHE_MAX` (600 entries). `_set_layers` puts every visual on `AVATAR_LAYER` (1 << 11). LEGACY_LOOK reproduces the Chapter
+One avatar exactly (60 mesh instances, 82 draw calls; pinned vertex by vertex and frame by frame against the Chapter One code in
+`test_avatar_look_legacy.gd`); full outfits measure 79–88 draw calls, the worst mix ~108.
+
+**After every rebuild** (`_after_rebuild`): `_chains` = the spring records of all units; `_scarf_ends` / `_braid` are derived from
+them (kind "scarf" / the first "braid"; either may be empty); a new lower unit sets up `_skirt` (`SkirtRig`) and `_skirt_pivots`;
+the roll hull is recomputed (below); `_patch` comes from the upper unit, `_lantern_belt` from the back unit. **A cape or shawl**
+(back result `cape: true`) hides the jacket's back patch **and** the explorer scarf ends (their first segment); the scarf wraps at
+the neck stay, and both come back when the cape is taken off.
+
+**Per-look head hull** (roll clearance): `_head_hull = _HEAD_HULL` (the 14 Chapter One points) **+ the hull points of the hair,
+hat and hair_acc units**. `_hull_points(unit)`: for results with `hull` "all" (hats, helms, buns: every part) or "direct" (hair: its
+direct parts, never the spring chains), the support points of the unit's meshes under `_head_c` in 26 directions, kept only when
+farther than `HULL_MIN_DIST` 0.28 m from `HULL_CENTRE`; plus the rest positions of listed `hull_nodes`, pushed out by their radius.
+Tall hats therefore lift the roll (witch hat +18 cm, moth antennae +13 cm; every hairstyle except the side braid +6 cm).
+
+**Public API** (the Chapter One methods are unchanged) — `apply_look(look) -> Array` (callable before `add_child`; a partial look
+takes the legacy value for each missing key), `var appearance` (same as `apply_look`; set it before `add_child` to build once),
+`apply_armor(on, equipment := {}) -> Array`, `set_show_armor(on) -> Array` / `var show_armor` (GameState.equipment when none was
+given), `refresh_from_state() -> Array` (followers only), `current_look() -> Dictionary` (sanitized copy), `missing_ids() -> Array`,
+`draw_call_estimate() -> int`, `var follow_game_state := true`, `set_held_tool(kind)` / `held_tool()` (wand, R100). A preview
+avatar (not driven) ignores GameState; `src/ui/widgets/avatar_preview.gd` drives the real avatar in "live" mode.
+Debug-only look args for non-driven avatars (preview stage): `--avatar-outfit= --avatar-hair= --avatar-hair-color= --avatar-skin=
+--avatar-eyes= --avatar-hat= --avatar-armor=<armor set id>` (full command in AGENTS.md).
 
 ## 8. krystal_avatar.gd — animation (fully procedural node transforms, no Skeleton3D)
 
@@ -175,9 +208,20 @@ frame (anything else writing joint rotations is overwritten); `_body_off` offset
 - Actions (`ACTION_TIME` 88): hurt .42, flinch .9, wave 1.8, cheer 1.6, eat 1.1, interact .45, tired .8, sleep/death loop (−1). Unknown names
   are ignored; "jump"/"land" only kick the squash spring. Face: blink timer, `_eyes_closed`, `_mouth_amt`, `_brow_worry`.
 - Roll: tuck pose, `_roll.rotation.x = smoothstep(.05,.92,t)*TAU`, y-scale `1-.46 sin(πt)`, pivot lowered; `_keep_roll_above_ground`
-  lifts the pivot so the 14 `_HEAD_HULL` points stay ≥ `ROLL_CLEARANCE` .02 m.
-- Secondary (`_update_secondary` 1125): local velocity from global position deltas (driven) or `(0,0,speed)` (not driven), jumps > 14 m/s
-  rejected, accel ≤ 40; springs: scarf (k 70, d 7.5), braid (k 38, d 5), lantern pendulum (k 55, d 4). Lantern kept upright via `global_basis`.
+  lifts the pivot so every point of the **per-look** `_head_hull` (§7: the 14 `_HEAD_HULL` points + hair/hat/hair_acc points) stays
+  ≥ `ROLL_CLEARANCE` .02 m.
+- Secondary (`_update_secondary`): local velocity from global position deltas (driven) or `(0,0,speed)` (not driven), jumps > 14 m/s
+  rejected, accel ≤ 40; kept in `_lv` / `_acc` for the skirt. **One general spring-chain loop** over `_chains` (records from
+  `AvatarKit.chain`), dispatched by kind: `scarf` (`_chain_scarf`, Chapter One formula, k 70 d 7.5), `braid` (`_chain_braid`: the
+  Chapter One braid formula around each segment's rest rotation — braids, ponytails, hair curtains, ribbon tails; per-style k/d/amp),
+  `cape` (`_chain_cape`: capes/shawls lift away from the back with speed, falls and running flutter, clamped so they never fold into
+  her back; k 45 d 6), `wing` (`_chain_wing`: a flap whose phase `_wing_phase` is integrated per frame, so a speed change never makes
+  the wings jump). Lantern pendulum (k 55, d 4) kept upright via `global_basis`.
+- Skirts (`_update_skirt`, after the chains): `SkirtRig.update(dt, lv, acc, legs, knees, t, run_w, turn_rate)` → per panel pivot
+  `rotation = (-flare, theta, side)`: base flare + bell + trail + running flutter, pushed out by the thigh/shin points of the
+  current pose (legs never poke through while walking, running, jumping, on stairs), clamped to [min, max] flare (garment max 1.3 rad).
+  **No roll sway**: the motion drive (`lv`, `acc`, `run_w`, `turn_rate`) is multiplied by `1 - _roll_blend`, so while she rolls the
+  panels keep only their base flare and the leg push (a trailing hem would swing into the ground as the body tumbles).
 - Props: raised lantern visible when `lantern_on` and not rolling; light follows `lantern_world_position()`; flicker × smoothed `lantern_energy_scale`.
 Public API: `play_action(name, strength=1)`, `play_emote(name)`, `cancel_action(include_death=false)`, `current_action()`,
 `set_food_color(c)`, `show_tool(kind, seconds=0.9)`, `set_body_visible(v)`, `reset_motion()`, `lantern_world_position()`,
@@ -193,17 +237,31 @@ shift probed by sphere casts; after `snap()` a direct `cast_motion` places the a
 `rotate_by(rel)`, `zoom_by`, `forward()`, `arm_length()`, `add_shake`, `shake_amount`, `get_camera`; fields `yaw`, `pitch`, `zoom_target`, `input_enabled`.
 
 ## 10. Performance tricks already in place
-Bake + static caches (`_bake_cache`, `_arc_cache`, Mat/Kit); probe at 12.5 Hz with preallocated queries; owned-item and terrain-height
-checks every 0.5 s; group scans only on button press; manual render interpolation; lantern light skips Krystal as a shadow caster.
+Bake + static caches (content-keyed `_bake_cache`, AvatarKit mesh/material caches, Mat/Kit); only changed units are rebuilt and
+only the hosts they touch are re-merged (look change 1.5–19 ms, legacy build 6–16 ms); skirt maths on packed arrays; per frame 22–41 µs
+(legacy vs heaviest look); probe at 12.5 Hz with preallocated queries; owned-item and terrain-height checks every 0.5 s; group scans only
+on button press; manual render interpolation; lantern light skips Krystal as a shadow caster.
 
 ## 11. Pitfalls
 - Avatar is top_level: children added to the **player** do not follow the avatar's rotation; attach visuals to avatar joints.
-- `_bake_children` frees the original parts: never keep references to part MeshInstances built before the bake (keep the Node3D container).
-- `_bake_cache` ignores colour: two avatars (player + UI preview) with different colours at the same node path share one mesh → wrong colours.
+- Baking detaches the source parts of a host (kept in `_detached`, re-merged when one unit changes) and `_bake_subtree` frees merged
+  parts: never keep references to part MeshInstances across a rebuild; keep the unit's container or the result's named nodes
+  (chain segments, skirt pivots, patch, belt) — `_after_rebuild` refreshes those references.
+- The merge cache (`_bake_cache`) is keyed by content **including colour** (fixed in Wave B): the player and a UI preview with different
+  looks never share a mesh. Keep new parts' albedo in the toon material (the key reads it); a part that changes colour at runtime must
+  stay unbaked (e.g. glowing cloth, which `_group_parts` skips).
 - Never `set_shader_parameter` on a `Mat.toon()` result (shared across the whole game); use `Mat.toon_unique` or new cached colours.
-- `_update_secondary` hard-codes `for i in 2` over `_scarf_ends`; removing the scarf crashes. `_braid` may be empty (loop is safe).
-- Toon `wind` sways only vertices with model-space `VERTEX.y > 0` and uses world position: useless for skirts/capes hanging below a pivot.
-- Height-coupled constants: camera TARGET_HEIGHT 1.38, look `head_h` 1.25, probe LOS +1.0, melee origin +0.9, `_HEAD_HULL`, tests.
+- Secondary motion is one loop over `_chains` (any number of scarf ends / braids / capes / wings, including none); `_scarf_ends` and
+  `_braid` are derived views and may be empty. A cape hides the patch and the scarf ends' first segment; a new back item that
+  overlaps them should return `cape: true`.
+- Skirt panels are rigid strips at their angle limit while rolling / sitting (sleep, death): expect ~3–4 cm leg overlap there, and long
+  skirts can dip ~6–7 cm into the ground mid-roll (review B1). Belt lantern / satchel can clip flared skirts (visual check pending).
+- Toon `wind` sways only vertices with model-space `VERTEX.y > 0` and uses world position: useless for skirts/capes hanging below a pivot
+  (that is why skirts and capes use SkirtRig / cape chains).
+- Height-coupled constants: camera TARGET_HEIGHT 1.38, look `head_h` 1.25, probe LOS +1.0, melee origin +0.9, `_HEAD_HULL` (+ the
+  per-look hull points), tests. A new hat/hairstyle must report `hull` so the roll keeps it out of the ground.
+- Appearance is cosmetic only: never add CollisionObjects, speed or reach effects to the avatar (spring arm, LOS and probe masks would
+  hit them); `test_avatar_look_build.gd` asserts no look adds collision.
 - Visual meshes are on layer 12 only; custom cameras / `light_cull_mask` must include `1 << 11`.
 - `health.max_hp` changes do not emit `changed`; call `health.set_hp()` to sync GameState/HUD.
 - HUD vitals read `max_stamina` from `GameState.player`, not from `_stamina.max_value`.
@@ -211,27 +269,30 @@ checks every 0.5 s; group scans only on button press; manual render interpolatio
 
 ## 12. Extension recipes
 
-### (a) Runtime hairstyles / outfits / colours / hats / capes (no collision change)
-1. New data file `data/avatar_styles.gd`: `HAIR` (8 ids), `OUTFITS`, `HATS`, `CAPES`, colour presets as HTML strings. Persist
-   `GameState.player["appearance"] = {"hair": "braid", "hair_color": "7a3b2e", "outfit": "explorer", "hat": "", "cape": ""}`
-   (strings only; unknown keys survive `_load_player`; read with `.get(k, default)`).
-2. Refactor krystal_avatar.gd into slot builders, each building into its own named container Node3D: `_build_hair(hc, style, color)`
-   (current lines 647-694 → "Hair" under `_head_c`), outfit pieces per joint ("Outfit" containers under Hips, Spine, Chest, Shoulder*, Elbow*,
-   Knee* — from `_build_leg/_build_torso/_build_arm`), hat under `_head_c`, cape under Chest. Keep joints, `_joints`, `_head_c`, `_eyes`, `_brows` untouched.
-3. Add `var appearance: Dictionary` read by `_build()` (set before `add_child` to avoid a double build) and
-   `set_appearance(app: Dictionary)`: for each changed slot `remove_child` + `free()` the old container, rebuild, then
-   `_bake_tree(container, _body_root)` and `_set_layers(container)`. Name containers with a signature (`"Hair_%s_%s" % [style, color]`) so
-   the path-based `_bake_cache` key differs per variant, or add the signature to `cache_key` in `_bake_children` (405).
-4. Secondary motion: store `lv`/`acc` in members inside `_update_secondary`; make the scarf loop `for i in _scarf_ends.size()` (and size
-   `_scarf_ang/_scarf_vel` to match); reset `_braid = []` for braidless styles; add spring chains for ponytails like the braid.
-5. Skirt/dress sway: under Hips add ~8 panel pivots on a ring (r ≈ .16, y ≈ 0); each pivot owns one tapered panel (`Kit.cylinder` wedge or
-   scaled `Kit.box`), animated in a new `_update_skirt(dt)` called from `_process` after `_apply_pose`: spring (k ≈ 60, d ≈ 7) toward
-   `trail(lv, acc)` plus an outward kick `max(0, ±_pose[J_LEG_*].x)` from the nearer leg so legs never pierce it; flare more in "sleep"/"death"
-   (legs at −1.45). Panels are single meshes per pivot (not merged), fine for ≤ 8.
-6. Hats: container on `_head_c`; a hat flag drops the curl/fringe parts; extend `_HEAD_HULL` (84) with the hat silhouette.
-   Capes: 2-3 segment chain from Chest (z ≈ −0.16) using the braid spring; hide Patch and the scarf ends while worn (they overlap).
-7. Player: `player._ready` sets `avatar.appearance = GameState.player.get("appearance", {})` before `add_child(avatar)`; the wardrobe UI calls
-   `Game.player.avatar.set_appearance(app)` and writes GameState. Never add CollisionObjects to the avatar (spring arm, LOS and probe masks would hit them).
+### (a) Runtime hairstyles / outfits / colours / hats / capes (no collision change) — DONE in Wave B (module B1)
+As built (details in §7; the original plan's data file `data/avatar_styles.gd` and `GameState.player["appearance"]` were replaced by
+the spec's `data/appearance.gd` catalogue and the top-level `GameState.appearance` section, spec §3/§4.1):
+1. Data: ids from `data/appearance.gd` through ItemDB (`appearance_part`, `outfit`, `sanitize_look`, `legacy_look` ...); the look is
+   `GameState.appearance`, show-armor is `GameState.wardrobe.show_armor`, armor pieces come from `GameState.equipment`.
+2. Slot builders in `src/player/avatar/` build into **slot containers** per rig host (`_box(host_key, unit)`); joints, `_joints`,
+   `_head_c`, `_eyes`, `_brows` are untouched by looks.
+3. `var appearance` / `apply_look(look)` (set before `add_child` to build once) rebuild only the units whose signature changed, then
+   re-merge only the hosts those containers sit on (`_rebake_host`). The merge cache is keyed by content (mesh, transform, **colour**),
+   not by node path, so containers need no signature in their names.
+4. Secondary motion: one **general spring-chain loop** over `_chains` (scarf / braid / cape / wing records from `AvatarKit.chain`);
+   `_lv` / `_acc` are members; styles without a braid or scarf simply contribute no chain.
+5. Skirt/dress sway: **skirt rig** `src/player/avatar/skirt_rig.gd` (panel pivots on a ring under the hips, spring toward trail +
+   bell, legs push panels out as a hard constraint, clamped flare); `_update_skirt` runs after the chains and fades the motion drive out
+   while rolling (**no roll sway**).
+6. Hats/helms/buns report `hull` points → the **per-look head hull** (§7). **Cape rig**: a 2-segment `cape` chain from the chest;
+   while a cape/shawl is worn the back **patch and the scarf ends are hidden** (the neck wraps stay).
+7. Player: the player's avatar is `driven` and `follow_game_state`: it reads GameState in `_ready` and re-reads on
+   `Events.appearance_changed` / `equipment_changed` / `game_loaded`; the wardrobe UI writes GameState and emits
+   `appearance_changed` (it never calls the avatar directly). Still no CollisionObjects on the avatar.
+**Adding a new part:** add it to `data/appearance.gd` (data module), then a branch in the matching builder that places parts through
+`AvatarKit` materials/helpers into `ctx.box.call(host_key)`; return `chains` for anything that swings, `hull` for anything on the head,
+`cape: true` for a back item that covers the patch/scarf, `skirt` for panels. Tests: `tools/test.sh avatar` (the legacy snapshot and
+motion tests must stay exact), plus a visual check with the preview command in AGENTS.md.
 
 ### (b) Equipment stat layer
 1. Pure `src/player/equipment_stats.gd` (RefCounted, testable like player_logic): `static func compute(equipped: Dictionary) -> Dictionary`
@@ -297,7 +358,10 @@ colour-aware bake key is **required** before the preview can differ from the liv
   enemy priority (`best_weapon` damage vs. qa_dummy 30 hp), camera clamps/comfort/shoulder tests, emote names.
   It pokes privates: `_dodge_t`, `_eat_lock`, `_stamina`, `_on_attack_pressed`, `_interact`, `_command_ok`, `rig`, `avatar`, `probe`.
 - test_player_avatar.gd uses `_head_c`, `_eyes`, `_blink_timer`, `roll_t`, `_process`: head centre y must stay 1.1–1.45 at idle and a 0.3 m
-  hull around the head must stay above −0.06 m during a roll (bigger hats/hair need `_HEAD_HULL` updates).
+  hull around the head must stay above −0.06 m during a roll (hats/hair report their own hull points, §7).
+- test_avatar_look_legacy.gd pins LEGACY_LOOK to the Chapter One meshes and motion (git 8de11a1 record, 1e-5): any change to the
+  shared rig, springs or bake that alters the legacy look fails it. test_avatar_look_motion.gd pins skirt limits (hem above −0.08 m in a
+  roll), cape/scarf hiding and the wing flap continuity; test_avatar_look_build.gd pins coverage, rebuild minimality and no collision.
 - test_player_logic.gd pins the tuning constants and `weapon_kind` mapping; test_core_game_state `best_weapon` expects copper_sword
   preferred; test_core_inventory / test_core_item_db require every item category in `CATEGORY_ORDER`.
 - test_audit_combat_ai_findings.gd:108 and test_enemies_boss_arena.gd:97 replicate `_melee_hit` numbers (sword 18 dmg, reach 2.5): change them

@@ -4,6 +4,11 @@ extends "res://tests/test_case.gd"
 
 const Logic := preload("res://src/companions/companion_logic.gd")
 const SkillsData := preload("res://data/companion_skills.gd")
+const CombatCtl := preload("res://src/companions/companion_combat.gd")
+const Support := preload("res://src/companions/companion_support.gd")
+const Stats := preload("res://src/core/stats.gd")
+const EggSac := preload("res://src/enemies/boss_hazards/egg_sac.gd")
+const TripLine := preload("res://src/enemies/boss_hazards/trip_line.gd")
 
 const ME := Vector3(0, 0, 0)
 const KRYSTAL := Vector3(0, 0, 2)
@@ -97,3 +102,48 @@ func test_next_perk_and_courage() -> void:
 	assert_false(Logic.dares_underground({"enters_below": false}, false), "timid Mochi")
 	assert_true(Logic.dares_underground({"enters_below": false}, true), "Mochi with courage")
 	assert_true(Logic.dares_underground({"enters_below": true}, false), "Pebble and Lumi")
+
+
+## Integration R61: boss hazards (meta "boss_hazard") are not companion enemies. The rule the threat scan, the
+## Lumi notice, the attack target and the skills share, checked against the Matron's real hazard scripts.
+func test_boss_hazards_are_not_companion_enemies() -> void:
+	var real := Node3D.new()
+	var marked := Node3D.new()
+	marked.set_meta("boss_hazard", true)
+	var unmarked := Node3D.new()
+	unmarked.set_meta("boss_hazard", false)
+	assert_false(CombatCtl.is_boss_hazard(real), "an ordinary enemy")
+	assert_true(CombatCtl.is_boss_hazard(marked))
+	assert_false(CombatCtl.is_boss_hazard(unmarked), "meta false = an ordinary enemy")
+	assert_false(CombatCtl.is_boss_hazard(null))
+	assert_eq(CombatCtl.without_hazards([real, marked, unmarked]), [real, unmarked])
+	var gone := Node3D.new()
+	gone.free()
+	assert_false(CombatCtl.is_boss_hazard(gone), "a freed cache entry: no hazard, no script error")
+	assert_eq(CombatCtl.without_hazards([gone, real]).size(), 2, "freed entries are left for _enemy_alive to skip")
+	var sac: Node3D = EggSac.new()
+	sac.setup({"pos": Vector3(0, 0, -30), "warn": 3.0})
+	add_child(sac)
+	var line: Node3D = TripLine.new()
+	line.setup({"a": Vector3(-2, 0, -32), "b": Vector3(2, 0, -32), "tele": 1.2, "life": 12.0})
+	add_child(line)
+	assert_true(sac.is_in_group("enemy") and CombatCtl.is_boss_hazard(sac), "the egg sac / seed pod")
+	assert_true(line.is_in_group("enemy") and CombatCtl.is_boss_hazard(line), "the trip-line / root runner")
+	assert_eq(CombatCtl.without_hazards([sac, real, line]), [real])
+	for n in [sac, line, real, marked, unmarked]:
+		(n as Node).free()
+
+
+## Integration R62: the companions' gear tier is Stats.best_weapon_tier() (one source of truth).
+func test_gear_tier_is_the_stats_weapon_tier() -> void:
+	fresh_state()
+	assert_eq(Support.gear_tier(), 1, "stone / nothing")
+	assert_eq(Support.gear_tier(), Stats.best_weapon_tier())
+	GameState.give_item("copper_sword", 1)
+	assert_eq(Support.gear_tier(), 2)
+	GameState.give_item("moonsteel_axe", 1)
+	assert_eq(Support.gear_tier(), Stats.best_weapon_tier(), "tools never count, exactly as in Stats")
+	GameState.give_item("sparkseed_wand", 1)
+	assert_eq(Support.gear_tier(), Stats.best_weapon_tier(), "wands count, exactly as in Stats")
+	assert_almost(Support.gear_damage_mult(), Stats.companion_damage_mult(), 0.0001)
+	fresh_state()

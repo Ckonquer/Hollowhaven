@@ -1,6 +1,6 @@
 extends "res://tests/unit/test_core_base.gd"
 ## GameState (autoload/game_state.gd): items & overflow, key pouch, tools, flags/counters/lore,
-## depletion timing, dropped items, structures/storages/crops, companions & bonds, clock, buffs.
+## depletion timing, dropped items, structures/storages/crops, companions & bonds, clock, buffs, dye palettes.
 
 const Layout := preload("res://data/world_layout.gd")
 const CreaturesData := preload("res://data/creatures.gd")
@@ -519,3 +519,29 @@ func test_buffs_do_not_tick_when_inactive_and_refresh() -> void:
 	GameState.add_buff("stamina_regen", 1.2, 2.0)   # eating again refreshes
 	GameState._process(1.0)
 	assert_almost(GameState.buff_mult("stamina_regen"), 1.2)
+
+
+# --- wardrobe: dye palettes -------------------------------------------------------------------------------
+
+## GameState.unlock_palette (crafting dyes, reward finishes): owned once, announced once, saved and loaded.
+func test_unlock_palette_once_and_announced() -> void:
+	var changed := record(Events.appearance_changed, 0)
+	assert_eq(GameState.wardrobe["palettes"], [], "a new journey owns no dye palettes")
+	assert_true(GameState.unlock_palette("rose"), "newly owned")
+	assert_eq(GameState.wardrobe["palettes"], ["rose"])
+	assert_eq(changed.size(), 1, "Events.appearance_changed when a palette is new")
+	assert_false(GameState.unlock_palette("rose"), "already owned")
+	assert_false(GameState.unlock_palette(""), "no id")
+	assert_eq(changed.size(), 1, "nothing announced for a palette already owned")
+	assert_true(GameState.unlock_palette("midnight"))
+	assert_eq(GameState.wardrobe["palettes"], ["rose", "midnight"], "kept in the order unlocked")
+	var d: Dictionary = json_norm(GameState.to_dict())
+	GameState.reset()
+	assert_eq(GameState.wardrobe["palettes"], [], "reset clears them")
+	GameState.from_dict(d)
+	assert_eq(GameState.wardrobe["palettes"], ["rose", "midnight"], "palettes survive save / load")
+	assert_false(GameState.unlock_palette("midnight"), "still owned after loading")
+	# A damaged save without a palette list: the first unlock repairs it.
+	GameState.wardrobe.erase("palettes")
+	assert_true(GameState.unlock_palette("cream"))
+	assert_eq(GameState.wardrobe["palettes"], ["cream"])

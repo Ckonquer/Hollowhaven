@@ -36,6 +36,17 @@ extends RefCounted
 ##   ch2_service_gate_open, ch2_true_signal, ch2_refuge_reached, ch2_refuge_shortcut, ch2_refuge_record,
 ##   ch2_line_water, ch2_line_bell, ch2_line_light, ch2_crossing_cleared, ch2_false_home_revealed,
 ##   ch2_choir_defeated, ch2_returned_to_reach, ch2_homecoming, chapter_two_complete (set by the ending flow).
+## More content flags that no step reads (listed so nobody reuses the names):
+##   lamp prerequisites - the lamp refuses to light, with its reason, until they hold:
+##     hr_warden_defeated (Reach east: the Quarry Warden's spawner hr_sp_quarry_warden cleared) and
+##     ch2_winch_repaired (the mineral winch; also data/unlocks.gd Moonsteel knowledge) before ch2_quarry_lamp_lit;
+##     ch2_velour_defeated (manor: its arena sets it on Events.boss_defeated("count_velour")) before
+##     ch2_manor_lamp_lit;
+##   ch2_moment_empty_waltz (manor: "The Empty Waltz" authored moment, set first, once per save).
+## Set by the Reach west module (C2) for its own world state, read by nobody else: ch2_orchard_irrigated,
+##   ch2_orchard_mimics_cleared, ch2_moment_pumpkin_seen / _turned / _twitched, hr_sluice_junction_garden,
+##   hr_sluice_gate_open, hr_festival_seed_planted, hr_read_garden_note, hr_chime_trail_found,
+##   hr_chime_trail_done (with its content bundle rw_hr_chime_trail), hr_candleyard_bench_rested.
 ## The seals / furnishings below are granted HERE (content modules must not grant them again), and so are
 ## the recipe unlock flags of data/unlocks.gd that belong to this layer: ch2_orchard_restored,
 ## ch2_quarry_restored, ch2_manor_restored (lamp steps), ch2_homecoming (home decoration: the Wardlight) and
@@ -44,7 +55,8 @@ extends RefCounted
 ## the region's road lights, src/world/reach/road_lights.gd, stay lit; any system may read it) and
 ## ch2_trials_open (step ch2_routes_restored: the optional echo trials may be offered, echo trial module).
 ## Texts, hints, targets and rewards follow MP §11 (story module C9). The ending (Game.complete_chapter_two)
-## commits rw_ch2_feast = the final step's give + flags + Game.chapter_two_rewards()'s continued resources; the
+## commits rw_ch2_feast = the final step's give + flags + Game.chapter_two_rewards()'s continued resources (the
+## step's give already lists those same amounts, story_ch2.gd FEAST_EXTRAS, so both paths pay the same); the
 ## Lanternwake outfit is owned and the gothic / cottage furnishing finishes (dye palettes) are unlocked with that
 ## same ledger entry (src/world/story_ch2/story_ch2.gd sync_feast_unlocks). Hints may use the {tokens} of
 ## src/ui/ui_util.gd TOKEN_ACTIONS; alt_<field> = arachnophobia wording.
@@ -192,6 +204,6 @@ const STEPS := [
 		"text": "Every lantern is lit. Celebrate the Lanternwake: at home with the Ward Stone, or at the Commons.",
 		"hint": "Choose Celebrate at the Ward Stone or at the Commons festival lantern ({interact}). Nothing is placed in your house.",
 		"objectives": [{"type": "flag", "flag": "chapter_two_complete", "label": "Celebrate the Lanternwake"}],
-		"on_complete": {"give": {"candy": 6}, "flags": ["ch2_feast"],
+		"on_complete": {"give": {"candy": 6, "pumpkin": 4, "lantern_wax": 4, "sugarcap": 3, "moonpetal": 3}, "flags": ["ch2_feast"],
 			"message": "The Lanternwake's gifts are yours: a festival outfit, new furniture finishes and a few supplies."}},
 ]

@@ -4,6 +4,7 @@ extends "res://tests/test_case.gd"
 
 const IconFactory := preload("res://src/ui/icon_factory.gd")
 const ItemsData := preload("res://data/items.gd")
+const MapView := preload("res://src/ui/widgets/map_view.gd")
 
 var _arachno_before: Variant = false
 
@@ -102,3 +103,30 @@ func test_portraits_and_glyphs() -> void:
 	var g := IconFactory.glyph("switch_on", 68, 38)
 	assert_eq(g.get_width(), 68)
 	assert_eq(g.get_height(), 38)
+
+
+## The Reach map asks for its own district stickers (map_view.gd REACH_ICONS [preferred glyph, fallback]): every
+## preferred glyph has a real drawing (so the fallback item icons are no longer used), renders as a tidy sticker
+## and differs from the fallback and from the other districts.
+func test_reach_map_glyphs_have_drawings() -> void:
+	var reach_icons: Dictionary = MapView.REACH_ICONS
+	var fallback := IconFactory.render("definitely_not_an_icon", Color.WHITE).get_data()
+	var seen := {}
+	for id in reach_icons:
+		var glyph := String(reach_icons[id][0])
+		assert_true(IconFactory.has_drawing(glyph), "%s has a drawing for %s" % [glyph, id])
+		assert_eq(MapView.place_icon(String(id), "hallowmere_reach"), glyph, "the Reach map uses %s for %s" % [glyph, id])
+		if seen.has(glyph):
+			continue
+		var img := IconFactory.render(glyph, Color.WHITE, 96)
+		var st := _alpha_stats(img)
+		assert_true(float(st["coverage"]) > 0.12, "%s is almost empty (%.2f)" % [glyph, st["coverage"]])
+		assert_true(float(st["coverage"]) < 0.93, "%s fills the whole square (%.2f)" % [glyph, st["coverage"]])
+		assert_true(float(st["corner"]) < 0.05, "%s: corners stay transparent" % glyph)
+		var data := img.get_data()
+		assert_ne(data, fallback, "%s is not the fallback drawing" % glyph)
+		for other in seen:
+			assert_ne(data, seen[other], "%s differs from %s" % [glyph, other])
+		seen[glyph] = data
+	for g in ["map_lantern", "map_glasshouse", "map_pumpkin", "map_candle", "map_manor", "map_bell"]:
+		assert_true(IconFactory.EXTRA_ICONS.has(g), g + " listed in EXTRA_ICONS")

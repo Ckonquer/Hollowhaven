@@ -14,6 +14,8 @@ const Reach := preload("res://data/hallowmere_layout.gd")
 const CANVAS := Vector2(1920, 1080)
 const REACH := "hallowmere_reach"
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
+const Mastery := preload("res://src/core/mastery.gd")
+const MasteryData := preload("res://data/mastery.gd")
 
 var ui: CanvasLayer
 var _mode_before := ""
@@ -466,3 +468,100 @@ func test_both_painted_maps_really_draw() -> void:
 	assert_eq(rv._target_world.size(), 3)
 	assert_eq(w._target_world.size(), 2)
 	assert_eq(rv._arches, [["commons", true], ["orchard", true], ["quarry", false]])
+
+
+# --- Mastery map clarity and Chapter One additions -------------------------------------------------------
+
+func _wayfinding(rank: int) -> void:
+	GameState.mastery["wayfinding"] = int(MasteryData.RANK_XP[rank])
+
+
+## Wayfinding 2: gathered special-material spots become small icon pins (a pocket shares one pin); Wayfinding 4:
+## unfound caches in discovered districts get a soft "?"; both on both outdoor maps, with legend rows, drawn
+## without errors, and the windows still fit the canvas.
+func test_mastery_pins_and_cache_hints_on_the_maps() -> void:
+	_accept(TO_LAMPS)
+	assert_true(Mastery.record_spot("surface", "sap_stump", Vector3(-46, 0, -14)))
+	assert_true(Mastery.record_spot("surface", "sap_stump", Vector3(-40, 0, -14)), "6 m apart: a second spot")
+	assert_true(Mastery.record_spot("surface", "bush", Vector3(-55, 0, 12)))
+	assert_true(Mastery.record_spot(REACH, "iron_vein", Vector3(80, 0, 20)))
+	_wayfinding(1)
+	var v1 := _standalone("surface", Vector2(800, 800))
+	assert_eq(v1.resource_pins, [], "rank 1: no pins")
+	assert_eq(MapPanel.legend_extras("surface"), [])
+	_wayfinding(2)
+	var w := _standalone("surface", Vector2(800, 800))
+	assert_eq(w.resource_pins.size(), 2, "the two stumps share one pin")
+	var items: Array = []
+	for pin in w.resource_pins:
+		items.append(String(pin[2]))
+	assert_true(items.has("resin") and items.has("berries"), "pins show the material (%s)" % [items])
+	for pin in w.resource_pins:
+		if String(pin[1]) == "sap_stump":
+			assert_eq(int(pin[3]), 2)
+	assert_eq(w.cache_hint_points, [], "rank 2: no cache hints yet")
+	GameState.discover(REACH, "hr_commons")
+	GameState.discover(REACH, "hr_candleyard")
+	var rv := _standalone(REACH, Vector2(1000, 800))
+	assert_eq(rv.resource_pins.size(), 1)
+	assert_eq(String(rv.resource_pins[0][2]), "iron_ore")
+	assert_eq(MapPanel.legend_extras("surface")[0]["text"], MapPanel.LEGEND_PINS)
+	_wayfinding(4)
+	GameState.discover("surface", "old_oak")
+	var w4 := _standalone("surface", Vector2(800, 800))
+	var c1x: Dictionary = (load("res://data/c1x_layout.gd") as Script).get_script_constant_map()
+	assert_eq(w4.cache_hint_points, [c1x["TAILOR_CACHE"]["pos"]], "the Tailor's Cache hint near the Old Oak")
+	var r4 := _standalone(REACH, Vector2(1000, 800))
+	assert_eq(r4.cache_hint_points.size(), 2, "the Candleyard's hat and pattern (the Pools are not found yet)")
+	var kinds: Array = []
+	for ex in MapPanel.legend_extras(REACH):
+		kinds.append(ex["kind"])
+	assert_eq(kinds, ["pins", "hints"])
+	await wait_frames(3)
+	assert_true(w4.frames_drawn > 0 and r4.frames_drawn > 0 and rv.frames_drawn > 0, "pins and hints drew without errors")
+	var r: Rect2 = w4.map_rect()
+	for pin in w4.resource_pins:
+		assert_true(r.has_point(w4.to_map(pin[0])), "pin inside the map")
+	# the panels show the legend rows and still fit the canvas
+	for a in ["surface", REACH]:
+		Game.area_id = String(a)
+		var m: Control = await _open_map()
+		await wait_frames(2)
+		assert_true(_has_text(m, MapPanel.LEGEND_PINS), "%s legend names the pins" % a)
+		assert_true(_has_text(m, MapPanel.LEGEND_HINTS), "%s legend names the hints" % a)
+		assert_eq(m.view.resource_pins.size(), 2 if a == "surface" else 1)
+		var ms: Vector2 = m.window.get_combined_minimum_size()
+		print("G3-LAYOUT map/%s with mastery rows %s" % [a, ms])
+		assert_true(ms.x <= CANVAS.x and ms.y <= CANVAS.y - 30.0, "map %s fits with the mastery rows (%s)" % [a, ms])
+		ui.close("map")
+		await wait_frames(2)
+	# found caches disappear (and so does the legend row once none is left on that map)
+	GameState.set_flag("c1x_tailor_cache")
+	GameState.set_flag("ch2_witch_hat_found")
+	var w5 := _standalone("surface", Vector2(800, 800))
+	assert_eq(w5.cache_hint_points, [])
+	assert_eq(_standalone(REACH, Vector2(1000, 800)).cache_hint_points.size(), 1)
+	assert_eq(MapPanel.legend_extras("surface").size(), 1, "surface: pins only")
+
+
+## Chapter One's Bramblewatch gets its name on the woods map once its zone is discovered, clear of every
+## sticker, name and the waygate pin.
+func test_bramblewatch_named_on_the_woods_map_once_found() -> void:
+	_accept()
+	var before := _standalone("surface", Vector2(800, 800))
+	assert_null(before.bramblewatch_at, "not before it is found")
+	GameState.discover("surface", "c1x_bramblewatch")
+	var zones: Array = (load("res://data/c1x_layout.gd") as Script).get_script_constant_map()["BRAMBLEWATCH_ZONES"]
+	var v := _standalone("surface", Vector2(800, 800))
+	assert_eq(v.bramblewatch_at, zones[0][0])
+	var lr: Rect2 = v.bramblewatch_label_rect()
+	var r: Rect2 = v.map_rect()
+	assert_true(r.encloses(lr), "the name is inside the map")
+	assert_false(lr.intersects(v.bramblewatch_marker_rect()), "the name does not cover its marker")
+	for b in v.surface_blocks():
+		assert_false(lr.intersects(b[1]), "Bramblewatch name %s overlaps %s %s" % [lr, b[0], b[1]])
+	assert_false(v.surface_blocks().is_empty())
+	assert_null(_standalone(REACH, Vector2(1000, 800)).bramblewatch_at, "woods only")
+	await wait_frames(2)
+	assert_true(v.frames_drawn > 0, "drawn without errors")
+

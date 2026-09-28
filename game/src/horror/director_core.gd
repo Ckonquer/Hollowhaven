@@ -508,6 +508,10 @@ func _ineligible_reason(id: String, ev: Dictionary, ctx: Dictionary, intensity: 
 	var needs := String(ev.get("needs_companion", ""))
 	if needs != "" and String(ctx.get("companion", "")) != needs:
 		return "needs companion %s present" % needs
+	# An imitation of a companion (wrong_mochi) only works while the real one is NOT following Krystal.
+	var absent := String(ev.get("absent_companion", ""))
+	if absent != "" and String(ctx.get("companion", "")) == absent:
+		return "companion %s is following (the imitation would fool nobody)" % absent
 	if last_fired.has(id):
 		var left := float(ev["cooldown"]) - (now - float(last_fired[id]))
 		if left > 0.0:

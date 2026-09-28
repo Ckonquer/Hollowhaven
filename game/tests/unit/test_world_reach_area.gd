@@ -3,6 +3,8 @@ extends "res://tests/test_case.gd"
 ## zones and safe zones per the layout, the boundary, no fall-through, walkable connectivity along every road
 ## (physics probes) plus real capsule walks over the crossings, through the Conservatory doors and down the
 ## Bellhouse stair, reachable interactables, Continue position validation, exits and the waygate home.
+## Load time (R110): the district scripts compile on loader threads (reach_districts.gd warm_up / load_all) and
+## the open Bellhouse stair asks Game.prefetch_area("hushed_works") once when she comes near.
 ## The region is built once and shared by the suite.
 
 const ReachWorld := preload("res://src/world/areas_ch2/hallowmere_reach_world.gd")
@@ -11,11 +13,20 @@ const WorldLayout := preload("res://data/world_layout.gd")
 const Vegetation := preload("res://src/world/reach/reach_vegetation.gd")
 const Conservatory := preload("res://src/world/reach/conservatory.gd")
 const Logic := preload("res://src/player/player_logic.gd")
+const Districts := preload("res://src/world/reach/reach_districts.gd")
 
 const SAFE_SPAWNS := ["waygate_arrival", "reach_respawn", "commons_arch", "orchard_arch", "quarry_arch", "manor_arch", "conservatory"]
 const LEGAL_TARGETS := {"surface": ["waygate"], "moonveil_manor": ["manor_entry"], "hushed_works": ["service_landing", "refuge"]}
 
 static var _w: Node3D = null
+
+
+## Stand-in for Game in the Bellhouse prefetch test (records prefetch_area calls).
+class PrefetchSpy extends RefCounted:
+	var calls: Array = []
+
+	func prefetch_area(area: String) -> void:
+		calls.append(area)
 
 
 func _world() -> Node3D:
@@ -550,6 +561,100 @@ func test_ys_bellhouse_stair_walks() -> void:
 			GameState.flags.erase(f)
 		else:
 			GameState.flags[f] = saved[f]
+	bh.apply_state()
+	w.road_lights.set_lit_instant(w.road_lights.should_be_lit())
+	w.conservatory.pedestal.refresh()
+
+
+## R110: the district scripts compile on loader threads. The region's own load collected every request (same
+## scripts as a plain load, the enemy factory loaded first); a cold script requested early (a prefetch) goes through
+## a loader thread and is collected by load_all(); a request that was never made falls back to a plain load; a
+## missing script is skipped; an empty table requests nothing.
+func test_district_scripts_load_on_loader_threads() -> void:
+	var w: Node3D = await _world()
+	assert_false(bool(Districts.has_pending_requests()), "the region collected every loader-thread request")
+	for e in Districts.default_entries():
+		var id := String(e["id"])
+		assert_true(["thread", "cached", "sync"].has(String(Districts.load_mode.get(id, ""))), "%s arrived (%s)" % [id, str(Districts.load_mode.get(id, ""))])
+	if ResourceLoader.exists(Districts.FACTORY_PATH):
+		assert_true(ResourceLoader.has_cached(Districts.FACTORY_PATH), "the enemy factory is loaded on the main thread first")
+	for d in w.districts:
+		assert_true(d["script"] == load(String(d["path"])), "%s: the collected script is the cached one" % d["id"])
+	var dir := "user://test_saves/reach_loader"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+	var stamp := Time.get_ticks_usec()
+	var cold := dir.path_join("probe_a_%d.gd" % stamp)
+	var plain := dir.path_join("probe_b_%d.gd" % stamp)
+	for path in [cold, plain]:
+		var f := FileAccess.open(String(path), FileAccess.WRITE)
+		f.store_string("extends RefCounted
+
+static func footprints() -> Array:
+	return [[Vector2(-44, -8), 7.0]]
+")
+		f.close()
+	var entries := [{"id": "missing", "path": "res://src/world/reach/districts/does_not_exist.gd", "landmark": "hr_orchard"},
+		{"id": "probe", "path": cold, "landmark": "hr_pools"}]
+	assert_eq(int(Districts.warm_up(entries)), 1, "one new request (the missing script is skipped)")
+	assert_true(bool(Districts.has_pending_requests()), "requested early, not collected yet (a prefetch)")
+	assert_eq(int(Districts.warm_up(entries)), 0, "asking again does not request it twice")
+	await wait_frames(2)
+	var loaded: Array = Districts.load_all(entries)
+	assert_eq(loaded.size(), 1, "the missing script is skipped, the probe loads")
+	assert_eq(String(Districts.load_mode.get("probe", "")), "thread", "compiled on a loader thread")
+	assert_false(bool(Districts.has_pending_requests()), "and collected")
+	assert_eq(Districts.footprints(loaded), [[Vector2(-44, -8), 7.0]], "its hooks work")
+	var again: Array = Districts.load_all(entries)
+	assert_eq(String(Districts.load_mode.get("probe", "")), "cached", "a second load reuses the cached script")
+	assert_true(again.size() == 1 and again[0]["script"] == loaded[0]["script"], "the same script object")
+	# a pending entry whose request was never made (or was taken elsewhere): the plain-load fallback
+	Districts._requests[plain] = true
+	var fb: Array = Districts.load_all([{"id": "plain", "path": plain, "landmark": "hr_pools"}])
+	assert_eq(fb.size(), 1, "the fallback loads it")
+	assert_eq(String(Districts.load_mode.get("plain", "")), "sync", "with a plain load on the main thread")
+	assert_false(bool(Districts.has_pending_requests()), "nothing left pending")
+	assert_eq(Districts.load_all([]), [], "an empty table loads nothing")
+	assert_false(bool(Districts.has_pending_requests()), "and requests nothing")
+	for path in [cold, plain]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(String(path)))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(dir))
+
+
+## R110: the way down asks Game.prefetch_area("hushed_works") ONCE, only when the stair is open and she is near
+## (the forecourt / stairwell); a Game without prefetch_area is never called (has_method guard).
+func test_ys_bellhouse_prefetches_the_works_once_near_the_open_stair() -> void:
+	var w: Node3D = await _world()
+	var B: Dictionary = Reach.BELLHOUSE
+	var bh: Node = w.bellhouse
+	var d: Node3D = bh.descent
+	var hb := float(w.terrain.bellhouse_level)
+	var fc: Vector2 = B["forecourt"]
+	var forecourt := Vector3(fc.x, hb, fc.y)
+	var stair_top := Vector3(float(B["stair_x"]), hb, float(B["ramp_top_z"]))
+	var far := Vector3(fc.x, hb, fc.y + 30.0)
+	var saved: Variant = GameState.flags.get("ch2_lamps_linked", null)
+	GameState.flags.erase("ch2_lamps_linked")
+	var spy := PrefetchSpy.new()
+	d.prefetch_target = spy
+	d.prefetched = false
+	assert_false(bool(d.maybe_prefetch(stair_top)), "sealed stair: no prefetch")
+	GameState.set_flag("ch2_lamps_linked", true)
+	assert_false(bool(d.maybe_prefetch(far)), "open stair, but she is far away (%.0f m)" % Vector2(far.x - d.global_position.x, far.z - d.global_position.z).length())
+	assert_eq(spy.calls, [], "nothing asked yet")
+	assert_true(bool(d.maybe_prefetch(forecourt)), "open stair and she stands in the forecourt")
+	assert_eq(spy.calls, ["hushed_works"], "the Works are prefetched")
+	assert_false(bool(d.maybe_prefetch(stair_top)), "only once")
+	assert_eq(spy.calls.size(), 1, "one call")
+	assert_false(d.is_processing(), "no more polling after it asked")
+	d.prefetched = false
+	d.prefetch_target = RefCounted.new()
+	assert_false(bool(d.maybe_prefetch(stair_top)), "a target without prefetch_area is never called")
+	assert_false(bool(d.prefetched), "and nothing is marked done")
+	d.prefetch_target = null
+	if saved == null:
+		GameState.flags.erase("ch2_lamps_linked")
+	else:
+		GameState.flags["ch2_lamps_linked"] = saved
 	bh.apply_state()
 	w.road_lights.set_lit_instant(w.road_lights.should_be_lit())
 	w.conservatory.pedestal.refresh()

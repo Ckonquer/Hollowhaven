@@ -21,7 +21,8 @@ extends RefCounted
 ##   * safety: the whole Bell Throat (add_safe_room, else a safe circle) + the checkpoints;
 ##   * zones: the area registers every merged room's zone; without that API one circle per deep zone;
 ##   * director anchors (Layout.ANCHORS: winch ceiling, wrong-landing spawn anchors for WORKS_EVENTS);
-##   * per-zone light temperature / ambience (Layout.MOODS / AMBIENCE through register_mood).
+##   * per-zone light temperature / ambience (Layout.MOODS / AMBIENCE through register_mood; the vault's
+##     loop is choir_arena.gd vault_ambience(): calm once ch2_choir_defeated).
 
 const Layout := preload("res://data/works_layout_deep.gd")
 const Builder := preload("res://src/world/below/below_builder.gd")
@@ -146,11 +147,15 @@ static func _register_zones(area: Node3D) -> void:
 
 
 ## Our light temperatures and ambience per zone, through the Works area's register_mood when present.
+## The vault's loop comes from the arena: the Choir's until ch2_choir_defeated, calm on a won save's builds.
 static func _register_moods(area: Node3D) -> void:
 	if not area.has_method("register_mood"):
 		return
 	for zone in Layout.MOODS:
-		area.call("register_mood", String(zone), (Layout.MOODS[zone] as Dictionary).duplicate(), String(Layout.AMBIENCE.get(zone, "")))
+		var amb := String(Layout.AMBIENCE.get(zone, ""))
+		if String(zone) == ChoirArena.VAULT_ZONE:
+			amb = ChoirArena.vault_ambience()
+		area.call("register_mood", String(zone), (Layout.MOODS[zone] as Dictionary).duplicate(), amb)
 
 
 ## Adds a safe circle through whatever the area offers (deep_art.gd add_safe).

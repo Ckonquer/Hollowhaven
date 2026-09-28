@@ -303,6 +303,8 @@ The fog and ambient mood (`MOODS`) changes per zone.
 
 ## 6. Extension recipes
 
+*Status: recipes (a)-(e) are built (Waves A-C); §8 at the end maps the current Chapter Two areas.*
+
 ### (a) New outdoor area `hallowmere_reach` (~280×220 m) with a two-way waygate
 
 1. **Data:** create `data/reach_layout.gd`. It holds `LANDMARKS`, `SPAWN_HINTS`, `PATHS`, `HX=140`,
@@ -496,3 +498,50 @@ The fog and ambient mood (`MOODS`) changes per zone.
   `set_shader_parameter("terrain_samples", 257.0)` with a float would silently fail. Always pass a Vector2.
 - **Load time:** area generation runs inside one frame behind the fade (rule: at most about 1 s). A larger
   terrain scales linearly with sample count. Keep an eye on `build_times` (`print`ed in debug builds).
+
+## 8. Chapter Two areas (Waves A-C + integration) — as built
+
+Sections 1-7 map the Chapter One areas; recipes 6(a)-(e) are built. Areas, spawn ids, travel and zone ids: spec §1 / §7 (they are
+the contract); Game flow constants (`AREAS`, `SAFE_SAVE_AREAS`, `OUTDOOR_AREAS`, `TRANSIENT_AREAS`, `DIRECTOR_AREAS`,
+`AREA_DEFAULT_RESPAWN`, `return_point`, `set_respawn`, Lantern Road): `docs/ch2/WAVE_A_REPORT.md`. Source of truth: the headers of
+the area scripts below and of `autoload/game.gd`.
+
+**Area scripts** (every scene keeps its Wave A spawn ids, zone ids and exit targets):
+| area | script | built from |
+|---|---|---|
+| `hallowmere_reach` | `src/world/areas_ch2/hallowmere_reach_world.gd` → `src/world/reach/reach_world.gd` (C1) | `data/hallowmere_layout.gd`; base region (terrain, brook, forest edge, roads, Commons, Conservatory, Bellhouse, arches) + districts through `reach_districts.gd` (`footprints()` → `shape_terrain()` strictly inside the district's landmark circle → `build(area)`); district scripts `src/world/reach/districts/{orchard,pools,candleyard}.gd` (C2, `west/*`, `data/reach_west.gd`), `quarry.gd` (C3, `east/*`, `data/reach_east.gd`), `manor_grounds.gd` (C4); story festival dressing (C9 `reach_dressing.gd`) is built during the load |
+| `moonveil_manor` | `moonveil_manor_world.gd` (C4) | its own room builder `src/world/manor/manor_builder.gd` + `data/manor_layout.gd` (not below_builder) |
+| `hushed_works` | `hushed_works_world.gd` (C7) | `data/works_layout.gd` (rooms 1-8) merged with `data/works_layout_deep.gd` (rooms 9-14) into one table for `below_builder.gd`, then `src/world/works/rooms_deep.gd` `build(area, builder)` (C8); Works horror director (`Game.DIRECTOR_AREAS` has "hushed_works") |
+| `tobin_annex` | `tobin_annex_world.gd` (B10; the scene's script, not `tobin_annex.gd`) | `src/world/annex/*` on the Below builder |
+| `echo_trial` | `echo_trial.gd` (B9) behind the 3-line `echo_trial_world.gd` shim that `scenes/echo_trial.tscn` loads | kept: no .tscn churn (R136 j); trial table `TRIALS` in `echo_trial.gd` holds the repeat rewards (trial-owned content data, R136 k) |
+Surface additions are annexes (`src/world/surface/annexes.gd` `ANNEX_SCRIPTS`, safe-loaded, `static build(area)` + optional
+`grass_clearings()`): the c1x content (B7), `courage_lantern.gd` (B4), `tobin_door.gd` (B10) and C9's `story_ch2/haven_dressing.gd`
+(the lasting Haven keepsake after `chapter_two_complete`; R50). The legacy vegetation golden hash stays green.
+
+**Cold-load warm-up (integration R05/R58/R110).** `Game.prefetch_area(area_id, extra := []) -> int` starts compiling an area on
+loader threads — its scene (with every script the scene preloads), the `AREA_WARMUP` scripts it builds or spawns early (surface:
+brambleback / knotted_elder / lantern_moth; tobin_annex: hollow_drudge; hushed_works: rooms_deep + hollow_drudge + bellcap_sentry;
+moonveil_manor: velvet_wing) and any `extra` paths. Idempotent, never blocks; `EnemyFactory` is loaded on the MAIN thread first (no
+worker may compile a script that preloads it: the quarry's deadlock-avoidance rule). `load_area()` calls it before its fade-out and
+takes the scene with `load_threaded_get()` (plain `change_scene_to_file()` fallback); `goto_title()` prefetches the Woods;
+`is_prefetching(path)` for tests. Early callers (behind `has_method` guards, once per node): the repaired waygate within ~25 m
+(`prefetch_area("hallowmere_reach")`), the open Bellhouse stair within ~20 m (`prefetch_area("hushed_works")`). The Reach districts warm
+themselves: `reach_districts.warm_up()` / `load_all()` request every district script with `ResourceLoader.load_threaded_request`
+and collect them in order (plain `load()` fallback).
+
+**Loading details (integration).** `Game.load_area` restores a position saved on an upper storey after the structures exist
+(`UPPER_STOREY_RESTORE` 1 m, R04). `Game.wire_session_systems()` (from `_ready`, idempotent; the test runner calls it between suites)
+starts the mastery listeners and the Chapter Two activity tracker node (R02/R03). `surface_world.get_zone_at()` reports "haven" in the
+whole expanded Haven (build regions + `HAVEN_SAFE_BUFFER`), any legacy zone that claims the point still wins (R51).
+Reusable Below nodes gained setup keys (spec §10); `lower_gate.gd` records `lower_gate_tried` only for the legacy gate, every other gate
+`<its flag>_tried` (R74); `BelowProps.tint()` / `torus_mesh()` are public for the annex (R75); the Foreman's desk offers a lost key again
+while the Bellhouse service gate still needs it (`ch2_lamps_linked` and not `ch2_service_gate_open`; never duplicates it, R73).
+
+**Kept as built (lead decisions R136, no change):** Celebrate at home before revisiting the Reach is allowed (step 18 skipped,
+`ch2_trials_open` still paid) (n); Hask's Rail completes on reaching the junction and the Works repairs `ch2_service_gate_open` on
+arrival (no softlock possible) (p); after the Choir the Works respawn is `vault_exit` and the porch fragment still asks for "haven" (q);
+entering a trial may set the Below respawn to `cp_arena` even if unlit (the echo stone stands at that lantern) (l); minor keeps (s):
+the annex echo plays on the stair, the lantern niche is safe unlit, the no-enemy fallbacks (annex Drudge, quarry Warden) stay as
+completability guards, the moth pocket sits just outside the pond music zone, Bramblewatch circles overlap the thicket rim, manor
+`height_at` in doorways, the brook corridor is held by the invisible wall, chime-trail progress is per session. After the Choir the
+vault ambience calms to `amb_stream` (R120); the quarry gangway collider switches on when the lowering animation ends (R112).

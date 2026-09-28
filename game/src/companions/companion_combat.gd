@@ -4,8 +4,13 @@ extends RefCounted
 ##    stalker, dummy, invulnerable or refusing target: can_be_hit_by / health.invulnerable), only with line of
 ##    sight (world|structure), within reach of Krystal (ENGAGE_RADIUS, Stay close: CLOSE_RADIUS) and roughly
 ##    on the pet's level. The damage happens on the attack animation's impact frame (action_event): Mochi and
-##    Lumi launch a projectile (src/combat/projectile.gd, shared & pooled; LOS-checked every tick), Pebble
-##    resolves its headbutt against the target only (reach + LOS re-checked at the impact).
+##    Lumi launch a projectile (src/combat/projectile.gd, shared & pooled; LOS-checked every tick) that can
+##    only hit its target ("only_target": any other enemy on the way, e.g. a peaceful one, is passed through,
+##    never clipped or woken), Pebble resolves its headbutt against the target only (reach + LOS re-checked
+##    at the impact). The attack's flourish (puff, sparkles, stone chips) belongs to the visual's impact frame;
+##    this layer only draws the hit impact (and the chips itself when there was no animation to carry them).
+##  * Boss hazards (nodes with meta "boss_hazard", e.g. the Matron's trip-lines and egg sacs, which are in group
+##    "enemy" so Krystal can cut / pop them) are never noticed, feared, charged, targeted or staggered.
 ##  * Signature skill with ONE cooldown per companion (companion_support.gd: GameState "skill_ready_at" on the
 ##    play_seconds timeline) shared by the autocast and the manual Companion Skill action.
 ##    Bloomguard: heal-over-time ticked here (Krystal's health.heal, which applies Stats.heal_mult itself);
@@ -155,12 +160,31 @@ static func is_dummy(e: Node) -> bool:
 	return v is bool and v
 
 
-## Whether this companion may hit `e` right now (alive, a real enemy, not armoured / refusing, not a dummy).
+## A boss's floor hazard (meta "boss_hazard"): in group "enemy" for Krystal's attacks, but not a creature, so
+## companions ignore it completely. Untyped: the shared enemy cache may hold freed entries.
+static func is_boss_hazard(e: Variant) -> bool:
+	if not is_instance_valid(e) or not (e is Object):
+		return false
+	var o := e as Object
+	return o.has_meta("boss_hazard") and _truthy(o.get_meta("boss_hazard"))
+
+
+## The "enemy" group without boss hazards (a new Array; callers throttle how often they ask).
+static func without_hazards(nodes: Array) -> Array:
+	var out: Array = []
+	for e in nodes:
+		if not is_boss_hazard(e):
+			out.append(e)
+	return out
+
+
+## Whether this companion may hit `e` right now (alive, a real enemy, not armoured / refusing, not a dummy,
+## not a boss hazard).
 func can_target(e: Variant) -> bool:
 	if not c.call("_enemy_alive", e):
 		return false
 	var n: Node3D = e
-	if n.is_in_group("stalker") or is_dummy(n):
+	if n.is_in_group("stalker") or is_dummy(n) or is_boss_hazard(n):
 		return false
 	var h := find_health(n)
 	if h == null or bool(h.get("invulnerable")):
@@ -423,7 +447,8 @@ func _start_attack() -> void:
 	if v is Node and action != "":
 		length = float((v as Node).call("play_action", action))
 	if length <= 0.0:
-		_pending = {"action": action, "target": target, "t": 0.0}
+		# No animation (so no impact-frame flourish from the visual): this layer draws it itself.
+		_pending = {"action": action, "target": target, "t": 0.0, "own_fx": true}
 		_resolve_pending()
 		return
 	_pending = {"action": action, "target": target, "t": length + 0.1}
@@ -452,24 +477,29 @@ func on_action(action_name: String) -> bool:
 
 func _resolve_pending() -> void:
 	var t: Variant = _pending.get("target")
+	var own_fx := bool(_pending.get("own_fx", false))
 	_pending = {}
-	if not (t is Node3D) or not can_target(t):
+	# Validity first: `is` on a target freed during the wind-up would be a script error.
+	if not is_instance_valid(t) or not (t is Node3D) or not can_target(t):
 		return
 	attacks_fired += 1
 	if is_melee():
-		_melee_hit(t)
+		_melee_hit(t, own_fx)
 	else:
 		_shoot(t)
 
 
-func _melee_hit(t: Node3D) -> void:
+## Pebble's Stone Bump. The stone chips of the bump come from the visual's impact frame (pebble_visual.gd
+## _on_action_fire "stone_bump"), the same frame this runs on: only draw them here when no animation played
+## (`own_fx`), so a bump always shows exactly one burst.
+func _melee_hit(t: Node3D, own_fx: bool = false) -> void:
 	if not within_reach(t) or not has_los(t):
 		return
 	var dir := Vector3(t.global_position.x - c.global_position.x, 0.0, t.global_position.z - c.global_position.z)
 	dir = dir.normalized() if dir.length_squared() > 0.0001 else Vector3.FORWARD
 	var dealt := deliver(t, Support.basic_damage(id), dir, MELEE_KNOCKBACK)
-	var ap := aim_point(t)
-	Fx.chips(c.get_parent(), ap - dir * 0.3, Color("9a948a"), 5)
+	if own_fx:
+		Fx.chips(c.get_parent(), aim_point(t) - dir * 0.3, Color("9a948a"), 5)
 	if dealt > 0.0:
 		c.call("_voice", "clack")
 
@@ -480,7 +510,9 @@ func _shoot(t: Node3D) -> void:
 	var from := attack_origin() + (aim_point(t) - attack_origin()).normalized() * 0.3
 	var dmg := Support.basic_damage(id)
 	if _projectile_s != null:
-		var p: Variant = _projectile_s.call("fire", {"shooter": c, "from": from, "target": t, "damage": dmg,
+		# only_target: the shot can only land on its target; anything else in the way (a peaceful enemy, a boss
+		# hazard) is passed through untouched, never clipped or woken. The world still blocks it.
+		var p: Variant = _projectile_s.call("fire", {"shooter": c, "from": from, "target": t, "only_target": t, "damage": dmg,
 			"speed": float(b.get("projectile_speed", 10.0)), "range": float(b.get("range", 9.0)) + 1.5,
 			"radius": float(look["radius"]), "groups": ["enemy"], "color": look["color"], "light": bool(look["light"]),
 			"kind": String(look["kind"]), "max_per_shooter": 2, "on_hit": _on_projectile_hit})
@@ -524,8 +556,8 @@ func deliver(t: Node3D, dmg: float, dir: Vector3, knock: float) -> float:
 ## Working together: +1 bond per landed hit on a real enemy, inside the shared daily work cap (never from
 ## dummies or blocked hits).
 func _reward_hit(t: Node) -> void:
-	# (A projectile may meet another enemy on its way: the stalker is never a source of bond either.)
-	if is_dummy(t) or t.is_in_group("stalker") or not GameState.is_befriended(id):
+	# (Shots are only_target now; the checks stay for any other caller of deliver().)
+	if is_dummy(t) or t.is_in_group("stalker") or is_boss_hazard(t) or not GameState.is_befriended(id):
 		return
 	var xp := Logic.work_bond(GameState.companion(id), GameState.day())
 	if xp > 0:
@@ -744,9 +776,10 @@ func _cast_glimmerstep(sig: Dictionary) -> void:
 	Fx.sparkles(c.get_parent(), c.global_position + Vector3.UP * 0.5, radius * 0.35, 18, Color(1.0, 0.92, 0.6))
 
 
-## A cast is a one-off: read the enemy group now (the shared scan cache may be up to 0.4 s old).
+## A cast is a one-off: read the enemy group now (the shared scan cache may be up to 0.4 s old). Boss hazards
+## are left out (Glimmerstep never "exposes", Stoneheart never staggers a trip-line).
 func _fresh_enemies() -> Array:
-	return c.get_tree().get_nodes_in_group("enemy") if c.is_inside_tree() else []
+	return without_hazards(c.get_tree().get_nodes_in_group("enemy")) if c.is_inside_tree() else []
 
 
 func _start_pulse(radius: float, seconds: float) -> void:

@@ -14,7 +14,6 @@ extends "res://src/ui/panels/panel_base.gd"
 
 const QuestsData := preload("res://data/quests.gd")
 const ChapterData := preload("res://data/quests_ch2.gd")
-const MasteryData := preload("res://data/mastery.gd")
 const Tracker := preload("res://src/ui/hud/tracker.gd")
 const MapView := preload("res://src/ui/widgets/map_view.gd")
 const LoreDB := preload("res://src/core/lore_db.gd")
@@ -498,7 +497,8 @@ static func lore_entry(id: String) -> Dictionary:
 
 
 ## Discovered lore ids in journal order: LoreDB order (legacy first, then each Chapter Two file), then any
-## discovered id no lore file knows (kept, shown with the placeholder).
+## discovered id no lore file knows (kept, shown with the placeholder); Chapter One notes before Chapter Two ones
+## (stable), so each chapter heading appears once.
 static func lore_ids() -> Array:
 	var out: Array = []
 	for id in LoreDB.ids():
@@ -507,11 +507,20 @@ static func lore_ids() -> Array:
 	for id in GameState.lore:
 		if not out.has(String(id)):
 			out.append(String(id))
-	return out
+	var ch1: Array = []
+	var ch2: Array = []
+	for id in out:
+		if lore_chapter(String(id)) == 2:
+			ch2.append(id)
+		else:
+			ch1.append(id)
+	return ch1 + ch2
 
 
+## Chapter a note is filed under (LoreDB.chapter_of: by its source file, so Tobin's annex notes - Chapter One
+## optional content - sit under Chapter One although their ids start with lore_ch2_).
 static func lore_chapter(id: String) -> int:
-	return 2 if id.begins_with("lore_ch2_") else 1
+	return LoreDB.chapter_of(id)
 
 
 func _build_lore() -> void:
@@ -649,12 +658,12 @@ static func mastery_info(track: String) -> Dictionary:
 	if raw is int or (raw is float and is_finite(raw)):
 		xp = maxi(int(raw), 0)
 	var rank: int = ItemDB.mastery_rank_for_xp(xp)
-	var names: Dictionary = MasteryData.TRACK_NAMES.get(track, {})
+	var names: Dictionary = ItemDB.mastery_track_info(track)
 	var rewards: Array = []
 	for r in range(1, max_rank + 1):
 		var rw: Dictionary = ItemDB.mastery_reward(track, r)
 		rewards.append({"rank": r, "text": String(rw.get("text", "")), "reached": r <= rank, "next": r == rank + 1})
-	return {"track": track, "name": String(names.get("name", track.capitalize())), "desc": String(names.get("desc", "")),
+	return {"track": track, "name": String(names["name"]), "desc": String(names["desc"]),
 		"xp": xp, "rank": rank, "max_rank": max_rank, "floor_xp": int(rank_xp[mini(rank, rank_xp.size() - 1)]),
 		"next_xp": int(rank_xp[rank + 1]) if rank < max_rank and rank + 1 < rank_xp.size() else -1, "rewards": rewards}
 

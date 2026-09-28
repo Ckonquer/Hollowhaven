@@ -69,9 +69,13 @@ const PLANT_RADIUS := 0.6
 ## west of it at the foot of the western hills, both more than 24 m from the legacy thicket_bramblings spawner.
 const BRAMBLEWATCH_ZONE := "c1x_bramblewatch"
 const BRAMBLEWATCH_ZONES := [[Vector2(-86.0, -34.0), 13.0], [Vector2(-75.0, -67.0), 10.0]]
+## "out_of_view": a renewable group never pops in where Krystal's camera can see (MP 7; enemy_spawner.gd
+## setup key, applied through spawner_extras() because Common.make_spawner forwards only the basic keys).
 const BRAMBLEBACK_SPAWNER := {"id": "c1x_sp_bramblebacks", "enemy": "brambleback", "pos": Vector2(-75.0, -67.0),
-	"count": 3, "radius": 4.0, "respawn_minutes": 720.0, "wander_radius": 4.0}
+	"count": 3, "radius": 4.0, "respawn_minutes": 720.0, "wander_radius": 4.0, "out_of_view": true}
 ## The Elder never respawns (its drops are one-time, data/sources.gd); its reward is paid once through the ledger.
+## It fights in ELDER_ARENA: Bramblewatch hands it the arena centre (on the ground) and ELDER_ARENA "radius"
+## through the spawner's enemy_params (its data "arena_radius" is only a fallback).
 const ELDER_SPAWNER := {"id": "c1x_sp_knotted_elder", "enemy": "knotted_elder", "pos": Vector2(-86.0, -34.0),
 	"count": 1, "radius": 1.0, "respawn_minutes": -1.0, "wander_radius": 3.0}
 ## Open arena (no walls): temporary roots rise on some of these slots (tangential root walls around the
@@ -97,7 +101,7 @@ const POST_RADIUS := 0.4
 
 ## --- Lantern Moth dusk pocket (east shore of Mirror Pond; the far side from both paths) -----------------------
 const MOTH_SPAWNER := {"id": "c1x_sp_moths", "enemy": "lantern_moth", "pos": Vector2(63.0, 53.0),
-	"count": 2, "radius": 3.5, "respawn_minutes": 720.0, "wander_radius": 3.0}
+	"count": 2, "radius": 3.5, "respawn_minutes": 720.0, "wander_radius": 3.0, "out_of_view": true}
 ## In-game hours when the pocket is awake: from dusk to just before dawn (wraps midnight).
 const MOTH_HOURS := {"from": 18.0, "to": 5.5}
 ## Pale night-blooming "moonbells" the moths gather around (decor; they glow softly while the pocket is awake).
@@ -167,6 +171,12 @@ static func footprints() -> Array:
 	for i in MOTH_BLOOMS.size():
 		out.append({"id": "c1x_bloom_%d" % i, "pos": MOTH_BLOOMS[i], "radius": BLOOM_RADIUS, "kind": "bloom"})
 	return out
+
+
+## The enemy_spawner.gd setup keys of a spawner def that Common.make_spawner does not forward (a second,
+## partial setup() call applies them; unspecified keys keep their values).
+static func spawner_extras(def: Dictionary) -> Dictionary:
+	return {"out_of_view": bool(def.get("out_of_view", false))}
 
 
 ## Spawners placed by the annexes: [{id, enemy, pos, ...}].

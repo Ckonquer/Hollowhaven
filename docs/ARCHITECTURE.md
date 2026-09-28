@@ -1,7 +1,8 @@
 # Hollowhaven architecture contract
 
 Godot 4.7.2, GDScript, Forward+ renderer, Jolt physics. Project root: `game/`.
-Read `GAME_SPEC.md` for design. This file defines how code fits together. **Follow it exactly** —
+Read `GAME_SPEC.md` for design (Chapter Two: `docs/CHAPTER_TWO_SPEC.md`; its conventions are summarised in the last
+section, "Chapter Two conventions"). This file defines how code fits together. **Follow it exactly** —
 several people build modules in parallel and integration depends on these contracts.
 
 ## Golden rules
@@ -56,7 +57,7 @@ several people build modules in parallel and integration depends on these contra
 
 ## Game flow (autoload/game.gd — read it)
 `scenes/boot.tscn` → `Game.boot()` → title (`scenes/title.tscn`, script `src/ui/title_screen.gd`).
-Title calls `Game.new_game()` (after the comfort screen) or `Game.continue_game()`.
+Title calls `Game.new_game(look)` (after the comfort screen and "Meet Krystal") or `Game.continue_game()`.
 `Game.load_area(area_id, spawn_id, use_saved_position)` changes scene to `scenes/surface.tscn` /
 `scenes/below.tscn`, then: creates UI root once (`src/ui/ui_root.gd`, child of Game), creates the player
 (`src/player/player.gd`) under the area root, calls `player.read_from_state()` and
@@ -137,7 +138,8 @@ hold 1.5 s), signal `lit`, `is_lit()`, in group "light_source" once lit.
 ### Companions (`src/companions/`)
 `companion_spawner.gd` static `spawn_for_area(area, area_id, player) -> Dictionary(id → node)`.
 Uses spawn ids `companion_wild_<id>`, `companion_home_<id>`, `mine_threshold` from the surface area;
-in "below" only the follower (if `enters_below`) spawns next to the player; Mochi refuses (see spec).
+in "below" only the follower (if `enters_below`) spawns next to the player; Mochi refuses (see spec) unless she has courage
+(Chapter Two area classes and doorsteps: last section).
 Companion node: `CharacterBody3D`, group "companion", layer 4, mask 1|32, never pushes the player
 (does not collide with the player layer). API: `companion_id`, `command(cmd: String)` with cmd in
 "pet", "follow", "wait", "home", "feed"; `get_interaction/interact` (wild → befriend attempt;
@@ -187,7 +189,7 @@ FPS (if enabled). Theme: `theme_factory.gd` (parchment panels, Fredoka headings,
 Icons: `icon_factory.gd` renders item icons procedurally (2D storybook sticker style) from the item's
 `icon` id and `color`; cached ImageTextures. Title screen `title_screen.gd`: 3D diorama backdrop,
 "Hollowhaven" logo text, "For Krystal" dedication, Continue / New Game (overwrite warning) / Settings /
-Credits / Quit; New Game → comfort screen → `Game.new_game()`.
+Credits / Quit; New Game → comfort screen → "Meet Krystal" → `Game.new_game(look)`.
 Mouse: panels call `Game.push_ui(name)` when opened and `Game.pop_ui(name)` when closed; full-screen
 menus (inventory/crafting/storage/journal/map/pause/settings) also `Game.set_paused(true/false)`.
 
@@ -294,3 +296,58 @@ Always use `timeout` and `--max-seconds` / `--quit-at` so no process is left run
   the Heartseed early never stalls the chain). `QuestLog.is_skipped(step)`.
 * **Stalker**: Krystal's own light only repels it during the rattle directly above her; director passes
   recoil only from light at the stalker's own position. Retreats never step toward Krystal.
+
+## Chapter Two conventions (Waves B/C + integration pass)
+The binding contract for Chapter Two is `docs/CHAPTER_TWO_SPEC.md`; what the foundation delivered is `docs/ch2/WAVE_A_REPORT.md`
+(schema v2, ChapterLog / OptionalLog, the rewards & flags rule, data catalogue, Game flow, music director). This section lists the
+conventions Waves B/C and the integration pass added; each points to the code map with the details (`docs/ch2/maps/*.md`, the
+"Chapter Two ... as built" sections). Module ownership: `docs/ch2/WAVES.md`; decisions: `docs/ch2/INTEGRATION_WAVE_BC.md`.
+* **New Game / look** (ui.md §11): title → overwrite confirm → comfort → "Meet Krystal" (`src/ui/screens/creation_screen.gd`) →
+  `Game.new_game(look)`. Nothing is written before Confirm. A non-empty look sets `c1x_look_chosen` and `wardrobe.notice_shown`.
+  The avatar (player_avatar.md §7) follows `GameState.appearance` / `wardrobe.show_armor` / `equipment` through
+  `Events.appearance_changed` / `equipment_changed` / `game_loaded`; UI code writes GameState and emits the event, never pokes the avatar.
+  Appearance is cosmetic only (no collision, speed or reach).
+* **UI root** (ui.md §11): panel `"wardrobe"` (fullscreen, gameplay panel, no hotkey yet); `ui_root.has_panel(name) -> bool`; the
+  one-time wardrobe notice for older saves waits for 3 s of continuous safe play with nothing in `overlay_layer`, never in headless
+  runs or with `NOTICE_OFF_ARGS`; `close()` defers `_focus_top()`; endings go through `show_ending()` (Chapter One) and
+  `show_chapter_two_ending()` (awaitable, tracked in `_ending` like the Chapter One ending; `Game._show_chapter_two_ending()` prefers
+  it). Pause "Return to safety" is per area ("Leave the trial" in the Echo Trial). Underground HUD look for every underground area.
+* **Journal / tracker / map / telemetry** (ui.md §11): journal tabs Story, Optional, Friends, Lore, Mastery (`args.tab`, alias
+  "goals" → story, `reopen(args)`); `tracker.objective_view()` kinds legacy | pointer | chapter2 | signpost | done | hidden;
+  `MapView.map_kind(area)` surface | reach | rooms | none (room names only in `MapView.ROOMS`); festival roads after
+  `ch2_read_festival_map`; read-only telemetry keys `area_info, chapter2, tracker, optional, equipment, companion_skills, music`.
+* **Stats and damage** (combat_enemies.md §11): `src/core/stats.gd` is static and recomputed from saved state (never cached across a
+  load). Player damage order, once per hit: i-frames → `Stats.damage_reduction()` (cap 45%) → transient shield
+  (`Game.player.add_shield(amount, seconds, source)`, read with `Stats.player_shield()`; never `GameState`) → Health. A hit fully
+  absorbed by the shield returns 0 and does not emit `Events.player_damaged`. `health.heal()` applies `Stats.heal_mult()` itself.
+  Slows only through `player.apply_slow` (bounded, immunity) or `EnemyBase.apply_slow`. Shared projectile
+  `src/combat/projectile.gd` `fire(params)` (pooled, LOS every tick, `only_target` / `filter`) for the wand, companions and enemies.
+  `Combat.INTENSITY_SCALED_AREAS` = below, tobin_annex, hushed_works; `enemy_base.threat_damage_mult()` follows where the enemy fights.
+* **Companions** (companions.md §15): `companion_combat.gd` / `companion_support.gd` / `companion_nav.gd` / `companion_home.gd`; area
+  classes `companion_logic.area_class(area)` haven | outdoor | interior | underground (single list, also used by the HUD); doorsteps
+  (`DOORSTEPS`, incl. `entries` for the Works refuge hatch); record keys `combat_mode, skill_ready_at, home_spot, ribbon, home_task,
+  home_nook, home_log, cairn`; ONE signature cooldown on the `stats.play_seconds` timeline; the skill key `companion_skill` is read by
+  the follower only. Boss hazards (meta `boss_hazard`) are never companion or director threats.
+* **Crafting, stations, mastery** (building_crafting_farming.md §11): recipe kinds item | timed | apply | pattern | dye; crafting from
+  same-area chests within `Crafting.CHEST_RADIUS` = 18 m (opt-in, one transaction); furnace queue in `structures[uid].data`
+  (`queue`, `output`, `held_jobs`) on the play-seconds timeline, refunded once on dismantle; chest record keys `slots`,
+  `upgrade_refunded`; `GameState.stations` keys `use_chests`, `table_decor`; `src/core/mastery.gd` static, wired once by
+  `Game.wire_session_systems()`; Stats applies mastery effects (mastery only exposes values).
+* **Building** (building_crafting_farming.md §11): storeys (`data.level`), undo (exact refund, one area visit), recolour
+  (`data.tint`, free once a dye is owned), pumpkin faces (`data.face`; festival faces after `ch2_feast`), expanded Haven safe zone +
+  "haven" zone, the Reach outpost. `structure_factory.LAZY_SCRIPTS` maps scripts owned by other modules (`wardrobe.gd` belongs to
+  the appearance UI module).
+* **Enemies** (combat_enemies.md §11): additive `enemy_base` hooks (`committed_states`, `attack_def/telegraph/recover/damage_for`,
+  `can_be_hit_by`, `can_stagger`, charge / leap / lane / pulse / projectile helpers, `mark()` → `telegraph_fx.gd`, `defeat_flag`);
+  ground marks match the attack footprint and honour `reduce_flashing` / `high_visibility_cues`; spawner params `enemy_params`
+  (merged into every enemy's spawn params) and `out_of_view` (never pop in within view); `EnemyFactory.can_spawn(id)` guards every
+  spawn; elites use Settings `timing_assist` like bosses; `boss_defeated(id)` listeners must check the id.
+* **Areas and loading** (world_areas.md §8): `Game.prefetch_area(area_id, extra := []) -> int` compiles an area's scene and its
+  `AREA_WARMUP` scripts on loader threads (idempotent, never blocks, EnemyFactory first on the main thread); `load_area` uses it, and
+  the waygate / Bellhouse stair call it early behind `has_method` guards. `Game.wire_session_systems()` (mastery listeners + the
+  Chapter Two activity tracker; idempotent). A position saved on an upper storey is restored after the structures exist.
+* **Lore** (state_save_data.md §14): `src/core/lore_db.gd` `get_lore(id)`, `has_lore(id)`, `ids()`, `chapter_of(id)` (by source file;
+  Tobin's annex notes are Chapter One); `UiUtil.lore_entry` delegates to it.
+* **Tests** (state_save_data.md §14): the runner isolates test files (restores Game flow state, frees strays, re-wires the session
+  listeners, prints `ISOLATION <suite>: ...`) and accepts comma-separated `--filter` fragments. Visual-QA commands for the new
+  screens are in AGENTS.md; the still-pending visual and real-input checks are in KNOWN_ISSUES.md.

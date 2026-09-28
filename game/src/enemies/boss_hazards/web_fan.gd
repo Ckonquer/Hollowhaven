@@ -6,12 +6,14 @@ extends Node3D
 ##   var f = WebFan.new(); f.setup({"apex": Vector3, "dir": Vector3, "half_deg": 12.0, "length": 7.0,
 ##       "tele": 1.2, "life": 7.0, "slow": 0.6, "alt": false}); field.add_child(f)
 ## Pure geometry for tests: WebFan.sector_contains(apex, dir, half_deg, r0, r1, pos).
+## slows(pos): what the field slows by - inside the active sheet with her feet on the floor (never mid-jump).
 
 const Art := preload("res://src/enemies/boss_hazards/hazard_art.gd")
 
 const R0 := 0.5                 # the sheet starts a little in front of the apex
 const TRACK_FRAC := 0.5         # follows Krystal for the first half of the telegraph, then locks
 const FADE := 0.45
+const AIR_RISE := 0.35          # feet this far above the sheet = airborne (a jump): the sheet never slows mid-air
 
 var kind := "fan"
 var apex := Vector3.ZERO
@@ -80,6 +82,12 @@ func remaining() -> float:
 ## Is `pos` (flat) inside the active sheet?
 func contains(pos: Vector3) -> bool:
 	return is_active() and sector_contains(apex, dir, half_deg, R0, length, pos)
+
+
+## Does the sheet slow someone whose feet are at `pos`? Active, inside the wedge and on the floor: jumping over
+## or through the sheet is never slowed (the slow only lingers SLOW_LINGER from the last grounded moment).
+func slows(pos: Vector3) -> bool:
+	return pos.y - apex.y <= AIR_RISE and contains(pos)
 
 
 static func sector_contains(p_apex: Vector3, p_dir: Vector3, p_half_deg: float, r0: float, r1: float, pos: Vector3) -> bool:

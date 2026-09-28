@@ -23,6 +23,10 @@ const JUMP_CUT := 0.8               # releasing jump early keeps this fraction o
 const COYOTE_TIME := 0.12
 const STEP_HEIGHT := 0.3            # small lips / floor tiles / pebbles are stepped over
 const JUMP_BUFFER := 0.12
+## Airborne speed bonus cap (lead decision for MP 6.2 "do not increase jump distance unpredictably"): in the air
+## the movement multiplier is minf(move_mult, AIR_MOVE_MULT_CAP) - a +30% buff stretches a jump by at most ~10%,
+## slows still apply fully, ground speed keeps the whole multiplier. See air_move_mult() / jump_takeoff().
+const AIR_MOVE_MULT_CAP := 1.10
 
 # --- Stamina ------------------------------------------------------------------------------------------
 const STAMINA_MAX := 100.0
@@ -58,6 +62,9 @@ const CAST_TIME := 0.45             # the cast gesture (the wand's own cooldown 
 const CAST_RELEASE := 0.16          # seconds into the cast when the spark leaves the wand
 const CAST_QUEUE_WINDOW := 0.35     # a click this close to the end of the cooldown fires as soon as it is ready
 const WAND_AIM_CONE := 0.5          # cos of the half-angle in which the wand looks for a target (60 deg)
+## Boss floor hazards (node meta "boss_hazard": egg sacs / seed pods, trip lines) score this many times farther
+## for the wand's auto-aim, so a stunned boss behind them wins; alone they are still targeted.
+const WAND_HAZARD_SCORE_MULT := 3.0
 
 # --- Recovery --------------------------------------------------------------------------------------------
 const OUTSIDE_MARGIN := 12.0        # metres past WORLD_HALF_EXTENT before the surface recovers you
@@ -471,6 +478,21 @@ static func lantern_tint(area_id: String, base: Color) -> Color:
 static func dodge_speed(t: float) -> float:
 	var k := clampf(t, 0.0, 1.0)
 	return lerpf(DODGE_SPEED_START, DODGE_SPEED_END, k * k)
+
+
+## The movement multiplier while airborne: bonuses capped at AIR_MOVE_MULT_CAP, slows (< 1) unchanged.
+static func air_move_mult(move_mult: float) -> float:
+	return minf(move_mult, AIR_MOVE_MULT_CAP)
+
+
+## Horizontal velocity at a jump's take-off: the part of the ground speed that came from a bonus above the
+## airborne cap is dropped (9.1 m/s sprinting at +30% leaves the ground at 7.7 m/s = sprint x 1.10), so the jump's
+## reach follows air_move_mult. Without a bonus above the cap (legacy, slowed) the velocity is unchanged.
+static func jump_takeoff(hv: Vector3, move_mult: float) -> Vector3:
+	var air := air_move_mult(move_mult)
+	if move_mult <= air or move_mult <= 0.0:
+		return hv
+	return hv * (air / move_mult)
 
 
 ## Horizontal velocity smoothing toward the wished velocity.

@@ -11,6 +11,7 @@ const Kit := preload("res://src/art/mesh_kit.gd")
 const Interactable := preload("res://src/world/below/below_interactable.gd")
 
 const SEED := "heartseed"
+const BOSS_ID := "weaver_matron"       # the only boss_defeated id that opens the cocoon
 
 var ceiling_points: Array = []       # threads/roots run up to these
 var opened: bool = false
@@ -187,8 +188,10 @@ func _open_pose() -> void:
 		_shell.scale = Vector3(1.25, 0.55, 1.25)
 
 
-func _on_boss_defeated(_boss_id: String) -> void:
-	if opened:
+## Only the Weaver Matron opens the cocoon: Chapter Two bosses (Crossing Matron, Count Velour, the
+## Choir, the Quarry Warden...) emit boss_defeated too (R72).
+func _on_boss_defeated(boss_id: String) -> void:
+	if boss_id != BOSS_ID or opened:
 		return
 	open_cocoon(true)
 
@@ -246,7 +249,7 @@ func _on_interact(_player: Node) -> void:
 		push_warning("Below: boss unavailable - freeing the Heartseed directly (fallback).")
 		GameState.set_flag("weaver_defeated", true)
 		GameState.give_item(SEED, 1)
-		Events.boss_defeated.emit("weaver_matron")
+		Events.boss_defeated.emit(BOSS_ID)
 		return
 	if opened and safety_net and seed_missing():
 		GameState.give_item(SEED, 1)

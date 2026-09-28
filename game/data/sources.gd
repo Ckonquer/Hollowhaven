@@ -56,12 +56,15 @@ const NODES := {
 		"where": {"below": ["ruins", "silk"], "tobin_annex": ["ta_sump"], "hushed_works": ["hw_refuge"]}, "min_count": {"tobin_annex": 2, "hushed_works": 3}, "access_flag": "", "legacy": true,
 		"note": "Renewable post-discovery pockets: Tobin's sump and the Pocket Conservatory refuge."},
 	# --- Chapter Two kinds ---
+	# Reach ids placed so far (data/reach_west.gd NODES): sunflax hr_sunflax_0..5 are all in the orchard (the six
+	# guaranteed Reach nodes); Commons sunflax, if a module adds some, would start at hr_sunflax_6.
 	"sunflax_patch": {"name": "Wild Sunflax", "tool": "hand", "min_tier": 0, "hits": 1, "drops": [{"item": "sunflax", "min": 2, "max": 3, "chance": 1.0}, {"item": "sunflax_seeds", "min": 1, "max": 1, "chance": 0.35}], "respawn_minutes": 720.0,
 		"where": {"surface": ["meadow"], "hallowmere_reach": ["hr_commons", "hr_orchard"]}, "min_count": {"surface": 4, "hallowmere_reach": 6}, "access_flag": "",
 		"note": "Surface: the Sunny Meadow gardener's patch (A Gardener's Afternoon), outside the Haven build area."},
 	"roseberry_bush": {"name": "Roseberry Bush", "tool": "hand", "min_tier": 0, "hits": 1, "drops": [{"item": "roseberries", "min": 2, "max": 4, "chance": 1.0}, {"item": "roseberry_seeds", "min": 1, "max": 1, "chance": 0.3}], "respawn_minutes": 720.0,
 		"where": {"surface": ["meadow"], "hallowmere_reach": ["hr_orchard", "hr_candleyard"]}, "min_count": {"surface": 3, "hallowmere_reach": 6}, "access_flag": "",
 		"note": "Surface: a roseberry cluster beside the meadow sunflax patch; Reach: orchard hedges and Candleyard edges."},
+	# Reach sap stumps (data/reach_west.gd NODES): hr_resin_0/1 in the orchard, hr_resin_2/3 in the Candleyard.
 	"sap_stump": {"name": "Sap Stump", "tool": "hand", "min_tier": 0, "hits": 1, "verb": "Tap", "drops": [{"item": "resin", "min": 1, "max": 2, "chance": 1.0}], "respawn_minutes": 900.0,
 		"where": {"surface": ["woods", "glade", "old_oak", "thicket"], "hallowmere_reach": ["hr_orchard", "hr_candleyard"]}, "min_count": {"surface": 5, "hallowmere_reach": 4}, "access_flag": "",
 		"note": "Tappable old stumps; never inside the Haven build area. No creature is ever harmed for resin."},
@@ -90,7 +93,13 @@ const NODES := {
 ##    are not mirrored here (read from those two files).
 ##  * "content": the named content module grants the bundle ITSELF at its event (a cache opened, a boss beaten, a
 ##    pickup found). A step / goal completed by one of its flags never gives one of its items again (tests), so
-##    one activity never pays the same item twice.
+##    one activity never pays the same item twice. The content bundles and the module that grants each one:
+##      rw_c1x_gardener, rw_c1x_tailor_cache, rw_c1x_elder (surface Chapter One additions), rw_c1x_tobin (Tobin's
+##      annex), rw_ch2_candleyard_pattern, rw_hr_chime_trail (Reach west: Candleyard / Thimblebrook Pools),
+##      rw_hw_lightwell_alcove (Works rooms 1-8: the Light Well keepsake trunk), rw_ch2_crossing,
+##      rw_hw_throat_supplies (Works deep: Weaver's Crossing, Bell Throat), rw_trial_matron_first (echo trial).
+##    Their flags are recipe unlock / world flags, or the module's own "already paid" marker (hr_chime_trail_done,
+##    hw_throat_supplies) that nothing else reads.
 ##  * "legacy": how the Chapter One code grants its rewards today. Documentation for ITEM_SOURCES only: never pass
 ##    these to grant_once (the legacy code already gives them exactly as before).
 ## `patterns` are wardrobe ownership ids (data/appearance.gd PATTERNS) granted directly. `who` = the event.
@@ -109,8 +118,15 @@ const REWARDS := {
 	"rw_ch2_manor": {"items": {"manor_seal": 1}, "flags": ["ch2_manor_restored"], "by": "chapter_log", "who": "ch2 step ch2_manor (Count Velour's enchantment broken)"},
 	"rw_ch2_crossing": {"items": {}, "flags": ["ch2_crossing_cleared"], "by": "content", "who": "works: Weaver's Crossing cleared (the Thread Veil is the step reward rw_ch2_weaver_crossing)"},
 	"rw_ch2_homecoming": {"items": {"wardlight": 1}, "flags": ["ch2_homecoming"], "by": "chapter_log", "who": "ch2 step ch2_homecoming (Haven Ward Stone)"},
-	"rw_ch2_feast": {"items": {"candy": 6}, "flags": ["ch2_feast"], "by": "chapter_log", "who": "ch2 step ch2_feast (The Lanternwake; Game.complete_chapter_two uses the same id)"},
+	"rw_ch2_feast": {"items": {"candy": 6, "pumpkin": 4, "lantern_wax": 4, "sugarcap": 3, "moonpetal": 3}, "flags": ["ch2_feast"], "by": "chapter_log",
+		"who": "ch2 step ch2_feast (The Lanternwake; Game.complete_chapter_two uses the same id and the same items: story_ch2.gd FEAST_EXTRAS)"},
 	"rw_ch2_candleyard_pattern": {"items": {}, "flags": ["ch2_candleyard_pattern"], "by": "content", "who": "Candleyard: the hidden dress pattern"},
+	"rw_hr_chime_trail": {"items": {"moonpetal": 3, "sugarcap": 2, "candy": 2}, "flags": ["hr_chime_trail_done"], "by": "content",
+		"who": "Thimblebrook Pools: the lost festival pouch at the end of the chime trail"},
+	"rw_hw_lightwell_alcove": {"items": {"bat_bunting": 2, "crescent_window": 1}, "flags": [], "patterns": [], "by": "content",
+		"who": "works: the Light Well alcove keepsake trunk (room 8)"},
+	"rw_hw_throat_supplies": {"items": {"hearty_stew": 2, "berry_snack": 2}, "flags": ["hw_throat_supplies"], "by": "content",
+		"who": "works (deep): Bell Throat final supplies"},
 	"rw_opt_pumpkin_face": {"items": {}, "flags": ["ch2_pumpkin_face"], "by": "optional_log", "who": "optional goal 'A Pumpkin With a Face'"},
 	"rw_opt_counts_wardrobe": {"items": {}, "flags": ["ch2_count_wardrobe"], "by": "optional_log", "who": "optional goal 'The Count's Wardrobe'"},
 	"rw_opt_hat_too_large": {"items": {}, "flags": [], "patterns": ["pat_witch_hat"], "by": "optional_log", "who": "optional goal 'A Hat Too Large'"},
@@ -168,8 +184,8 @@ const ITEM_SOURCES := {
 	"stone_pickaxe": [{"kind": "recipe", "recipe": "stone_pickaxe"}],
 	"copper_sword": [{"kind": "recipe", "recipe": "copper_sword"}],
 	"lantern": [{"kind": "recipe", "recipe": "lantern"}],
-	"berry_snack": [{"kind": "recipe", "recipe": "berry_snack"}],
-	"hearty_stew": [{"kind": "recipe", "recipe": "hearty_stew"}],
+	"berry_snack": [{"kind": "recipe", "recipe": "berry_snack"}, {"kind": "reward", "reward": "rw_hw_throat_supplies", "guaranteed": true, "renewable": false}],
+	"hearty_stew": [{"kind": "recipe", "recipe": "hearty_stew"}, {"kind": "reward", "reward": "rw_hw_throat_supplies", "guaranteed": true, "renewable": false}],
 	"glowcap_skewer": [{"kind": "recipe", "recipe": "glowcap_skewer"}],
 	"workbench": [{"kind": "recipe", "recipe": "workbench"}],
 	"storage_chest": [{"kind": "recipe", "recipe": "storage_chest"}],
@@ -208,12 +224,15 @@ const ITEM_SOURCES := {
 	"moon_crystal": [{"kind": "gather", "node": "moon_crystal_vein", "guaranteed": true, "renewable": true}],
 	"moonsteel_bar": [{"kind": "station", "station": "furnace", "recipe": "moonsteel_bar"}],
 	"pumpkin": [{"kind": "gather", "node": "pumpkin_vine", "guaranteed": true, "renewable": true}, {"kind": "crop", "crop": "pumpkin", "guaranteed": true, "renewable": true},
-		{"kind": "drop", "enemy": "pumpkin_mimic", "guaranteed": false, "renewable": true}],
-	"sugarcap": [{"kind": "gather", "node": "sugarcap_patch", "guaranteed": true, "renewable": true}, {"kind": "drop", "enemy": "bellcap_sentry", "guaranteed": false, "renewable": true}],
-	"moonpetal": [{"kind": "gather", "node": "moonpetal_patch", "guaranteed": true, "renewable": true}],
+		{"kind": "drop", "enemy": "pumpkin_mimic", "guaranteed": false, "renewable": true}, {"kind": "reward", "reward": "rw_ch2_feast", "guaranteed": true, "renewable": false}],
+	"sugarcap": [{"kind": "gather", "node": "sugarcap_patch", "guaranteed": true, "renewable": true}, {"kind": "drop", "enemy": "bellcap_sentry", "guaranteed": false, "renewable": true},
+		{"kind": "reward", "reward": "rw_hr_chime_trail", "guaranteed": true, "renewable": false}, {"kind": "reward", "reward": "rw_ch2_feast", "guaranteed": true, "renewable": false}],
+	"moonpetal": [{"kind": "gather", "node": "moonpetal_patch", "guaranteed": true, "renewable": true},
+		{"kind": "reward", "reward": "rw_hr_chime_trail", "guaranteed": true, "renewable": false}, {"kind": "reward", "reward": "rw_ch2_feast", "guaranteed": true, "renewable": false}],
 	"lantern_wax": [{"kind": "recipe", "recipe": "lantern_wax"}, {"kind": "drop", "enemy": "lantern_moth", "guaranteed": false, "renewable": true},
-		{"kind": "drop", "enemy": "borrowed_wisp", "guaranteed": false, "renewable": true}],
-	"candy": [{"kind": "recipe", "recipe": "candy"}, {"kind": "reward", "reward": "rw_ch2_feast", "guaranteed": true, "renewable": false}],
+		{"kind": "drop", "enemy": "borrowed_wisp", "guaranteed": false, "renewable": true}, {"kind": "reward", "reward": "rw_ch2_feast", "guaranteed": true, "renewable": false}],
+	"candy": [{"kind": "recipe", "recipe": "candy"}, {"kind": "reward", "reward": "rw_ch2_feast", "guaranteed": true, "renewable": false},
+		{"kind": "reward", "reward": "rw_hr_chime_trail", "guaranteed": true, "renewable": false}],
 	"sunflax_seeds": [{"kind": "gather", "node": "sunflax_patch", "guaranteed": false, "renewable": true}, {"kind": "crop", "crop": "sunflax", "guaranteed": true, "renewable": true},
 		{"kind": "reward", "reward": "rw_c1x_gardener", "guaranteed": true, "renewable": false}, {"kind": "reward", "reward": "rw_c1x_tailor_cache", "guaranteed": true, "renewable": false},
 		{"kind": "reward", "reward": "rw_ch2_commons", "guaranteed": true, "renewable": false}, {"kind": "reward", "reward": "rw_opt_gardeners_afternoon", "guaranteed": true, "renewable": false}],
@@ -283,9 +302,9 @@ const ITEM_SOURCES := {
 	"cottage_bench": [{"kind": "recipe", "recipe": "cottage_bench"}],
 	"pumpkin_lantern": [{"kind": "recipe", "recipe": "pumpkin_lantern"}],
 	"pumpkin_lights": [{"kind": "recipe", "recipe": "pumpkin_lights"}],
-	"bat_bunting": [{"kind": "recipe", "recipe": "bat_bunting"}],
+	"bat_bunting": [{"kind": "recipe", "recipe": "bat_bunting"}, {"kind": "reward", "reward": "rw_hw_lightwell_alcove", "guaranteed": true, "renewable": false}],
 	"ghost_lantern": [{"kind": "recipe", "recipe": "ghost_lantern"}, {"kind": "reward", "reward": "rw_opt_groundskeeper", "guaranteed": true, "renewable": false}],
-	"crescent_window": [{"kind": "recipe", "recipe": "crescent_window"}],
+	"crescent_window": [{"kind": "recipe", "recipe": "crescent_window"}, {"kind": "reward", "reward": "rw_hw_lightwell_alcove", "guaranteed": true, "renewable": false}],
 	"candy_bowl": [{"kind": "recipe", "recipe": "candy_bowl"}],
 	"scarecrow": [{"kind": "recipe", "recipe": "scarecrow"}],
 	"gothic_trim": [{"kind": "recipe", "recipe": "gothic_trim"}],

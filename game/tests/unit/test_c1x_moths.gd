@@ -162,6 +162,8 @@ func test_real_pocket_build_is_guarded() -> void:
 		if sp is Node3D:
 			assert_eq(String((sp as Node3D).get("spawner_id")), String(L.MOTH_SPAWNER["id"]), "c1x_sp_moths")
 			assert_eq(String((sp as Node3D).get("enemy_id")), "lantern_moth")
+			assert_true(bool((sp as Node3D).get("out_of_view")), "moths never pop in within view (R82)")
+			assert_eq(int((sp as Node3D).get("count")), int(L.MOTH_SPAWNER["count"]), "the rest of the def is kept")
 	else:
 		assert_null(sp, "no spawner while lantern_moth is unavailable (and no crash)")
 	assert_eq((pocket.get("blooms") as MultiMeshInstance3D).multimesh.instance_count, L.MOTH_BLOOMS.size(), "moonbells")
@@ -182,6 +184,13 @@ func test_real_moths_only_at_night_when_available() -> void:
 	player.global_position = Vector3(p.x + 14.0, 0, p.y)
 	sp.set("player_override", player)
 	sp.set("ignore_safe_zones", true)
+	# out_of_view (R82): her camera looks away from the moonbells, so the moths may gather (a camera another
+	# suite left current can never decide this test).
+	var cam := Camera3D.new()
+	_area.add_child(cam)
+	cam.global_position = player.global_position + Vector3.UP * 2.0
+	cam.look_at(player.global_position + Vector3(20, 1, 0), Vector3.UP)
+	sp.set("camera_override", cam)
 	pocket.hour_override = 13.0
 	pocket.update()
 	for i in 4:

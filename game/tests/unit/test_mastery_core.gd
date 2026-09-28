@@ -280,3 +280,134 @@ func test_record_with_progress_is_left_exactly_as_loaded() -> void:
 	assert_eq(Mastery.xp("gathering"), 12)
 	assert_false(Mastery.legacy_applied())
 
+
+
+# --- Map clarity (Wayfinding 2 / 4) ---------------------------------------------------------------------
+
+func _harvest_at(area: String, kind: String, item: String, x: float, z: float) -> void:
+	var was := String(Game.area_id)
+	Game.area_id = area
+	Events.harvested.emit(kind, item, 1, Vector3(x, 1.5, z))
+	Game.area_id = was
+
+
+## Harvested spots are remembered per area and kind (JSON-safe, deduped by distance, bounded, oldest forgotten),
+## never for everyday kinds or areas without a painted map, and survive save / load. The map draws them from
+## Wayfinding rank 2 (resource_pins_on).
+func test_resource_spots_are_recorded_bounded_and_saved() -> void:
+	var reach := "hallowmere_reach"
+	_harvest_at(reach, "iron_vein", "iron_ore", 80.0, 20.0)
+	_harvest_at(reach, "iron_vein", "stone", 80.0, 20.0)       # same node, second drop: one spot
+	_harvest_at(reach, "iron_vein", "iron_ore", 83.0, 22.0)    # < SPOT_MIN_DIST: the same spot
+	_harvest_at(reach, "iron_vein", "iron_ore", 88.0, 20.0)    # a second vein
+	assert_eq(Mastery.known_spots(reach), [{"kind": "iron_vein", "pos": Vector2(80, 20)}, {"kind": "iron_vein", "pos": Vector2(88, 20)}])
+	for k in MasteryData.SPOT_SKIP_KINDS:
+		_harvest_at(reach, String(k), "stone", 10.0, 10.0)
+	_harvest_at("below", "glowcap", "glowcap", 5.0, 5.0)
+	_harvest_at("", "ore", "copper_ore", 5.0, 5.0)
+	assert_eq(Mastery.known_spots(reach).size(), 2, "everyday kinds are never pinned")
+	assert_eq(Mastery.known_spots("below"), [], "no painted map in the Below: nothing recorded")
+	_harvest_at("surface", "sap_stump", "resin", -46.0, -14.0)
+	assert_eq(Mastery.known_spots("surface"), [{"kind": "sap_stump", "pos": Vector2(-46, -14)}])
+	# bounded: the oldest spot of a kind is forgotten first
+	var cap := int(MasteryData.SPOT_MAX_PER_KIND)
+	for i in cap + 6:
+		_harvest_at(reach, "sugarcap_patch", "sugarcap", -60.0 + float(i) * 10.0, -8.0)
+	var sugar: Array = Mastery.known_spots(reach).filter(func(s: Dictionary) -> bool: return s["kind"] == "sugarcap_patch")
+	assert_eq(sugar.size(), cap, "at most %d per kind" % cap)
+	assert_eq(sugar[0]["pos"], Vector2(-60.0 + 6.0 * 10.0, -8.0), "the six oldest were forgotten")
+	assert_eq(sugar[cap - 1]["pos"], Vector2(-60.0 + float(cap + 5) * 10.0, -8.0))
+	# save / load (JSON) keeps them; spots are not "progress" for the legacy-credit decision
+	var before: Array = Mastery.known_spots(reach)
+	GameState.from_dict(JSON.parse_string(JSON.stringify(GameState.to_dict())))
+	assert_eq(Mastery.known_spots(reach), before, "spots survive a save round trip")
+	assert_eq(Mastery.known_spots("surface").size(), 1)
+	# damaged records never raise an error
+	GameState.mastery["spots"] = "broken"
+	assert_eq(Mastery.known_spots(reach), [])
+	GameState.mastery["spots"] = {reach: {"iron_vein": [[1, 2], "x", [null, 3], [4.0]], "moonpetal_patch": 7}}
+	assert_eq(Mastery.known_spots(reach), [{"kind": "iron_vein", "pos": Vector2(1, 2)}], "bad entries skipped")
+	assert_true(Mastery.record_spot(reach, "moonpetal_patch", Vector3(30, 0, 30)), "a damaged list is replaced")
+	GameState.mastery["spots"] = 5
+	assert_true(Mastery.record_spot(reach, "iron_vein", Vector3(1, 0, 1)))
+	# rank gate for the map
+	assert_false(Mastery.resource_pins_on())
+	GameState.mastery["wayfinding"] = int(MasteryData.RANK_XP[1])
+	assert_false(Mastery.resource_pins_on(), "rank 1: no pins")
+	GameState.mastery["wayfinding"] = int(MasteryData.RANK_XP[2])
+	assert_true(Mastery.resource_pins_on(), "rank 2: pins")
+	GameState.mastery["wayfinding"] = int(MasteryData.RANK_XP[5])
+	assert_true(Mastery.resource_pins_on(), "later ranks keep the pins")
+	# pin icons: the node kind's main drop
+	assert_eq(Mastery.spot_item("iron_vein"), "iron_ore")
+	assert_eq(Mastery.spot_item("ore"), "copper_ore")
+	assert_eq(Mastery.spot_item("no_such_kind"), "")
+	GameState.active = false
+	assert_false(Mastery.record_spot(reach, "iron_vein", Vector3(200, 0, 200)), "inactive state records nothing")
+	GameState.active = true
+
+
+## Cache hints: a "?" for each optional cache whose district is discovered, until the owner module's flag is
+## set; positions come from the owner's layout constants. The map shows them from Wayfinding rank 4.
+func test_cache_hints_follow_discovery_and_owner_flags() -> void:
+	var C1x: Script = load("res://data/c1x_layout.gd")
+	var West: Script = load("res://data/reach_west.gd")
+	var c1x: Dictionary = C1x.get_script_constant_map()
+	var west: Dictionary = West.get_script_constant_map()
+	assert_eq(Mastery.cache_hints("surface"), [], "nothing before the Old Oak is found")
+	GameState.discover("surface", "old_oak")
+	assert_eq(Mastery.cache_hints("surface"), [{"id": "tailor_cache", "pos": c1x["TAILOR_CACHE"]["pos"], "district": "old_oak"}])
+	GameState.set_flag("c1x_tailor_cache")
+	assert_eq(Mastery.cache_hints("surface"), [], "found: the hint is gone")
+	var reach := "hallowmere_reach"
+	assert_eq(Mastery.cache_hints(reach), [])
+	GameState.discover(reach, "hr_candleyard")
+	var ids: Array = []
+	for h in Mastery.cache_hints(reach):
+		ids.append(h["id"])
+	assert_eq(ids, ["witch_hat", "candleyard_pattern"], "only the discovered district's caches")
+	assert_eq(Mastery.cache_hints(reach)[0]["pos"], west["HAT"]["pos"])
+	assert_eq(Mastery.cache_hints(reach)[1]["pos"], west["PATTERN_SPOT"])
+	GameState.discover(reach, "hr_pools")
+	GameState.set_flag("ch2_witch_hat_found")
+	ids = []
+	for h in Mastery.cache_hints(reach):
+		ids.append(h["id"])
+	assert_eq(ids, ["festival_pouch", "candleyard_pattern"])
+	assert_eq(Mastery.cache_hints(reach)[0]["pos"], west["POUCH"])
+	GameState.set_flag("hr_chime_trail_done")
+	GameState.set_flag("ch2_candleyard_pattern")
+	assert_eq(Mastery.cache_hints(reach), [], "every cache found")
+	# rank gate for the map
+	GameState.mastery["wayfinding"] = int(MasteryData.RANK_XP[3])
+	assert_false(Mastery.cache_hints_on(), "rank 3: no hints")
+	GameState.mastery["wayfinding"] = int(MasteryData.RANK_XP[4])
+	assert_true(Mastery.cache_hints_on(), "rank 4: hints")
+
+
+## Every cache hint resolves to a position inside its district, and its flag is one the owner module really
+## sets (a flag constant of the layout file, or a flag of a reward bundle that file names).
+func test_cache_hint_data_matches_the_owner_layouts() -> void:
+	var surface_lm: Dictionary = preload("res://data/world_layout.gd").LANDMARKS
+	var reach_lm: Dictionary = preload("res://data/hallowmere_layout.gd").LANDMARKS
+	for h in MasteryData.MAP_CACHE_HINTS:
+		var id := String(h["id"])
+		var pos: Variant = Mastery.cache_hint_pos(h)
+		assert_true(pos is Vector2, id + " has a layout position")
+		var lms: Dictionary = surface_lm if String(h["area"]) == "surface" else reach_lm
+		assert_true(lms.has(h["district"]), id + " district is a landmark of its area")
+		if pos is Vector2 and lms.has(h["district"]):
+			var lm: Dictionary = lms[h["district"]]
+			assert_true((pos as Vector2).distance_to(lm["pos"]) <= float(lm["radius"]), id + " lies inside its district")
+		var consts: Dictionary = (load(String(h["layout"])) as Script).get_script_constant_map()
+		var flags: Array = []
+		for k in consts:
+			var v: Variant = consts[k]
+			if v is String:
+				flags.append(v)
+				if String(v).begins_with("rw_"):
+					flags.append_array(ItemDB.reward_bundle(String(v)).get("flags", []))
+			elif v is Dictionary and (v as Dictionary).get("flags") is Array:
+				flags.append_array((v as Dictionary)["flags"])
+		assert_true(flags.has(h["flag"]), "%s: flag %s is set by the owner module" % [id, h["flag"]])
+	assert_true(Mastery.cache_hint_pos({"layout": "res://data/no_such_layout.gd", "const": "X"}) == null, "missing layout: no hint")

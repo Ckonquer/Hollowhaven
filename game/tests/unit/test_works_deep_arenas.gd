@@ -2,8 +2,9 @@ extends "res://tests/test_case.gd"
 ## Weaver's Crossing and Choir Vault arenas: the APIs the boss modules will use (anchors, line-braziers,
 ## landing points, temporary threads, lantern anchors, resonators with the taught symbols, the safe
 ## perimeter), the guarded boss hooks (no crash while crossing_matron / borrowed_choir scripts are missing,
-## fallback completion, debug/test hooks), rewards and flags exactly once (rw_ch2_crossing ->
-## ch2_crossing_cleared; ch2_choir_defeated), the route onward / service gate, and the vault exit.
+## a spawned Choir that vanishes without a defeat falls back, fallback completion, debug/test hooks), rewards
+## and flags exactly once (rw_ch2_crossing -> ch2_crossing_cleared; ch2_choir_defeated), the route onward /
+## service gate, the vault exit, and the vault's calm ambience after the victory (and on later builds).
 
 const Host := preload("res://src/world/works/deep/deep_preview_host.gd")
 const Layout := preload("res://data/works_layout_deep.gd")
@@ -365,8 +366,21 @@ func test_choir_boss_hook_guard_fallback_and_exit() -> void:
 	_ctl().call("check", 0.1)
 	assert_true(bool(a.get("active")), "walking into the vault starts the encounter")
 	if ChoirArena.boss_available():
-		return
-	assert_true(bool(a.get("fallback")), "boss script missing: guarded fallback")
+		# borrowed_choir is registered now: simulate its script failing after the spawn (node gone, no
+		# defeat) so the guarded fallback stays covered instead of silently passing.
+		var b: Variant = a.get("boss")
+		assert_true(b is Node and is_instance_valid(b), "a registered Choir is spawned")
+		assert_false(bool(a.get("fallback")), "no fallback while the Choir is there")
+		if b is Node and is_instance_valid(b):
+			for r in a.call("resonator_nodes"):
+				(r as Node).set("enabled", false)      # e.g. left in Phase A (plates idle) by the vanished boss
+			(b as Node).free()
+		_ctl().call("check", 0.1)
+		assert_true(bool(a.get("active")), "the encounter goes on without its boss")
+	assert_true(bool(a.get("fallback")), "boss missing or vanished: guarded fallback")
+	assert_null(a.get("boss"), "no boss node kept")
+	for r in a.call("resonator_nodes"):
+		assert_true(bool((r as Node).get("enabled")), "the fallback's resonators are usable")
 	for an in a.call("anchor_nodes"):
 		(an as Node).call("raise", null)
 	assert_false(bool(a.get("cleared")), "anchors alone are not enough")
@@ -413,6 +427,57 @@ func test_choir_victory_makes_the_vault_safe() -> void:
 	await wait_frames(2)
 	host = await _make()
 	assert_true(host.is_safe_zone(c), "still safe after reloading a won save")
+
+
+## A preview host with the Works area's register_mood(zone, mood, ambience) API, recording what it is given.
+func _make_mood_host() -> Node3D:
+	var s := GDScript.new()
+	s.source_code = "extends \"res://src/world/works/deep/deep_preview_host.gd\"\nvar mood_zone: String = \"\"\nvar amb_by_zone: Dictionary = {}\nvar mood_by_zone: Dictionary = {}\nfunc register_mood(zone: String, mood: Dictionary, ambience: String = \"\") -> void:\n\tmood_by_zone[zone] = mood\n\tif ambience != \"\":\n\t\tamb_by_zone[zone] = ambience\n"
+	s.reload()
+	var h: Node3D = s.new()
+	h.set("with_environment", false)
+	add_child(h)
+	await wait_physics(3)
+	return h
+
+
+func test_choir_victory_calms_the_vault_ambience() -> void:
+	host = await _make_mood_host()
+	var amb: Dictionary = host.get("amb_by_zone")
+	assert_eq(String(amb.get("hw_vault", "")), String(Layout.AMBIENCE["hw_vault"]), "the Choir's loop before the victory")
+	assert_eq(ChoirArena.vault_ambience(), String(Layout.AMBIENCE["hw_vault"]))
+	assert_eq(String(amb.get("hw_throat", "")), String(Layout.AMBIENCE["hw_throat"]), "other zones keep theirs")
+	Events.boss_defeated.emit("borrowed_choir")
+	amb = host.get("amb_by_zone")
+	assert_eq(String(amb.get("hw_vault", "")), ChoirArena.CALM_AMBIENCE, "the victory re-registers a calm vault")
+	assert_ne(ChoirArena.CALM_AMBIENCE, "amb_boss", "calm is not the boss loop")
+	assert_eq(host.get("mood_by_zone")["hw_vault"], Layout.MOODS["hw_vault"], "the light mood is unchanged")
+	assert_eq(String(amb.get("hw_crossing", "")), String(Layout.AMBIENCE["hw_crossing"]), "nothing else changes")
+	# a later build of the won save registers the calm loop from the start
+	host.queue_free()
+	await wait_frames(2)
+	host = await _make_mood_host()
+	amb = host.get("amb_by_zone")
+	assert_eq(String(amb.get("hw_vault", "")), ChoirArena.CALM_AMBIENCE, "still calm on the next build")
+	assert_eq(ChoirArena.vault_ambience(), ChoirArena.CALM_AMBIENCE)
+
+
+## Standing in the vault at the moment of victory: the calm loop plays at once (the area only replays a zone's
+## ambience when she enters it).
+func test_choir_victory_in_the_vault_plays_the_calm_loop_now() -> void:
+	host = await _make_mood_host()
+	var a: Node = _ctl().get("choir")
+	a.set("save_on_clear", false)
+	host.set("mood_zone", "hw_vault")
+	Audio.play_ambience(String(Layout.AMBIENCE["hw_vault"]), 0.0)
+	var saved_area: Node = Game.area
+	Game.area = host
+	a.call("clear_encounter")
+	var now := Audio.current_ambience()
+	Game.area = saved_area
+	Audio.stop_ambience(0.0)
+	assert_eq(now, ChoirArena.CALM_AMBIENCE, "the vault's ambience crossfades to calm right away")
+	assert_true(bool(GameState.get_flag("ch2_choir_defeated")))
 
 
 func test_high_visibility_markers() -> void:

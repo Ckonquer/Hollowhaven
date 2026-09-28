@@ -214,8 +214,9 @@ capped at `REDUCTION_CAP`; `Stats.move_mult() -> float` (1 + lumi passive + glim
 cap +0.30); `Stats.heal_mult()` (Mochi passive, perks); `Stats.stamina_cost_mult()`;
 `Stats.gather_bonus()`; `Stats.melee_damage(weapon_id) -> float`; `Stats.effective_max_hp()` (= base
 100 unless a later design adds max HP). The player damage path: invulnerable? -> reduction ->
-shield absorb (`GameState.player_shield()` transient, not saved) -> Health. Companion passives count only
-for `GameState.active_companion` when that companion node is in the same area within 25 m of Krystal
+shield absorb (transient, not saved: the shield lives on the player's health node `src/player/player_health.gd`,
+added with `Game.player.add_shield(...)` and read with `Stats.player_shield()`; there is no
+`GameState.player_shield()`) -> Health. Companion passives count only for `GameState.active_companion` when that companion node is in the same area within 25 m of Krystal
 (`Game.companion_present(id)`).
 
 ## 6. Module ownership (who edits what)
@@ -322,9 +323,9 @@ lift returns to 7. Flags: `ch2_line_water`, `ch2_line_bell`, `ch2_line_light`, `
 * **Structure scripts owned by other modules** are mapped in `structure_factory.gd` through a
   safe-loaded `LAZY_SCRIPTS := {structure_id: path}`: `furnace` -> `src/building/structures/furnace.gd`
   (crafting module), `companion_bed` / `companion_perch` -> `src/building/structures/companion_nook.gd`
-  (companions module), `wardrobe` / `vanity_mirror` -> `src/building/structures/wardrobe.gd` (building
-  module), `pumpkin_lantern` -> `src/building/structures/pumpkin_lantern.gd` (building module),
-  `loom` / `kitchen_counter` -> `workbench.gd` with the station id from data.
+  (companions module), `wardrobe` / `vanity_mirror` -> `src/building/structures/wardrobe.gd` (appearance UI
+  module B2, which wrote it; the building module only maps it here - lead decision R133, docs/ch2/WAVES.md),
+  `pumpkin_lantern` -> `src/building/structures/pumpkin_lantern.gd` (building module), `loom` / `kitchen_counter` -> `workbench.gd` with the station id from data.
 * **Crafting stations**: `crafting_station` group nodes expose `station_id`; the furnace also exposes
   `queue_add(recipe_id) -> bool`, `queue() -> Array`, `collect() -> int`. The crafting panel shows the
   queue when the station is a furnace (`Game.open_panel("crafting", {"station": "furnace", "uid": uid})`).

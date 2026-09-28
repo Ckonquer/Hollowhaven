@@ -192,7 +192,92 @@ Setup param `stage` forces a preview stage.
 `GameState.INVENTORY_SIZE` (:76, :130), a `chest.changed` connection, Take all / Store all. `inventory_panel.gd`: 92 px slots,
 backpack `range(HOTBAR_SIZE, INVENTORY_SIZE)` (:68). `_build()` runs on open (`panel_base.gd:61`). Registry: `ui_root.gd:23-39`.
 
+## 11. Chapter Two (Wave B: B5 crafting/stations/mastery, B6 building + integration) — as built
+
+Sections 1-10 map the Chapter One code (many recipes below are now built). Source of truth: the headers of
+`src/crafting/crafting.gd`, `src/crafting/furnace.gd`, `src/core/mastery.gd`, `src/building/build_mode.gd`, `build_ops.gd`,
+`placement.gd`, `structure_factory.gd`.
+
+**Crafting (`crafting.gd`, static; legacy signatures kept).** Recipe kinds (`kind(rid)` = `ItemDB.recipe_kind`): `"item"`
+(instant), `"timed"` (furnace queue only), `"apply"` (`backpack_40` / `backpack_48` grow `GameState` capacity; `chest_40` upgrades
+ONE chest in place from the storage panel), `"pattern"` (wardrobe ownership via `GameState.unlock_pattern`) and `"dye"` (ids
+`"dye:<palette>"`, mixed once at the Loom; `GameState.unlock_palette(id)` when present, R07). API: `stations_near(pos)`,
+`nearest_station(pos, station)`, `nearest_station_uid`, `known_recipes()`, `known_special(station)`, `recipes_for_stations`,
+`recipe_def`, `kind`, `is_known`, `display_name`, `effect_text`, `check(rid, stations, sources := [], target := "")`,
+`craft(rid, stations, sources := [], target := "") -> bool`, `max_craftable`, `plan(rid, sources)` (says where each ingredient
+comes from), `count_available`, `transact(ingredients, sources, commit: Callable)`, `upgrade_chest(uid, sources)`,
+`chest_upgrade_info`, `refund_chest_upgrade(rec, drop_pos)`, `chest_sources_near(pos, area_id := "", radius := CHEST_RADIUS)`,
+`use_chests()` / `set_use_chests(on)`, `owns_palette` / `owns_pattern`, `dye_ids()`, `table_decor()` / `decorate_table(choice)`,
+`seasonal_dishes_cooked()`, `static var last_reason`.
+* **Crafting from nearby chests** (opt-in toggle in the crafting panel): placed storage chests within **`CHEST_RADIUS` = 18 m** in
+  the SAME area, stable uid order; ingredients come from the backpack (+ key pouch) first, then the chests; ONE transaction
+  (snapshot/restore) covers backpack, key pouch and every source chest, and nothing is consumed when the result can't be created.
+  Lead decision R136 a: 18 m stays (it came from B5's reading of the relayed "use 18 instead of 8", which every other module read as
+  the agent count; generous same-area chest crafting is cozy, never crosses areas, and is one constant to revert).
+* Kitchen: "The Harvest Table" counter `ch2_seasonal_dishes` (distinct dishes, flags `ch2_cooked_<dish>`, the same five dishes as the
+  story tracker; candy doesn't count). `decorate_table(choice)` stores the choice and sets `ch2_table_decorated` (with placing a
+  `lanternwake_table`, the only ways to complete "Set a table for the festival"; a plain legacy table no longer counts, R44).
+* Mastery XP for crafting comes only through `Events.crafted` (furnace jobs when they finish).
+
+**Furnace (`src/crafting/furnace.gd` static + node `src/building/structures/furnace.gd`).** A finite queue of jobs on the
+`GameState.stats.play_seconds` timeline (advances only while unpaused; the crafting panel is fullscreen, so the queue is frozen
+while it is open — by design, the panel says so). Capacity = data `queue` (4) + 1 at hearthcraft rank 3 (`Mastery.furnace_queue_bonus()`).
+API: `enqueue(uid, rid, sources := []) -> bool` (transactional), `can_enqueue`, `settle(uid) -> int` (moves finished jobs to the output
+buffer exactly once, emitting `Events.crafted` per job), `collect(uid) -> int` (what doesn't fit stays in the buffer, saved, never
+dropped), `queue(uid)`, `output(uid)`, `progress(uid) -> {jobs, output, capacity, busy, ready}`, `capacity(uid)`, `job_seconds(rid)`,
+`is_furnace(uid)`, `refund_all(uid, drop_pos)` / `refund_record(rec, drop_pos, uid)` (dismantle returns queued ingredients and
+finished bars once). Node API (spec §9): `queue_add(rid) -> bool`, `queue() -> Array`, `collect() -> int`; the panel opens with
+`Game.open_panel("crafting", {"station": "furnace", "uid": uid})`. Steady glow with `reduce_flashing`.
+
+**Record / state keys.** `GameState.structures[uid].data`: `queue` [{recipe, start, end}], `output` {item: n}, `held_jobs` (jobs whose
+recipe this build doesn't know — kept for a newer save, not refunded on dismantle), `slots` (40 = upgraded chest), `upgrade_refunded`
+(the chest upgrade kit was paid back once), `tint` (recolour palette id), `face` (pumpkin face), `level` (1 = upper storey).
+`GameState.stations` (reserved dict, spec §3) holds two B5 keys: `use_chests` (bool, the panel toggle) and `table_decor` (the festival
+table choice).
+
+**Chest / backpack upgrades.** `Inventory.resize` grows only; the chest 20 → 40 upgrade keeps uid, contents, slot order and the
+Inventory object; dismantling an upgraded chest returns contents, the chest and the upgrade kit (6 wood + 2 iron bars) once
+(`storage_chest.gd` refunds itself; an explicit `build_ops` hook is optional and never pays twice). Full-backpack refusal shows both the
+panel line and a toast (kept, R136 e).
+
+**Mastery (`src/core/mastery.gd`, static; state `GameState.mastery`).** Wired once by `Game.wire_session_systems()` (called from
+`Game._ready`; idempotent; R02). `init()` / `shutdown()` / `is_listening()`, `tracks()`, `xp(track)`, `rank(track)` (0..5),
+`progress(track)`, `track_name(track)`, `effect(key, default)`, small effects read by Stats / stations / food: `gather_power()`,
+`bonus_yield_chance()`, `furnace_queue_bonus()`, `station_time_mult()`, `meal_buff_bonus()`, `sprint_stamina_save()` (Stats applies
+them once — mastery only exposes values), `award(track, kind_id, xp := -1) -> int` (first-time kinds dedupe, repeats capped per
+in-game day, no XP for dismantle/rebuild, chest shuffling, loading, equipping, healing), `apply_legacy_credit()` (once, recorded,
+only for a mastery record without progress), `legacy_credit_preview()`, `legacy_applied()`. Map / world rewards (R22):
+`known_spots(area)` (resource spots from `Events.harvested`, `GameState.mastery.spots`, bounded), `cache_hints(area)`,
+`resource_pins_on()`, `cache_hints_on()`, `highlight_radius()` (Gathering 4 sparkle, `src/world/common/gather_sparkle.gd`).
+
+**Farming.** New crops `sunflax` / `roseberry` / `pumpkin` with 4 stage meshes each (`CropModels.stage_mesh(stage, crop)`, plant counts
+9/4/1 on a plot, 6/2/1 on the Sturdy Planter `CropModels.planter()`); harvests set `c1x_grew_new_crop` and `ch2_pumpkin_harvested`;
+the ×1.5 restored-Haven blessing is still applied on read (never compounds on reload).
+
+**Building (B6).** Two storeys (`level` in data, `placement.gd requested_level`; stairs / upper floors / roofs pick their storey; the
+flag `c1x_upstairs_reachable` = stairs actually lead onto an upper floor, `build_ops.update_upstairs_flag`, repaired on load, used by
+"opt_upstairs", R36). Undo (Z / action `build_undo`): two-step confirm, exact refund, `structures_built` goes back too, up to
+`UNDO_DEPTH` 10, **the undo list lasts one area visit**. Recolour (P / `build_recolor`): cycles natural wood and the owned dye palettes
+(`data.tint`), **free once a dye is owned**, never automatic. Variant (N / `build_variant`): pumpkin faces before placing / re-carve;
+the Lanternwake festival faces unlock with `ch2_feast` (R52; a locked or unknown saved face falls back to the first face without
+rewriting data). Fallback keys (`FALLBACK_KEYS`) avoid every default binding until Settings gets the actions (deferred D03);
+`BuildMode.key_label(action)` and `get_state()` (undo, undo_armed, face, level) feed the HUD build bar. The Haven grows by BUILD_AREA
+`extra` circles; the Haven safe zone follows them + `HAVEN_SAFE_BUFFER` 4 m, and `surface_world.get_zone_at` reports "haven" there too
+(R51). **Reach outpost**: the building system also attaches in `hallowmere_reach`; building only inside
+`HallowmereLayout.OUTPOST_BUILD_AREA` (Commons cottage foundation; its circle may reach ~1.1 m past the Commons safe radius — spec
+placement, kept, R136 f); bed and companion nooks are refused there (home stays at the Haven). `Game.load_area` restores a position
+saved on an upper storey after the structures exist (R04).
+**Structure scripts owned elsewhere** (`structure_factory.gd` `LAZY_SCRIPTS`, safe-loaded; a missing script falls back to the base
+structure): `furnace` → B5, `companion_bed` / `companion_perch` → `companion_nook.gd` (B4), `wardrobe` / `vanity_mirror` →
+`wardrobe.gd` (**owned by the appearance UI module B2**, lead decision R133), `pumpkin_lantern` (B6), `loom` / `kitchen_counter` →
+`workbench.gd` with the data's station id. Gothic/cottage furnishing variants are the Midnight/Cream dye finishes (tints recolour
+furniture); the Wardlight is the homecoming reward (R136 m).
+Tests: `crafting`, `station`, `mastery`, `farming`, `economy`, `building`, `audit_building`, `audit_economy`.
+
 ## Extension recipes
+
+*Status after Wave B: two storeys, the new pieces, recolour, undo, pumpkin faces, the bigger Haven (B6), the furnace queue,
+Loom/Kitchen, chest/backpack upgrades, crops and mastery (B5) are built; §11 describes the current code, the recipes stay for history.*
 
 **(a) Stairs + upper floors (two storeys).**
 1. Data: add `"level"` to the records as `rec.data.level: int` (absent = 0, so all old saves stay level 0 and JSON float → `int()`).

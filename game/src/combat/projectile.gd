@@ -20,6 +20,11 @@ extends Node3D
 ##   damage: float         applied through the target's health (0 = harmless, e.g. a light pulse)
 ##   speed (16), range (14), radius (0.22), lifetime (range / speed + 0.1): flight limits
 ##   groups (["enemy"])    target groups ("player" for enemy throws; companions are never targets)
+##   only_target: Node3D   when given, ONLY this node can be hit (groups are not consulted): every other body
+##                         on the path is passed through; the world still blocks. A freed / non-3D value hits
+##                         nothing (companion shots use it so they never clip or wake a peaceful enemy)
+##   filter: Callable      func(candidate: Node3D) -> bool; false = pass through that candidate (checked only for
+##                         nearby candidates; a filter that becomes invalid mid-flight lets nothing be hit)
 ##   knockback (0)         force passed to target.knockback(dir, force) on a damaging hit
 ##   los_mask (1|32)       what stops the projectile (world | structure)
 ##   color, light (false)  look; light adds a small shadowless OmniLight (at most MAX_LIGHTS at once)
@@ -68,6 +73,8 @@ var hitstop: bool = false
 var impact_fx: bool = true
 var result: String = ""                   # "" in flight, then "hit" | "blocked" | "wall" | "expired"
 var hit_target: Node = null
+var only_target: Node3D = null            # fire() "only_target" (null + _only_set = hits nothing)
+var filter: Callable = Callable()         # fire() "filter"
 
 var _orb: MeshInstance3D
 var _tail: MeshInstance3D
@@ -76,6 +83,9 @@ var _light_on: bool = false
 var _query: PhysicsRayQueryParameters3D
 var _exclude: Array[RID] = []
 var _last_s: float = 0.0                  # segment parameter of the last target found by _first_target
+var _only_set: bool = false
+var _only: Array = [null]                 # the one-candidate list scanned instead of the groups (no allocation)
+var _filter_set: bool = false
 
 
 # =====================================================================================================
@@ -294,6 +304,15 @@ func _launch(params: Dictionary, shooter_node: Node, from: Vector3, dir: Vector3
 	color = col if col is Color else Color("ffe08a")
 	var oh: Variant = params.get("on_hit", Callable())
 	on_hit = oh if oh is Callable else Callable()
+	# only_target: validity first (`is` on a freed instance is a script error); a freed / non-3D value still
+	# counts as "set", so the shot then hits nothing rather than whatever happens to be on the way.
+	var ot: Variant = params.get("only_target")
+	_only_set = typeof(ot) != TYPE_NIL
+	only_target = ot if _only_set and is_instance_valid(ot) and ot is Node3D else null
+	_only[0] = only_target
+	var fl: Variant = params.get("filter")
+	_filter_set = fl is Callable and not (fl as Callable).is_null()
+	filter = fl if _filter_set else Callable()
 	hitstop = bool(params.get("hitstop", false))
 	impact_fx = bool(params.get("impact_fx", true))
 	result = ""
@@ -402,8 +421,14 @@ func _first_target(a: Vector3, b: Vector3) -> Node3D:
 	var best_s := 2.0
 	var seg_len := a.distance_to(b)
 	var mid := (a + b) * 0.5
-	for g in groups:
-		for n in _targets(String(g)):
+	if _filter_set and not filter.is_valid():
+		_last_s = best_s
+		return null   # the filter's owner is gone: pass through everything (the world still blocks)
+	# only_target: that one node is the whole candidate list; everything else on the way is passed through.
+	var lists: int = 1 if _only_set else groups.size()
+	for gi in lists:
+		var list: Array = _only if _only_set else _targets(String(groups[gi]))
+		for n in list:
 			# shooter_id (not the shooter reference): an enemy freed mid-flight must not be compared as an object
 			if not is_instance_valid(n) or not (n is Node3D) or (shooter_id != 0 and n.get_instance_id() == shooter_id):
 				continue
@@ -418,6 +443,8 @@ func _first_target(a: Vector3, b: Vector3) -> Node3D:
 				hh = float(hv)
 			if aim.distance_to(mid) > seg_len * 0.5 + r + hh + 0.5:
 				continue      # cheap distance cull first: the health lookup below only runs for nearby targets
+			if _filter_set and not Combat.truthy(filter.call(t)):
+				continue
 			var h := Combat.find_health(t)
 			if h != null and Combat.truthy(h.get("dead")):
 				continue
@@ -466,6 +493,11 @@ func _finish(why: String) -> void:
 	_set_light(false)
 	shooter = null
 	on_hit = Callable()
+	only_target = null                    # a pooled projectile never keeps a target or a filter alive
+	_only[0] = null
+	_only_set = false
+	filter = Callable()
+	_filter_set = false
 	_live.erase(self)
 	if _pool.size() < POOL_MAX:
 		if not _pool.has(self):

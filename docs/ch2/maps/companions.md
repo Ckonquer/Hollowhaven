@@ -249,3 +249,55 @@ A pinned Pebble short-circuits at L494: it only looks at the player.
   - Plus the spawn plan tables in `test_companions_logic.gd` L37-160.
 - **Contracts others depend on**: `notice_threat`, `teleport_near`, `on_player_respawned`, `react`, `command` return shape, the `companion_id` property, layer 4 (build mode's 2|4 overlap query), and `Game.companion_nodes` entries being valid Node3Ds. Lumi's `light_source` membership changes Gloomling exposure and stalker behaviour globally.
 - **Comfort and perf**: new hits must use `Events.camera_shake` and `hitstop` sparingly. Avoid per-frame `get_nodes_in_group` and extra per-frame rays (three companions can exist at once on the surface).
+
+## 15. Chapter Two (Wave B, module B4 + integration) — as built
+
+Sections 1-14 map the Chapter One code (the recipes in §13 are now built). Source of truth: the headers of the files below.
+
+**Files.** `companion.gd` (node; owns `combat`, `nav`, `home_life`), and four new helpers:
+| file | role |
+|---|---|
+| `companion_combat.gd` | ONE companion's basic attack + signature skill + support. Targets only enemies Krystal fights or that go for her (never peaceful groups, stalkers, dummies, invulnerable / `can_be_hit_by() == false` targets), with LOS (world \| structure), within `ENGAGE_RADIUS` 12 m of Krystal (Stay close: `CLOSE_RADIUS` 4 m). Damage lands on the attack animation's impact frame: Mochi / Lumi fire `src/combat/projectile.gd` with `only_target` = their chosen target (other bodies on the path are passed through, never clipped or woken; integration R60), Pebble's headbutt resolves against the target only. Boss hazards (meta `boss_hazard`: trip-lines, egg sacs, threads) are never targets or threats (`is_boss_hazard()`, R61). No bond XP from invulnerable targets, dummies, friends or the stalker. |
+| `companion_support.gd` | static: the data numbers at the current bond level (`table/signature/basic`), the ONE signature cooldown (`remaining/is_ready/start_cooldown/cooldown_fraction` on the `GameState.stats.play_seconds` timeline), modes (`mode/set_mode`), settings (`auto_attack()`, `autocast()`), gear tier (`gear_tier()` delegates to `Stats.best_weapon_tier()`, R62; counts carried weapons only — kept, R136 s), ribbon / courage, and the Friends-panel texts. Reads GameState/ItemDB/Settings only. |
+| `companion_nav.gd` | obstacle-aware approach: direct ray → bounded local grid A* (0.9 m cells, lazily probed, physics-query + 3 ms time budget, one search per physics frame for all pets, `SEARCH_COOLDOWN` 0.8 s per pet, 2.5 s after a failed search, partial paths allowed, string-pulled) → whisker steering. Breadcrumbs stay first when Krystal is out of sight. |
+| `companion_home.gd` | Haven home life with a saved daily ledger: Mochi naps near its home spot, Pebble builds a cairn (≤ `CAIRN_MAX` 7 stones, visual only), Lumi perches and visits one Haven lamp at night; everyone notices new furnishings near home a few times a day. Never creates items. |
+Also B4: `src/building/structures/companion_nook.gd` (companion bed / perch = home spot; `assign(cid)`, `owner_id()`, `spot()`; a nook outside
+the Haven never becomes a home spot), `src/world/surface/c1x/courage_lantern.gd` (Brave Little Steps at the outside mine threshold),
+`companion_panel.gd` (passive, attack purpose, skill + cooldown / failure reason, next perk, mode buttons, ribbon, "Attacks on its own" /
+"Uses its skill on its own"), `hud/companion_badge.gd` (cooldown ring + ready flash, `reduce_flashing`).
+
+**Skill key.** Action `companion_skill` (default T) is read only by the follower in `_unhandled_input`, only when
+`Game.gameplay_input_allowed()`; autocast and the key share the one cooldown (`use_skill(manual) -> {ok, reason, skill}`,
+`skill_status()`, `get_skill_state()` for telemetry). Settings `companion_auto_attack` off = support only; `companion_autocast`.
+Skills: Mochi Bloomguard (heal-over-time through `Game.player.health.heal`, which applies `Stats.heal_mult()` itself), Pebble
+Stoneheart (`Game.player.add_shield(...)` + a brief stagger that honours each enemy's `can_stagger`, never a boss lock), Lumi
+Glimmerstep (`glimmerstep` move buff + a light pulse; light-fearing enemies may implement `expose(seconds)`, deferred D04).
+Pebble's headbutt stays **8** damage (MP §6.2; lead decision R136 b).
+
+**Area classes** (`companion_logic.gd`, spec §9): `area_class(area_id)` → `"haven"` (`SURFACE_AREAS`: surface, arena: homes, wild
+spots, the mine threshold, every legacy rule) | `"outdoor"` (`OUTDOOR_AREAS`: hallowmere_reach) | `"interior"` (`INTERIOR_AREAS`:
+moonveil_manor, echo_trial) | `"underground"` (`UNDERGROUND_AREAS`: below, tobin_annex, hushed_works; also the default for unknown ids).
+`is_outdoor_area()` = haven or outdoor (Mochi always comes along), `is_underground_area()`. The follower comes along into outdoor and
+interior areas; underground only if it dares (`dares_underground(def, courage)`: `enters_below`, or Mochi with flag
+`c1x_mochi_courage`). The same list drives the HUD's underground look (`UiUtil.is_underground_area`).
+
+**Doorsteps** (where a timid follower waits when Krystal goes underground without it): `DOORSTEPS := {"below": {area: surface,
+threshold: true}, "tobin_annex": {area: surface, threshold: true}, "hushed_works": {area: hallowmere_reach, spawn: bellhouse_stair,
+arrivals: [bellhouse_stair], entries: {"refuge": {spawn: refuge_exit, arrivals: [refuge_exit]}}}}`. `threshold` = the legacy surface
+mine threshold (Tobin's side door and hatch are at the same mine mouth; reunite on `SURFACE_REUNITE_ARRIVALS` mine_exit / annex_door
+/ annex_hatch). `entries`: entered through another door (arrival spawn inside), the companion waits at THAT door (the Works refuge
+hatch → `refuge_exit`). `doorstep(area_id, threshold, reach_doorsteps := {}, entry_spawn := "")`, `doorsteps_in(area_id)`,
+`doorstep_spawns_in(area_id)` (the spawner registers every doorstep position); `plan_spawns(...)` passes the arrival spawn.
+
+**Record keys** (`GameState.companions[id]`; spec §3 defaults added by migrate/_load_companion, extra keys survive load):
+`combat_mode` ("assist" | "close"), `skill_ready_at` (play_seconds when the skill is ready: frozen while paused, saved, untouched by
+switching pets / loading / area changes), `home_spot` ([x,y,z] | null), `ribbon`, `home_task`; B4 extras `home_nook` (uid of the nook
+that is its home), `home_log` ({day, <task>: n}, the daily ledger), `cairn` (stone count). Mochi's courage is the flag
+`c1x_mochi_courage`.
+
+**Other rules.** Brave Mochi still shelters 1.5 s on horror cues and keeps following and healing (4 s hide without courage); the
+director skips `wrong_mochi` while the real Mochi is present (R70). A pet that falls during a boss fight > 12 m from Krystal returns
+to the last floor it stood on (never teleported into the arena). Storey changes (upper floors) rely on the existing stuck recovery
+(no progress 4 s / > 20 m) — no new teleport helper (lead decision R136 g; real-input check pending). Measured cost: ~0.08-0.13 ms
+per physics frame for 3 companions with 8 enemies; one walled-in path search ≤ 0.8 ms / 178 queries in 3 s.
+Tests: `tools/test.sh companions` (fixture, combat, skills, courage, areas, nav, home, nook, ui, rules).

@@ -180,3 +180,58 @@ func test_use_key_casts_but_never_while_eating() -> void:
 	player.call("_use_item")
 	assert_almost(float(player.stamina), 100.0 - 8.0, 0.01, "the use key casts once the bite is over")
 	assert_true(float(player.wand_cooldown_left()) > 0.7, "cooldown started")
+
+
+## Integration (B9 Matron trial): boss floor hazards (egg sacs / seed pods, trip lines: meta "boss_hazard") rank
+## Logic.WAND_HAZARD_SCORE_MULT times farther for the auto-aim, so the wand prefers the stunned boss behind them;
+## on their own they are still a target.
+func test_wand_prefers_the_boss_over_floor_hazards() -> void:
+	_hold_wand()
+	var boss := _dummy(Vector3(0, 0, -9))
+	var sac := _dummy(Vector3(1.2, 0, -4))
+	sac.set_meta("boss_hazard", true)
+	await wait_physics(2)
+	var aim := Vector3(0, 0, -1)
+	assert_eq(player.call("_ranged_target", 14.0, aim), boss, "the boss 9 m away beats a hazard 4 m away")
+	sac.set_meta("boss_hazard", false)
+	assert_eq(player.call("_ranged_target", 14.0, aim), sac, "control: without the meta the closer target wins")
+	sac.set_meta("boss_hazard", true)
+	var near_sac := _dummy(Vector3(-0.3, 0, -1.8))
+	near_sac.set_meta("boss_hazard", true)
+	assert_eq(player.call("_ranged_target", 14.0, aim), near_sac, "a hazard right at her feet still wins (a soft preference)")
+	near_sac.free()
+	boss.remove_from_group("enemy")
+	assert_eq(player.call("_ranged_target", 14.0, aim), sac, "alone, a hazard is still a target")
+	boss.add_to_group("enemy")
+	Projectile.invalidate_targets()
+	player.call("_on_attack_pressed")
+	await wait_physics(50)
+	assert_almost(float(boss.get("health").hp), 30.0 - 9.0, 0.01, "the spark flies to the boss")
+	assert_almost(float(sac.get("health").hp), 30.0, 0.01, "and leaves the hazard alone")
+
+
+## Review fix (B3): a selected wand shows in Krystal's hand (built on first use) and a cast plays the wand pose
+## instead of the bare-hands swing; selecting something else puts it away.
+func test_holding_the_wand_shows_it_in_her_hand() -> void:
+	var av: Node3D = player.avatar
+	assert_eq(String(av.call("held_tool")), "", "nothing held on a fresh save")
+	assert_false((av.get("_tools") as Dictionary).has("wand"), "no wand model until one is held")
+	_hold_wand()
+	assert_eq(String(av.call("held_tool")), "wand", "selecting the wand puts it in her hand")
+	var w: Node3D = (av.get("_tools") as Dictionary)["wand"]
+	await wait_frames(2)
+	assert_true(w.visible, "wand shown between casts")
+	var foe := _dummy(Vector3(0, 0, -6))
+	player.call("_on_attack_pressed")
+	await wait_physics(4)
+	await wait_frames(1)
+	assert_eq(String(av.get("swing_kind")), "wand", "the cast plays the wand pose")
+	assert_true(float(av.get("swing_t")) >= 0.0)
+	assert_true(w.visible, "the wand is in her hand while casting")
+	await wait_physics(45)
+	assert_almost(float(foe.get("health").hp), 30.0 - 9.0, 0.01)
+	assert_true(w.visible, "still held after the cast")
+	GameState.select_hotbar(5)                   # an empty slot
+	assert_eq(String(av.call("held_tool")), "")
+	await wait_frames(2)
+	assert_false(w.visible, "put away when another slot is selected")

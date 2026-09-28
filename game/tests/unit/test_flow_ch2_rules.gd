@@ -2,8 +2,9 @@ extends "res://tests/test_case.gd"
 ## Game flow rules for Chapter Two (autoload/game.gd, docs/CHAPTER_TWO_SPEC.md §1, §5, §8, MP §9):
 ## manual save / quiet autosave per area (SAFE_SAVE_AREAS anywhere; other Chapter Two areas in a safe
 ## zone; the Below and trials never; never with a boss active or something chasing within 20 m),
-## per-area respawn memory, the Lantern Road list and gate, companion_present(), the new-game look and
-## complete_chapter_two() granting exactly once (twice in a row, and after a save/reload).
+## per-area respawn memory, the Lantern Road list and gate, companion_present(), the new-game look,
+## complete_chapter_two() granting exactly once (twice in a row, and after a save/reload) with one gifts toast,
+## and Continue on an upper storey (the saved spot is validated again once the structures exist).
 
 const Reach := preload("res://data/hallowmere_layout.gd")
 
@@ -318,3 +319,156 @@ func test_complete_chapter_two_never_replays_chapter_one() -> void:
 		var oc: Dictionary = Game._feast_step_rewards()
 		for f in oc.get("flags", []):
 			assert_true(bool(GameState.get_flag(String(f))), "the final step's flag %s is set with the same ledger entry" % f)
+
+
+## One reward toast at the end of Chapter Two (R06): the ending's grant (rw_ch2_feast) is silent and the
+## ch2_feast step's own on_complete message is THE toast (the ending screen already says "Chapter Two complete").
+## The rewards are unchanged, and a reload never announces the gifts a second time (the step is completed
+## before the ending's commit save).
+func test_chapter_two_ending_shows_one_gifts_toast() -> void:
+	Game.mode = "boot"          # headless: no cutscene/UI; the commit path is the same
+	GameState.active = true
+	for f in ["ward_restored", "chapter_one_complete", "ch2_accepted", "ch2_waygate_repaired", "ch2_arch_commons",
+			"ch2_read_festival_map", "ch2_found_orchard_lamp", "ch2_found_quarry_lamp", "ch2_found_manor_lamp",
+			"ch2_garden_lamp_lit", "ch2_quarry_lamp_lit", "ch2_manor_lamp_lit", "ch2_read_preparations", "ch2_lamps_linked",
+			"ch2_service_gate_open", "ch2_true_signal", "ch2_refuge_reached", "ch2_refuge_shortcut", "ch2_refuge_record",
+			"ch2_line_water", "ch2_line_bell", "ch2_line_light", "ch2_crossing_cleared", "ch2_false_home_revealed",
+			"ch2_choir_defeated", "ch2_returned_to_reach", "ch2_homecoming"]:
+		GameState.set_flag(f, true)
+	GameState.chapter2.evaluate()
+	await wait_frames(2)        # the deferred quest evaluation of the flags above
+	assert_eq(String(GameState.current_objective()["id"]), "ch2_feast", "only the Lanternwake is left")
+	var feast: Dictionary = GameState.chapter2.step_by_id("ch2_feast")
+	var step_msg := String((feast.get("on_complete", {}) as Dictionary).get("message", ""))
+	assert_ne(step_msg, "", "the final step carries the gifts message")
+	var notes: Array = []
+	var cb := func(text: String, kind: String) -> void: notes.append([text, kind])
+	Events.notify.connect(cb)
+	var is_gift := func(n: Array) -> bool: return String(n[0]) == step_msg or String(n[0]).to_lower().contains("gifts")
+	var rewards: Dictionary = Game.chapter_two_rewards()
+	var before := {}
+	for id in rewards:
+		before[id] = GameState.count_item(String(id))
+	assert_true(await Game.complete_chapter_two(rewards), "completes")
+	await wait_frames(3)        # anything deferred after the ending (quest / optional evaluations)
+	var gifts: Array = notes.filter(is_gift)
+	assert_eq(gifts.size(), 1, "exactly one gifts toast: %s" % str(notes))
+	if gifts.size() == 1:
+		assert_eq(String(gifts[0][0]), step_msg, "it is the ch2_feast step's message")
+	var texts: Array = notes.map(func(n: Array) -> String: return String(n[0]))
+	for t in texts:
+		assert_eq(texts.count(t), 1, "no toast is shown twice (%s)" % t)
+	for id in rewards:
+		assert_eq(GameState.count_item(String(id)) - int(before[id]), int(rewards[id]), "reward %s granted once, unchanged" % id)
+	assert_true(GameState.has_reward(Game.CH2_REWARD_ID), "one ledger entry")
+	assert_true(GameState.chapter2.is_finished(), "the final step completed with the ending")
+	# The commit save already lists the final step: a reload (e.g. after a crash during the ending) is quiet.
+	notes.clear()
+	fresh_state()
+	assert_true(SaveSystem.load_game(), "reloaded")
+	GameState.active = true
+	GameState.chapter2.evaluate()
+	await wait_frames(2)
+	assert_eq(notes.filter(is_gift).size(), 0, "a reload never announces the gifts again: %s" % str(notes))
+	assert_true(GameState.chapter2.is_finished())
+	Events.notify.disconnect(cb)
+
+
+## Continue on an upper storey (R04): outdoor areas validate the saved spot BEFORE BuildingSystem.attach() has
+## spawned the house, so the ground under an upper floor won and Krystal woke downstairs. load_area() now
+## validates the spot again once the structures stand. Stand-in upper floor: one saved upper_floor tile (a real
+## structure record; spawning a saved piece never re-checks its support) in the Haven of the REAL surface.
+func test_continue_upstairs_keeps_krystal_on_her_upper_floor() -> void:
+	var Terrain: Script = load("res://src/world/surface/terrain.gd")
+	var Placement: Script = load("res://src/building/placement.gd")
+	var t: RefCounted = Terrain.new()
+	t.call("generate")
+	var x := -4.0
+	var z := 7.0
+	var ground: float = float(t.call("height_at", x, z))
+	var consts: Dictionary = Placement.get_script_constant_map()
+	var floor_origin := Vector3(x, ground + float(consts["LEVEL_HEIGHT"]), z)
+	var top: float = floor_origin.y + float(consts["UPPER_TOP"])
+	var uid := GameState.add_structure("upper_floor", floor_origin, 0.0, "surface")
+	GameState.structures[uid]["data"] = {"level": 1}
+	GameState.active = true
+	GameState.player["area"] = "surface"
+	GameState.player["pos"] = [x, top + 0.02, z]      # what write_to_state() saved while she stood upstairs
+	GameState.player["yaw"] = 0.5
+	var runner := get_tree().current_scene
+	var ph := Node.new()
+	ph.name = "Ch2Placeholder"
+	get_tree().root.add_child(ph)
+	get_tree().current_scene = ph
+	Game._transitioning = false
+	Game.load_area("surface", "haven_respawn", true)
+	var ok := false
+	for i in 1500:
+		if Game.mode == "playing" and not Game._transitioning and Game.area_id == "surface" \
+				and Game.player != null and is_instance_valid(Game.player):
+			ok = true
+			break
+		await get_tree().process_frame
+	assert_true(ok, "Continue loaded the Woods")
+	if ok:
+		await wait_physics(3)
+		var spawned: bool = Game.area.find_children("*", "", true, false).any(func(n: Node) -> bool: return n.get("uid") == uid)
+		assert_true(spawned, "the saved upper floor was spawned")
+		var p: Vector3 = Game.player.global_position
+		assert_true(top - ground > 2.5, "the saved spot really is a storey up")
+		assert_true(absf(p.y - top) < 0.4, "Krystal is upstairs on her floor (y %.2f; floor top %.2f; ground %.2f)" % [p.y, top, ground])
+		assert_true(Vector2(p.x - x, p.z - z).length() < 0.5, "at the saved spot (%s)" % str(p))
+		var sp: Variant = GameState.player.get("pos")
+		assert_true(sp is Array and absf(float(sp[1]) - top) < 0.4, "GameState keeps the restored spot (%s)" % str(sp))
+	# Clean up the loaded Woods, the UI root and the runner scene.
+	if Game.ui != null and is_instance_valid(Game.ui):
+		Game.ui.queue_free()
+	Game.ui = null
+	Game._ui_stack.clear()
+	Game._transitioning = false
+	Game.area = null
+	Game.player = null
+	Game.area_id = ""
+	Game.zone_id = ""
+	Game.companion_nodes = {}
+	Game.director = null
+	var cs := get_tree().current_scene
+	if cs != null and cs != runner and is_instance_valid(cs):
+		cs.queue_free()
+	for n in get_tree().root.get_children():
+		if n.name == "Ch2Placeholder" or n.name == "Surface":
+			n.queue_free()
+	get_tree().current_scene = runner
+	GameState.active = false
+	if Audio.has_method("stop_all"):
+		Audio.stop_all()
+	await wait_frames(4)
+
+
+## Cold-load warm-up (R05): prefetch_area() starts threaded loads of an area's scene and its AREA_WARMUP scripts,
+## is idempotent, ignores unknown ids and never waits; finished scripts are collected and kept compiled, the
+## scene stays requested until load_area() takes it (every flow test that travels goes through that path).
+func test_prefetch_area_is_idempotent_and_never_blocks() -> void:
+	assert_eq(Game.prefetch_area("nowhere"), 0, "an unknown area requests nothing")
+	var scene := String(Game.AREAS["moonveil_manor"])
+	var warm: Array = Game.AREA_WARMUP["moonveil_manor"]
+	var t0 := Time.get_ticks_msec()
+	Game.prefetch_area("moonveil_manor")
+	var ms := Time.get_ticks_msec() - t0
+	assert_eq(Game.prefetch_area("moonveil_manor"), 0, "a second call starts nothing new")
+	for p in [scene] + warm:
+		assert_true(Game.is_prefetching(String(p)) or ResourceLoader.has_cached(String(p)), "%s is loading or loaded" % p)
+	assert_true(ms < 1000, "it never waits for the loads (%d ms)" % ms)
+	for i in 900:
+		Game._collect_warmups()
+		if not warm.any(func(p: Variant) -> bool: return Game.is_prefetching(String(p))):
+			break
+		await get_tree().process_frame
+	for p in warm:
+		assert_false(Game.is_prefetching(String(p)), "%s collected" % p)
+		assert_true(ResourceLoader.has_cached(String(p)), "%s stays compiled" % p)
+	# Hand the scene request back the way load_area() does, so nothing stays pending after this test.
+	if Game.is_prefetching(scene):
+		Game._prefetching.erase(scene)
+		var ps: Variant = ResourceLoader.load_threaded_get(scene)
+		assert_true(ps is PackedScene, "the prefetched scene is the area's PackedScene")

@@ -11,6 +11,7 @@ const HorrorData := preload("res://data/horror_events.gd")
 const Layout := preload("res://data/world_layout.gd")
 const UnlocksData := preload("res://data/unlocks.gd")
 const SourcesData := preload("res://data/sources.gd")
+const MasteryData := preload("res://data/mastery.gd")
 
 # Chapter Two appended "stair" / "stair2" (stairs) and the interact kinds of docs/CHAPTER_TWO_SPEC.md 4.4.
 const LAYERS := ["decor", "floor", "object", "edge", "roof", "stair"]
@@ -319,3 +320,17 @@ func test_item_descriptions_do_not_hard_code_keys() -> void:
 		for field in ["desc", "alt_desc"]:
 			var d := String((ItemsData.ITEMS[id] as Dictionary).get(field, ""))
 			assert_null(rx.search(d), "%s %s hard-codes a key: %s" % [id, field, d])
+
+
+## Mastery track names / descriptions come through ItemDB (the journal never reads data/mastery.gd itself).
+func test_mastery_track_info() -> void:
+	for t in ItemDB.mastery_tracks():
+		var info: Dictionary = ItemDB.mastery_track_info(String(t))
+		assert_eq(info.keys().size(), 2, "only name and desc")
+		assert_eq(String(info["name"]), String(MasteryData.TRACK_NAMES[t]["name"]))
+		assert_eq(String(info["desc"]), String(MasteryData.TRACK_NAMES[t]["desc"]))
+		assert_ne(String(info["desc"]), "", "%s has a description" % t)
+	assert_eq(ItemDB.mastery_track_info("gathering")["name"], "Gathering")
+	var unknown: Dictionary = ItemDB.mastery_track_info("star_gazing")
+	assert_eq(String(unknown["name"]), "Star Gazing", "unknown track: capitalised id")
+	assert_eq(String(unknown["desc"]), "")

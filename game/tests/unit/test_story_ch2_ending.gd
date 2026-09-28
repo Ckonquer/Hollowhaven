@@ -14,6 +14,8 @@ const Story := preload("res://src/world/story_ch2/story_ch2.gd")
 const WardStone := preload("res://src/world/surface/ward_stone.gd")
 const Pole := preload("res://src/world/story_ch2/lanternwake_pole.gd")
 const Celebration := preload("res://src/world/story_ch2/celebration.gd")
+## MP 11 step 20 + MP 17 "a few supplies": the final step's give = data/sources.gd rw_ch2_feast = the ending's list.
+const FEAST_TOTALS := {"candy": 6, "pumpkin": 4, "lantern_wax": 4, "sugarcap": 3, "moonpetal": 3}
 
 
 class StubArea extends Node3D:
@@ -66,6 +68,11 @@ func setup() -> void:
 	Game.ui = null          # isolated from whatever an earlier suite left loaded
 	Game.area = null
 	Game.area_id = ""
+	# Game's session tracker steps aside (leaving the tree disconnects it): these tests drive exactly one tracker.
+	var session: Node = Game.get_node_or_null("StoryCh2Tracker")
+	if session != null:
+		Game.remove_child(session)
+		session.queue_free()
 	tracker = Story.new_tracker()
 	add_child(tracker)
 
@@ -81,6 +88,8 @@ func teardown() -> void:
 	if tracker != null and is_instance_valid(tracker):
 		tracker.queue_free()
 	await wait_frames(2)
+	if Game.has_method("wire_session_systems"):
+		Game.call("wire_session_systems")     # the session tracker is back for the next suite
 
 
 func _held(id: String) -> int:
@@ -118,6 +127,7 @@ static func _disk_count(st: Dictionary, id: String) -> int:
 func test_ending_grants_once_even_across_reloads() -> void:
 	var ended := record(Events.chapter2_completed, 0)
 	var rewards: Dictionary = Game.chapter_two_rewards()
+	assert_deep_eq(json_norm(rewards), json_norm(FEAST_TOTALS), "the ending pays exactly the Lanternwake list")
 	assert_true(await Game.complete_chapter_two(rewards), "completes")
 	assert_eq(ended.size(), 1, "chapter2_completed once")
 	var counts := {}
@@ -143,6 +153,19 @@ func test_ending_grants_once_even_across_reloads() -> void:
 	assert_eq(ended.size(), 1, "the ending never shows again")
 	assert_true(GameState.chapter2.is_finished(), "the chapter log is finished")
 	assert_eq(String(GameState.current_objective()["source"]), "legacy", "free play: the tracker hands back")
+
+
+## The chapter log's own path to rw_ch2_feast (chapter_two_complete already set, e.g. a save repaired by hand)
+## pays exactly what the ending pays: the step data lists the same items (no path pays less, none pays twice).
+func test_chapter_log_path_pays_the_same_lanternwake() -> void:
+	GameState.set_flag("chapter_two_complete")
+	GameState.chapter2.evaluate()
+	assert_true(GameState.has_reward("rw_ch2_feast"), "the chapter log paid the final step")
+	for id in FEAST_TOTALS:
+		assert_eq(_held(String(id)), int(FEAST_TOTALS[id]), "chapter log pays " + String(id))
+	assert_false(await Game.complete_chapter_two(Game.chapter_two_rewards()), "the ending then pays nothing more")
+	for id2 in FEAST_TOTALS:
+		assert_eq(_held(String(id2)), int(FEAST_TOTALS[id2]), "not twice: " + String(id2))
 
 
 func test_ending_never_replays_chapter_one() -> void:
@@ -265,6 +288,63 @@ func test_in_game_presentation_order_and_cleanup() -> void:
 	assert_true(GameState.lore.has(Story.LORE_LANTERNWAKE))
 	area.queue_free()
 	ui.queue_free()
+
+
+func _mouse(button: int, pressed: bool = true) -> InputEventMouseButton:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = button as MouseButton
+	ev.pressed = pressed
+	return ev
+
+
+func _key(pressed: bool, echo: bool = false) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_SPACE
+	ev.physical_keycode = KEY_SPACE
+	ev.pressed = pressed
+	ev.echo = echo
+	return ev
+
+
+## Skipping the celebration: a deliberate key press or mouse click after SKIP_AFTER seconds; never the mouse wheel
+## (looking around / a stray tick) and never a held key's repeat.
+func test_celebration_skip_ignores_the_wheel_and_key_repeats() -> void:
+	for b in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
+		assert_false(Celebration.is_skip_input(_mouse(b)), "wheel button %d never skips" % int(b))
+	assert_false(Celebration.is_skip_input(_key(true, true)), "a key echo never skips")
+	assert_false(Celebration.is_skip_input(_key(false)), "a key release never skips")
+	assert_false(Celebration.is_skip_input(_mouse(MOUSE_BUTTON_LEFT, false)), "a button release never skips")
+	assert_false(Celebration.is_skip_input(InputEventMouseMotion.new()), "moving the mouse never skips")
+	assert_true(Celebration.is_skip_input(_key(true)), "a key press skips")
+	for b2 in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+		assert_true(Celebration.is_skip_input(_mouse(b2)), "mouse button %d skips" % int(b2))
+	# The running node: nothing skips before SKIP_AFTER; after it the wheel still does not, a click does.
+	var area := StubArea.new()
+	add_child(area)
+	var cel: Node3D = Celebration.new()
+	cel.setup({"area": area, "area_id": "", "duration": 60.0})
+	area.add_child(cel)
+	var state := {"done": false}
+	var runner := func() -> void:
+		await cel.play()
+		state["done"] = true
+	runner.call()
+	await wait_frames(1)
+	cel.set("_t", 0.2)
+	cel.call("_input", _mouse(MOUSE_BUTTON_LEFT))
+	assert_false(bool(cel.get("skipped")), "too early to skip")
+	cel.set("_t", Celebration.SKIP_AFTER + 0.5)
+	cel.call("_input", _mouse(MOUSE_BUTTON_WHEEL_DOWN))
+	cel.call("_input", _key(true, true))
+	assert_false(bool(cel.get("skipped")), "the wheel and a key repeat never skip")
+	assert_false(bool(state["done"]), "still playing")
+	cel.call("_input", _mouse(MOUSE_BUTTON_LEFT))
+	assert_true(bool(cel.get("skipped")), "a click skips")
+	await wait_frames(1)
+	assert_true(bool(state["done"]), "play() returned")
+	cel.call("finish")
+	area.queue_free()
+	await wait_frames(1)
 
 
 func test_ending_screen_on_the_ui_root_overlay() -> void:

@@ -242,3 +242,77 @@ func test_melee_respects_can_be_hit_by_too() -> void:
 	assert_eq(hits.size(), 1, "accepted again")
 	assert_almost(float(t.health.hp), 12.0, 0.001, "one 18-damage hit")
 	assert_almost(t.knocked, 4.0, 0.001)
+
+
+## Integration R60: "only_target" narrows the candidates to that one node. Anything else on the path (here an
+## enemy standing right in the way) is passed through untouched - no damage, no on_hit_blocked - while the
+## world still blocks the shot. A pooled projectile forgets the restriction, so the defaults are unchanged.
+func test_only_target_passes_through_everything_else() -> void:
+	var blocker := _target(Vector3(0, 0, -4))
+	var foe := _target(Vector3(0, 0, -8))
+	var p := _fire({"only_target": foe})
+	assert_not_null(p, "fired")
+	await wait_physics(50)
+	assert_almost(float(blocker.health.hp), 30.0, 0.001, "the enemy in the way is passed through")
+	assert_eq(blocker.blocked, 0, "not even a blocked hit (never clipped, never woken)")
+	assert_almost(float(foe.health.hp), 21.0, 0.001, "lands on its one target")
+	assert_eq(String(p.result), "hit")
+	assert_eq(p.hit_target, foe)
+	assert_eq(_hits.size(), 1, "on_hit once, for the target")
+	assert_null(p.only_target, "a finished (pooled) projectile keeps no target alive")
+	# Defaults unchanged: the next (pooled) shot without only_target stops at the first enemy again.
+	var q := _fire({})
+	await wait_physics(50)
+	assert_almost(float(blocker.health.hp), 21.0, 0.001, "a plain shot hits the first enemy on its path")
+	assert_eq(q.hit_target, blocker)
+	assert_almost(float(foe.health.hp), 21.0, 0.001)
+
+
+func test_only_target_is_still_blocked_by_the_world() -> void:
+	var foe := _target(Vector3(0, 0, -8))
+	_wall(Vector3(0, 1, -4), Vector3(4, 3, 0.4), 1)
+	var p := _fire({"only_target": foe})
+	await wait_physics(40)
+	assert_almost(float(foe.health.hp), 30.0, 0.001, "never through a wall")
+	assert_eq(String(p.result), "wall")
+
+
+## A target freed mid-flight (or a freed value handed in) makes the shot hit nothing: it never "falls back" to
+## whatever else is on the way.
+func test_only_target_gone_hits_nothing() -> void:
+	var blocker := _target(Vector3(0, 0, -6))
+	var foe := _target(Vector3(0, 0, -10))
+	var p := _fire({"only_target": foe})
+	p.step(1.0 / 60.0)
+	foe.free()
+	await wait_physics(80)
+	assert_almost(float(blocker.health.hp), 30.0, 0.001, "the enemy on the path is still passed through")
+	assert_eq(blocker.blocked, 0)
+	assert_eq(String(p.result), "expired", "flies on to its range")
+	assert_eq(_hits.size(), 0)
+	var gone := _target(Vector3(3, 0, -12))
+	gone.free()
+	var blocker2 := _target(Vector3(0, 0, -5))
+	var p2 := _fire({"only_target": gone})
+	assert_not_null(p2, "a freed only_target still fires (harmlessly)")
+	await wait_physics(80)
+	assert_almost(float(blocker2.health.hp), 30.0, 0.001, "nothing on the path is hit")
+	assert_eq(String(p2.result), "expired")
+
+
+func test_filter_passes_through_rejected_candidates() -> void:
+	var blocker := _target(Vector3(0, 0, -4))
+	var foe := _target(Vector3(0, 0, -8))
+	var asked: Array = []
+	var flt := func(n: Node3D) -> bool:
+		if not asked.has(n):
+			asked.append(n)
+		return n != blocker
+	var p := _fire({"filter": flt})
+	await wait_physics(50)
+	assert_almost(float(blocker.health.hp), 30.0, 0.001, "rejected by the filter: passed through")
+	assert_eq(blocker.blocked, 0)
+	assert_almost(float(foe.health.hp), 21.0, 0.001, "accepted: hit")
+	assert_eq(p.hit_target, foe)
+	assert_true(asked.has(blocker) and asked.has(foe), "the filter saw both candidates")
+	assert_false(p.filter.is_valid(), "a finished (pooled) projectile drops its filter")

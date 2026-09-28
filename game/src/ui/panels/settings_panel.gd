@@ -1,7 +1,8 @@
 extends "res://src/ui/panels/panel_base.gd"
-## Settings: Gameplay, Controls (rebinding with "press a key" capture, conflict warnings, reset),
-## Video, Audio (with test sounds) and Comfort (horror intensity, arachnophobia, shake, flashing,
-## captions, each explained). Changes apply live; the owner saves Settings when the panel closes.
+## Settings: Gameplay (camera, hints, companion fighting / skills, seasonal decorations), Controls (rebinding
+## with "press a key" capture, conflict warnings, reset), Video, Audio (with test sounds) and Comfort (horror
+## intensity, arachnophobia, shake, flashing, captions, high-visibility cues, timing assist, each explained).
+## Changes apply live; the owner saves Settings when the panel closes.
 ## args: {"tab": "controls"} opens a specific tab.
 
 const Rows := preload("res://src/ui/widgets/setting_rows.gd")
@@ -9,8 +10,9 @@ const Schema := preload("res://src/ui/settings_schema.gd")
 
 const ROW_W := 1200.0
 ## Settings "Reset to defaults" leaves alone: the key bindings (they have their own reset) and every
-## comfort choice, which a player may depend on (e.g. arachnophobia mode).
-const RESET_KEEPS := ["bindings", "comfort_confirmed", "arachnophobia", "reduce_shake", "reduce_flashing", "captions", "horror_intensity"]
+## comfort choice, which a player may depend on (e.g. arachnophobia mode, timing assist).
+const RESET_KEEPS := ["bindings", "comfort_confirmed", "arachnophobia", "reduce_shake", "reduce_flashing", "captions", "horror_intensity",
+	"high_visibility_cues", "timing_assist"]
 
 var tabs: TabContainer
 var _capturing := ""
@@ -84,8 +86,8 @@ func _build_comfort(v: VBoxContainer) -> void:
 	v.add_child(Kit.wrap_label(String(r["desc"]), "Small", ROW_W))
 	v.add_child(Rows.intensity_picker(ROW_W, 96.0))
 	v.add_child(_thin_sep())
-	for key in ["arachnophobia", "reduce_shake", "reduce_flashing", "captions"]:
-		v.add_child(Rows.build(key, ROW_W))
+	for key in Schema.COMFORT_TOGGLES:
+		v.add_child(Rows.build(String(key), ROW_W))
 		v.add_child(_thin_sep())
 
 

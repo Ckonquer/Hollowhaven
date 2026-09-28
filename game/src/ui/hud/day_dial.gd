@@ -1,6 +1,7 @@
 extends HBoxContainer
 ## Day / time indicator: a little round window onto the sky (sun or moon travelling across it, soft
-## hills below) with "Day 3" and the time of day next to it.
+## hills below) with "Day 3" and the time of day next to it. Underground (UiUtil.is_underground_area: the
+## Below, Tobin's annex, the Hushed Works) a little lantern glows over rock instead of the sky.
 
 const Kit := preload("res://src/ui/ui_kit.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -61,6 +62,11 @@ func refresh() -> void:
 	dial.queue_redraw()
 
 
+## True when the dial shows the underground lantern instead of the sky (the current area is underground).
+func shows_lantern() -> bool:
+	return UiUtil.is_underground_area(Game.area_id)
+
+
 static func sky_color(hour: float) -> Color:
 	var h := fposmod(hour, 24.0)
 	var night := Palette.SKY_NIGHT_TOP.lerp(Palette.SKY_NIGHT_HORIZON, 0.45)
@@ -81,7 +87,7 @@ static func sky_color(hour: float) -> Color:
 
 func _draw_dial() -> void:
 	var c := dial.size * 0.5
-	var below := Game.area_id == "below"
+	var below := shows_lantern()
 	var sky := sky_color(_hour) if not below else Color("2e2733")
 	dial.draw_circle(c + Vector2(0, 3), R + 4.0, Color(0, 0, 0, 0.25), true, -1.0, true)
 	dial.draw_circle(c, R + 4.0, ThemeFactory.PAPER_LIGHT, true, -1.0, true)

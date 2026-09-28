@@ -347,6 +347,22 @@ func test_director_context_inputs() -> void:
 	Events.boss_encounter_changed.emit("knotted_elder", false)
 
 
+## Authored silences (data/music.gd AUTHORED_SILENCE): the short Chapter Two moments get a shorter hush, the rest of
+## the authored moments keep the default, and ordinary horror events ask for none.
+func test_authored_silence_lengths() -> void:
+	assert_almost(MusicData.authored_silence_seconds("authored:ta_echo"), 12.0, 0.001, "Tobin's annex echo")
+	assert_almost(MusicData.authored_silence_seconds("authored:empty_waltz"), 15.0, 0.001, "the Empty Waltz")
+	assert_almost(MusicData.authored_silence_seconds("authored:boss"), 0.0, 0.001, "bosses bring their own music")
+	for id in ["authored:hw_knock", "authored:hw_wrong_door", "authored:hw_porch", "authored:threshold"]:
+		assert_almost(MusicData.authored_silence_seconds(String(id)), MusicData.AUTHORED_SILENCE_DEFAULT, 0.001, String(id) + " keeps the default")
+	assert_almost(MusicData.authored_silence_seconds("dir_creak"), 0.0, 0.001, "director events rely on the horror state")
+	# The two moments really emit these ids.
+	var annex: String = FileAccess.get_file_as_string("res://src/world/areas_ch2/tobin_annex_world.gd")
+	assert_true(annex.contains("\"authored:ta_echo\""), "the annex emits authored:ta_echo")
+	var waltz: Script = load("res://src/world/manor/waltz_moment.gd")
+	assert_eq(String(waltz.get_script_constant_map().get("SILENCE_EVENT", "")), "authored:empty_waltz", "the waltz emits authored:empty_waltz")
+
+
 func test_director_skips_cues_that_fail_to_load() -> void:
 	if _have("m07") or _have("m08"):
 		return      # the woods pieces exist now: nothing to simulate

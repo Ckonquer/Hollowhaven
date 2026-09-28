@@ -7,8 +7,11 @@ extends Control
 ##   bottom-left: FPS (optional)
 ## Toasts and the quest banner live in the UI root's top layer (they stay visible over menus).
 ## Everything is mouse-transparent except the hotbar slots.
+## Underground areas (UiUtil.is_underground_area: the Below, Tobin's annex, the Hushed Works) tone the
+## parchment HUD down a little (apply_area_look).
 
 const Kit := preload("res://src/ui/ui_kit.gd")
+const UiUtil := preload("res://src/ui/ui_util.gd")
 const Vitals := preload("res://src/ui/hud/vitals.gd")
 const Hotbar := preload("res://src/ui/hud/hotbar.gd")
 const Tracker := preload("res://src/ui/hud/tracker.gd")
@@ -97,12 +100,20 @@ func _ready() -> void:
 	Events.settings_changed.connect(_on_settings_changed)
 	Events.player_died.connect(func() -> void: set_cinematic(true))
 	Events.player_respawned.connect(func() -> void: set_cinematic(false))
-	Events.area_loaded.connect(func(a: String) -> void:
-		# the parchment HUD is toned down a little in the dark places below
-		var tint := Color(0.84, 0.82, 0.88) if a == "below" else Color.WHITE
-		modulate = Color(tint.r, tint.g, tint.b, modulate.a)
-		if Game.mode == "playing":
-			set_cinematic(false))
+	Events.area_loaded.connect(_on_area_loaded)
+	apply_area_look(Game.area_id)
+
+
+func _on_area_loaded(a: String) -> void:
+	apply_area_look(a)
+	if Game.mode == "playing":
+		set_cinematic(false)
+
+
+## The parchment HUD is toned down a little in the dark places underground (keeps the current alpha).
+func apply_area_look(area_id: String) -> void:
+	var tint := UiUtil.hud_tint(area_id)
+	modulate = Color(tint.r, tint.g, tint.b, modulate.a)
 
 
 func _region(align: BoxContainer.AlignmentMode, m: Array) -> VBoxContainer:

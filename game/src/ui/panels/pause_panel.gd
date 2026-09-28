@@ -1,12 +1,17 @@
 extends "res://src/ui/panels/panel_base.gd"
 ## Pause menu: Resume, Save Game (with feedback), Settings, Controls, Wardrobe (always available: styling
 ## is free and cosmetic), Comfort, an "unstuck" option (Return to the Haven on the surface / Return to
-## last lantern below / Return to safety in the Chapter Two areas, using Game.return_point()), Quit to
-## Title (confirm, offers to save when allowed) and Quit Game.
+## last lantern below / Return to safety in the Chapter Two areas, using Game.return_point(); "Leave the
+## trial" in an Echo Trial), Quit to Title (confirm, offers to save when allowed) and Quit Game.
+## Echo Trial (lead decision, MP section 15): the option leaves THROUGH the trial - Game.area.leave() when the
+## trial offers it, else the saved respawn point (the origin checkpoint the trial was entered from) - so
+## Krystal is back at the checkpoint with her progress intact, never sent to the trial's own entry pad.
 
 ## Unstuck fallbacks for areas without a remembered return point (Game.AREA_DEFAULT_RESPAWN covers the
 ## others): a trial always has its entry pad.
 const UNSTUCK_DEFAULTS := {"echo_trial": "trial_start"}
+## Areas whose pause option leaves the area for its origin instead of moving Krystal inside it.
+const TRIAL_AREAS := ["echo_trial"]
 
 var sub_l: Label
 var save_btn: Button
@@ -113,16 +118,34 @@ static func _legacy_area(area_id: String) -> bool:
 	return area_id == "surface" or area_id == "below" or area_id == ""
 
 
+static func is_trial_area(area_id: String) -> bool:
+	return TRIAL_AREAS.has(area_id)
+
+
 static func unstuck_label(area_id: String) -> String:
 	if area_id == "below":
 		return "Return to last lantern"
+	if is_trial_area(area_id):
+		return "Leave the trial"
 	return "Return to the Haven" if _legacy_area(area_id) else "Return to safety"
 
 
 static func unstuck_tooltip(area_id: String) -> String:
 	if area_id == "below":
 		return "Stuck? Safely return to your last lit lantern."
+	if is_trial_area(area_id):
+		return "Step out of the echo, back to the checkpoint where it began. Nothing you've done is lost."
 	return "Stuck? Walk home in the blink of an eye." if _legacy_area(area_id) else "Stuck? Safely return to the last safe spot here."
+
+
+## Where leaving a trial goes when the trial itself can't say: the saved respawn point (the origin checkpoint
+## the trial made it on entry), never a trial; else the Haven. {"area", "spawn"}. Pure; see tests.
+static func trial_exit_destination(player_state: Dictionary) -> Dictionary:
+	var ra := String(player_state.get("respawn_area", ""))
+	var rs := String(player_state.get("respawn_spawn", ""))
+	if ra == "" or rs == "" or is_trial_area(ra):
+		return {"area": "surface", "spawn": "haven_respawn"}
+	return {"area": ra, "spawn": rs}
 
 
 ## Spawn id used by the unstuck option (pure logic, see tests). Surface: the bed or the Haven. Below: the
@@ -172,6 +195,12 @@ func _unstuck() -> void:
 	if ui_root == null:
 		return
 	var a := Game.area_id
+	if is_trial_area(a):
+		var pick: String = await ui_root.confirm("Leave the trial?", "Krystal will step out of the echo and back to the checkpoint where it began. Nothing she has done is lost.",
+			[["go", "Leave the trial", "AccentButton"], ["cancel", "Stay", ""]])
+		if pick == "go":
+			leave_trial()
+		return
 	var below := a == "below"
 	var legacy := _legacy_area(a)
 	var head := "Return to the last lantern?" if below else ("Return to the Haven?" if legacy else "Return to safety?")
@@ -183,6 +212,20 @@ func _unstuck() -> void:
 	var spawn := unstuck_target()
 	if ui_root.has_method("teleport_player"):
 		ui_root.teleport_player(spawn)
+
+
+## Leaves the trial for its origin checkpoint: closes the menus (unpausing), then the trial's own leave() (its
+## exit door's destination: the respawn point set on entry) or, without one, Game.change_area to the saved
+## respawn point. Progress is untouched (Game.change_area autosaves on arrival at the origin).
+func leave_trial() -> void:
+	if ui_root != null and ui_root.has_method("close_all"):
+		ui_root.close_all()
+	var ar: Node = Game.area
+	if ar != null and is_instance_valid(ar) and ar.has_method("leave"):
+		ar.call("leave")
+		return
+	var d := trial_exit_destination(GameState.player)
+	Game.change_area(String(d["area"]), String(d["spawn"]))
 
 
 func _quit_title() -> void:

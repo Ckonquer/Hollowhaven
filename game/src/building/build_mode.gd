@@ -20,7 +20,9 @@ extends Node
 ##   recolour P (action "build_recolor"): cycles the piece under the cursor through natural wood and the dye
 ##            palettes made at the Loom (data.tint; uid and contents kept). Never automatic.
 ##   variant  N (action "build_variant"): with a carved pumpkin selected, picks its face BEFORE placing
-##            (saved as data.face; the ghost shows it); pointing at a placed pumpkin re-carves it.
+##            (saved as data.face; the ghost shows it); pointing at a placed pumpkin re-carves it. Only faces
+##            available now are offered (pumpkin_faces.gd: the six faces, then the Lanternwake festival faces
+##            once ch2_feast is set).
 ##   The fallback keys (FALLBACK_KEYS) avoid every default binding (T is the companion skill, F the lantern),
 ##   so build mode never shadows another action.
 
@@ -32,6 +34,7 @@ const U := preload("res://src/building/model_util.gd")
 const Palette := preload("res://src/art/palette.gd")
 
 const Tints := preload("res://src/building/tints.gd")
+const Faces := preload("res://src/building/pumpkin_faces.gd")
 
 const MAX_REACH := 8.0
 const RAY_LENGTH := 45.0
@@ -318,6 +321,10 @@ func _select(item_id: String, force: bool = false) -> void:
 		Events.build_selection_changed.emit(item_id)
 		if active and not _faces().is_empty():
 			Events.hint.emit("build_pumpkin_face", "%s picks the carved face before you place it. Interact with a placed pumpkin to carve it a new one." % key_label("build_variant"))
+			var festival := Faces.unlocked_festival()
+			if not festival.is_empty():
+				var names: Array = festival.map(func(f: Variant) -> String: return String(f).capitalize())
+				Events.hint.emit("build_pumpkin_festival_faces", "The Lanternwake taught you festival carvings: %s. %s cycles through them." % [" and ".join(PackedStringArray(names)), key_label("build_variant")])
 
 
 func cycle(dir: int) -> void:
@@ -770,10 +777,10 @@ func recolor_under_cursor() -> bool:
 	return true
 
 
-## Face ids of the selected piece ([] when it has none).
+## Face ids the selected piece can be carved with now ([] when it has none): its own faces, then the
+## unlocked festival faces (locked ones are never offered).
 func _faces() -> Array:
-	var f: Variant = Placement.def_of(_sid).get("faces", []) if _sid != "" else []
-	return f if f is Array else []
+	return Faces.unlocked_faces(Placement.def_of(_sid)) if _sid != "" else []
 
 
 ## The face the selected pumpkin will be carved with ("" when the selection has no faces).

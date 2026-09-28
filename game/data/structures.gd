@@ -28,7 +28,8 @@ extends RefCounted
 ##   interact          new values: "wardrobe" (mirror & wardrobe), "nook" (companion bed/perch), "board"
 ##                     (expedition board), "music" (music box), "face" (pumpkin lantern face picker)
 ##   queue             furnace: max queued jobs (data.queue / data.output live in the structure record)
-##   faces             pumpkin lantern: selectable face ids (data.face; default the first)
+##   faces             pumpkin lantern: selectable face ids (data.face; default the first); festival faces
+##                     (FESTIVAL_FACES below) are appended to the choices once unlocked
 ##   alt_name          arachnophobia display name (same rule as items)
 
 const STRUCTURES := {
@@ -112,3 +113,9 @@ const CROPS := {
 
 ## Faces a carved pumpkin can show (structure data.face). Cosmetic and reversible.
 const PUMPKIN_FACES := ["friendly", "sleepy", "toothy", "cat", "moon", "ghost"]
+
+## Festival faces (MP §17 ending reward "carved-lantern patterns"): face id -> unlock flag. Once the flag is set
+## they join the END of a pumpkin's `faces` choices (src/building/pumpkin_faces.gd); they are never part of
+## `faces` / PUMPKIN_FACES, so nothing earlier changes before the Lanternwake. ch2_feast = the final Chapter Two
+## step (data/unlocks.gd). A saved festival face that is not unlocked is shown as the first face (data kept).
+const FESTIVAL_FACES := {"starry": "ch2_feast", "lanternwake": "ch2_feast"}

@@ -134,6 +134,39 @@ func _scripts_under(dir: String, out: Array) -> void:
 		_scripts_under(dir.path_join(String(d)), out)
 
 
+## Quoted strings that are code identifiers, not sound names: has_method("music_director") arguments and baked
+## mesh cache keys (U.baked("music_box_dancer", ...)). Removed from a line before it is scanned for music_* / amb_*.
+var _not_sound_re := RegEx.create_from_string("(?:has_method|baked)\\(\\s*\"[^\"]*\"")
+var _loop_re := RegEx.create_from_string("\"((?:music|amb)_[a-z0-9_]+)\"")
+
+
+## Music / ambience names a line of code refers to (quoted music_* / amb_* strings), minus catalogue ids (the
+## music_box item), *_volume settings keys, method names and bake keys.
+func _loop_names(line: String) -> Array:
+	var out: Array = []
+	var scan := _not_sound_re.sub(line, "", true)
+	for m in _loop_re.search_all(scan):
+		var n := m.get_string(1)
+		if n.ends_with("_volume") or ItemDB.has_item(n) or not ItemDB.structure(n).is_empty():
+			continue
+		out.append(n)
+	return out
+
+
+func test_loop_name_scan_skips_identifiers_but_not_sounds() -> void:
+	assert_eq(_loop_names("\tvar dancer := U.baked(\"music_box_dancer\", func(b: Batch) -> void:"), [], "a bake cache key")
+	assert_eq(_loop_names("var dir: Node = Audio.music_director() if Audio.has_method(\"music_director\") else null"), [], "has_method argument")
+	assert_eq(_loop_names("x = Audio.has_method( \"music_director_active\" )"), [])
+	assert_eq(_loop_names("Settings.get_value(\"music_volume\")"), [], "a settings key")
+	assert_eq(_loop_names("GameState.give_item(\"music_box\", 1)"), [], "a catalogue id")
+	# real sound names are still found, also next to an identifier on the same line
+	assert_eq(_loop_names("Audio.play_music(\"music_nowhere\")"), ["music_nowhere"])
+	assert_eq(_loop_names("{\"track\": \"amb_nowhere\"}"), ["amb_nowhere"])
+	assert_eq(_loop_names("if Audio.has_method(\"music_director\"): Audio.play_music(\"music_haven\")"), ["music_haven"])
+	assert_eq(_loop_names("U.baked(\"music_box_dancer\", f); Audio.play_ambience(\"amb_nowhere\")"), ["amb_nowhere"])
+	assert_false(Audio.has_sound("music_nowhere"), "so a missing one would fail the scan below")
+
+
 func test_every_name_the_game_uses_resolves() -> void:
 	# Integration guard: scans the other modules' scripts and data for sound names given to Audio
 	# (literal first arguments, both arms of a ternary, data keys like "sound"/"hit_sound", and
@@ -142,7 +175,6 @@ func test_every_name_the_game_uses_resolves() -> void:
 		"Audio\\.(?:play_3d|play_sfx|play_ui|play_music|play_ambience|has_sound|get_stream)\\(\\s*\"([a-z][a-z0-9_]*)\"(?:\\s+if\\s+[^\"]+?\\s+else\\s+\"([a-z][a-z0-9_]*)\")?")
 	var key_re := RegEx.create_from_string(
 		"\"(?:sound|alt_sound|hit_sound|break_sound|test_ui|test_sfx)\"\\s*:\\s*\"([a-z][a-z0-9_]*)\"")
-	var loop_re := RegEx.create_from_string("\"((?:music|amb)_[a-z0-9_]+)\"")
 	var snd_re := RegEx.create_from_string("return\\s+\"([a-z][a-z0-9_]*)\"\\s+if\\s+\\w+\\s+else\\s+\"([a-z][a-z0-9_]*)\"")
 	var files: Array = []
 	_scripts_under("res://src", files)
@@ -160,9 +192,7 @@ func test_every_name_the_game_uses_resolves() -> void:
 					hits.append(m.get_string(2))
 			for m in key_re.search_all(line):
 				hits.append(m.get_string(1))
-			for m in loop_re.search_all(line):
-				if not m.get_string(1).ends_with("_volume") and not ItemDB.has_item(m.get_string(1)) and ItemDB.structure(m.get_string(1)).is_empty():
-					hits.append(m.get_string(1))   # catalogue ids (e.g. the music_box item) are not sound names
+			hits.append_array(_loop_names(line))   # music / ambience names (not catalogue ids, methods, bake keys)
 			if line.find("return") >= 0 and (line.find("weaver_") >= 0 or line.find("shade_") >= 0):
 				for m in snd_re.search_all(line):
 					hits.append(m.get_string(1))

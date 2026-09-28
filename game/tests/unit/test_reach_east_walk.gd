@@ -10,6 +10,8 @@ extends "res://tests/test_case.gd"
 ##  * no holes (every sample in the circle has a floor at or above the terrain), the spawn has capsule
 ##    clearance, the gangway / bell gate / haul road openings are >= 1.6 m wide x 2.4 m tall
 ##  * build time, determinism of node ids and positions
+##  * the gangway's collider waits for the plank: none while it lowers after a repair, solid once it has landed
+##    (R112); at once when the flag is already there (a loaded save) or on set_lowered(on, false)
 
 const Q := preload("res://data/reach_east.gd")
 const Reach := preload("res://data/hallowmere_layout.gd")
@@ -323,6 +325,68 @@ func test_walk_with_the_winch() -> void:
 	var lamp_cell := _nearest_cell(ys, Vector2(lp.x, lp.z), lp.y)
 	assert_true(lamp_cell >= 0 and back[lamp_cell] == 1, "from the lamp she can walk all the way back")
 	await _set_gangway(false)
+
+
+## What a straight-down ray at the middle of the LOWERED gangway's footprint hits first (world|structure).
+func _gangway_probe(w: Node3D) -> Object:
+	var frame := w.get_node("GangwayLoweredFrame") as Node3D
+	var mid: Vector3 = frame.global_transform * Vector3(0.0, 0.0, float(w.length) * 0.5)
+	var q := PhysicsRayQueryParameters3D.create(mid + Vector3(0, 2.5, 0), mid + Vector3(0, -6.0, 0))
+	q.collision_mask = MASK
+	var hit := _box.get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.get("collider") as Object
+
+
+## R112: repairing the winch plays the LOWER_SECONDS lowering; the plank's collider only switches on once it has
+## landed (no invisible walkway ahead of the moving plank). A flag that is already there (a loaded save / set
+## elsewhere) and set_lowered(on, false) switch it at once; hoisting removes it at once.
+func test_gangway_collider_waits_for_the_plank() -> void:
+	if not _host_ok():
+		return
+	var w: Node3D = _quarry().winch
+	var solid := w.get_node("GangwayLoweredFrame/GangwaySolid") as Object
+	GameState.flags.erase(Q.FLAG_WINCH)
+	await _set_gangway(false)
+	assert_false(bool(w.gangway_solid()), "hoisted: no gangway collider")
+	assert_true(_gangway_probe(w) != solid, "hoisted: nothing to stand on where the plank will land")
+	for c in Q.WINCH_COST:
+		GameState.give_item(String(c[0]), int(c[1]))
+	var a0 := float(w.get("_angle"))
+	assert_true(bool(w.repair()), "repaired")
+	assert_true(bool(GameState.get_flag(Q.FLAG_WINCH)), "the flag is set at once (save-safe)")
+	assert_true(bool(w.gangway_enabled()), "the way up is open (lowering)")
+	assert_true(bool(w.is_lowering()), "the plank is lowering")
+	assert_false(bool(w.gangway_solid()), "no collider while the plank starts to move")
+	assert_true(w.get_interaction(null).is_empty(), "no prompt while it lowers")
+	await wait_physics(2)
+	assert_true(_gangway_probe(w) != solid, "nothing solid at the plank's landing spot yet")
+	await wait_seconds(float(w.LOWER_SECONDS) * 0.5)
+	var a1 := float(w.get("_angle"))
+	assert_true(a1 > a0 + 1.0 and a1 < float(w.slope_deg) - 1.0, "the plank visibly swings down (%.1f -> %.1f deg)" % [a0, a1])
+	assert_false(bool(w.gangway_solid()), "still no collider half-way down")
+	await wait_physics(2)
+	assert_true(_gangway_probe(w) != solid, "still nothing solid half-way down")
+	await wait_seconds(float(w.LOWER_SECONDS) * 0.5 + 0.5)
+	assert_false(bool(w.is_lowering()), "the plank has landed")
+	assert_almost(float(w.get("_angle")), float(w.slope_deg), 0.01, "at its lowered slope")
+	assert_true(bool(w.gangway_solid()), "the collider is on once it has landed")
+	await wait_physics(2)
+	assert_true(_gangway_probe(w) == solid, "the landed plank carries her")
+	assert_eq(String(w.get_interaction(null).get("text", "")), Q.TEXT["winch_look"], "the prompt is back")
+	# hoisting (debug / tests) removes it at once; the flag arriving from elsewhere lowers it at once
+	w.set_lowered(false, false)
+	assert_false(bool(w.gangway_solid()), "hoisted at once")
+	GameState.flags.erase(Q.FLAG_WINCH)
+	GameState.set_flag(Q.FLAG_WINCH, true)
+	assert_true(bool(w.gangway_solid()), "a flag already there (a loaded save) lowers it with its collider at once")
+	assert_false(bool(w.is_lowering()), "no animation for that")
+	GameState.flags.erase(Q.FLAG_WINCH)
+	await _set_gangway(false)
+	# the landing dust frees itself (keeps the quarry's node structure clean for the determinism test)
+	var t_end := Time.get_ticks_msec() + 4000
+	while Time.get_ticks_msec() < t_end and not _quarry().find_children("*", "CPUParticles3D", false, false).is_empty():
+		await wait_frames(2)
+	assert_true(_quarry().find_children("*", "CPUParticles3D", false, false).is_empty(), "the landing dust is gone")
 
 
 ## Connected groups (>= 6 cells, i.e. room for Krystal) of standable cells inside the quarry that are not in

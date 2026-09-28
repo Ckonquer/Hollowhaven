@@ -137,6 +137,45 @@ func test_one_activity_never_pays_the_same_item_twice() -> void:
 		assert_true(payers.has(seal), seal + " is a guaranteed reward")
 
 
+## A constant of a content module's data script (null when the file or constant is missing).
+func _script_const(path: String, const_name: String) -> Variant:
+	assert_true(ResourceLoader.exists(path), path + " exists")
+	if not ResourceLoader.exists(path):
+		return null
+	var s: Variant = load(path)
+	return (s as Script).get_script_constant_map().get(const_name, null) if s is Script else null
+
+
+## The content modules' own reward ids resolve to "content" bundles here, and the fallbacks those modules keep for
+## a missing bundle pay exactly the same (so an older or newer build never changes what a save receives).
+func test_content_modules_find_their_bundles() -> void:
+	var cases := [
+		["res://data/reach_west.gd", "REWARD_CHIMES", "CHIME_REWARD_FALLBACK", "rw_hr_chime_trail"],
+		["res://data/works_layout_deep.gd", "THROAT_SUPPLIES_ID", "THROAT_SUPPLIES_FALLBACK", "rw_hw_throat_supplies"],
+		["res://data/works_layout.gd", "ALCOVE_REWARD_ID", "", "rw_hw_lightwell_alcove"],
+	]
+	for c in cases:
+		var rid: Variant = _script_const(String(c[0]), String(c[1]))
+		assert_eq(String(rid), String(c[3]), "%s %s" % [c[0], c[1]])
+		var b := ItemDB.reward_bundle(String(c[3]))
+		assert_true(SourcesData.REWARDS.has(String(c[3])), String(c[3]) + " is catalogued in data/sources.gd REWARDS")
+		assert_eq(String(b.get("by", "")), "content", String(c[3]) + " is granted by its content module")
+		assert_false((b.get("items", {}) as Dictionary).is_empty(), String(c[3]) + " pays something")
+		for it in b.get("items", {}):
+			assert_false(ItemDB.is_quest_item(String(it)), "%s: %s is an ordinary item, never a key item" % [c[3], it])
+		if String(c[2]) != "":
+			var fb: Variant = _script_const(String(c[0]), String(c[2]))
+			assert_true(fb is Dictionary, "%s %s" % [c[0], c[2]])
+			if fb is Dictionary:
+				assert_true(_same_items((fb as Dictionary).get("items", {}), b.get("items", {})), String(c[3]) + " fallback items = the bundle")
+				assert_eq(_sorted((fb as Dictionary).get("flags", [])), _sorted(b.get("flags", [])), String(c[3]) + " fallback flags = the bundle")
+	# The Light Well keepsake is decor only (MP 13 row 8, "outfit/decor alcove"): no pattern, so every pattern keeps
+	# its one unique source.
+	assert_eq(ItemDB.reward_bundle("rw_hw_lightwell_alcove").get("patterns", []), [], "the keepsake grants no pattern")
+	for it2 in ItemDB.reward_bundle("rw_hw_lightwell_alcove")["items"]:
+		assert_eq(String(ItemDB.item(String(it2)).get("cat", "")), "placeable", "keepsake %s is a decoration" % it2)
+
+
 func test_legacy_descriptions_are_never_ledger_rewards() -> void:
 	for rid in SourcesData.REWARDS:
 		var b: Dictionary = SourcesData.REWARDS[rid]

@@ -13,6 +13,13 @@ extends Node
 ## Second-monitor QA additions: "window_pos", "window_focused", "mouse_mode" and "qa_input" (the virtual input
 ## server's status when --qa-input-port is given; the bot then drives the game through src/qa/qa_input.gd
 ## instead of SendInput).
+## Headless QA additions (tools/qa --headless: the root window is 64x64 px, so the 1920x1080 UI is drawn at 1/30
+## scale and integer rects lose the sub-pixel position a click needs): every button also carries "rf" (the same
+## rect in window pixels as floats), "view" is the UI's size in window pixels, "appearance" is the current look
+## (progress snapshot), "buffs" the timed buffs (e.g. a boss slow) and nearby enemies may carry "phase" (bosses),
+## "kind" (boss hazards: trip / thread / sac) and "vuln" (is_vulnerable()); "boss" is the nearest visible boss
+## (id, name, pos, state, hp, max_hp, phase, vuln, threat, dist) read fresh for every line, and player "facing_yaw"
+## is Krystal's body facing (cam_yaw convention). All read-only.
 
 const Tracker := preload("res://src/ui/hud/tracker.gd")
 const MapView := preload("res://src/ui/widgets/map_view.gd")
@@ -31,6 +38,7 @@ var _seq := 0
 var _progress_t := PROGRESS_INTERVAL
 var _progress: Dictionary = {}
 var _music_cue := ""
+var _boss: WeakRef = null          # nearest boss node (has "boss_id") seen by _collect_nearby; read every snapshot
 
 
 func setup(path: String, interval: float) -> void:
@@ -116,9 +124,15 @@ func _snapshot() -> Dictionary:
 	d["messages"] = _messages.duplicate()
 	d["build"] = _build.duplicate()
 	d["nearby"] = _nearby
+	var be := _boss_entry()
+	if not be.is_empty():
+		d["boss"] = be
 	d["buttons"] = _buttons
 	var win := DisplayServer.window_get_size()
 	d["window"] = [win.x, win.y]
+	var vp := get_viewport()
+	var view: Vector2 = vp.get_final_transform().basis_xform(vp.get_visible_rect().size)
+	d["view"] = [snappedf(view.x, 0.01), snappedf(view.y, 0.01)]
 	# Second-monitor QA mode: where the window is, whether it ever had focus, the OS cursor mode and the virtual
 	# input server's state (src/qa/qa_input.gd; the QA bot checks the owner's focus was never taken).
 	var wpos := DisplayServer.window_get_position()
@@ -141,6 +155,10 @@ func _snapshot() -> Dictionary:
 			pd["cam_pitch"] = snappedf(rad_to_deg(asin(clampf(fwd.y, -1.0, 1.0))), 0.1)
 		if p.has_method("get_prompt"):
 			pd["prompt"] = p.get_prompt()
+		if p.has_method("get_facing"):
+			# Krystal's body facing (same yaw convention as cam_yaw): melee swings go this way unless the soft lock turns her.
+			var fdir: Vector3 = p.get_facing()
+			pd["facing_yaw"] = snappedf(rad_to_deg(atan2(-fdir.x, -fdir.z)), 0.1)
 		if p.has_method("get_focus_target"):
 			var f = p.get_focus_target()
 			if f != null and is_instance_valid(f) and f is Node3D:
@@ -191,6 +209,14 @@ func progress_snapshot() -> Dictionary:
 			pending.append(gid)
 	out["optional"] = {"done": done, "pending": pending, "done_count": og.done_count()}
 	out["equipment"] = GameState.equipment.duplicate()
+	out["appearance"] = GameState.appearance.duplicate(true)
+	var buffs := {}
+	for bk in GameState.buffs:
+		var bv: Variant = GameState.buffs[bk]
+		if bv is Dictionary:
+			buffs[String(bk)] = {"mult": snappedf(float((bv as Dictionary).get("mult", 1.0)), 0.01),
+				"left": snappedf(float((bv as Dictionary).get("remaining", 0.0)), 0.1)}
+	out["buffs"] = buffs
 	out["companion_skills"] = companion_skill_info()
 	if _music_cue == "":
 		var dir: Node = Audio.music_director() if Audio.has_method("music_director") else null
@@ -234,6 +260,8 @@ func _collect_nearby() -> Array:
 		return out
 	var origin: Vector3 = p.global_position
 	var seen := {}
+	var boss_node: Node = null
+	var boss_d := INF
 	for g in ["harvestable", "interactable", "enemy", "companion", "checkpoint", "crafting_station"]:
 		for n in get_tree().get_nodes_in_group(g):
 			if not (n is Node3D) or not is_instance_valid(n) or seen.has(n.get_instance_id()):
@@ -264,11 +292,50 @@ func _collect_nearby() -> Array:
 				var h = n.get("health")
 				if h != null and is_instance_valid(h):
 					e["hp"] = snappedf(float(h.hp), 0.1)
+				var ph = n.get("phase")
+				if ph is int:
+					e["phase"] = ph
+				var kd = n.get("kind")
+				if kd is String or kd is StringName:
+					e["kind"] = String(kd)
+				if n.has_method("is_vulnerable"):
+					e["vuln"] = bool(n.call("is_vulnerable"))
+				if n.get("boss_id") != null and (boss_node == null or dist < boss_d):
+					boss_node = n
+					boss_d = dist
 			out.append(e)
+	_boss = weakref(boss_node) if boss_node != null else null
 	out.sort_custom(func(a, b): return a["dist"] < b["dist"])
 	if out.size() > 60:
 		out.resize(60)
 	return out
+
+
+## The nearest visible boss (found by _collect_nearby every 0.4 s) read fresh for every snapshot: bosses act on
+## ~1 s telegraphs, so the bot needs their state at the snapshot rate, not the nearby-list rate. {} when none.
+func _boss_entry() -> Dictionary:
+	var bn: Variant = _boss.get_ref() if _boss != null else null
+	if bn == null or not is_instance_valid(bn) or not (bn is Node3D) or not (bn as Node3D).is_inside_tree():
+		return {}
+	var n := bn as Node3D
+	if not n.is_visible_in_tree():
+		return {}
+	var e := {"id": str(n.get("boss_id")), "name": String(n.name), "pos": _v(n.global_position), "state": str(n.get("state"))}
+	var p = Game.player
+	if p != null and is_instance_valid(p):
+		e["dist"] = snappedf(n.global_position.distance_to(p.global_position), 0.1)
+	var h = n.get("health")
+	if h != null and is_instance_valid(h):
+		e["hp"] = snappedf(float(h.hp), 0.1)
+		e["max_hp"] = snappedf(float(h.max_hp), 0.1)
+	var ph = n.get("phase")
+	if ph is int:
+		e["phase"] = ph
+	if n.has_method("is_vulnerable"):
+		e["vuln"] = bool(n.call("is_vulnerable"))
+	if n.has_method("is_threatening"):
+		e["threat"] = bool(n.call("is_threatening"))
+	return e
 
 
 ## Visible, clickable buttons with rects in WINDOW pixel coordinates.
@@ -299,7 +366,8 @@ func _collect_buttons_rec(n: Node, xf: Transform2D, out: Array) -> void:
 			var owner_inv = sc.get("inv")
 			out.append({"text": "slot:%s:%d" % ["bag" if owner_inv == GameState.inventory else "other", int(sc.get("index"))],
 				"item": String(st["id"]) if st is Dictionary else "", "count": int(st["count"]) if st is Dictionary else 0,
-				"rect": [int(a.x), int(a.y), int(b2.x - a.x), int(b2.y - a.y)], "disabled": false, "clipped": _is_clipped(sc, r0)})
+				"rect": [int(a.x), int(a.y), int(b2.x - a.x), int(b2.y - a.y)], "rf": _rf(a, b2), "disabled": false,
+				"clipped": _is_clipped(sc, r0)})
 	if n is BaseButton:
 		var b: BaseButton = n
 		if b.is_visible_in_tree():
@@ -315,10 +383,15 @@ func _collect_buttons_rec(n: Node, xf: Transform2D, out: Array) -> void:
 				text = b.tooltip_text
 			if text == "":
 				text = String(b.name)
-			out.append({"text": text, "rect": [int(tl.x), int(tl.y), int(br.x - tl.x), int(br.y - tl.y)], "disabled": b.disabled,
-				"clipped": _is_clipped(b, r)})
+			out.append({"text": text, "rect": [int(tl.x), int(tl.y), int(br.x - tl.x), int(br.y - tl.y)], "rf": _rf(tl, br),
+				"disabled": b.disabled, "clipped": _is_clipped(b, r)})
 	for c in n.get_children():
 		_collect_buttons_rec(c, xf, out)
+
+
+## A window-pixel rect as floats [x, y, w, h] (headless runs draw the UI at 1/30 scale).
+static func _rf(tl: Vector2, br: Vector2) -> Array:
+	return [snappedf(tl.x, 0.001), snappedf(tl.y, 0.001), snappedf(br.x - tl.x, 0.001), snappedf(br.y - tl.y, 0.001)]
 
 
 ## Concatenated text of Labels inside a text-less button (e.g. recipe rows).

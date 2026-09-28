@@ -1,10 +1,16 @@
 extends RefCounted
 ## Pure UI helpers (no scene tree needed) so they can be unit tested:
 ## hint token replacement, toast aggregation, inventory stack moves, clock / day formatting,
-## input-binding codes and conflict detection, item stat lines, lore lookup and map projection.
+## input-binding codes and conflict detection, item stat lines, lore lookup, map projection and the
+## underground-area look (HUD tint, day dial lantern).
 ##   const UiUtil := preload("res://src/ui/ui_util.gd")
 
 const Layout := preload("res://data/world_layout.gd")
+const LoreDB := preload("res://src/core/lore_db.gd")
+## The one list of underground areas (docs/CHAPTER_TWO_SPEC.md section 9: below, tobin_annex, hushed_works),
+## shared with the companions' area classes.
+const CompanionLogic := preload("res://src/companions/companion_logic.gd")
+const ITEM_SLOT_SCRIPT := "res://src/ui/widgets/item_slot.gd"
 
 ## Hint tokens -> input actions (see data/quests.gd). {move} is special (four movement keys).
 const TOKEN_ACTIONS := {
@@ -19,6 +25,7 @@ const CATEGORY_NAMES := {"resource": "Material", "tool": "Tool", "weapon": "Weap
 	"placeable": "Buildable", "seed": "Seed", "key": "Key Item", "equipment": "Equipment", "decor": "Decoration",
 	"wand": "Wand", "armor": "Armor", "charm": "Charm", "companion": "Companion Gear"}
 
+## Legacy notes (LoreDB reads them too; kept for older callers).
 const LORE_SCRIPT := "res://src/world/below/lore.gd"
 
 ## Tests set this to false so UI code never writes the player's real settings file.
@@ -318,7 +325,11 @@ static func category_name(cat: String) -> String:
 
 
 ## Short stat lines for tooltips / detail cards, all read from ItemDB.
-static func item_stat_lines(item_id: String) -> Array:
+## `with_gear` also appends the Chapter Two gear lines (tier, protection, charm effects, wand numbers:
+## item_slot.gd equipment_stat_lines), each once - for views that show stats only through this helper (the
+## crafting card). The item slot tooltip and the backpack detail card still append those lines themselves,
+## so the default stays false until they switch to `with_gear` (never printed twice).
+static func item_stat_lines(item_id: String, with_gear: bool = false) -> Array:
 	var out: Array = []
 	if not ItemDB.has_item(item_id):
 		return out
@@ -329,6 +340,11 @@ static func item_stat_lines(item_id: String) -> Array:
 	var buff: Variant = d.get("buff", null)
 	if buff is Dictionary and (buff as Dictionary).has("stamina_regen"):
 		out.append("Faster stamina recovery for %s" % _duration(float((buff as Dictionary).get("seconds", 60.0))))
+	if buff is Dictionary and (buff as Dictionary).has("slow_resist"):
+		# slow_resist multiplies the strength of slows (0.5 = half as strong; Stats.slow_mult)
+		var weaker := 1.0 - clampf(float((buff as Dictionary).get("slow_resist", 1.0)), 0.0, 1.0)
+		if weaker > 0.0:
+			out.append("Resists slowing: %d%% weaker for %s" % [int(round(weaker * 100.0)), _duration(float((buff as Dictionary).get("seconds", 60.0)))])
 	var tool := String(d.get("tool", ""))
 	if tool != "":
 		out.append("Tool: %s" % ("Axe (fells trees)" if tool == "axe" else ("Pickaxe (breaks rocks)" if tool == "pickaxe" else tool.capitalize())))
@@ -344,33 +360,62 @@ static func item_stat_lines(item_id: String) -> Array:
 	var stack := int(d.get("stack", 1))
 	if stack > 1:
 		out.append("Stacks to %d" % stack)
+	if with_gear:
+		for line in gear_stat_lines(item_id):
+			if not out.has(line):
+				out.append(line)
 	return out
 
 
+## The Chapter Two gear lines of an item (item_slot.gd equipment_stat_lines; [] when that widget is missing).
+static func gear_stat_lines(item_id: String) -> Array:
+	if not ResourceLoader.exists(ITEM_SLOT_SCRIPT):
+		return []
+	var s: Variant = load(ITEM_SLOT_SCRIPT)
+	if not (s is Script) or not (s as Script).has_method("equipment_stat_lines"):
+		return []
+	var r: Variant = (s as Script).call("equipment_stat_lines", item_id)
+	return (r as Array).duplicate() if r is Array else []
+
+
+## "45 s", "2 min", "1 min 30 s".
 static func _duration(seconds: float) -> String:
-	if seconds >= 60.0:
-		var m := int(round(seconds / 60.0))
-		return "%d min" % m
-	return "%d s" % int(round(seconds))
+	var total := int(round(seconds))
+	if total >= 60:
+		var m := floori(total / 60.0)
+		var rest := total % 60
+		return "%d min" % m if rest == 0 else "%d min %d s" % [m, rest]
+	return "%d s" % total
 
 
 # --- Lore ---------------------------------------------------------------------------------------------------
 
-## {title, text} for a lore id from res://src/world/below/lore.gd (static get_lore(id)) if available.
+## {title, text} for a lore id through LoreDB (legacy notes and every Chapter Two lore file,
+## arachnophobia-aware). Unknown ids (or empty fields) read as a faded page, never blank.
 static func lore_entry(lore_id: String) -> Dictionary:
 	var out := {"title": lore_id.replace("_", " ").capitalize(), "text": "The page is too faded to read."}
-	if ResourceLoader.exists(LORE_SCRIPT):
-		var s: Script = load(LORE_SCRIPT)
-		if s != null and s.can_instantiate() and s.has_method("get_lore"):
-			var d: Variant = s.call("get_lore", lore_id)
-			if d is Dictionary:
-				var t := String((d as Dictionary).get("title", ""))
-				var x := String((d as Dictionary).get("text", ""))
-				if t.strip_edges() != "":
-					out["title"] = t
-				if x.strip_edges() != "":
-					out["text"] = x
+	var d: Dictionary = LoreDB.get_lore(lore_id)
+	var t := String(d.get("title", ""))
+	var x := String(d.get("text", ""))
+	if t.strip_edges() != "":
+		out["title"] = t
+	if x.strip_edges() != "":
+		out["text"] = x
 	return out
+
+
+# --- Areas ---------------------------------------------------------------------------------------------------
+
+## Underground areas (the Below, Tobin's annex, the Hushed Works) get the underground HUD look: the toned-down
+## parchment tint and the lantern in the day dial instead of the sky. One shared list (companion_logic.gd
+## UNDERGROUND_AREAS, spec section 9); unknown / debug ids are not underground here.
+static func is_underground_area(area_id: String) -> bool:
+	return CompanionLogic.UNDERGROUND_AREAS.has(area_id)
+
+
+## The HUD's modulate tint for an area (white = none).
+static func hud_tint(area_id: String) -> Color:
+	return Color(0.84, 0.82, 0.88) if is_underground_area(area_id) else Color.WHITE
 
 
 # --- Crafting (defensive wrappers over src/crafting/crafting.gd) -----------------------------------------------
