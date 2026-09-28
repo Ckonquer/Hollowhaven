@@ -29,8 +29,16 @@ coordinates, screenshots), so every scenario runs on either:
   display/window/size/no_focus) so even the engine's first window never activates; `--dev` runs (editor binary +
   --path) cannot do that and may flash focus once while the fullscreen boot window turns into the QA window.
 
+* Headless (--headless in session.py): the same VirtualInput transport against the source project running in the
+  console editor binary with --headless (no window anywhere). The root window is then 64x64 px and the
+  1920x1080 UI is drawn at 1/30 scale, so this module (a) clicks buttons at the centre of the telemetry's FLOAT
+  rect "rf" (integer rects are ~30 UI px off), (b) sends FRACTIONAL mouse motion (one window pixel turns the
+  camera ~4 degrees there) and calibrates the look adaptively, and (c) reads the UI size from telemetry "view"
+  instead of "window" (0x0 headless). Screenshots fail headless (the game's "shot" command refuses); callers
+  log that and carry on. Visible runs are unaffected (integer rects/motion are used for SendInput).
+
 Library layer only (window control, input, telemetry, navigation primitives). Scenarios live in
-tools/qa/playthrough.py and tools/qa/persistence.py.
+tools/qa/playthrough.py, tools/qa/persistence.py and tools/qa/ch2/.
 """
 from __future__ import annotations
 
@@ -310,8 +318,9 @@ class VirtualInput:
     def key_up(self, name: str):
         self.request({"k": name, "down": False})
 
-    def mouse_move(self, dx: int, dy: int):
-        self.request({"mm": [int(dx), int(dy)]})
+    def mouse_move(self, dx: float, dy: float):
+        """Relative motion; fractional pixels are allowed (headless: one window pixel is 30 UI pixels)."""
+        self.request({"mm": [round(float(dx), 3), round(float(dy), 3)]})
 
     def mouse_button(self, button: str, up: bool):
         self.request({"mb": button, "down": not up})
@@ -321,20 +330,23 @@ class VirtualInput:
         for _ in range(notches):
             self.request({"mb": "wheel_up" if delta > 0 else "wheel_down", "down": True})
 
-    def hover(self, x: int, y: int):
-        self.request({"move": [int(x), int(y)]})
+    def hover(self, x: float, y: float):
+        self.request({"move": [round(float(x), 3), round(float(y), 3)]})
 
-    def click(self, x: int, y: int, button: str = "left"):
-        """Click at window coordinates (move + press, 2 frames, release inside the game)."""
-        self.request({"click": [int(x), int(y)], "button": button})
+    def click(self, x: float, y: float, button: str = "left"):
+        """Click at window coordinates (move + press, 2 frames, release inside the game). Floats allowed."""
+        self.request({"click": [round(float(x), 3), round(float(y), 3)], "button": button})
 
     def client_rect(self):
-        """(0, 0, w, h): coordinates are window-relative in this transport."""
+        """(0, 0, w, h): coordinates are window-relative in this transport (headless: the telemetry "view")."""
         w, h = 1920, 1080
         if self.tele is not None:
             win = self.tele.last.get("window") or [w, h]
+            view = self.tele.last.get("view") or []
             if len(win) == 2 and win[0] > 0 and win[1] > 0:
                 w, h = int(win[0]), int(win[1])
+            elif len(view) == 2 and view[0] > 0 and view[1] > 0:
+                w, h = float(view[0]), float(view[1])
         return 0, 0, w, h
 
     def screenshot(self, path: str | Path):
@@ -381,13 +393,15 @@ class Telemetry:
         self._buf += chunk
         lines = self._buf.split("\n")
         self._buf = lines[-1]
-        for ln in lines[:-1]:
+        # Only the newest complete line matters (a snapshot is ~10-20 KB; parsing every line wastes the bot's time).
+        for ln in reversed(lines[:-1]):
             ln = ln.strip()
             if ln:
                 try:
                     self.last = json.loads(ln)
+                    break
                 except json.JSONDecodeError:
-                    pass
+                    continue
         return self.last
 
 
@@ -405,6 +419,7 @@ class Bot:
     def __init__(self, win: "GameWindow | VirtualInput", tele: Telemetry, log_path: str | Path | None = None):
         self.win = win
         self.virtual = isinstance(win, VirtualInput)
+        self.fine = self.virtual          # fractional mouse motion / float click positions (virtual transport)
         self.tele = tele
         self.px_per_deg = 8.0         # calibrated by calibrate_look()
         self.invert = 1.0
@@ -458,8 +473,37 @@ class Bot:
         self.held.discard(key)
 
     # --- mouse (through the transport) ----------------------------------------------------------------
-    def mouse_move(self, dx: int, dy: int):
-        self.win.mouse_move(dx, dy)
+    def _px(self, v: float):
+        """A motion amount for the transport: fractional for virtual input, whole pixels for SendInput."""
+        return round(float(v), 3) if self.fine else int(v)
+
+    def mouse_move(self, dx: float, dy: float):
+        self.win.mouse_move(self._px(dx), self._px(dy))
+
+    def view_size(self) -> tuple[float, float]:
+        """The UI's size in window pixels (the window itself; headless: telemetry "view", e.g. 64x64)."""
+        s = self.state()
+        win = s.get("window") or [0, 0]
+        if len(win) == 2 and win[0] > 0 and win[1] > 0:
+            return float(win[0]), float(win[1])
+        view = s.get("view") or [0, 0]
+        if len(view) == 2 and view[0] > 0 and view[1] > 0:
+            return float(view[0]), float(view[1])
+        return 1920.0, 1080.0
+
+    @staticmethod
+    def rect_of(b: dict):
+        """(x, y, w, h) of a telemetry button: the float rect "rf" when present, else the integer "rect"."""
+        r = b.get("rf") or b.get("rect")
+        return float(r[0]), float(r[1]), float(r[2]), float(r[3])
+
+    def click_at_button(self, b: dict):
+        x, y, w, h = self.rect_of(b)
+        cx, cy = x + w / 2.0, y + h / 2.0
+        if self.fine:
+            self.win.click(cx, cy)
+        else:
+            self.win.click(int(cx), int(cy))
 
     def wheel(self, delta: int):
         self.win.wheel(delta)
@@ -489,22 +533,52 @@ class Bot:
         return self.player().get("cam_yaw")
 
     def calibrate_look(self) -> float:
-        """Measures pixels of mouse motion per degree of camera yaw."""
+        """Measures pixels of mouse motion per degree of camera yaw. SendInput: 4 x 50 px as before. Virtual
+        input: adaptive - starts with a 2 px motion (headless one window pixel is ~4 degrees, a second-monitor
+        pixel ~0.13) and grows it until the yaw moves by a clearly measurable, un-aliased amount."""
         self.win.focus()
-        y0 = self.cam_yaw()
-        time.sleep(0.2)
-        for _ in range(4):
-            self.win.mouse_move(50, 0)
-            time.sleep(0.03)
-        time.sleep(0.35)
-        y1 = self.cam_yaw()
-        if y0 is None or y1 is None:
+        if not self.fine:
+            y0 = self.cam_yaw()
+            time.sleep(0.2)
+            for _ in range(4):
+                self.win.mouse_move(50, 0)
+                time.sleep(0.03)
+            time.sleep(0.35)
+            y1 = self.cam_yaw()
+            if y0 is None or y1 is None:
+                return self.px_per_deg
+            d = angle_diff(y1, y0)
+            if abs(d) > 0.5:
+                self.px_per_deg = 200.0 / abs(d)
+                self.invert = -1.0 if d > 0 else 1.0   # moving right should DEcrease yaw (turn right)
+            self.log(f"calibrated look: {self.px_per_deg:.2f} px/deg (dyaw={d:.1f}) invert={self.invert}")
             return self.px_per_deg
-        d = angle_diff(y1, y0)
-        if abs(d) > 0.5:
-            self.px_per_deg = 200.0 / abs(d)
-            self.invert = -1.0 if d > 0 else 1.0   # moving right should DEcrease yaw (turn right)
-        self.log(f"calibrated look: {self.px_per_deg:.2f} px/deg (dyaw={d:.1f}) invert={self.invert}")
+        amt = 2.0
+        d = 0.0
+        for _ in range(6):
+            time.sleep(0.25)
+            y0 = self.cam_yaw()
+            if y0 is None:
+                time.sleep(0.3)
+                continue
+            for _k in range(4):
+                self.win.mouse_move(round(amt / 4.0, 3), 0)
+                time.sleep(0.03)
+            time.sleep(0.35)
+            y1 = self.cam_yaw()
+            if y1 is None:
+                continue
+            d = angle_diff(y1, y0)
+            if abs(d) < 4.0:
+                amt *= 5.0
+                continue
+            if abs(d) > 120.0:
+                amt /= 4.0
+                continue
+            self.px_per_deg = amt / abs(d)
+            self.invert = -1.0 if d > 0 else 1.0
+            break
+        self.log(f"calibrated look (virtual): {self.px_per_deg:.4f} px/deg (motion {amt:.2f} px -> dyaw={d:.1f}) invert={self.invert}")
         return self.px_per_deg
 
     def turn_to_yaw(self, target: float, tol: float = 4.0, timeout: float = 3.0) -> bool:
@@ -518,7 +592,7 @@ class Bot:
             if abs(d) <= tol:
                 return True
             step = max(-60.0, min(60.0, d))
-            self.win.mouse_move(int(-step * self.px_per_deg * self.invert * 0.8), 0)
+            self.win.mouse_move(self._px(-step * self.px_per_deg * self.invert * 0.8), 0)
             time.sleep(0.06)
         return False
 
@@ -532,7 +606,7 @@ class Bot:
             if abs(d) <= tol:
                 return True
             step = max(-30.0, min(30.0, d))
-            self.win.mouse_move(0, int(-step * self.px_per_deg * 0.8))
+            self.win.mouse_move(0, self._px(-step * self.px_per_deg * 0.8))
             time.sleep(0.06)
         return False
 
@@ -571,7 +645,7 @@ class Bot:
                     d = angle_diff(want, y)
                     if abs(d) > 2.0:
                         step = max(-25.0, min(25.0, d))
-                        self.win.mouse_move(int(-step * self.px_per_deg * self.invert * 0.7), 0)
+                        self.win.mouse_move(self._px(-step * self.px_per_deg * self.invert * 0.7), 0)
                 if dist < best - 0.3:
                     best = dist
                     last_prog_t = time.time()
@@ -614,8 +688,7 @@ class Bot:
             self.log(f"button not found: {text!r}; visible: {[b['text'] for b in self.buttons()][:30]}")
             return False
         b = next(b for b in s["buttons"] if ((b["text"] == text) if exact else (text.lower() in b["text"].lower())) and not b.get("disabled"))
-        x, y, w, h = b["rect"]
-        self.win.click(x + w // 2, y + h // 2)
+        self.click_at_button(b)
         time.sleep(0.25)
         return True
 
