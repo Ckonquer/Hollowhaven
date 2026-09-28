@@ -10,8 +10,8 @@ where the route itself quits the game (S1's save / quit / relaunch + Continue, a
                                           waygate, Commons arch + festival map, Lantern Road home and back,
                                           pause-menu save, Quit, relaunch, Continue (its own checks).
   S2   tools/qa/ch2/s2_orchard_quarry.py orchard (irrigation, seed, mimic pocket, garden lamp, Patchwalkers,
-                                          food), quarry (wood, iron, winch, Quarry Warden - up to 3 exposures and
-                                          three pulses in the fixed build -, quarry lamp), Save & Quit -> Continue.
+                                          food), quarry (wood, iron, winch, Quarry Warden - slam lesson, 1-3 pillar
+                                          exposures, three pulses -, quarry lamp), Save & Quit -> Continue.
   T23  (this file)                        what the S3 fixture handed out (full health) is earned by play: down from
                                           the lamp shelf, Lantern Road home from the quarry arch, sleep in the bed
                                           (full heal + save), pick berries, harvest the ripe sweetroot, cook / craft
@@ -32,8 +32,8 @@ The segment scripts were developed from diagnostic fixture starts; here they run
 adaptation lives in this file (segment modules untouched): the transitions T23 / T34 (see above), S3's backpack
 eating (its own eat() only uses hotbar food), a look calibration that also works on a 1080p second-monitor window
 (the segment ones were tuned to the 64 px headless window), the preparation-notes step before S4 links the lanterns,
-and one player-level recovery in S2's Warden fight (walk back up the haul ramp when a roll drops Krystal off the
-arena bench - the Warden then waits at the edge forever, qa/tmp/bot/chain/bugs.json CHAIN-001).
+and S2's Warden-fight notes (the fight itself - tells read from the telemetry "elite" entry, pillar bait, side-steps
+across the locked charge lane, the pulse ring, climbing back onto the bench after a fall - lives in S2.WardenFight).
 Weapon upgrades: none of the fixtures handed any out; the Ironwood sword needs Woven Cloth (a Loom,
 locked behind the optional Chapter One Tailor's Cache flag that the real save does not have), so the natural
 chain keeps the copper sword like every fixture did.
@@ -213,29 +213,16 @@ class ChainBot(C.S1Bot):
 
 
 def chain_s2_class(S2, notes: list):
-    """S2's Segment from natural state + one player-level recovery in the Quarry Warden fight: when Krystal ends up
-    on the terrace BELOW the arena bench (a roll off the 1.4 m step while dodging the pulses) she walks back up by the
-    haul ramp, as a player would, instead of pressing into the step. Seen in a validation run: the Warden then
-    waited at the edge in 'chase' for minutes without a clear shot (qa/tmp/bot/chain/bugs.json)."""
+    """S2's Segment from natural state. The Quarry Warden fight itself (S2.WardenFight) reads the Warden's tells from
+    the telemetry "elite" entry, baits its charge into a pillar, side-steps across the locked lane, steps out of the
+    pulse ring and climbs back onto the arena bench by the nearest ramp when a roll / knockback drops Krystal to L1
+    (the Warden gives up and resets after 5 s off its floor - CHAIN-001 fix). This wrapper only collects that fight's
+    player-level recoveries (climbs, give-ups) as chain notes."""
 
     class ChainS2(S2.Segment):
-        def warden(self):
-            w = super().warden()
-            if w is None or self.flag("warden"):
-                return w
-            me_uv = S2.to_uv(xz(self.p.pos()))
-            w_uv = S2.to_uv(xz(w["pos"]))
-            if S2.q_level(me_uv) < 2 <= S2.q_level(w_uv) and time.time() - getattr(self, "_climb_t", 0.0) > 5.0 \
-                    and str(w.get("state", "")) not in ("telegraph", "slam", "pulses", "charge"):
-                self._climb_t = time.time()
-                self.climbs = getattr(self, "climbs", 0) + 1
-                self.log(f"chain: Krystal is below the Warden's bench (uv {tuple(round(x, 1) for x in me_uv)}, Warden "
-                         f"{w.get('state')} at uv {tuple(round(x, 1) for x in w_uv)}): back up the haul ramp (#{self.climbs})")
-                notes.append(f"S2 Warden: climbed back onto the bench from uv {tuple(round(x, 1) for x in me_uv)} "
-                             f"(Warden {w.get('state')}, hp {w.get('hp')})")
-                self.qgoto(S2.quv(8.0, -9.0), tol=2.0, timeout=20)
-                w = super().warden()
-            return w
+        def warden_note(self, text):
+            super().warden_note(text)
+            notes.append(text)
 
     return ChainS2
 
@@ -777,11 +764,15 @@ class Chain:
         st = res.get("status") if ok else f"stops: {res.get('stopped_at')}"
         detail = {"status": st, "checkpoints": cps, "shots": res.get("screenshots", []), "problems": res.get("problems", []),
                   "bugs": res.get("bugs", []), "result_file": str(out / "s2_result.json")}
-        # the Warden, as the fixed build plays it (MP 12: several exposures, three pulses)
-        detail["warden"] = {"exposures": tm.get("warden_exposures"), "damage_per_exposure": tm.get("warden_exposure_damage"),
-                            "log": res.get("warden_log", [])}
-        self.notes.append(f"S2 Warden: exposures={tm.get('warden_exposures')} damage/exposure={tm.get('warden_exposure_damage')} "
-                          f"pulses_seen={sum(1 for x in res.get('warden_log', []) if ' pulses ' in x)}")
+        # the Warden, as the fixed build plays it (MP 12: slam lesson, pillar exposures, three pulses)
+        ws = tm.get("warden_stats") or {}
+        detail["warden"] = {"fight_s": tm.get("warden_fight_s"), "step_s": tm.get("quarry_warden"),
+                            "exposures": tm.get("warden_exposures"), "damage_per_exposure": tm.get("warden_exposure_damage"),
+                            "stats": ws, "log": res.get("warden_log", [])}
+        self.notes.append(f"S2 Warden: fight {tm.get('warden_fight_s')} s, exposures={tm.get('warden_exposures')} "
+                          f"damage/exposure={tm.get('warden_exposure_damage')} pulses_fired={(ws.get('game') or {}).get('pulses_fired')} "
+                          f"charges={ws.get('charge_results')} hits_taken={ws.get('hits_taken')} deaths={ws.get('deaths')} "
+                          f"climbs={ws.get('climbs')}")
         return ok, detail
 
     # ---------------------------------------------------------------- S3

@@ -20,6 +20,10 @@ extends Node
 ## "kind" (boss hazards: trip / thread / sac) and "vuln" (is_vulnerable()); "boss" is the nearest visible boss
 ## (id, name, pos, state, hp, max_hp, phase, vuln, threat, dist) read fresh for every line, and player "facing_yaw"
 ## is Krystal's body facing (cam_yaw convention). All read-only.
+## Elite QA addition: "elite" is the nearest visible elite enemy (data "elite", no boss_id - the Quarry Warden) read
+## fresh for every line with what its tells show a player: state + timing (state_time, state_len, lock_in / release_in
+## of a wind-up), the attack it winds up (attack_kind), its facing, the drawn charge lane / pulse ring / slam wedge, and
+## the encounter getters it offers (pillars, exposures, shell floor, arena floor ...), see _elite_entry(). Read-only.
 ## Performance QA additions (tools/qa/perf_profile.py, MP §20.5; read-only - Performance monitors and clocks only):
 ## every line carries "perf" (see _perf_block()): tick_ms (Time.get_ticks_msec), area / zone / mode, fps, process_ms /
 ## physics_ms (Performance TIME_*), static_mb / static_max_mb (0 in release builds: the engine tracks it in debug builds
@@ -58,6 +62,7 @@ var _progress_t := PROGRESS_INTERVAL
 var _progress: Dictionary = {}
 var _music_cue := ""
 var _boss: WeakRef = null          # nearest boss node (has "boss_id") seen by _collect_nearby; read every snapshot
+var _elite: WeakRef = null         # nearest elite enemy (data "elite", no boss_id) seen by _collect_nearby; read every snapshot
 # Performance QA ("perf", see the header). Measurement only: nothing here changes game state.
 var _perf_mode := false            # --qa-perf
 var _last_frame_us := 0
@@ -175,6 +180,9 @@ func _snapshot() -> Dictionary:
 	var be := _boss_entry()
 	if not be.is_empty():
 		d["boss"] = be
+	var ee := _elite_entry()
+	if not ee.is_empty():
+		d["elite"] = ee
 	d["buttons"] = _buttons
 	var win := DisplayServer.window_get_size()
 	d["window"] = [win.x, win.y]
@@ -500,6 +508,8 @@ func _collect_nearby() -> Array:
 	var seen := {}
 	var boss_node: Node = null
 	var boss_d := INF
+	var elite_node: Node = null
+	var elite_d := INF
 	for g in ["harvestable", "interactable", "enemy", "companion", "checkpoint", "crafting_station"]:
 		for n in get_tree().get_nodes_in_group(g):
 			if not (n is Node3D) or not is_instance_valid(n) or seen.has(n.get_instance_id()):
@@ -541,8 +551,12 @@ func _collect_nearby() -> Array:
 				if n.get("boss_id") != null and (boss_node == null or dist < boss_d):
 					boss_node = n
 					boss_d = dist
+				elif n.get("boss_id") == null and _is_elite(n) and (elite_node == null or dist < elite_d):
+					elite_node = n
+					elite_d = dist
 			out.append(e)
 	_boss = weakref(boss_node) if boss_node != null else null
+	_elite = weakref(elite_node) if elite_node != null else null
 	out.sort_custom(func(a, b): return a["dist"] < b["dist"])
 	if out.size() > 60:
 		out.resize(60)
@@ -573,6 +587,146 @@ func _boss_entry() -> Dictionary:
 		e["vuln"] = bool(n.call("is_vulnerable"))
 	if n.has_method("is_threatening"):
 		e["threat"] = bool(n.call("is_threatening"))
+	return e
+
+
+## Zero-argument, side-effect-free getters an elite may offer (src/enemies/quarry_warden.gd); each one present is
+## reported under its own name by _elite_entry().
+const ELITE_READERS := ["attack_reach", "slam_reach", "slam_arc", "pulse_radius", "pulse_spacing", "pulse_count",
+	"charge_distance", "lane_length", "charge_unlocked", "pulses_owed", "exposure_owed", "shell_floor", "shell_holds",
+	"player_on_arena_floor", "has_given_up", "off_floor_time", "is_exposed", "expose_time", "expose_cap",
+	"intact_pillars", "armor_mult", "poise_damage"]
+## Plain script variables of an elite reported as they are (missing ones are skipped).
+const ELITE_VARS := ["attack_kind", "next_attack", "phase", "engaged", "slams_done", "charges_done", "pulses_fired",
+	"exposures", "exposures_capped", "exposure_damage", "pillars_cracked", "last_charge_result", "ledge_stops",
+	"edge_holds", "give_ups", "arena_radius"]
+
+
+static func _is_elite(n: Node) -> bool:
+	var dd: Variant = n.get("data")
+	return dd is Dictionary and bool((dd as Dictionary).get("elite", false))
+
+
+## A constant of `n`'s script or one of its base scripts (read-only), else `fallback`.
+static func _script_const(n: Object, cname: String, fallback: Variant) -> Variant:
+	var s: Variant = n.get_script()
+	while s is Script:
+		var m: Dictionary = (s as Script).get_script_constant_map()
+		if m.has(cname):
+			return m[cname]
+		s = (s as Script).get_base_script()
+	return fallback
+
+
+static func _plain(v: Variant) -> Variant:
+	if v is float:
+		return snappedf(v, 0.01)
+	if v is int or v is bool or v is String:
+		return v
+	if v is StringName:
+		return String(v)
+	if v is Vector3:
+		return [snappedf(v.x, 0.01), snappedf(v.y, 0.01), snappedf(v.z, 0.01)]
+	return str(v)
+
+
+static func _num(v: Variant, fallback: float = 0.0) -> float:
+	return float(v) if (v is float or v is int) else fallback
+
+
+## The nearest visible elite (found by _collect_nearby every 0.4 s) read fresh for every snapshot, as a player reads
+## its tells (all read-only; {} when none):
+##   name, id, pos, state, dist, hp, max_hp, yaw / fwd (its facing: the cam_yaw convention / flat [x, z]),
+##   state_time, state_len (a wind-up's length), track (the tracking fraction: TELEGRAPH_TRACK), cooldown;
+##   in "telegraph": locked (the mark stopped tracking her), lock_in, release_in (s until the lock / the release);
+##   the getters of ELITE_READERS and the vars of ELITE_VARS it has; lane_width (LANE_WIDTH);
+##   "lane" {from, to, locked, moving} - the charge lane drawn during a charge wind-up (its facing x lane_length()) or
+##   the committed charge (start, direction, clipped length, travel so far);
+##   "ring" {center, radius, fired, next_in} - the pulse ring during the pulse wind-up and the pulses;
+##   "arena" {center, radius}; "pillars" [{id, pos, r, intact, regrow}] (pillar_nodes()).
+func _elite_entry() -> Dictionary:
+	var en: Variant = _elite.get_ref() if _elite != null else null
+	if en == null or not is_instance_valid(en) or not (en is Node3D) or not (en as Node3D).is_inside_tree():
+		return {}
+	var n := en as Node3D
+	if not n.is_visible_in_tree():
+		return {}
+	var st := str(n.get("state"))
+	var e := {"name": String(n.name), "id": str(n.get("enemy_id")), "pos": _v(n.global_position), "state": st}
+	var p = Game.player
+	if p != null and is_instance_valid(p):
+		e["dist"] = snappedf(n.global_position.distance_to(p.global_position), 0.01)
+	var h = n.get("health")
+	if h != null and is_instance_valid(h):
+		e["hp"] = snappedf(float(h.hp), 0.1)
+		e["max_hp"] = snappedf(float(h.max_hp), 0.1)
+	var fwd := -n.global_transform.basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized() if fwd.length_squared() > 0.0001 else Vector3.FORWARD
+	e["yaw"] = snappedf(rad_to_deg(atan2(-fwd.x, -fwd.z)), 0.1)
+	e["fwd"] = [snappedf(fwd.x, 0.001), snappedf(fwd.z, 0.001)]
+	var t_state := _num(n.get("state_time"))
+	var t_len := _num(n.get("_state_len"))
+	var track := _num(_script_const(n, "TELEGRAPH_TRACK", 0.6), 0.6)
+	e["state_time"] = snappedf(t_state, 0.01)
+	e["state_len"] = snappedf(t_len, 0.01)
+	e["track"] = track
+	e["cooldown"] = snappedf(_num(n.get("_cooldown")), 0.01)
+	if st == "telegraph":
+		e["locked"] = t_state > t_len * track
+		e["lock_in"] = snappedf(maxf(t_len * track - t_state, 0.0), 0.01)
+		e["release_in"] = snappedf(maxf(t_len - t_state, 0.0), 0.01)
+	for r in ELITE_READERS:
+		if n.has_method(r):
+			e[r] = _plain(n.call(r))
+	for k in ELITE_VARS:
+		var v: Variant = n.get(k)
+		if v != null:
+			e[k] = _plain(v)
+	e["lane_width"] = _num(_script_const(n, "LANE_WIDTH", 0.0))
+	var kind := str(n.get("attack_kind"))
+	if st == "telegraph" and kind == "charge" and n.has_method("lane_length"):
+		var ll := _num(n.call("lane_length"))
+		e["lane"] = {"from": _v(n.global_position), "to": _v(n.global_position + fwd * ll), "len": snappedf(ll, 0.01),
+			"locked": bool(e.get("locked", false)), "moving": false}
+	elif st == "charge":
+		var cd: Variant = n.get("_charge_dir")
+		if cd is Vector3:
+			var dir := Vector3((cd as Vector3).x, 0.0, (cd as Vector3).z)
+			dir = dir.normalized() if dir.length_squared() > 0.0001 else fwd
+			var travel := _num(n.get("_charge_travel"))
+			var clen := _num(n.get("_charge_len"))
+			var start := n.global_position - dir * travel
+			e["lane"] = {"from": _v(start), "to": _v(start + dir * clen), "len": snappedf(clen, 0.01),
+				"travel": snappedf(travel, 0.01), "locked": true, "moving": bool(n.get("_charge_active"))}
+	if (st == "telegraph" and kind == "pulses") or st == "pulses":
+		var c: Variant = n.get("_center")
+		var ring := {"center": _v(c if c is Vector3 else n.global_position),
+			"radius": snappedf(_num(n.call("pulse_radius")) if n.has_method("pulse_radius") else 0.0, 0.01)}
+		if st == "pulses":
+			var fired := int(_num(n.get("_pulse_i")))
+			ring["fired"] = fired
+			if n.has_method("pulse_time") and n.has_method("pulse_count") and fired < int(_num(n.call("pulse_count"))):
+				ring["next_in"] = snappedf(maxf(_num(n.call("pulse_time", fired)) - t_state, 0.0), 0.01)
+		else:
+			ring["fired"] = 0
+			if n.has_method("pulse_time"):
+				ring["next_in"] = snappedf(maxf(t_len - t_state, 0.0) + _num(n.call("pulse_time", 0)), 0.01)
+		e["ring"] = ring
+	var ac: Variant = n.get("arena_center")
+	if ac is Vector3:
+		e["arena"] = {"center": _v(ac), "radius": snappedf(_num(n.get("arena_radius")), 0.01)}
+	if n.has_method("pillar_nodes"):
+		var pls: Array = []
+		for pl in n.call("pillar_nodes"):
+			if not (pl is Node3D) or not is_instance_valid(pl):
+				continue
+			var pn := pl as Node3D
+			pls.append({"id": str(pn.get("pillar_id")), "pos": _v(pn.global_position),
+				"r": snappedf(_num(pn.get("hit_radius"), 0.85), 0.01),
+				"intact": bool(pn.call("is_intact")) if pn.has_method("is_intact") else true,
+				"regrow": snappedf(_num(pn.call("regrow_left")) if pn.has_method("regrow_left") else -1.0, 0.1)})
+		e["pillars"] = pls
 	return e
 
 
