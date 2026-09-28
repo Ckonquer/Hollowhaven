@@ -323,3 +323,17 @@ func test_event_labels() -> void:
 func test_sanitize_bindings() -> void:
 	var out := Settings.sanitize_bindings({"jump": PackedStringArray(["key:%d" % KEY_K]), "dodge": [], "craft": ["mouse:-1", "key:0", "pad:3"], 5: ["key:65"]})
 	assert_eq(out, {"jump": ["key:%d" % KEY_K]})
+
+
+func test_auto_quality_picks_lighter_presets_for_weak_gpus() -> void:
+	var saved_q: Variant = Settings.get_value("quality")
+	var saved_rs: Variant = Settings.get_value("render_scale")
+	assert_eq(Settings.auto_quality(RenderingDevice.DEVICE_TYPE_DISCRETE_GPU), "high")
+	assert_eq(int(Settings.get_value("quality")), int(saved_q), "a dedicated GPU keeps the defaults")
+	assert_eq(Settings.auto_quality(RenderingDevice.DEVICE_TYPE_INTEGRATED_GPU), "medium")
+	assert_eq(int(Settings.get_value("quality")), 1)
+	assert_almost(float(Settings.get_value("render_scale")), 0.85, 0.001)
+	assert_eq(Settings.auto_quality(RenderingDevice.DEVICE_TYPE_CPU), "low")
+	assert_eq(int(Settings.get_value("quality")), 0)
+	Settings.set_value("quality", saved_q)
+	Settings.set_value("render_scale", saved_rs)

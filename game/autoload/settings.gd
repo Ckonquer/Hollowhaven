@@ -95,7 +95,10 @@ var values: Dictionary = {}
 
 func _ready() -> void:
 	values = DEFAULTS.duplicate(true)
+	var first_run := not FileAccess.file_exists(PATH)
 	load_settings()
+	if first_run:
+		auto_quality.call_deferred()
 	setup_input_map()
 	apply_video.call_deferred()
 
@@ -259,6 +262,29 @@ func _enter_windowed() -> void:
 	DisplayServer.window_set_size(want)
 	if usable.size.x > 0 and usable.size.y > 0:
 		DisplayServer.window_set_position(usable.position + (usable.size - want) / 2)
+
+
+## First launch only (no settings file yet): lighter defaults on integrated / software GPUs so a laptop
+## starts smooth. Later launches keep whatever is saved; the player can change both in Settings > Video.
+## Returns the preset chosen ("high" keeps the defaults).
+func auto_quality(device_type: int = -1) -> String:
+	if device_type < 0:
+		if DisplayServer.get_name() == "headless":
+			return "high"
+		device_type = int(RenderingServer.get_video_adapter_type())
+	var preset := "high"
+	match device_type:
+		RenderingDevice.DEVICE_TYPE_INTEGRATED_GPU:
+			preset = "medium"
+		RenderingDevice.DEVICE_TYPE_CPU, RenderingDevice.DEVICE_TYPE_VIRTUAL_GPU:
+			preset = "low"
+	if preset == "medium":
+		set_value("quality", 1)
+		set_value("render_scale", 0.85)
+	elif preset == "low":
+		set_value("quality", 0)
+		set_value("render_scale", 0.7)
+	return preset
 
 
 # --- Input map ---------------------------------------------------------------------
