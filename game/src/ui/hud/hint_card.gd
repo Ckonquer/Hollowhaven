@@ -7,6 +7,11 @@ extends PanelContainer
 ## onboarding tip ("ob_*") is re-checked with the OnboardingHints node before it is shown, when it comes back from a
 ## hold and every RECHECK_SECONDS while it shows: a tip that play has made redundant (the Ward Stone invitation once
 ## Chapter Two is accepted) is dropped instead of shown stale.
+## Fight tips (FIGHT_TIP_PREFIXES: the bosses' own tips) must not lag behind the fight (final 2.0.1 run: ten Crossing
+## Matron tips in 75 s, each 7-13 s long, spilled past her defeat and over the Chapter One ending): a newer fight tip
+## replaces an older one still waiting in the queue and cuts the one on screen short after FIGHT_TIP_MIN_SECONDS, and
+## when the encounter ends (won, reset or left: Events.boss_encounter_changed false, boss_defeated, area_exiting) the
+## fight tips go at once. A fight tip dropped unshown gets its once-per-save flag back, so a later attempt still teaches it.
 
 const Kit := preload("res://src/ui/ui_kit.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -14,6 +19,8 @@ const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
 
 const RECHECK_SECONDS := 0.5
+const FIGHT_TIP_PREFIXES := ["boss_", "velour_", "choir_", "hint_quarry_warden_"]
+const FIGHT_TIP_MIN_SECONDS := 4.0
 const ONBOARDING_GROUP := "onboarding_hints"
 
 var text_l: RichTextLabel
@@ -23,6 +30,7 @@ var _showing := false
 var _tw: Dictionary = {}
 var _current_id := ""
 var _recheck_t := 0.0
+var _shown_t := 0.0                   # seconds the tip on screen has been readable (not held)
 var held := false
 
 
@@ -49,6 +57,11 @@ func _ready() -> void:
 	visible = false
 	modulate.a = 0.0
 	Events.hint.connect(on_hint)
+	Events.boss_encounter_changed.connect(func(_id: String, active: bool) -> void:
+		if not active:
+			drop_fight_tips())
+	Events.boss_defeated.connect(func(_id: String) -> void: drop_fight_tips())
+	Events.area_exiting.connect(func(_id: String) -> void: drop_fight_tips())
 	Events.settings_changed.connect(func(k: String) -> void:
 		if k == "show_hints" and not bool(Settings.get_value("show_hints")):
 			_queue.clear()
@@ -73,10 +86,48 @@ func on_hint(hint_id: String, text: String) -> bool:
 		if String(q["id"]) == hint_id:
 			return false
 	GameState.set_flag(flag, true)
+	if is_fight_tip(hint_id):
+		_drop_queued_fight_tips()      # the newest fight tip is the one that matters now
 	_queue.append({"id": hint_id, "text": text})
 	if not _showing and not held:
 		_next()
 	return true
+
+
+static func is_fight_tip(hint_id: String) -> bool:
+	for p in FIGHT_TIP_PREFIXES:
+		if hint_id.begins_with(String(p)):
+			return true
+	return false
+
+
+## The fight is over (won, reset or left): its tips no longer apply. Queued ones are dropped unshown (flag given back),
+## the one on screen leaves now (or, while the card is held, never comes back).
+func drop_fight_tips() -> void:
+	_drop_queued_fight_tips()
+	if not _showing or not is_fight_tip(_current_id):
+		return
+	_showing = false
+	_current_id = ""
+	if held:
+		_hide()
+		return
+	var tw := Kit.retween(self, _tw, "fade")
+	tw.tween_property(self, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(func() -> void:
+		if not _showing:
+			_next())
+
+
+func _drop_queued_fight_tips() -> void:
+	var keep: Array = []
+	for q in _queue:
+		var id := String((q as Dictionary)["id"])
+		if is_fight_tip(id):
+			GameState.set_flag("hint_" + id, false)
+		else:
+			keep.append(q)
+	_queue = keep
 
 
 ## True when an onboarding tip ("ob_*") no longer applies: asks the OnboardingHints node (group "onboarding_hints")
@@ -129,6 +180,7 @@ func _next() -> void:
 	_showing = true
 	_current_id = String(h["id"])
 	_recheck_t = RECHECK_SECONDS
+	_shown_t = 0.0
 	visible = true
 	text_l.text = format_hint(String(h["text"]), Callable(UiUtil, "settings_label"))
 	_time_left = clampf(5.0 + float(String(h["text"]).length()) * 0.06, 7.0, 13.0)
@@ -144,6 +196,13 @@ func _hide() -> void:
 	tw.tween_callback(func() -> void:
 		if not _showing:
 			visible = false)
+
+
+func _has_queued_fight_tip() -> bool:
+	for q in _queue:
+		if is_fight_tip(String((q as Dictionary)["id"])):
+			return true
+	return false
 
 
 func is_showing() -> bool:
@@ -162,6 +221,9 @@ func _process(delta: float) -> void:
 		_recheck_t = RECHECK_SECONDS
 		if is_obsolete(_current_id):
 			_time_left = 0.0     # redundant now: leave early (the next tip follows as usual)
+	_shown_t += delta
+	if _shown_t >= FIGHT_TIP_MIN_SECONDS and is_fight_tip(_current_id) and _has_queued_fight_tip():
+		_time_left = 0.0         # a newer fight tip is waiting: make room for it
 	_time_left -= delta
 	if _time_left <= 0.0:
 		var tw := Kit.retween(self, _tw, "fade")
