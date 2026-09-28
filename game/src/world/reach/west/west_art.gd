@@ -221,30 +221,93 @@ static func xf(pos: Vector3, rot_deg: Vector3 = Vector3.ZERO, scl: Vector3 = Vec
 
 # --- Pumpkins ----------------------------------------------------------------------------------------------
 
+## Vertical squash of pumpkin_body(variant).
+static func pumpkin_squash(variant: int) -> float:
+	return 0.78 + 0.06 * float(posmod(variant, 3))
+
+
+## The ellipsoids that make up pumpkin_body(variant) (radius 1): each Transform3D maps the unit sphere onto one
+## part (8 ribs + the core). The mesh and the rind queries below share them, so carved faces and mimic tells are
+## always placed ON the rind, never inside it.
+static func pumpkin_ellipsoids(variant: int) -> Array:
+	var key := "pell|%d" % variant
+	if _cache.has(key):
+		return _cache[key]
+	var squash := pumpkin_squash(variant)
+	var out: Array = []
+	for i in 8:
+		var a := TAU * float(i) / 8.0 + 0.2 * float(variant)
+		out.append(Transform3D(rs(-a, Vector3(0.62, 0.72 * squash, 0.5)), Vector3(cos(a) * 0.42, 0.72 * squash, sin(a) * 0.42)))
+	out.append(Transform3D(Basis.from_scale(Vector3(0.82, 0.82 * squash, 0.82)), Vector3(0, 0.72 * squash, 0)))
+	_cache[key] = out
+	return out
+
+
 ## A ribbed pumpkin of radius 1 (base at y = 0) without its stem. lo/hi = bottom/top colours.
 static func pumpkin_body(variant: int, lo: Color = PUMPKIN_DEEP, hi: Color = PUMPKIN) -> ArrayMesh:
 	var key := "pbody|%d|%s|%s" % [variant, lo.to_html(), hi.to_html()]
 	if _cache.has(key):
 		return _cache[key]
 	var m := NV.Merger.new()
-	var squash := 0.78 + 0.06 * float(posmod(variant, 3))
+	var squash := pumpkin_squash(variant)
 	var fn := func(p: Vector3, n: Vector3) -> Color:
 		var t := clampf(p.y / (1.5 * squash), 0.0, 1.0)
 		var c := lo.lerp(hi, t)
 		return c.lerp(hi.lightened(0.18), clampf(n.y, 0.0, 1.0) * 0.25)
-	var lobes := 8
-	for i in lobes:
-		var a := TAU * float(i) / float(lobes) + 0.2 * float(variant)
-		var lp := Vector3(cos(a) * 0.42, 0.72 * squash, sin(a) * 0.42)
-		var b := rs(-a, Vector3(0.62, 0.72 * squash, 0.5))
-		m.add(NV._sph(1.0, 8, 12), Transform3D(b, lp), fn)
-	m.add(NV._sph(0.82, 8, 12), Transform3D(Basis().scaled(Vector3(1.0, squash, 1.0)), Vector3(0, 0.72 * squash, 0)), fn)
+	for e in pumpkin_ellipsoids(variant):
+		m.add(NV._sph(1.0, 8, 12), e, fn)
 	return _commit(key, m)
 
 
 ## Height of the top of pumpkin_body(variant) (radius 1): where its stem sits.
 static func pumpkin_top(variant: int) -> float:
-	return 1.44 * (0.78 + 0.06 * float(posmod(variant, 3))) - 0.04
+	return 1.44 * pumpkin_squash(variant) - 0.04
+
+
+## True when `p` (radius-1 space) is inside the rind of pumpkin_body(variant) (inside any of its ellipsoids).
+static func pumpkin_inside(variant: int, p: Vector3) -> bool:
+	for e in pumpkin_ellipsoids(variant):
+		if ((e as Transform3D).affine_inverse() * p).length() < 1.0:
+			return true
+	return false
+
+
+## Where a ray from `from` (inside the pumpkin) along the unit `dir` leaves the rind: the outermost crossing of
+## any of its ellipsoids, {"p": point, "n": outward normal} in radius-1 space ({} if the ray misses).
+static func pumpkin_hit(variant: int, from: Vector3, dir: Vector3) -> Dictionary:
+	var best := -INF
+	var best_e := Transform3D()
+	for e in pumpkin_ellipsoids(variant):
+		var inv := (e as Transform3D).affine_inverse()
+		var u0 := inv * from
+		var d := inv.basis * dir
+		var qa := d.dot(d)
+		var qb := 2.0 * u0.dot(d)
+		var qc := u0.dot(u0) - 1.0
+		var disc := qb * qb - 4.0 * qa * qc
+		if disc < 0.0 or qa < 0.000001:
+			continue
+		var t := (-qb + sqrt(disc)) / (2.0 * qa)
+		if t > best:
+			best = t
+			best_e = e
+	if best == -INF:
+		return {}
+	var p := from + dir * best
+	var u := best_e.affine_inverse() * p
+	return {"p": p, "n": (best_e.basis.inverse().transposed() * u).normalized()}
+
+
+## A detail's transform on the rind: `theta` = azimuth from +Z (radians, + toward +X), `y` = height, lifted
+## `lift` along the rind normal; local +Z = the normal (out of the pumpkin), X along the rind, rolled `roll_deg`.
+static func on_rind(variant: int, theta: float, y: float, lift: float = 0.0, roll_deg: float = 0.0) -> Transform3D:
+	var dir := Vector3(sin(theta), 0.0, cos(theta))
+	var h := pumpkin_hit(variant, Vector3(0, y, 0), dir)
+	var p: Vector3 = h.get("p", Vector3(0, y, 0) + dir)
+	var n: Vector3 = h.get("n", dir)
+	var x := Vector3.UP.cross(n).normalized()
+	var up := n.cross(x).normalized()
+	return Transform3D(Basis(x, up, n) * Basis(Vector3.BACK, deg_to_rad(roll_deg)), p + n * lift)
 
 
 ## A curly stem (pivot at its base) for pumpkins of radius 1: separate so it can twitch.
@@ -260,39 +323,215 @@ static func pumpkin_stem(crooked: bool = false) -> ArrayMesh:
 	return _commit(key, m)
 
 
-## Carved friendly face (eyes + grin) on the +Z side of a radius-1 pumpkin; use a glow material.
-static func carved_face() -> ArrayMesh:
-	if _cache.has("face"):
-		return _cache["face"]
-	var m := NV.Merger.new()
+const FACE_DEPTH := 0.1
+const FACE_LIFT := 0.012
+
+## Carved face pieces of pumpkin_body(variant) on its +Z side: [[mesh, Transform3D]] (radius 1). Every piece sits
+## on the rind: its front is FACE_DEPTH / 2 + FACE_LIFT proud of the ellipsoid surface, its back sunk into it.
+static func carved_face_parts(variant: int) -> Array:
+	var key := "faceparts|%d" % variant
+	if _cache.has(key):
+		return _cache[key]
+	var sq := pumpkin_squash(variant)
+	var yc := 0.72 * sq
+	var out: Array = []
+	# two big upright triangle eyes, tilted a little toward the nose
 	for sx in [-1.0, 1.0]:
-		var p := Vector3(float(sx) * 0.3, 0.86, 0.78)
-		m.add(_prism(Vector3(0.22, 0.2, 0.08)), xf(p, Vector3(-8, float(sx) * 18.0, 0)), Color.WHITE)
-	for i in 5:
-		var t := float(i) / 4.0
-		var x := lerpf(-0.36, 0.36, t)
-		var y := 0.5 - sin(t * PI) * 0.1
-		var z := 0.82 - absf(x) * 0.28
-		m.add(NV._box(Vector3(0.15, 0.1 if i % 2 == 0 else 0.07, 0.08)), xf(Vector3(x, y, z), Vector3(-6, x * 40.0, 0)), Color.WHITE)
-	return _commit("face", m)
+		out.append([_prism(Vector3(0.27, 0.25, FACE_DEPTH)), on_rind(variant, float(sx) * 0.36, yc + 0.24 * sq, FACE_LIFT, float(sx) * -12.0)])
+	# a small triangle nose
+	out.append([_prism(Vector3(0.13, 0.12, FACE_DEPTH)), on_rind(variant, 0.0, yc + 0.03 * sq, FACE_LIFT)])
+	# a wide grin; two teeth hang from its top edge (shorter cut segments)
+	var n := 7
+	for i in n:
+		var t := float(i) / float(n - 1)
+		var th := lerpf(-0.52, 0.52, t)
+		var y := yc - 0.18 * sq - sin(t * PI) * 0.1
+		var slope := rad_to_deg(atan2(-0.1 * PI * cos(t * PI), 1.0))
+		var hgt := 0.08 if i == 2 or i == 4 else 0.13
+		out.append([NV._box(Vector3(0.18, hgt, FACE_DEPTH)), on_rind(variant, th, y - (0.13 - hgt) * 0.5, FACE_LIFT, slope)])
+	_cache[key] = out
+	return out
 
 
-## The mimic's tells: a jagged closed seam of a mouth, sleepy closed eyes and stubby vine feet (radius 1).
-static func mimic_details() -> ArrayMesh:
-	if _cache.has("mimic_det"):
-		return _cache["mimic_det"]
+## Carved friendly face (eyes, nose, toothy grin) on the +Z side of pumpkin_body(variant); use carved_material()
+## (a dark cut by day that glows at night).
+static func carved_face(variant: int = 1) -> ArrayMesh:
+	var key := "face|%d" % variant
+	if _cache.has(key):
+		return _cache[key]
 	var m := NV.Merger.new()
-	for i in 7:
-		var t := float(i) / 6.0
-		var x := lerpf(-0.42, 0.42, t)
-		var y := 0.5 + (0.05 if i % 2 == 0 else -0.04)
-		m.add(NV._box(Vector3(0.14, 0.05, 0.06)), xf(Vector3(x, y, 0.84 - absf(x) * 0.3), Vector3(0, x * 40.0, 35.0 if i % 2 == 0 else -35.0)), MIMIC_DEEP)
+	for part in carved_face_parts(variant):
+		m.add(part[0], part[1], Color.WHITE)
+	return _commit(key, m)
+
+
+const MIMIC_SEAM := Color("3a150c")
+
+## The mimic's tells on pumpkin_body(variant) (radius 1), dark and ON the rind: a jagged seam of a mouth pressed
+## shut and two sleepy closed eyes with lashes, [[mesh, Transform3D]] (the vine feet are added by mimic_details()).
+static func mimic_tell_parts(variant: int) -> Array:
+	var key := "mimicparts|%d" % variant
+	if _cache.has(key):
+		return _cache[key]
+	var sq := pumpkin_squash(variant)
+	var yc := 0.72 * sq
+	var out: Array = []
+	# the seam: one continuous zig-zag of thin strokes joining alternate high / low points
+	var pts: Array = []
+	for i in 9:
+		var t := float(i) / 8.0
+		pts.append(Vector2(lerpf(-0.62, 0.62, t), yc - 0.16 * sq + (0.04 if i % 2 == 0 else -0.04)))
+	out.append_array(_rind_strokes(variant, pts, 0.045))
+	# two sleepy closed eyes: smooth lid arcs, ends a little higher than the middle
 	for sx in [-1.0, 1.0]:
-		m.add(NV._box(Vector3(0.2, 0.04, 0.05)), xf(Vector3(float(sx) * 0.3, 0.88, 0.76), Vector3(0, float(sx) * 20.0, float(sx) * -12.0)), MIMIC_DEEP)
+		var arc: Array = []
+		for k in 5:
+			var u := float(k - 2) / 2.0
+			arc.append(Vector2(float(sx) * 0.34 + u * 0.13, yc + 0.24 * sq + u * u * 0.05))
+		out.append_array(_rind_strokes(variant, arc, 0.04))
+	_cache[key] = out
+	return out
+
+
+## Thin dark strokes on the rind joining consecutive (azimuth, height) points: [[mesh, Transform3D]].
+static func _rind_strokes(variant: int, pts: Array, width: float) -> Array:
+	var out: Array = []
+	for i in range(pts.size() - 1):
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[i + 1]
+		var mid := (a + b) * 0.5
+		var dx := (b.x - a.x) * 0.95          # ~ metres along the rind (radius ~0.95 at the face)
+		var dy := b.y - a.y
+		var ln := sqrt(dx * dx + dy * dy) + width * 0.9
+		out.append([NV._box(Vector3(ln, width, 0.06)), on_rind(variant, mid.x, mid.y, FACE_LIFT, rad_to_deg(atan2(dy, dx)))])
+	return out
+
+
+## The mimic's tells: a jagged closed seam of a mouth, sleepy closed eyes and stubby vine feet, for
+## pumpkin_body(variant) (use the body's transform, so they stay on its rind).
+static func mimic_details(variant: int = 2) -> ArrayMesh:
+	var key := "mimic_det|%d" % variant
+	if _cache.has(key):
+		return _cache[key]
+	var m := NV.Merger.new()
+	for part in mimic_tell_parts(variant):
+		m.add(part[0], part[1], MIMIC_SEAM)
 	for i in 4:
 		var a := TAU * (float(i) + 0.5) / 4.0
 		m.add(NV._cyl(0.07, 0.1, 0.28, 6), xf(Vector3(cos(a) * 0.72, 0.06, sin(a) * 0.72), Vector3(0, 0, 70.0)).rotated_local(Vector3.UP, -a), VINE_DARK)
-	return _commit("mimic_det", m)
+	return _commit(key, m)
+
+
+# --- Carved faces and candle halos by day and night ---------------------------------------------------------------
+
+const FACE_CUT := Color("2b130b")       # the dark cut interior (day)
+const FACE_GLOW := Color("ffb347")      # candle-lit (night)
+const HALO_WARM := Color("ffb45e")
+static var _night: float = 0.0
+
+
+## 0 (day) .. 1 (night), as last set by set_daylight() (smoothstep of the sky's daylight).
+static func night_amount() -> float:
+	return _night
+
+
+## Called by the region a few times a second with the sky's daylight (0 night .. 1 day). Every carved face shares
+## one material: a dark cut by day, a warm glow at night; candle halos brighten the same way.
+static func set_daylight(daylight: float) -> void:
+	var t := clampf((0.62 - daylight) / 0.47, 0.0, 1.0)
+	var night := t * t * (3.0 - 2.0 * t)
+	if absf(night - _night) < 0.004:
+		return
+	_night = night
+	if _cache.has("mat_carved"):
+		_apply_carved(_cache["mat_carved"], night)
+	if _cache.has("mat_halo"):
+		_apply_halo(_cache["mat_halo"], night)
+
+
+## Unshaded, so the cut reads as a hole by day (no light on it) and as a warm glow at night (emission > 1.2
+## blooms). Shared by the Pumpkin That Turned and the Commons jack-o'-lanterns.
+static func carved_material() -> StandardMaterial3D:
+	if _cache.has("mat_carved"):
+		return _cache["mat_carved"]
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.emission_enabled = true
+	m.emission = FACE_GLOW
+	_apply_carved(m, _night)
+	_cache["mat_carved"] = m
+	return m
+
+
+static func _apply_carved(m: StandardMaterial3D, night: float) -> void:
+	m.albedo_color = FACE_CUT.lerp(FACE_GLOW, night)
+	m.emission_energy_multiplier = 1.7 * night
+
+
+## A soft additive glow card that always faces the camera (candle flames, lantern glass). Unit quad: scale it.
+static func halo_mesh() -> Mesh:
+	if not _cache.has("halo_mesh"):
+		var q := QuadMesh.new()
+		q.size = Vector2.ONE
+		_cache["halo_mesh"] = q
+	return _cache["halo_mesh"]
+
+
+## Shared warm halo: faint by day, full at night (set_daylight). A generated radial gradient, no image files.
+static func halo_material() -> StandardMaterial3D:
+	if _cache.has("mat_halo"):
+		return _cache["mat_halo"]
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	g.add_point(0.35, Color(1, 1, 1, 0.45))
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	tex.width = 64
+	tex.height = 64
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.billboard_keep_scale = true
+	m.albedo_texture = tex
+	m.proximity_fade_enabled = true
+	m.proximity_fade_distance = 0.25
+	m.disable_receive_shadows = true
+	_apply_halo(m, _night)
+	_cache["mat_halo"] = m
+	return m
+
+
+## A soft round warm-light footprint for glow decals (emission: white centre fading to black at the rim).
+static func pool_texture() -> Texture2D:
+	if _cache.has("pool_tex"):
+		return _cache["pool_tex"]
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(0, 0, 0, 1))
+	g.add_point(0.45, Color(0.5, 0.5, 0.5, 1))
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	tex.width = 64
+	tex.height = 64
+	_cache["pool_tex"] = tex
+	return tex
+
+
+static func _apply_halo(m: StandardMaterial3D, night: float) -> void:
+	var c := HALO_WARM
+	c.a = lerpf(0.18, 0.85, night)
+	m.albedo_color = c
 
 
 # --- Orchard props -------------------------------------------------------------------------------------------
@@ -316,29 +555,101 @@ static func vine_patch(variant: int) -> ArrayMesh:
 	return _commit(key, m)
 
 
+const HEDGE_LUMP := 0.25
+const HEDGE_SQUASH := 0.8
+const BERRY_R := 0.082
+
+## The three unit blobs of hedge(variant): [ublob seed, scale, centre].
+static func hedge_blobs(variant: int) -> Array:
+	return [[variant, 0.62, Vector3(-0.5, 0.55, 0)], [variant + 1, 0.72, Vector3(0.1, 0.62, 0.05)], [variant + 2, 0.58, Vector3(0.68, 0.5, -0.05)]]
+
+
 static func hedge(variant: int) -> ArrayMesh:
 	var key := "hedge|%d" % variant
 	if _cache.has(key):
 		return _cache[key]
 	var m := NV.Merger.new()
 	var fn := _grad(Color("355f33"), Color("6d9b4c"), 1.3)
-	m.add(NV.ublob(variant, 0.25, 0.8, 2), NV.sxf(0.62, Vector3(-0.5, 0.55, 0)), fn)
-	m.add(NV.ublob(variant + 1, 0.25, 0.8, 2), NV.sxf(0.72, Vector3(0.1, 0.62, 0.05)), fn)
-	m.add(NV.ublob(variant + 2, 0.25, 0.8, 2), NV.sxf(0.58, Vector3(0.68, 0.5, -0.05)), fn)
+	for b in hedge_blobs(variant):
+		m.add(NV.ublob(int(b[0]), HEDGE_LUMP, HEDGE_SQUASH, 2), NV.sxf(float(b[1]), b[2]), fn)
 	return _commit(key, m)
 
 
-static func berry_clusters(variant: int, color: Color, count: int = 16, spread: Vector3 = Vector3(0.95, 0.55, 0.55)) -> ArrayMesh:
-	var key := "berr|%d|%s|%d" % [variant, color.to_html(), count]
+## Surface radius of the unit blob NV.ublob(seed, lump, ...) along the unit direction `d` (Kit.blob_mesh noise;
+## the mesh's squash is applied on top of it).
+static func blob_radius(seed_value: int, lump: float, d: Vector3) -> float:
+	var key := "bnoise|%d" % seed_value
+	if not _cache.has(key):
+		var nz := FastNoiseLite.new()
+		nz.seed = 700 + posmod(seed_value, 8)
+		nz.frequency = 1.3
+		nz.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		_cache[key] = nz
+	return 1.0 + (_cache[key] as FastNoiseLite).get_noise_3dv(d) * lump
+
+
+## How far `p` (hedge space) lies outside the leaf blobs of hedge(variant), in metres (negative = inside).
+static func hedge_clearance(variant: int, p: Vector3) -> float:
+	var best := INF
+	for b in hedge_blobs(variant):
+		var s := float(b[1])
+		var q: Vector3 = (p - (b[2] as Vector3)) / s
+		q.y /= HEDGE_SQUASH
+		var ln := q.length()
+		if ln < 0.0001:
+			return -s
+		var r := blob_radius(int(b[0]), HEDGE_LUMP, q / ln)
+		best = minf(best, (ln - r) * s)
+	return best
+
+
+## Berry centres ON the leaves of hedge(variant): each is projected onto a blob's surface (its own noise radius)
+## and pushed out by 60 % of a berry, and never lands inside a neighbouring blob or down in the grass.
+static func berry_points(variant: int, count: int = 18) -> Array:
+	var key := "berrpts|%d|%d" % [variant, count]
 	if _cache.has(key):
 		return _cache[key]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5300 + variant
+	var blobs := hedge_blobs(variant)
+	var out: Array = []
+	var tries := 0
+	while out.size() < count and tries < count * 40:
+		tries += 1
+		var b: Array = blobs[out.size() % blobs.size()]
+		var s := float(b[1])
+		var d := Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.15, 1.0), rng.randf_range(-1, 1)).normalized()
+		var r := blob_radius(int(b[0]), HEDGE_LUMP, d)
+		var surf: Vector3 = (b[2] as Vector3) + Vector3(d.x * r, d.y * r * HEDGE_SQUASH, d.z * r) * s
+		var nrm := Vector3(d.x, d.y / HEDGE_SQUASH, d.z).normalized()
+		var p := surf + nrm * BERRY_R * 0.6
+		if p.y < 0.28 or hedge_clearance(variant, p) < BERRY_R * 0.35:
+			continue
+		var crowded := false
+		for q in out:
+			if (q as Vector3).distance_to(p) < BERRY_R * 2.4:
+				crowded = true
+				break
+		if not crowded:
+			out.append(p)
+	_cache[key] = out
+	return out
+
+
+static func berry_clusters(variant: int, color: Color, count: int = 18) -> ArrayMesh:
+	var key := "berr|%d|%s|%d" % [variant, color.to_html(), count]
+	if _cache.has(key):
+		return _cache[key]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5350 + variant
 	var m := NV.Merger.new()
-	for i in count:
-		var d := Vector3(rng.randf_range(-1, 1), rng.randf_range(0.1, 1.0), rng.randf_range(-1, 1)).normalized()
-		var p := Vector3(d.x * spread.x, 0.5 + d.y * spread.y, d.z * spread.z)
-		m.add(NV._sph(0.075, 4, 7), Transform3D(Basis(), p), color.lerp(Color.WHITE, rng.randf() * 0.2))
+	var fn := func(_q: Vector3, n: Vector3) -> Color:
+		return color.lerp(Color("ffc2d6"), clampf(n.y, 0.0, 1.0) * 0.45)
+	for p in berry_points(variant, count):
+		m.add(NV._sph(BERRY_R, 5, 8), Transform3D(Basis(), p), fn)
+		if rng.randf() < 0.35:
+			# a little glossy highlight berry beside it (a cluster of two)
+			m.add(NV._sph(BERRY_R * 0.7, 4, 7), Transform3D(Basis(), (p as Vector3) + Vector3(rng.randf_range(-1, 1), 0.4, rng.randf_range(-1, 1)).normalized() * BERRY_R * 1.1), color.lightened(0.15))
 	return _commit(key, m)
 
 
@@ -361,13 +672,37 @@ static func puddle_disc() -> Mesh:
 	return NV._cyl(1.0, 1.0, 0.02, 18)
 
 
+## A chunky rectangular hay bale (1.25 x 0.6 x 0.82, top at 0.6) with soft rounded edges, two twine bands wrapped
+## round it and a few loose straws poking out of the ends.
 static func hay_bale() -> ArrayMesh:
 	if _cache.has("bale"):
 		return _cache["bale"]
 	var m := NV.Merger.new()
-	m.add(Kit.blob_mesh(0.5, 5601, 0.08, 1.0, 2), Transform3D(Basis().scaled(Vector3(1.3, 0.62, 0.85)), Vector3(0, 0.3, 0)), _grad(STRAW_DARK, STRAW, 0.6))
+	var fn := func(p: Vector3, n: Vector3) -> Color:
+		var c := STRAW_DARK.lerp(STRAW, clampf(p.y / 0.6, 0.0, 1.0))
+		return c.lerp(Color("f3d98a"), clampf(n.y, 0.0, 1.0) * 0.3)
+	var s := Vector3(1.25, 0.6, 0.82)
+	var r := 0.09
+	# a rounded box: three crossed slabs + edge rolls
+	m.add(NV._box(Vector3(s.x, s.y - r * 2.0, s.z)), Transform3D(Basis(), Vector3(0, s.y * 0.5, 0)), fn)
+	m.add(NV._box(Vector3(s.x - r * 2.0, s.y, s.z - r * 2.0)), Transform3D(Basis(), Vector3(0, s.y * 0.5, 0)), fn)
+	for sy in [r, s.y - r]:
+		for sz in [-1.0, 1.0]:
+			m.add(NV._cyl(r, r, s.x - r * 2.0, 8), Transform3D(Basis(Vector3.BACK, PI * 0.5), Vector3(0, float(sy), float(sz) * (s.z * 0.5 - r))), fn)
+		for sx in [-1.0, 1.0]:
+			m.add(NV._cyl(r, r, s.z - r * 2.0, 8), Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(float(sx) * (s.x * 0.5 - r), float(sy), 0)), fn)
+	# twine bands
 	for x in [-0.3, 0.3]:
-		m.add(NV._box(Vector3(0.05, 0.64, 0.9)), Transform3D(Basis(), Vector3(float(x), 0.31, 0)), FENCE_DARK)
+		m.add(NV._box(Vector3(0.045, s.y + 0.02, s.z + 0.02)), Transform3D(Basis(), Vector3(float(x), s.y * 0.5, 0)), Color("8a6a3a"))
+	# loose straws on the ends and the top
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5602
+	for i in 10:
+		var sx2 := -1.0 if i % 2 == 0 else 1.0
+		var p := Vector3(sx2 * (s.x * 0.5 + 0.02), rng.randf_range(0.12, s.y - 0.1), rng.randf_range(-0.3, 0.3))
+		m.add(NV._box(Vector3(0.12, 0.012, 0.012)), xf(p, Vector3(0, rng.randf_range(-30, 30), rng.randf_range(-35, 35))), STRAW.lightened(0.1))
+	for i in 5:
+		m.add(NV._box(Vector3(0.012, 0.012, 0.16)), xf(Vector3(rng.randf_range(-0.5, 0.5), s.y + 0.005, rng.randf_range(-0.3, 0.3)), Vector3(0, rng.randf_range(0, 180), 0)), STRAW.lightened(0.15))
 	return _commit("bale", m)
 
 
@@ -397,12 +732,20 @@ static func scarecrow() -> ArrayMesh:
 		m.add(NV._cyl(0.08, 0.1, 0.4, 6), xf(Vector3(float(sx) * 0.38, 1.1, 0), Vector3(0, 0, 90)), Color("7a8a4a"))
 		m.add(NV._cyl(0.02, 0.1, 0.16, 6), xf(Vector3(float(sx) * 0.62, 1.1, 0), Vector3(0, 0, float(sx) * -90.0)), STRAW)
 	m.add(NV._cyl(0.06, 0.2, 0.16, 7), Transform3D(Basis(), Vector3(0, 0.6, 0)), STRAW)
-	m.add(NV._sph(0.21, 6, 9), Transform3D(Basis().scaled(Vector3(1.0, 1.05, 0.95)), Vector3(0, 1.43, 0)), Color("e8d2a6"))
+	m.add(NV._sph(0.21, 8, 12), Transform3D(Basis().scaled(Vector3(1.0, 1.05, 0.95)), Vector3(0, 1.43, 0)), Color("e8d2a6"))
+	# a friendly sack face that reads at play distance: two plum buttons with cream cross-stitches, rosy cheeks
+	# and one soft stitched smile (no stitch ticks: those read as teeth), all just proud of the sack
 	for sx in [-1.0, 1.0]:
-		m.add(NV._sph(0.03, 3, 5), Transform3D(Basis(), Vector3(float(sx) * 0.07, 1.47, 0.19)), PLUM)
-	for i in 5:
-		var x := lerpf(-0.08, 0.08, float(i) / 4.0)
-		m.add(NV._box(Vector3(0.03, 0.012, 0.02)), Transform3D(Basis(), Vector3(x, 1.36 - sin(float(i) / 4.0 * PI) * 0.025, 0.2)), PLUM)
+		m.add(NV._cyl(0.034, 0.034, 0.024, 10), xf(Vector3(float(sx) * 0.085, 1.475, 0.19), Vector3(90 - 12, float(sx) * 24.0, 0)), Color("5a3a66"))
+		for cr in [45.0, -45.0]:
+			m.add(NV._box(Vector3(0.04, 0.009, 0.01)), xf(Vector3(float(sx) * 0.087, 1.476, 0.204), Vector3(-12, float(sx) * 24.0, cr)), RIBBON_CREAM)
+		m.add(NV._cyl(0.034, 0.034, 0.012, 8), xf(Vector3(float(sx) * 0.13, 1.4, 0.168), Vector3(90 - 5, float(sx) * 38.0, 0)), Color("f0a29a"))
+	for i in 6:
+		var t := (float(i) + 0.5) / 6.0
+		var x := lerpf(-0.08, 0.08, t)
+		var y := 1.385 - sin(t * PI) * 0.03
+		var z := 0.2 - absf(x) * 0.3
+		m.add(NV._box(Vector3(0.03, 0.012, 0.018)), xf(Vector3(x, y, z), Vector3(0, x * 250.0, rad_to_deg(atan2(-0.03 * PI * cos(t * PI), 0.16)))), PLUM)
 	m.add(NV._cyl(0.3, 0.3, 0.03, 12), Transform3D(Basis(), Vector3(0, 1.6, 0)), STRAW_DARK)
 	m.add(NV._cyl(0.02, 0.16, 0.3, 10), xf(Vector3(0.02, 1.76, 0), Vector3(0, 0, -8)), STRAW_DARK)
 	return _commit("scare", m)
@@ -590,15 +933,31 @@ static func stake() -> ArrayMesh:
 	return _commit("stake", m)
 
 
-## A ribbon streamer: rises from its knot at the origin (so the toon wind sways its tail).
+## A ribbon streamer: two thin tails run from a knot at the origin along local +Y and curve gently away (three
+## bent segments each, a notched tip); the toon wind (stronger further along +Y) flutters the ends. Flip it
+## (rotate ~PI about a horizontal axis) for ribbons that hang from a knot and still flutter.
 static func ribbon_strip(length: float = 0.7) -> ArrayMesh:
 	var key := "ribbon|%.2f" % length
 	if _cache.has(key):
 		return _cache[key]
 	var m := NV.Merger.new()
-	m.add(NV._box(Vector3(0.07, length, 0.012)), xf(Vector3(0.05, length * 0.5, 0), Vector3(0, 0, -18)), Color.WHITE)
-	m.add(NV._box(Vector3(0.07, length * 0.8, 0.012)), xf(Vector3(-0.05, length * 0.4, 0), Vector3(0, 0, 14)), Color.WHITE)
-	m.add(NV._sph(0.05, 4, 6), Transform3D(Basis().scaled(Vector3(1.4, 0.8, 0.6)), Vector3.ZERO), Color.WHITE)
+	for tail in [[1.0, 1.0, 0.0], [-1.0, 0.8, 0.012]]:
+		var side := float(tail[0])
+		var seg := length * float(tail[1]) / 3.0
+		var p := Vector3(side * 0.02, 0.0, float(tail[2]))
+		var ang := side * -8.0
+		for k in 3:
+			var a := deg_to_rad(ang)
+			var dir := Vector3(-sin(a), cos(a), 0.0)
+			var w := 0.05 - 0.008 * float(k)
+			m.add(NV._box(Vector3(w, seg + 0.01, 0.008)), xf(p + dir * seg * 0.5, Vector3(0, float(k) * side * 9.0, ang)), Color.WHITE)
+			p += dir * seg
+			ang += side * -(9.0 + 6.0 * float(k))
+		# the notched tip: two little points
+		var a2 := deg_to_rad(ang)
+		for s in [-1.0, 1.0]:
+			m.add(_prism(Vector3(0.022, 0.05, 0.008)), xf(p + Vector3(-sin(a2), cos(a2), 0) * 0.02 + Vector3(cos(a2), sin(a2), 0) * float(s) * 0.012, Vector3(0, 0, ang)), Color.WHITE)
+	m.add(NV._sph(0.035, 4, 6), Transform3D(Basis().scaled(Vector3(1.5, 0.9, 0.8)), Vector3.ZERO), Color.WHITE)
 	return _commit(key, m)
 
 
@@ -607,10 +966,26 @@ static func coat_post() -> ArrayMesh:
 	if _cache.has("coatpost"):
 		return _cache["coatpost"]
 	var m := NV.Merger.new()
+	var coat := Color("5f5a4a")
 	m.add(NV._cyl(0.06, 0.08, 1.8, 6), xf(Vector3(0, 0.9, 0), Vector3(0, 0, 6)), FENCE_DARK)
-	m.add(NV._box(Vector3(0.7, 0.9, 0.16)), xf(Vector3(0.05, 1.2, 0), Vector3(0, 0, 4)), Color("5f5a4a"))
-	m.add(NV._box(Vector3(0.2, 0.3, 0.17)), xf(Vector3(-0.18, 0.86, 0.01), Vector3(0, 0, -20)), Color("7a6a3a"))
-	m.add(NV._box(Vector3(0.16, 0.16, 0.18)), xf(Vector3(0.22, 1.35, 0.01), Vector3(0, 0, 25)), RIBBON_PLUM.darkened(0.3))
+	# a cross-bar for the shoulders and a torn old coat hung on it: rounded shoulders, a collar, two drooping
+	# sleeves, a ragged hem, big stitched patches and buttons - a coat, not a board
+	m.add(NV._cyl(0.025, 0.025, 0.9, 5), xf(Vector3(0.05, 1.55, 0), Vector3(0, 0, 90)), FENCE_DARK)
+	m.add(NV._cyl(0.2, 0.3, 0.72, 8), Transform3D(Basis().scaled(Vector3(1.0, 1.0, 0.5)), Vector3(0.05, 1.16, 0.02)), coat)
+	m.add(NV._sph(0.3, 5, 8), Transform3D(Basis().scaled(Vector3(1.25, 0.45, 0.55)), Vector3(0.05, 1.5, 0.02)), coat.lightened(0.05))
+	m.add(NV._cyl(0.1, 0.16, 0.12, 8), Transform3D(Basis().scaled(Vector3(1.0, 1.0, 0.6)), Vector3(0.05, 1.62, 0.02)), coat.darkened(0.15))
+	for sx in [-1.0, 1.0]:
+		m.add(NV._cyl(0.07, 0.1, 0.62, 6), xf(Vector3(0.05 + float(sx) * 0.36, 1.23, 0.02), Vector3(0, 0, float(sx) * 12.0)), coat.darkened(0.08))
+		m.add(NV._cyl(0.02, 0.08, 0.14, 6), xf(Vector3(0.05 + float(sx) * 0.42, 0.88, 0.02), Vector3(0, 0, float(sx) * 12.0)), STRAW)
+	for i in 5:
+		var hx := -0.2 + float(i) * 0.1
+		m.add(_prism(Vector3(0.1, 0.12, 0.26)), xf(Vector3(0.05 + hx, 0.76, 0.02), Vector3(0, 0, 180)), coat)
+	m.add(NV._box(Vector3(0.2, 0.22, 0.03)), xf(Vector3(-0.07, 0.98, 0.16), Vector3(-6, 0, -10)), Color("c98a3a"))
+	m.add(NV._box(Vector3(0.16, 0.16, 0.03)), xf(Vector3(0.2, 1.3, 0.16), Vector3(-8, 0, 16)), RIBBON_PLUM)
+	for i in 4:
+		m.add(NV._box(Vector3(0.012, 0.05, 0.02)), xf(Vector3(-0.15 + float(i) * 0.055, 0.88, 0.175), Vector3(0, 0, 10)), RIBBON_CREAM)
+	for i in 3:
+		m.add(NV._sph(0.03, 3, 6), Transform3D(Basis().scaled(Vector3(1, 1, 0.5)), Vector3(0.07, 1.38 - float(i) * 0.17, 0.17)), RIBBON_GOLD)
 	m.add(NV._cyl(0.025, 0.025, 1.7, 5), xf(Vector3(0.45, 0.8, 0.2), Vector3(0, 0, -24)), FENCE)
 	m.add(NV._box(Vector3(0.5, 0.05, 0.06)), xf(Vector3(0.8, 1.56, 0.2), Vector3(0, 0, -24)), IRON)
 	for i in 5:
@@ -830,9 +1205,26 @@ static func candle(variant: int) -> ArrayMesh:
 	return _commit(key, m)
 
 
-## Candle flame (unit, at the candle top): used with a violet glow material in a MultiMesh.
-static func flame() -> Mesh:
-	return NV._sph(0.03, 3, 5)
+## Candle flame: a warm ~7 cm teardrop standing on its base at the origin (put it on the wick); a glow material
+## in a MultiMesh, with halo_mesh() cards around it for the night.
+static func flame() -> ArrayMesh:
+	if _cache.has("flame"):
+		return _cache["flame"]
+	var m := NV.Merger.new()
+	m.add(NV._sph(0.024, 4, 7), Transform3D(Basis().scaled(Vector3(1.0, 1.1, 1.0)), Vector3(0, 0.024, 0)), Color.WHITE)
+	m.add(NV._cyl(0.0, 0.023, 0.05, 7), Transform3D(Basis(), Vector3(0, 0.05, 0)), Color.WHITE)
+	return _commit("flame", m)
+
+
+## A candle-lit lantern globe (warm glass, a little faceted), centred on the origin, ~0.24 m tall.
+static func lantern_globe() -> ArrayMesh:
+	if _cache.has("lglobe"):
+		return _cache["lglobe"]
+	var m := NV.Merger.new()
+	for i in 6:
+		var a := TAU * float(i) / 6.0
+		m.add(NV._sph(0.1, 5, 7), Transform3D(rs(-a, Vector3(0.6, 1.15, 0.55)), Vector3(cos(a) * 0.05, 0, sin(a) * 0.05)), Color.WHITE)
+	return _commit("lglobe", m)
 
 
 ## Moonflower clump: stems and leaves (vertex colour); the petals are moonflower_petals() (soft glow).
@@ -957,15 +1349,45 @@ static func bench() -> ArrayMesh:
 	return _commit("bench", m)
 
 
-## Stone plinth with a shallow empty candle dish on top (the groundskeeper's marker).
+## A short, rough stone with a wide, shallow, open candle dish on its flat top (the groundskeeper's marker; the
+## dish floor is at MARKER_DISH_Y, where her candle stands once it is lit).
+const MARKER_DISH_Y := 0.74
+
+
 static func marker_plinth() -> ArrayMesh:
 	if _cache.has("plinth"):
 		return _cache["plinth"]
 	var m := NV.Merger.new()
-	m.add(NV._cyl(0.26, 0.34, 0.8, 10), Transform3D(Basis(), Vector3(0, 0.4, 0)), LILAC_STONE)
-	m.add(NV._cyl(0.36, 0.36, 0.08, 12), Transform3D(Basis(), Vector3(0, 0.84, 0)), LILAC_STONE.lightened(0.1))
-	m.add(NV._cyl(0.18, 0.12, 0.06, 12), Transform3D(Basis(), Vector3(0, 0.91, 0)), Color("8f8a9a"))
+	var fn := _grad(LILAC_STONE.darkened(0.28), LILAC_STONE.lightened(0.04), 0.7)
+	# a short, rough stone narrowing to its top, on a mossy foot (like a little bird bath, not a pot)
+	m.add(Kit.blob_mesh(0.42, 6702, 0.25, 0.32, 1), Transform3D(Basis(), Vector3(0, 0.04, 0)), Color("8a8398"))
+	m.add_lumpy(NV._cyl(0.15, 0.27, 0.62, 8, 3), Transform3D(Basis(), Vector3(0, 0.31, 0)), fn, 0.06, Vector3.ZERO, 6701)
+	m.add(Kit.blob_mesh(0.16, 6703, 0.3, 0.4, 1), Transform3D(Basis(), Vector3(0.26, 0.09, 0.14)), Palette.MOSS)
+	m.add(NV._cyl(0.2, 0.17, 0.06, 10), Transform3D(Basis(), Vector3(0, 0.64, 0)), LILAC_STONE.lightened(0.06))
+	# the dish: wide and shallow, overhanging the stone, a thin rolled rim and a dark empty floor
+	m.add(NV._cyl(0.37, 0.2, 0.08, 18), Transform3D(Basis(), Vector3(0, MARKER_DISH_Y - 0.03, 0)), Color("c9b98f"))
+	m.add(_torus(0.345, 0.385), Transform3D(Basis().scaled(Vector3(1.0, 0.55, 1.0)), Vector3(0, MARKER_DISH_Y + 0.012, 0)), Color("e3d6ae"))
+	m.add(NV._cyl(0.34, 0.34, 0.01, 18), Transform3D(Basis(), Vector3(0, MARKER_DISH_Y + 0.006, 0)), Color("4f3f33"))
+	# old wax drips over the rim
+	for i in 3:
+		var a := 0.6 + float(i) * 1.9
+		m.add(NV._sph(0.028, 3, 5), Transform3D(Basis().scaled(Vector3(0.8, 1.7, 0.8)), Vector3(cos(a) * 0.37, MARKER_DISH_Y - 0.03, sin(a) * 0.37)), Color("f4ead2"))
 	return _commit("plinth", m)
+
+
+## The groundskeeper's little tin (note 2): a lidded box with a bright lid and a brass clasp on its +Z side.
+static func tin_box() -> ArrayMesh:
+	if _cache.has("tinbox"):
+		return _cache["tinbox"]
+	var m := NV.Merger.new()
+	m.add(NV._box(Vector3(0.42, 0.18, 0.3)), Transform3D(Basis(), Vector3(0, 0.09, 0)), Color("8fa3ad"))
+	m.add(NV._box(Vector3(0.45, 0.06, 0.33)), Transform3D(Basis(), Vector3(0, 0.2, 0)), Color("d7e4ea"))
+	m.add(NV._box(Vector3(0.36, 0.015, 0.25)), Transform3D(Basis(), Vector3(0, 0.235, 0)), Color("b9ccd6"))
+	m.add(NV._box(Vector3(0.08, 0.1, 0.03)), Transform3D(Basis(), Vector3(0, 0.15, 0.165)), RIBBON_GOLD)
+	m.add(NV._box(Vector3(0.43, 0.02, 0.31)), Transform3D(Basis(), Vector3(0, 0.015, 0)), Color("5f7079"))
+	# a corner of the folded note peeking out under the lid
+	m.add(NV._box(Vector3(0.12, 0.012, 0.08)), xf(Vector3(0.12, 0.17, 0.17), Vector3(0, 12, 0)), Color("fbf3dc"))
+	return _commit("tinbox", m)
 
 
 static func seat_stone() -> ArrayMesh:

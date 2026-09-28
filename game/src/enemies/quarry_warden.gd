@@ -15,11 +15,19 @@ extends "res://src/enemies/enemy_base.gd"
 ##            mark shows the clipped length) tracks her for 60% then locks -> a committed straight charge (one hit):
 ##              * into an INTACT mineral pillar: the pillar cracks (quarry_pillar.crack()) and the Warden is EXPOSED
 ##                for EXPOSE_TIME: its shell splits open around the glowing bell, it takes EXPOSED_MULT damage and
-##                companions may join in;
+##                companions may join in - but one exposure takes at most EXPOSE_CAP of its health (the blow that
+##                reaches the cap is trimmed to it and the shell grinds shut at once; QA CH2-004: one uncapped window
+##                took ~250 of 300 with the starting copper sword and skipped the pulse phase). Early gear needs about
+##                2-3 exposures;
 ##              * into a plain wall - or up to a LEDGE (no floor within LEDGE_PROBE_DEPTH below its next step, so a
 ##                charge baited at the L2 edge never carries it down to L1): a bonk and a stun (shell open);
 ##              * nothing in the way: it skids to a stop and recovers for data recover (3.5 s, shell open).
 ## Shell: outside those windows the shell takes SHELL_MULT of every hit (never nothing: early tools still work).
+## Phase 2 always shows its pulses (MP 12 "then introduce three spaced ground pulses"; QA CH2-004): crossing
+## PHASE2_RATIO makes the pulses OWED - its next attack is the pulses (from pulse reach) - and while they are owed
+## blows never take it below PULSE_FLOOR_RATIO of its health (the excess glances off, a hint explains). The first
+## full pulse cycle pays the debt; after that phase 2 picks its attacks as before. Never a softlock: the pulses are
+## an ordinary committed attack it starts as soon as Krystal is within reach.
 ## Never unwinnable: pillars come from the arena (3, re-knitting by themselves) or group "quarry_pillar" near the
 ## arena; when NO intact pillar is left (or none exists) a charge into any wall exposes it too.
 ## Companions (spec 9) may only hit it while exposed or recovering (can_be_hit_by). Ordinary hits never stagger it;
@@ -69,7 +77,9 @@ const LEDGE_PROBE_LEAD := 0.45       # ... probed this far ahead of that step (i
 const SHELL_MULT := 0.5
 const OPEN_MULT := 1.0
 const EXPOSED_MULT := 1.6
+const EXPOSE_CAP := 0.35             # of max health: the most one exposure can take (then the shell grinds shut)
 const PHASE2_RATIO := 0.66
+const PULSE_FLOOR_RATIO := 0.3       # of max health: blows stop here while the phase-2 pulses are still owed
 const SLAMS_BEFORE_CHARGE := 1
 const POISE := 45.0
 const POISE_WINDOW := 5.0
@@ -91,6 +101,8 @@ var slams_done: int = 0
 var charges_done: int = 0
 var pulses_fired: int = 0
 var exposures: int = 0
+var exposures_capped: int = 0        # exposures cut short by EXPOSE_CAP
+var exposure_damage: float = 0.0     # health taken in the current / last exposure (<= expose_cap())
 var pillars_cracked: int = 0
 var last_charge_result: String = ""  # "hit" | "missed" | "pillar" | "wall" | "wall_exposed"
 var ledge_stops: int = 0             # charges stopped by a ledge (no floor ahead) - they bonk like a wall
@@ -101,6 +113,7 @@ var _resolved := false
 var _center := Vector3.ZERO
 var _pulse_i: int = 0
 var _since_pulses: int = 2
+var _pulses_owed := false
 var _lane_len: float = 0.0
 var _lane_clip_t: float = 0.0
 var _poise_dmg: float = 0.0
@@ -204,6 +217,7 @@ func _on_health_changed(hp: float, max_hp: float) -> void:
 	if phase == 1 and hp > 0.0 and max_hp > 0.0 and hp / max_hp <= PHASE2_RATIO:
 		phase = 2
 		_since_pulses = 2
+		_pulses_owed = true                         # phase 2 opens with its pulses (never skipped by a burst)
 		Events.boss_phase_changed.emit(BAR_ID, 2)
 		Events.caption.emit("[the cracked bell begins to hum]")
 		if visual != null and visual.has_method("set_phase"):
@@ -249,6 +263,8 @@ func reset_encounter() -> void:
 	phase = 1
 	slams_done = 0
 	_since_pulses = 2
+	_pulses_owed = false
+	exposure_damage = 0.0
 	_poise_dmg = 0.0
 	_poise_t = 0.0
 	_poise_immune = 0.0
@@ -344,11 +360,28 @@ func expose_time() -> float:
 
 func attack_reach() -> float:
 	var close := float(data.get("attack_range", 3.4))
+	if next_attack == "pulses" or (next_attack == "" and _pulses_owed):
+		return maxf(close, pulse_radius() * 0.8)
 	if next_attack == "charge" or (next_attack == "" and charge_unlocked()):
 		return maxf(close, charge_distance() * CHARGE_START_FRACTION)
-	if next_attack == "pulses":
-		return maxf(close, pulse_radius() * 0.8)
 	return close
+
+
+## True from the moment phase 2 begins until its first full pulse cycle has played (its next attack is the pulses).
+func pulses_owed() -> bool:
+	return _pulses_owed
+
+
+## The most health one exposure can take (EXPOSE_CAP of max health).
+func expose_cap() -> float:
+	return float(health.max_hp) * EXPOSE_CAP if health != null else 0.0
+
+
+## Blows never take it below this now: PULSE_FLOOR_RATIO of max health while the phase-2 pulses are owed, else 0.
+func pulse_floor() -> float:
+	if not _pulses_owed or health == null:
+		return 0.0
+	return float(health.max_hp) * PULSE_FLOOR_RATIO
 
 
 func _can_start_attack() -> bool:
@@ -357,6 +390,8 @@ func _can_start_attack() -> bool:
 
 func _choose_attack() -> void:
 	var kind := next_attack
+	if kind == "" and _pulses_owed:
+		kind = "pulses"
 	if kind == "":
 		var dist := _flat_dist_to_player()
 		var pulses_ok := phase >= 2 and _since_pulses >= 2
@@ -499,6 +534,8 @@ func _st_custom(state_name: String, delta: float) -> void:
 				if visual != null and visual.has_method("pulse_fired"):
 					visual.pulse_fired(pulse_count() - _pulse_i)
 				_on_attack_resolved(hits2)
+				if _pulse_i >= pulse_count():
+					_pulses_owed = false                # a full cycle played: the phase-2 floor lifts
 			if state_time >= _state_len:
 				_enter("recover", recover_duration())
 		"charge":
@@ -520,8 +557,7 @@ func _st_custom(state_name: String, delta: float) -> void:
 						_end_charge("missed")
 		"exposed":
 			if state_time >= _state_len:
-				_cooldown = float(data.get("cooldown", 3.0)) * intensity_cooldown_mult()
-				_resume_after_interrupt()
+				_end_exposure(false)
 
 
 func _end_charge(result: String) -> void:
@@ -577,12 +613,27 @@ func _pillar_ahead() -> Node3D:
 
 func _expose() -> void:
 	exposures += 1
+	exposure_damage = 0.0
 	_enter("exposed", expose_time())
 	Audio.play_3d("heartseed_pulse", global_position + Vector3.UP * 1.6, 0.0, 0.05)
 	HitFx.chips(global_position + Vector3.UP * 1.8, CRYSTAL, 12, 3.4, 0.8)
 	Events.camera_shake.emit(0.25, 0.3)
 	Events.caption.emit("[the Warden's shell cracks open around its glowing bell]")
 	Events.hint.emit("hint_quarry_warden_exposed", "The Warden's shell is open! Strike the glowing bell before it closes.")
+
+
+## The exposure ends - its time ran out, or it took expose_cap() (`capped`): the shell closes over the bell (its
+## poise starts fresh: the bell blows never bank a stun for right after) and it fights on.
+func _end_exposure(capped: bool) -> void:
+	_poise_dmg = 0.0
+	_poise_t = 0.0
+	if capped:
+		exposures_capped += 1
+		Audio.play_3d("dir_creak", global_position + Vector3.UP * 1.6, -2.0, 0.08)
+		HitFx.chips(global_position + Vector3.UP * 1.8, STONE, 8, 2.6, 0.5)
+		Events.caption.emit("[the Warden's shell grinds shut over its bell]")
+	_cooldown = float(data.get("cooldown", 3.0)) * intensity_cooldown_mult()
+	_resume_after_interrupt()
 
 
 func is_exposed() -> bool:
@@ -670,6 +721,45 @@ func _on_player_died() -> void:
 	else:
 		super._on_player_died()
 	reset_encounter()
+
+
+# --- Damage limits (QA CH2-004) -----------------------------------------------------------------------------------
+
+## Health emits `damaged` after taking the blow but before it tests for death: the part of a blow past the
+## exposure cap or the owed-pulses floor is handed back here, so it never kills or skips through them.
+func _on_damaged(amount: float, source: Node, dir: Vector3) -> void:
+	var shown := _limit_damage(amount)
+	if shown <= 0.0 and amount > 0.0 and health != null and health.hp > 0.0:
+		HitFx.spark(get_aim_point() + _forward() * 0.6)      # nothing got through: it glances off
+		return
+	super._on_damaged(shown, source, dir)
+	if state == "exposed" and health != null and health.hp > 0.0 and exposure_damage >= expose_cap() - 0.01:
+		_end_exposure(true)
+
+
+## The share of a blow (`amount`, already taken from health) it may keep: at most what is left of expose_cap() in
+## an exposure, and never below pulse_floor(). The rest goes back to health.
+func _limit_damage(amount: float) -> float:
+	if health == null or amount <= 0.0:
+		return amount
+	var allowed := amount
+	if state == "exposed":
+		allowed = minf(allowed, maxf(expose_cap() - exposure_damage, 0.0))
+	var fl := pulse_floor()
+	if fl > 0.0:
+		var floored := maxf(float(health.hp) + amount - fl, 0.0)
+		if floored < allowed:
+			allowed = floored
+			_floor_hint()
+	if allowed < amount:
+		health.hp += amount - allowed
+	if state == "exposed":
+		exposure_damage += allowed
+	return allowed
+
+
+func _floor_hint() -> void:
+	Events.hint.emit("hint_quarry_warden_pulses", "The cracked bell is humming - the Warden won't give way until it has rung its three pulses. Step out of the red ring, or roll on each beat!")
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

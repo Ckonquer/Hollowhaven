@@ -10,59 +10,97 @@ const Mat := preload("res://src/art/mat.gd")
 const U := preload("res://src/building/model_util.gd")
 const Shapes := preload("res://src/building/shapes.gd")
 const Batch := preload("res://src/building/batch.gd")
+const Placement := preload("res://src/building/placement.gd")
 
-static var BRASS: Color = Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04)
-static var BOOK_COLS: Array = [Palette.CLOTH_RED, Palette.TEAL, Palette.K_SCARF, Palette.K_PANTS, Palette.FOLIAGE_DARK,
-	Palette.BLOSSOM, Palette.CLOTH_CREAM, Palette.WOOD_DARK, Palette.FLOWER_BLUE]
+static var BRASS: Color = U.keep(Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04))   # never dyed
+## Book spines keep their colours when the shelf is recoloured (U.keep).
+static var BOOK_COLS: Array = [U.keep(Palette.CLOTH_RED), U.keep(Palette.TEAL), U.keep(Palette.K_SCARF), U.keep(Palette.K_PANTS),
+	U.keep(Palette.FOLIAGE_DARK), U.keep(Palette.BLOSSOM), U.keep(Palette.CLOTH_CREAM), U.keep(Palette.WOOD_DARK), U.keep(Palette.FLOWER_BLUE)]
 
 
 # --- Window flower box (1 x 1, wall) ---------------------------------------------------------------------------
 
-static func flower_box(root: Node3D) -> Dictionary:
+## A window box on two wall brackets at sill height (its top just under a round window's frame and under the
+## arched window's sill). `dir` (model option "mount_dir", placement.gd mount_info): on a window panel the box
+## shifts half a metre toward the window centre (-1 / +1 in local x) so it sits centred under the 2 m window;
+## 0 = on its own cell (plain walls, previews).
+static func flower_box(root: Node3D, dir: int = 0) -> Dictionary:
 	var mesh := U.baked("flower_box", func(b: Batch) -> void:
-		var z := -0.33
+		var back := Placement.MOUNT_BACK
+		var z := back + 0.15
+		var y := FLOWER_BOX_Y
+		# Brackets: a plate on the wall and a curved brace under each end of the box.
 		for sx in [-1.0, 1.0]:
-			b.rbox(Vector3(0.06, 0.16, 0.24), Vector3(0.32 * sx, 0.08, z - 0.02), Palette.WOOD_DARK, 0.015)
-		b.rbox(Vector3(0.9, 0.2, 0.26), Vector3(0, 0.26, z), Palette.WOOD_LIGHT, 0.03)
+			b.rbox(Vector3(0.07, 0.26, 0.04), Vector3(0.3 * sx, y - 0.2, back + 0.02), Palette.WOOD_DARK, 0.015)
+			b.rbox(Vector3(0.06, 0.05, 0.3), Vector3(0.3 * sx, y - 0.19, back + 0.13), Palette.WOOD_DARK, 0.015, Vector3(-38, 0, 0))
+			b.sphere(0.022, Vector3(0.3 * sx, y - 0.28, back + 0.045), Palette.BARK_DARK, Vector3(1, 1, 0.5))
+		b.rbox(Vector3(0.9, 0.2, 0.26), Vector3(0, y, z), Palette.WOOD_LIGHT, 0.03)
+		b.rbox(Vector3(0.94, 0.04, 0.3), Vector3(0, y - 0.1, z + 0.01), Palette.WOOD, 0.015)
 		for x in [-0.3, 0.0, 0.3]:
-			b.rbox(Vector3(0.012, 0.18, 0.01), Vector3(x + 0.15, 0.26, z + 0.132), Palette.WOOD, 0.0)
-		b.heart(0.09, Vector3(0, 0.26, z + 0.135), Palette.CLOTH_RED, 0.015)
-		b.rbox(Vector3(0.84, 0.03, 0.2), Vector3(0, 0.355, z), Palette.DIRT_DARK, 0.01)
+			b.rbox(Vector3(0.012, 0.18, 0.01), Vector3(x + 0.15, y, z + 0.132), Palette.WOOD, 0.0)
+		b.heart(0.09, Vector3(0, y, z + 0.135), Palette.CLOTH_RED, 0.015)
+		b.rbox(Vector3(0.84, 0.03, 0.2), Vector3(0, y + 0.095, z), Palette.DIRT_DARK, 0.01)
 		var fcols := [Palette.BLOSSOM, Palette.FLOWER_YELLOW, Palette.FLOWER_PURPLE, Palette.FLOWER_RED, Palette.BLOSSOM, Palette.FLOWER_BLUE]
 		for i in 6:
 			var fx := -0.36 + i * 0.144
-			b.sphere(0.065, Vector3(fx, 0.39, z + (0.03 if i % 2 == 0 else -0.03)), Palette.FOLIAGE, Vector3(1.2, 0.8, 1.0))
-			b.sphere(0.045, Vector3(fx + 0.02, 0.45, z + 0.04), fcols[i])
-			b.sphere(0.018, Vector3(fx + 0.02, 0.47, z + 0.075), Palette.FLOWER_WHITE)
+			b.sphere(0.065, Vector3(fx, y + 0.13, z + 0.02 + (0.03 if i % 2 == 0 else -0.01)), Palette.FOLIAGE, Vector3(1.2, 0.8, 1.0))
+			b.sphere(0.045, Vector3(fx + 0.02, y + 0.19, z + 0.06), fcols[i])
+			b.sphere(0.018, Vector3(fx + 0.02, y + 0.21, z + 0.095), Palette.FLOWER_WHITE)
+		# Ivy trailing over the front edge at both ends (the heart stays clear).
+		for ix in [-0.37, 0.36]:
+			for j in 4:
+				b.sphere(0.032, Vector3(ix + 0.025 * float(j % 2), y + 0.1 - 0.06 * float(j), z + 0.14), Palette.FOLIAGE_DARK if j % 2 == 0 else Palette.FOLIAGE, Vector3(1.3, 0.75, 0.5), Vector3(0, 0, 25.0 * float(1 - 2 * (j % 2))))
 	)
-	U.instance(root, mesh, U.vc_outlined(0.01, {"wind": 0.012, "wind_height": 0.5, "wind_speed": 1.4}))
+	var mi := U.instance(root, mesh, U.vc_outlined(0.01, {"wind": 0.012, "wind_height": 0.5, "wind_speed": 1.4}))
+	mi.position.x = 0.5 * float(signi(dir))
 	return {}
+
+
+const FLOWER_BOX_Y := 0.72        # box centre height: top 0.82, flowers to ~0.95 (round windows start at 1.06)
 
 
 # --- Curtains (1 x 1, wall) --------------------------------------------------------------------------------------
 
-static func curtain(root: Node3D) -> Dictionary:
-	var mesh := U.baked("curtain", func(b: Batch) -> void:
-		var z := -0.42
-		b.cyl(0.025, 0.025, 1.0, Vector3(0, 2.3, z), Palette.WOOD_DARK, Vector3(0, 0, 90), 8)
-		for sx in [-1.0, 1.0]:
-			b.sphere(0.05, Vector3(0.5 * sx, 2.3, z), BRASS)
+## Curtains on a rail held off the wall by brackets (in front of any window frame or sill). `dir` (model option
+## "mount_dir"): on a window panel the piece is one half of a pair that frames the window: a single drape tied
+## back on the side away from the window centre, the rail and valance running across to it (-1 / +1 = the
+## window centre's side in local x). 0 = both drapes on the cell (plain walls, previews).
+static func curtain(root: Node3D, dir: int = 0) -> Dictionary:
+	var sd := signi(dir)
+	var mesh := U.baked("curtain|%d" % sd, func(b: Batch) -> void:
+		var back := Placement.MOUNT_BACK
+		var z := back + CURTAIN_OUT
+		var ry := CURTAIN_RAIL_Y
+		b.cyl(0.025, 0.025, 1.0, Vector3(0, ry, z), Palette.WOOD_DARK, Vector3(0, 0, 90), 8)
+		var ends: Array = [-1.0, 1.0] if sd == 0 else [-float(sd)]
+		for sx in ends:
+			b.sphere(0.05, Vector3(0.5 * sx, ry, z), BRASS)
+		# Brackets from the wall to the rail (away from the panel's corner posts).
+		for bx in [-0.34, 0.34]:
+			b.rbox(Vector3(0.04, 0.04, CURTAIN_OUT + 0.02), Vector3(bx, ry, back + CURTAIN_OUT * 0.5), BRASS.darkened(0.15), 0.012)
+			b.rbox(Vector3(0.06, 0.1, 0.02), Vector3(bx, ry, back + 0.01), BRASS.darkened(0.15), 0.01)
 		# Valance: a scalloped band along the top.
-		b.rbox(Vector3(0.98, 0.16, 0.06), Vector3(0, 2.2, z + 0.05), Palette.CLOTH_RED.darkened(0.05), 0.03)
+		b.rbox(Vector3(0.98, 0.16, 0.06), Vector3(0, ry - 0.1, z + 0.05), Palette.CLOTH_RED.darkened(0.05), 0.03)
 		for k in 6:
-			b.sphere(0.085, Vector3(-0.41 + 0.164 * float(k), 2.12, z + 0.05), Palette.CLOTH_RED.darkened(0.05), Vector3(1, 0.7, 0.45))
-		# Two panels of soft folds, gathered by a ribbon tie-back.
-		for sx in [-1.0, 1.0]:
+			b.sphere(0.085, Vector3(-0.41 + 0.164 * float(k), ry - 0.18, z + 0.05), Palette.CLOTH_RED.darkened(0.05), Vector3(1, 0.7, 0.45))
+		# Drapes of soft folds, gathered by a ribbon tie-back.
+		var sides: Array = [-1.0, 1.0] if sd == 0 else [-float(sd)]
+		for sx in sides:
 			for f in 3:
 				var x: float = (0.2 + 0.1 * float(f)) * sx
 				var col: Color = Palette.CLOTH_RED if f != 1 else Palette.CLOTH_RED.lightened(0.08)
-				b.cyl(0.05, 0.035, 1.05, Vector3(x * 0.9 + 0.03 * sx, 1.62, z + 0.03 + 0.02 * float(f % 2)), col, Vector3.ZERO, 10)
-				b.cyl(0.035, 0.065, 1.05, Vector3(x + 0.02 * sx * float(f), 0.58, z + 0.04 + 0.02 * float(f % 2)), col, Vector3(0, 0, -4.0 * sx), 10)
-			b.torus(0.07, 0.1, Vector3(0.3 * sx, 1.1, z + 0.06), Palette.K_SCARF, Vector3(90, 0, 0), Vector3(1.6, 1, 0.6))
-			b.heart(0.08, Vector3(0.3 * sx, 1.1, z + 0.12), Palette.K_SCARF, 0.02)
+				var top_h := ry - 1.25
+				b.cyl(0.05, 0.035, ry - 0.2 - top_h, Vector3(x * 0.9 + 0.03 * sx, (ry - 0.2 + top_h) * 0.5, z + 0.03 + 0.02 * float(f % 2)), col, Vector3.ZERO, 10)
+				b.cyl(0.035, 0.065, top_h - 0.06, Vector3(x + 0.02 * sx * float(f), (top_h + 0.06) * 0.5, z + 0.04 + 0.02 * float(f % 2)), col, Vector3(0, 0, -4.0 * sx), 10)
+			b.torus(0.07, 0.1, Vector3(0.3 * sx, ry - 1.25, z + 0.06), Palette.K_SCARF, Vector3(90, 0, 0), Vector3(1.6, 1, 0.6))
+			b.heart(0.08, Vector3(0.3 * sx, ry - 1.25, z + 0.12), Palette.K_SCARF, 0.02)
 	)
 	U.instance(root, mesh, U.vc_outlined(0.01))
 	return {}
+
+
+const CURTAIN_RAIL_Y := 2.45
+const CURTAIN_OUT := 0.2          # rail in front of the wall face: clear of window frames (0.1) and sills (0.11)
 
 
 # --- Bookshelf (2 x 1) ----------------------------------------------------------------------------------------------

@@ -2,8 +2,9 @@ extends Node3D
 ## The escaped Matron's look for the Weaver's Crossing (MP 13.2), built by COMPOSITION around the Chapter One
 ## visuals (weaver_visual.gd / shade_visual.gd are reused untouched as the inner body):
 ##   silk mode (arachnophobia OFF): the Weaver Matron (WeaverVisual, scale 2.6) + what she carries out of the
-##       Heartseed Chamber: a dull ember SCAR ringing her abdomen (the braziers' burn) and a frayed MANTLE of
-##       torn silk streamers trailing behind - a distinct silhouette from the Chapter One boss;
+##       Heartseed Chamber: a dull ember SCAR burnt round her abdomen (the braziers' burn; a band fitted onto the
+##       abdomen surface and riding its bob, CR-05 - never a hoop floating off the body) and a fuller frayed MANTLE
+##       of six torn silk streamers trailing behind - a distinct silhouette from the Chapter One boss;
 ##   arachnophobia ON: the Hollow Mother (ShadeVisual, scale 2.3, upright, floats beneath the stone seals) +
 ##       two long drifting pale VEILS from her shoulders and a circlet of pale ROOTS above her hood.
 ## Both: a soft COIL HALO that brightens for the delayed pounce's final preparation (set_final_tell), steady
@@ -21,7 +22,16 @@ const WEAVER_SCALE := 2.6
 const SHADE_SCALE := 2.3
 const SCAR := Color("7a3a22")
 const SCAR_GLOW := Color("ff7a3a")
-const MANTLE := Color(0.9, 0.88, 0.96, 0.75)
+const MANTLE := Color(0.9, 0.88, 0.96, 0.9)
+const STREAMERS := 6
+## The ember scar fitted onto the Weaver's abdomen pivot (its local space, x the Weaver scale): a torus hugging the
+## abdomen blob (radius 0.33, squashed 0.85 in y) as a flat belt round its long axis.
+const SCAR_INNER := 0.29
+const SCAR_OUTER := 0.355
+const SCAR_POS := Vector3(0.0, 0.0, -0.05)
+const SCAR_ROT := Vector3(90.0, 0.0, 0.0)
+const SCAR_SCALE := Vector3(1.0, 1.0, 0.865)
+const SCAR_GLOW_ENERGY := 0.6
 const VEIL := Color(0.86, 0.94, 0.84, 0.55)
 const ROOT := Color("cdbfa3")
 const HALO_SILK := Color(1.0, 0.8, 0.62)
@@ -34,6 +44,7 @@ var state_len: float = 0.0
 var final_tell := false
 
 var _extras: Node3D = null
+var _scar: MeshInstance3D = null
 var _streamers: Array = []
 var _halo: MeshInstance3D = null
 var _halo_mat: StandardMaterial3D = null
@@ -114,6 +125,15 @@ func halo_strength() -> float:
 	return _halo_mat.albedo_color.a if _halo_mat != null else 0.0
 
 
+## The ember scar (silk mode; null with arachnophobia on) - tests.
+func scar_node() -> MeshInstance3D:
+	return _scar if _scar != null and is_instance_valid(_scar) else null
+
+
+func streamer_count() -> int:
+	return _streamers.size()
+
+
 # --- Building -------------------------------------------------------------------------------------------------------
 
 func _build() -> void:
@@ -121,6 +141,7 @@ func _build() -> void:
 		if n != null and is_instance_valid(n):
 			remove_child(n)
 			(n as Node).queue_free()
+	_scar = null        # it lived under the old body (or the old extras) and leaves with it
 	_streamers.clear()
 	if alt:
 		inner = ShadeVisual.new()
@@ -154,17 +175,30 @@ func _build() -> void:
 
 func _build_mantle() -> void:
 	var s := WEAVER_SCALE
-	var scar := Kit.torus(0.3, 0.36, Mat.toon(SCAR, {"rim": 0.2, "emission": SCAR_GLOW, "emission_energy": 0.35}))
-	scar.name = "EmberScar"
-	scar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	Kit.add(_extras, scar, Vector3(0, (0.46 + 0.1) * s, 0.4 * s), Vector3(90, 0, 0), Vector3(s, s * 1.3, s * 0.6))
+	var scar_mat := Mat.toon(SCAR, {"rim": 0.2, "emission": SCAR_GLOW, "emission_energy": SCAR_GLOW_ENERGY})
+	var abd: Node3D = null
+	if inner != null and inner.has_method("abdomen_node"):
+		abd = inner.call("abdomen_node") as Node3D
+	if abd != null:
+		# on the abdomen itself: it bobs and tips with her poses and leaves with the body on a swap
+		_scar = Kit.torus(SCAR_INNER, SCAR_OUTER, scar_mat)
+		_scar.name = "EmberScar"
+		_scar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		Kit.add(abd, _scar, SCAR_POS, SCAR_ROT, SCAR_SCALE)
+	else:
+		# the body is not built yet (outside the tree): the old free placement; _ready rebuilds onto the abdomen
+		_scar = Kit.torus(0.3, 0.36, scar_mat)
+		_scar.name = "EmberScar"
+		_scar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		Kit.add(_extras, _scar, Vector3(0, (0.46 + 0.1) * s, 0.4 * s), Vector3(90, 0, 0), Vector3(s, s * 1.3, s * 0.6))
 	var silk := Mat.transparent(MANTLE, false)
-	for i in 4:
-		var sx := (float(i) - 1.5) * 0.12 * s
-		var strip := Kit.box(Vector3(0.07 * s, 0.012 * s, 0.9 * s), silk)
+	var mid := float(STREAMERS - 1) * 0.5
+	for i in STREAMERS:
+		var sx := (float(i) - mid) * 0.1 * s
+		var strip := Kit.box(Vector3(0.1 * s, 0.012 * s, (0.8 + 0.25 * float((i * 5) % 3)) * s), silk)
 		strip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		strip.name = "Streamer%d" % i
-		Kit.add(_extras, strip, Vector3(sx, (0.46 + 0.02) * s, (0.72 + 0.45) * s), Vector3(-8.0 - 5.0 * float(i % 2), (float(i) - 1.5) * 7.0, 0))
+		Kit.add(_extras, strip, Vector3(sx, (0.46 + 0.02) * s, (0.72 + 0.45) * s), Vector3(-8.0 - 5.0 * float(i % 2), (float(i) - mid) * 8.0, 0))
 		_streamers.append(strip)
 
 

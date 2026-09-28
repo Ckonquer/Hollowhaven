@@ -144,7 +144,7 @@ const NODE_TOKENS := {"pumpkin_vine": "pumpkin", "roseberry_bush": "roseberry", 
 	"sugarcap_patch": "sugarcap", "sap_stump": "resin", "sunflax_patch": "sunflax"}
 
 # --- Pumpkintide Orchard -----------------------------------------------------------------------------------
-const ORCHARD_ENTRY := Vector2(-62.5, 48.4)       # the region's orchard_arch spawn (where she arrives)
+const ORCHARD_ENTRY := Vector2(-63.88, 47.53)     # the region's orchard_arch spawn (where she arrives)
 ## Irrigation: a stone cistern feeds a wooden flume south to a junction. Lever 1 at the junction sends the water
 ## west (the drain pond, where it starts) or south-east toward the festival garden; lever 2 raises the garden
 ## sluice gate. Water reaches the garden only when both are set (src/world/reach/west/irrigation.gd).
@@ -296,6 +296,18 @@ const LEANING_STONES := [
 ]
 const VIOLET_LIGHTS := [[Vector2(-86.0, -62.0), 3.4, 14.0, 1.3], [Vector2(-75.5, -53.5), 2.2, 8.0, 0.9],
 	[Vector2(-95.5, -66.0), 2.2, 8.0, 0.9]]         # [pos, height, range, energy (night)]
+## Warm candle light at night, inside the west districts' light budget (at most 8 lights, none shadowed): ONE warm
+## unshadowed omni light low over the Candle Tree's candle ring (CANDLE_LIGHTS) and one at each lit gate
+## (candleyard_controller GATE_LIGHT_*); every other candle cluster gets a warm glow DECAL (emission only, not a
+## Light3D: CANDLE_POOLS) so the ground, the grass and the stones' feet pick up soft light pools. All off by day.
+const CANDLE_LIGHTS := [[Vector2(-86.0, -62.0), 0.9, 6.5, 1.7]]      # [pos, height, range, energy (night)]
+const CANDLE_POOLS := [
+	[Vector2(-80.9, -62.2), 2.4, 1.0], [Vector2(-90.0, -58.3), 2.4, 1.0], [Vector2(-91.3, -66.8), 2.6, 1.0],
+	[Vector2(-79.6, -68.3), 2.6, 1.0], [Vector2(-86.4, -50.6), 2.8, 0.9], [Vector2(-97.2, -60.6), 2.8, 0.9],
+	[Vector2(-94.6, -72.0), 2.6, 0.9], [Vector2(-75.4, -71.6), 2.6, 0.9],
+]                                                                        # [pos, radius, strength (night)]
+const CANDLE_WARM := Color("ffb562")
+const MARKER_POOL := [1.8, 0.8]          # [radius, strength]: the groundskeeper's candle, once she has lit it
 const CANDLEYARD_FOOTPRINTS := [
 	[Vector2(-86.0, -60.0), 19.9], [Vector2(-65.2, -62.8), 2.8], [Vector2(-80.5, -43.8), 1.6],
 	[Vector2(-92.8, -43.9), 1.6], [Vector2(-86.0, -41.0), 3.0], [Vector2(-74.0, -45.2), 3.0],

@@ -444,6 +444,7 @@ static func sap_stump_visual(variant: int) -> Node3D:
 
 
 ## Wild sunflax clump: short green stubble ("Stems", stays) + tall stalks with golden flower heads ("Berries").
+## The stalks stand ~1.1 m tall with big bright heads, so the patch rises above the Sunny Meadow's grass.
 static func sunflax_visual(variant: int) -> Node3D:
 	var key := "sunflax|%d" % variant
 	if not _meshes.has(key):
@@ -457,17 +458,18 @@ static func sunflax_visual(variant: int) -> Node3D:
 			var base := Vector3(cos(a) * rr, 0.0, sin(a) * rr)
 			var tilt := Basis(Vector3.UP, a) * Basis(Vector3.RIGHT, rng.randf_range(0.04, 0.22))
 			stems.add(NodeVisuals._cyl(0.012, 0.018, 0.16, 4), Transform3D(tilt, base + Vector3(0, 0.08, 0)), SUNFLAX_STEM.darkened(0.1))
-			var h := rng.randf_range(0.55, 0.9)
-			tops.add(NodeVisuals._cyl(0.008, 0.012, h, 4), Transform3D(tilt, base + tilt * Vector3(0, 0.16 + h * 0.5, 0)), SUNFLAX_STEM)
+			var h := rng.randf_range(0.72, 0.96)
+			tops.add(NodeVisuals._cyl(0.009, 0.013, h, 4), Transform3D(tilt, base + tilt * Vector3(0, 0.16 + h * 0.5, 0)), SUNFLAX_STEM)
 			var tip := base + tilt * Vector3(0, 0.16 + h, 0)
-			tops.add(NodeVisuals._sph(0.04, 4, 6), Transform3D(Basis().scaled(Vector3(1.4, 0.6, 1.4)), tip), SUNFLAX_GOLD)
+			tops.add(NodeVisuals._sph(0.058, 4, 7), Transform3D(Basis().scaled(Vector3(1.45, 0.62, 1.45)), tip), SUNFLAX_GOLD)
+			tops.add(NodeVisuals._sph(0.03, 3, 5), Transform3D(Basis().scaled(Vector3(1.0, 0.7, 1.0)), tip + Vector3(0, 0.03, 0)), Color("fff1b0") if i % 2 == 0 else Color("e0a53a"))
 			if i % 3 == 0:
-				tops.add(NodeVisuals._sph(0.025, 3, 5), Transform3D(Basis(), tip + Vector3(0, 0.035, 0)), Color("fff1b0"))
+				tops.add(NodeVisuals._sph(0.05, 3, 5), Transform3D(tilt * Basis().scaled(Vector3(1.6, 0.25, 0.7)), base + tilt * Vector3(0.03, 0.16 + h * 0.55, 0)), SUNFLAX_STEM.lightened(0.1))
 		_meshes[key] = stems.commit()
 		_meshes[key + "|tops"] = tops.commit()
 	var root_node := Node3D.new()
 	var m_stem := Mat.toon(Color.WHITE, {"vertex_color": true, "rim": 0.2})
-	var m_top := Mat.toon(Color.WHITE, {"vertex_color": true, "rim": 0.3, "wind": 0.05, "wind_height": 1.0})
+	var m_top := Mat.toon(Color.WHITE, {"vertex_color": true, "rim": 0.45, "wind": 0.05, "wind_height": 1.0, "emission": SUNFLAX_GOLD, "emission_energy": 0.12})
 	root_node.add_child(mi(_meshes[key], m_stem, "Stems", 55.0, false))
 	root_node.add_child(mi(_meshes[key + "|tops"], m_top, "Berries", 70.0, false))
 	root_node.set_meta("solid", "none")
@@ -679,6 +681,68 @@ static func moonbell_mesh() -> ArrayMesh:
 	var mesh := m.commit()
 	_meshes["moonbell"] = mesh
 	return mesh
+
+
+## Just the moonbells' bell caps, a little larger (the night glow shell drawn over moonbell_mesh()).
+static func moonbell_glow_mesh() -> ArrayMesh:
+	if _meshes.has("moonbell_glow"):
+		return _meshes["moonbell_glow"]
+	var m := NodeVisuals.Merger.new()
+	for i in 3:
+		var a := TAU * float(i) / 3.0 + 0.4
+		var off := Vector3(cos(a) * 0.12, 0, sin(a) * 0.12)
+		var h := 0.42 + float(i) * 0.08
+		m.add(NodeVisuals._hemi(0.092, 0.115, 10), Transform3D(Basis(Vector3.RIGHT, PI), off + Vector3(0, h + 0.065, 0)), Color.WHITE)
+	var mesh := m.commit()
+	_meshes["moonbell_glow"] = mesh
+	return mesh
+
+
+## The moonbells' night glow (bright enough to bloom; steady, never flashing).
+static func moonbell_glow_material() -> Material:
+	return Mat.glow(MOONBELL_GLOW, 3.0)
+
+
+## A soft additive moonlight halo card that always faces the camera (drawn around each moonbell at night).
+## A generated radial gradient, no image files. Unit quad: scale it.
+static func moonbell_halo_material() -> Material:
+	if _meshes.has("mat_moon_halo"):
+		return _meshes["mat_moon_halo"]
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	g.add_point(0.3, Color(1, 1, 1, 0.5))
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(0.5, 0.0)
+	tex.width = 64
+	tex.height = 64
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.billboard_keep_scale = true
+	m.albedo_texture = tex
+	var c := MOONBELL_GLOW
+	c.a = 0.7
+	m.albedo_color = c
+	m.proximity_fade_enabled = true
+	m.proximity_fade_distance = 0.3
+	_meshes["mat_moon_halo"] = m
+	return m
+
+
+static func halo_quad() -> Mesh:
+	if not _meshes.has("halo_quad"):
+		var q := QuadMesh.new()
+		q.size = Vector2.ONE
+		_meshes["halo_quad"] = q
+	return _meshes["halo_quad"]
 
 
 ## Day / night materials for the moonbells (the night one glows softly; steady, never flashing).

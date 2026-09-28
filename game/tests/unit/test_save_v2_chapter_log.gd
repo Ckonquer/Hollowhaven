@@ -6,6 +6,7 @@ extends "res://tests/unit/test_core_base.gd"
 
 const ChapterLog := preload("res://src/core/chapter_log.gd")
 const Data := preload("res://data/quests_ch2.gd")
+const DeepLayout := preload("res://data/works_layout_deep.gd")
 const MP_IDS := ["ch2_light_beyond", "ch2_waygate", "ch2_commons", "ch2_outer_lamps", "ch2_orchard", "ch2_quarry",
 	"ch2_manor", "ch2_prepare", "ch2_lamps_linked", "ch2_service_gate", "ch2_true_signal", "ch2_refuge", "ch2_miners",
 	"ch2_three_lines", "ch2_weaver_crossing", "ch2_false_home", "ch2_choir", "ch2_routes_restored", "ch2_homecoming",
@@ -52,6 +53,32 @@ func _finish(step_id: String) -> void:
 		GameState.set_flag(f)
 
 
+## "New goal" announcements among recorded Events.notify calls, in order.
+func _news(notes: Array) -> Array:
+	var out: Array = []
+	for n in notes:
+		if String(n[0]).begins_with("New goal"):
+			out.append(String(n[0]))
+	return out
+
+
+## Hint ids among recorded Events.hint calls, in order.
+func _hint_ids(hints: Array) -> Array:
+	var out: Array = []
+	for h in hints:
+		out.append(String(h[0]))
+	return out
+
+
+## A title's words, lower case, sorted (so "Three Lamps, Three Roads" == "Three Roads, Three Lamps").
+func _title_words(t: String) -> Array:
+	var words: Array = []
+	for w in t.to_lower().replace(",", " ").replace(".", " ").replace(":", " ").split(" ", false):
+		words.append(w)
+	words.sort()
+	return words
+
+
 ## Reward-item total, whether the item is known (backpack/pouch) or not yet defined (orphans).
 func _held(id: String) -> int:
 	var n := GameState.count_item(id)
@@ -87,7 +114,26 @@ func test_twenty_steps_with_the_design_ids_in_order() -> void:
 	for s in Data.STEPS:
 		if String(s.get("group", "")) == "lamps":
 			grouped.append(s["id"])
-	assert_eq(grouped, ["ch2_orchard", "ch2_quarry", "ch2_manor"])
+	assert_eq(grouped, ["ch2_outer_lamps", "ch2_orchard", "ch2_quarry", "ch2_manor"], "the lamp search and its three roads")
+	# A group only works as consecutive steps (ChapterLog._pending_front walks STEPS in order).
+	var seen_groups: Array = []
+	var prev := ""
+	for s in Data.STEPS:
+		var g := String(s.get("group", ""))
+		if g != "" and g != prev:
+			assert_false(seen_groups.has(g), "group %s is consecutive" % g)
+			seen_groups.append(g)
+			assert_true(Data.GROUPS.has(g), "group %s has display data" % g)
+		prev = g
+	# Place-bound hints: each lamp road's hint waits until that lamp is found.
+	var hint_flags := {}
+	for s in Data.STEPS:
+		if s.has("hint_when"):
+			var w: Dictionary = s["hint_when"]
+			assert_eq(String(w.get("type", "")), "flag", s["id"] + " hint_when is a flag check")
+			hint_flags[s["id"]] = String(w.get("flag", ""))
+	assert_eq(hint_flags, {"ch2_orchard": "ch2_found_orchard_lamp", "ch2_quarry": "ch2_found_quarry_lamp",
+		"ch2_manor": "ch2_found_manor_lamp"})
 	assert_eq(Data.FINAL_STEP, "ch2_feast")
 	# Hints are shown by the HUD hint card: every {token} must be one the UI knows how to fill in.
 	var tokens: Array = preload("res://src/ui/ui_util.gd").TOKEN_ACTIONS.keys() + ["move"]
@@ -225,6 +271,180 @@ func test_lamp_steps_are_shown_together_and_done_in_any_order() -> void:
 	assert_true(GameState.get_flag("ch2_orchard_restored"), "lamp steps set their recipe unlock flags")
 	assert_true(GameState.get_flag("ch2_quarry_restored"))
 	assert_true(GameState.get_flag("ch2_manor_restored"))
+
+
+## CH2-001: the lamp search and the three roads are current together as soon as the Commons is done, so a lit
+## lamp completes its own road at once (seal, recipe flag, "Goal complete" + message) while the other lamps are
+## not even found, and each road is recorded on its own (MP §9). Before the fix the roads only started once the
+## manor lamp had been found, and the Garden / Quarry Seals waited until then.
+func test_each_lit_lamp_pays_its_road_at_once() -> void:
+	_activate()
+	_finish("ch2_waygate")
+	_finish("ch2_commons")
+	var notes := record(Events.notify, 2)
+	log.evaluate()
+	assert_eq(_ids(log.current_steps()), ["ch2_outer_lamps", "ch2_orchard", "ch2_quarry", "ch2_manor"])
+	assert_eq(log.display_title(), "Three Roads, Three Lamps")
+	assert_eq(_news(notes), ["New goal: Three Roads, Three Lamps"], "one announcement for the whole group")
+	# The garden lamp, found and lit first: the orchard road pays now, with the quarry and manor lamps unfound.
+	GameState.set_flag("ch2_found_orchard_lamp")
+	GameState.set_flag("ch2_garden_lamp_lit")
+	assert_true(log.has_pending_completion(), "the 1 s poll sees the lit lamp")
+	log.evaluate()
+	assert_true(log.is_done("ch2_orchard"))
+	assert_eq(_held("garden_seal"), 1)
+	assert_true(GameState.get_flag("ch2_orchard_restored"), "its recipes unlock now")
+	assert_true(notes.has(["Goal complete: Pumpkins With Opinions", "quest"]))
+	assert_true(notes.has([String(log.step_by_id("ch2_orchard")["on_complete"]["message"]), "info"]))
+	assert_false(log.is_done("ch2_outer_lamps"), "the search is still open")
+	assert_eq(_ids(log.current_steps()), ["ch2_outer_lamps", "ch2_quarry", "ch2_manor"])
+	# Then the quarry, the manor lamp still unfound: its own seal, the garden one untouched.
+	GameState.set_flag("ch2_found_quarry_lamp")
+	GameState.set_flag("ch2_quarry_lamp_lit")
+	log.evaluate()
+	assert_true(log.is_done("ch2_quarry"))
+	assert_eq(_held("quarry_seal"), 1)
+	assert_eq(_held("garden_seal"), 1)
+	assert_true(GameState.get_flag("ch2_quarry_restored"), "Ironwood recipes before the manor")
+	assert_eq(_ids(log.current_steps()), ["ch2_outer_lamps", "ch2_manor"])
+	assert_eq(log.display_title(), "Three Roads, Three Lamps", "still the group")
+	# Finding the manor lamp completes the search (its own record); the manor road stays open until it is lit.
+	GameState.set_flag("ch2_found_manor_lamp")
+	log.evaluate()
+	assert_true(log.is_done("ch2_outer_lamps"))
+	assert_true(notes.has(["Goal complete: Find the Three Lamps", "quest"]))
+	assert_eq(_ids(log.current_steps()), ["ch2_manor"])
+	assert_false(GameState.has_reward("rw_ch2_manor"))
+	GameState.set_flag("ch2_manor_lamp_lit")
+	log.evaluate()
+	assert_eq(_held("manor_seal"), 1)
+	assert_eq(_ids(log.current_steps()), ["ch2_prepare"])
+	assert_eq(_news(notes), ["New goal: Three Roads, Three Lamps", "New goal: Made for the Journey"])
+
+
+## CH2-001, old saves: a save the old build made while the lamp search held the roads back (the search current,
+## the garden lamp already lit, the quarry lamp found) loads unchanged, and the next evaluation - the 1 s poll -
+## pays the garden road at once (state based), starts the other roads without announcing the group again and
+## gives the found quarry lamp its hint.
+func test_old_save_stuck_in_the_lamp_search_pays_on_load() -> void:
+	_activate()
+	for f in ["ch2_waygate_repaired", "ch2_arch_commons", "ch2_read_festival_map", "ch2_found_orchard_lamp",
+			"ch2_garden_lamp_lit", "ch2_found_quarry_lamp"]:
+		GameState.set_flag(f)
+	# Exactly what the old build saved: done up to the Commons, only the lamp search started.
+	var old := {"accepted": true, "done": ["ch2_light_beyond", "ch2_waygate", "ch2_commons"],
+		"baselines": {"ch2_light_beyond": {}, "ch2_waygate": {}, "ch2_commons": {}, "ch2_outer_lamps": {}}}
+	var saved: Dictionary = GameState.to_dict()
+	saved["chapter2"] = old
+	GameState.from_dict(json_norm(saved))
+	log = GameState.chapter2
+	assert_deep_eq(json_norm(log.to_dict()), json_norm(old), "loading changes nothing by itself")
+	assert_false(GameState.has_reward("rw_ch2_orchard"))
+	assert_true(log.has_pending_completion(), "the poll sees the lit garden lamp")
+	var notes := record(Events.notify, 2)
+	var hints := record(Events.hint, 2)
+	log.evaluate()
+	assert_true(log.is_done("ch2_orchard"), "the stuck road completes on load")
+	assert_eq(_held("garden_seal"), 1)
+	assert_true(GameState.get_flag("ch2_orchard_restored"))
+	assert_true(notes.has(["Goal complete: Pumpkins With Opinions", "quest"]))
+	assert_eq(_news(notes), [], "the old build announced the group already")
+	assert_eq(_ids(log.current_steps()), ["ch2_outer_lamps", "ch2_quarry", "ch2_manor"])
+	assert_eq(_hint_ids(hints), ["quest_ch2_quarry"], "the found quarry lamp's hint; none for the paid road")
+	log.evaluate()
+	assert_eq(_held("garden_seal"), 1, "paid once")
+	assert_eq(_hint_ids(hints), ["quest_ch2_quarry"], "hints once")
+
+
+## CH2-001 hints: when the lamp group starts at the Commons only the search's map hint goes out (not four cards
+## about places Krystal has not reached); each road's hint waits until its lamp is found - she is standing at it -
+## and goes out once. One the HUD hint card already showed (flag hint_quest_<id>, an earlier session) stays quiet.
+func test_lamp_road_hints_wait_for_their_lamp() -> void:
+	_activate()
+	_finish("ch2_waygate")
+	_finish("ch2_commons")
+	var hints := record(Events.hint, 2)
+	log.evaluate()
+	assert_eq(_hint_ids(hints), ["quest_ch2_outer_lamps"])
+	GameState.set_flag("ch2_found_quarry_lamp")
+	log.evaluate()
+	assert_eq(_hint_ids(hints), ["quest_ch2_outer_lamps", "quest_ch2_quarry"])
+	if hints.size() > 1:
+		assert_eq(String(hints[1][1]), String(log.step_by_id("ch2_quarry")["hint"]))
+	log.evaluate()
+	assert_eq(hints.size(), 2, "once")
+	GameState.set_flag("hint_quest_ch2_manor", true)
+	GameState.set_flag("ch2_found_orchard_lamp")
+	GameState.set_flag("ch2_found_manor_lamp")
+	log.evaluate()
+	assert_true(log.is_done("ch2_outer_lamps"))
+	assert_eq(_hint_ids(hints), ["quest_ch2_outer_lamps", "quest_ch2_quarry", "quest_ch2_orchard"])
+	# A new session (loading) forgets what went out, the hint card's flags do not.
+	GameState.set_flag("hint_quest_ch2_orchard", true)
+	GameState.set_flag("hint_quest_ch2_quarry", true)
+	log.from_dict(log.to_dict())
+	log.evaluate()
+	assert_eq(hints.size(), 3)
+
+
+## CH2-012: a group title and a step title never read as the same goal twice (the old step 'Three Lamps, Three
+## Roads' followed by 'New goal: Three Roads, Three Lamps'): no step title uses exactly the words of a group title.
+func test_group_and_step_titles_never_repeat_each_other() -> void:
+	for g in Data.GROUPS:
+		var gw := _title_words(String(Data.GROUPS[g]["title"]))
+		for s in Data.STEPS:
+			for field in ["title", "alt_title"]:
+				if s.has(field):
+					assert_ne(_title_words(String(s[field])), gw, "%s %s vs the %s group title" % [s["id"], field, g])
+
+
+## CH2-015: a step's hint goes out when the step starts - wherever Krystal is (Wake the Lines ends in whichever
+## room restores the last line, often the Light Well) - and the journal shows it as the tip for as long as the
+## step is current, so a hint never assumes where she stands. The crossing hint still names its checkpoint.
+func test_step_hints_never_assume_where_krystal_stands() -> void:
+	var relative := ["behind you", "in front of you", "ahead of you", "beside you", "next to you", "around you"]
+	for s in Data.STEPS:
+		for field in ["hint", "alt_hint"]:
+			var h := String(s.get(field, "")).to_lower()
+			for p in relative:
+				assert_false(h.contains(p), "%s %s assumes where she stands ('%s')" % [s["id"], field, p])
+	# The hint really goes out at the last line, far from the crossing.
+	_activate()
+	for id in MP_IDS.slice(1, 13):   # up to What They Left
+		_finish(id)
+	GameState.set_flag("ch2_line_water")
+	GameState.set_flag("ch2_line_bell")
+	log.evaluate()
+	var hints := record(Events.hint, 2)
+	GameState.set_flag("ch2_line_light")   # restored in the Light Well
+	log.evaluate()
+	assert_eq(_hint_ids(hints), ["quest_ch2_weaver_crossing"])
+	assert_true(String(hints[0][1]).contains("checkpoint"), "the checkpoint is still mentioned: " + String(hints[0][1]))
+	assert_true(String(hints[0][1]).contains("before the bridge"), "and where it is")
+
+
+## CH2-016: the Choir falls in the vault and "Lanterns on Every Road" starts right there, as the vault's own
+## bell-lift opens: the hint sent at that moment names that lift and where it goes (the Sunken Bellhouse, in the
+## Reach), not the refuge shortcut or the Bellhouse stair five rooms back.
+func test_after_the_choir_the_hint_names_the_vault_bell_lift() -> void:
+	_activate()
+	for id in MP_IDS.slice(1, 16):   # up to The House That Isn't
+		_finish(id)
+	log.evaluate()
+	assert_eq(_ids(log.current_steps()), ["ch2_choir"])
+	var hints := record(Events.hint, 2)
+	GameState.set_flag("ch2_choir_defeated")
+	log.evaluate()
+	assert_eq(_ids(log.current_steps()), ["ch2_routes_restored"])
+	assert_eq(_hint_ids(hints), ["quest_ch2_routes_restored"])
+	var h := String(hints[0][1])
+	assert_true(h.contains("bell-lift"), h)
+	assert_true(h.contains("Sunken Bellhouse"), h)
+	assert_false(h.begins_with("Take the refuge shortcut"), "the vault's exit comes first: " + h)
+	# That lift really goes up to the Reach (choir_arena.gd rides it to works_layout_deep.gd VAULT_EXIT_TARGET).
+	var exit_target: Dictionary = DeepLayout.VAULT_EXIT_TARGET
+	assert_eq(String(exit_target["area"]), Data.REACH)
+	assert_true(String(exit_target["spawn"]).begins_with("bellhouse"), str(exit_target))
 
 
 ## R38 / F03: the quarry step shows what its lamp needs ("Calm the Quarry Warden", "Mend the mineral winch")

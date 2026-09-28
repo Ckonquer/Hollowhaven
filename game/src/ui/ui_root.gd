@@ -12,6 +12,12 @@ extends CanvasLayer
 ## "expedition" panel (Expedition Board; full-screen) and the "music_box" panel (Music Box; never pauses), has_panel(name),
 ## the one-time "Your wardrobe is ready" notice for older saves (tick_wardrobe_notice / show_wardrobe_notice),
 ## and show_chapter_two_ending() (awaitable; Game._show_chapter_two_ending() prefers it).
+## HUD hush (visual QA theme T4): while a chapter card, a full-screen menu or modal card, the ending or the death
+## screen is up, the chatter waits: toasts and quest banners hold in their queues with their timers paused (the top
+## layer fades out, so nothing lands on the card / ending text or peeks past a menu's edge), the tip card holds
+## and re-checks that its tip still applies before it comes back, and during a chapter card the gameplay HUD steps
+## aside like a cutscene. hush_reason() / is_hushed(); _sync_hush() applies it (on every change and polled).
+## Toasts also climb above the dialogue box whenever it would share their corner (_layout_toasts, IN-09).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -59,6 +65,10 @@ const WARDROBE_NOTICE_POLL := 0.25
 ## Command-line args (debug boots, screenshots, demos) that switch the notice off; --ui-show=wardrobe_notice
 ## still shows it on demand.
 const NOTICE_OFF_ARGS := ["cams", "shot-dir", "shots", "area", "preview", "player-demo", "no-wardrobe-notice"]
+## Toast column (bottom-right): margins [left, top, right, bottom]; the bottom one grows while the dialogue box is up.
+const TOAST_MARGINS := [34, 34, 34, 150]
+const TOAST_DIALOG_GAP := 18.0     # clearance between the toasts and the dialogue box (its speaker tab included)
+const TOAST_LAYOUT_POLL := 0.1
 
 var root: Control
 var hud: Control
@@ -83,6 +93,10 @@ var wardrobe_notice_enabled: bool = true
 var _notice_safe_t := 0.0
 var _notice_poll_t := 0.0
 var _notice_showing := false
+var toast_margin: MarginContainer  # the toast column's margins (bottom grows over the dialogue box)
+var _hush := ""                    # last applied hush_reason()
+var _toast_layout_t := 0.0
+var _toast_bottom := -1.0
 
 
 func _ready() -> void:
@@ -108,9 +122,10 @@ func _ready() -> void:
 	top_layer = _layer("Top")
 	panel_layer = _layer("Panels")
 	toasts = Toasts.new()
-	var tmc := Kit.margin([34, 34, 34, 150])
+	var tmc := Kit.margin(TOAST_MARGINS)
 	tmc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_layer.add_child(Kit.full_rect(tmc))
+	toast_margin = tmc
 	var tv := Kit.vbox(0)
 	tv.alignment = BoxContainer.ALIGNMENT_END
 	tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -128,6 +143,15 @@ func _ready() -> void:
 	Events.area_loaded.connect(_on_area_loaded)
 	Events.area_exiting.connect(func(_a: String) -> void: close_all())
 	Events.settings_changed.connect(_on_settings_changed)
+	apply_window_scale()
+	get_window().size_changed.connect(apply_window_scale)
+
+
+## Small windows get slightly larger small print (ThemeFactory.apply_window_scale, visual QA UI-22). Not headless.
+func apply_window_scale() -> void:
+	if DisplayServer.get_name() == "headless" or not is_inside_tree():
+		return
+	ThemeFactory.apply_window_scale(float(get_window().size.y))
 
 
 func _layer(n: String) -> Control:
@@ -205,6 +229,7 @@ func open(panel_name: String, args: Dictionary = {}) -> void:
 	Game.push_ui(panel_name)
 	_update_pause()
 	_refresh_focus_layers()
+	_sync_hush()
 	Audio.play_ui("ui_open")
 
 
@@ -243,6 +268,7 @@ func close(panel_name: String) -> void:
 	Game.pop_ui(panel_name)
 	_update_pause()
 	_refresh_focus_layers()
+	_sync_hush()
 	Audio.play_ui("ui_close")
 	if panel_name == "settings":
 		UiUtil.save_settings()
@@ -407,6 +433,7 @@ func show_chapter_card(title: String, subtitle: String = "") -> void:
 	_card = ChapterCard.new()
 	_card.setup(title, subtitle)
 	overlay_layer.add_child(_card)
+	_sync_hush()
 
 
 ## ~2.5 s: dims, "Krystal was overwhelmed...", then fades to black (the respawn fades back in).
@@ -415,11 +442,13 @@ func show_death() -> void:
 	hud.set_cinematic(true)
 	_death = DeathScreen.new()
 	overlay_layer.add_child(_death)
+	_sync_hush()
 	await _death.play()
 	await fade_out(0.6)
 	if _death != null and is_instance_valid(_death):
 		_death.queue_free()
 	_death = null
+	_sync_hush()
 
 
 ## Chapter complete + thank-you + credits; returns when the player chooses to continue.
@@ -456,9 +485,11 @@ func _play_ending(params: Dictionary) -> void:
 		e.setup(params)
 	_ending = e
 	overlay_layer.add_child(e)
+	_sync_hush()
 	await e.play()
 	if _ending == e:
 		_ending = null
+	_sync_hush()
 
 
 func _end_ending_cinematic() -> void:
@@ -481,6 +512,7 @@ func show_comfort(first_time: bool = false) -> void:
 	Game.push_ui("comfort")
 	_update_pause()
 	_refresh_focus_layers()
+	_sync_hush()
 	Audio.play_ui("ui_open")
 	await p.confirmed
 
@@ -532,6 +564,97 @@ func _process(delta: float) -> void:
 		IconFactory.item_icon(String(_warm.pop_back()))
 	if wardrobe_notice_enabled:
 		tick_wardrobe_notice(delta)
+	_sync_hush()
+	_toast_layout_t -= delta
+	if _toast_layout_t <= 0.0:
+		_toast_layout_t = TOAST_LAYOUT_POLL
+		_layout_toasts()
+
+
+# --- HUD hush (visual QA T4) -----------------------------------------------------------------------------
+
+## Why the HUD's chatter is held right now ("" = free): "ending", "death", "card" (a chapter card) or "panel" (a
+## full-screen menu or a modal confirm card, FULLSCREEN). Non-full-screen panels (companion menu, Music Box) keep
+## the world, and the toasts, running.
+func hush_reason() -> String:
+	if _ending != null and is_instance_valid(_ending):
+		return "ending"
+	if _death != null and is_instance_valid(_death):
+		return "death"
+	if _card != null and is_instance_valid(_card) and not _card.is_queued_for_deletion():
+		return "card"
+	for n in order:
+		if FULLSCREEN.has(n):
+			return "panel"
+	return ""
+
+
+func is_hushed() -> bool:
+	return hush_reason() != ""
+
+
+## Applies hush_reason() when it changed: toasts and the quest banner hold (the top layer fades out, their timers
+## pause), the HUD holds its tip card and, for a chapter card, hides its gameplay widgets. On release everything
+## still due plays in order.
+func _sync_hush() -> void:
+	var h := hush_reason()
+	if h == _hush:
+		return
+	_hush = h
+	var held := h != ""
+	var tw := Kit.retween(self, _tw, "hush")
+	tw.tween_property(top_layer, "modulate:a", 0.0 if held else 1.0, 0.18 if held else 0.35)
+	if toasts.has_method("set_held"):
+		toasts.set_held(held)
+	if quest_banner.has_method("set_held"):
+		quest_banner.set_held(held)
+	if hud.has_method("set_hush"):
+		hud.set_hush(h)
+
+
+## The toast column's bottom margin: the default, or high enough to clear the dialogue box (and its speaker tab)
+## while a line shows and the box reaches into the toasts' corner (at 16:9 it always does: the box is 900+ px wide).
+func toast_bottom_margin() -> float:
+	var base := float(TOAST_MARGINS[3])
+	var dlg: Variant = hud.get("dialog") if hud != null else null
+	if not (dlg is Control) or not is_instance_valid(dlg) or root == null:
+		return base
+	var d := dlg as Control
+	if not d.is_visible_in_tree() or d.modulate.a < 0.05 or not (d.has_method("is_showing") and bool(d.call("is_showing"))):
+		return base
+	var vs := root.size
+	var r := d.get_global_rect()
+	var column_left := vs.x - float(TOAST_MARGINS[2]) - toasts_max_width()
+	if r.end.x <= column_left:
+		return base
+	var tab_h := 0.0
+	var tab: Variant = d.get("speaker_tab")
+	if tab is Control and (tab as Control).visible:
+		tab_h = (tab as Control).size.y * 0.55
+	return maxf(base, vs.y - (r.position.y - tab_h) + TOAST_DIALOG_GAP)
+
+
+## Width of the widest toast card (Toasts.MAX_TEXT_W text + icon + padding).
+func toasts_max_width() -> float:
+	return Toasts.MAX_CARD_W
+
+
+func _layout_toasts() -> void:
+	if toast_margin == null:
+		return
+	var want := toast_bottom_margin()
+	if is_equal_approx(want, _toast_bottom):
+		return
+	var first := _toast_bottom < 0.0
+	_toast_bottom = want
+	var tw := Kit.retween(self, _tw, "toast_margin")
+	if first:
+		tw.kill()
+		toast_margin.add_theme_constant_override("margin_bottom", int(want))
+		return
+	var from := float(toast_margin.get_theme_constant("margin_bottom"))
+	tw.tween_method(func(v: float) -> void: toast_margin.add_theme_constant_override("margin_bottom", int(round(v))),
+		from, want, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
 
 # --- Wardrobe notice (existing saves) ------------------------------------------------------------------

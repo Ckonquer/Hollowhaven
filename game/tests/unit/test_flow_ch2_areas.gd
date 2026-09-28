@@ -295,10 +295,13 @@ func test_waygate_site_is_validated() -> void:
 	assert_almost(Vector2(gate.global_position.x, gate.global_position.z).distance_to(site), 0.0, 0.001, "gate at CH2_POINTS.waygate")
 	assert_eq(String(gate.get("target_area")), "hallowmere_reach")
 	assert_eq(String(gate.get("target_spawn")), "waygate_arrival")
-	# Spawn: 3 m south, facing south (toward the ruin and home).
+	# Spawn: WAYGATE_SPAWN_OFFSET (5.8 m) south, facing south (toward the ruin and home): far enough out that the
+	# arrival camera frames her in front of the arch, not under its lintel (test_camera_spawn_clearance.gd).
 	var xf: Transform3D = w.spawns["waygate"]
+	assert_almost(Annexes.WAYGATE_SPAWN_OFFSET, 5.8, 0.001, "the arrival stands 5.8 m out from the gate")
 	assert_almost(xf.origin.x, site.x, 0.01, "spawn x")
-	assert_almost(xf.origin.z, site.y + 3.0, 0.01, "spawn 3 m south of the gate")
+	assert_almost(xf.origin.z, site.y + Annexes.WAYGATE_SPAWN_OFFSET, 0.01, "spawn %.1f m south of the gate" % Annexes.WAYGATE_SPAWN_OFFSET)
+	assert_almost(Vector2(xf.origin.x, xf.origin.z).distance_to(Annexes.waygate_spawn_site()), 0.0, 0.001, "Annexes.waygate_spawn_site()")
 	assert_true((-xf.basis.z).dot(Vector3.BACK) > 0.99, "arrival faces south, toward home")
 	# Never near the Haven (existing saves may have structures there).
 	assert_true(site.length() >= Layout.HAVEN_RADIUS + 18.0, "far from the Haven (%.1f m)" % site.length())
@@ -311,17 +314,41 @@ func test_waygate_site_is_validated() -> void:
 	assert_true(w.is_safe_zone(Vector3(site.x, 0, site.y)), "the gate stands in a safe zone")
 	assert_true(w.is_safe_zone(xf.origin), "the waygate spawn is safe")
 	assert_eq(w.get_zone_at(xf.origin), Annexes.WAYGATE_ZONE)
+	# Centred halfway between the gate and its spawn with the 4.5 m radius: both stand well inside it.
+	assert_true(Annexes.WAYGATE_SPAWN_OFFSET * 0.5 <= Annexes.WAYGATE_SAFE_RADIUS - 1.0, "gate and spawn >= 1 m inside the zone edge")
+	var zone_seen := false
 	for z in w.zones:
 		if String(z["id"]) != Annexes.WAYGATE_ZONE:
 			continue
+		zone_seen = true
 		assert_true(float(z["radius"]) <= 5.0, "small zone")
+		assert_almost(float(z["radius"]), Annexes.WAYGATE_SAFE_RADIUS, 0.001, "zone radius")
+		var zc: Vector3 = z["center"]
+		assert_almost(Vector2(zc.x, zc.z).distance_to(site + Vector2(0.0, Annexes.WAYGATE_SPAWN_OFFSET * 0.5)), 0.0, 0.01, "zone centred halfway between gate and spawn")
+		assert_almost(Vector2(zc.x, zc.z).distance_to(Annexes.waygate_zone_centre()), 0.0, 0.001, "Annexes.waygate_zone_centre()")
 		for id in Layout.LANDMARKS:
 			var p: Vector2 = Layout.LANDMARKS[id]["pos"]
 			var c: Vector3 = z["center"]
 			assert_true(Vector2(c.x, c.z).distance_to(p) > float(z["radius"]), "the waygate zone never contains landmark %s" % id)
+	assert_true(zone_seen, "the ch2_waygate zone is registered")
 	for id in Layout.LANDMARKS:
 		var p: Vector2 = Layout.LANDMARKS[id]["pos"]
 		assert_eq(w.get_zone_at(Vector3(p.x, 0, p.y)), String(id), "zone at landmark %s unchanged" % id)
+	# The walk from the arrival spot back up to the arch is clear and nearly flat.
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.35
+	cap.height = 1.4
+	var space := w.get_world_3d().direct_space_state
+	var gate_front := Vector3(site.x, 0.0, site.y + WaygateScript.FOOTPRINT_RADIUS * 0.5)
+	for k in 7:
+		var q := xf.origin.lerp(gate_front, float(k) / 6.0)
+		q.y = float(w.height_at(q.x, q.z))
+		var sq := PhysicsShapeQueryParameters3D.new()
+		sq.shape = cap
+		sq.transform = Transform3D(Basis.IDENTITY, q + Vector3(0, 1.0, 0))
+		sq.collision_mask = 1 | 32
+		assert_eq(space.intersect_shape(sq, 4).size(), 0, "the walk from the waygate spawn to the arch is clear (%d)" % k)
+	assert_true(absf(float(w.height_at(site.x, site.y)) - xf.origin.y) < 1.2, "the spawn is on the gate's level")
 	# No legacy vegetation within the footprint + 2 m.
 	var clear := WaygateScript.FOOTPRINT_RADIUS + 2.0
 	var plan: Dictionary = w.vegetation.plan_data

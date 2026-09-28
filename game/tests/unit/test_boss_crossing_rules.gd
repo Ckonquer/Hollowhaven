@@ -187,16 +187,24 @@ func test_scorch_keeps_her_from_being_a_health_sponge() -> void:
 		n += 1
 		hp -= 320.0 * Rules.scorch_fraction(n)
 	assert_true(n <= 6, "at most six exposures even with zero damage (%d)" % n)
-	# Two or three exposures + capped windows: good damage ends it at the second, fair damage by the third.
+	# ...and the scorch clamp at the floors never slows that down (the floors sit below each scorch step)
+	hp = 320.0
+	n = 0
+	while hp > 0.0 and n < 20:
+		n += 1
+		hp -= Rules.scorch_damage(320.0, hp, n, Rules.hp_floor(320.0, n))
+	assert_true(n <= 6, "flares alone, floors applied: still at most six (%d)" % n)
+	# Three exposures (one per phase) + capped windows: fair damage ends it by the third.
 	var per_window := 320.0 * Rules.WINDOW_CAP_EXPOSED
-	assert_true(2.0 * (per_window + 320.0 * Rules.SCORCH_FRAC) >= 320.0, "two maxed exposures can end it")
 	assert_true(3.0 * (0.6 * per_window + 320.0 * Rules.SCORCH_FRAC) >= 320.0, "three fair exposures end it")
 	assert_true(per_window + 320.0 * Rules.SCORCH_FRAC < 320.0, "never in one")
-	# A strong weapon can't skip the rule: blows alone hold at the floor for the exposures made, so the
-	# fastest possible win (every window maxed, every missed pounce punished) still takes two exposures.
+	# A strong weapon can't skip the rule: blows alone hold at the floor for the exposures made (and a scorch
+	# never burns past the floor of its exposure), so the fastest possible win (every window maxed, every missed
+	# pounce punished) takes exactly three exposures - one per phase (QA CH2-007).
 	assert_almost(Rules.hp_floor(320.0, 0), 192.0, 0.001, "60% before the first exposure")
-	assert_almost(Rules.hp_floor(320.0, 1), 80.0, 0.001, "25% before the second")
-	assert_eq(Rules.hp_floor(320.0, 2), 0.0, "nothing holds her up from the second exposure on")
+	assert_almost(Rules.hp_floor(320.0, 1), 112.0, 0.001, "35% before the second")
+	assert_almost(Rules.hp_floor(320.0, 2), 64.0, 0.001, "20% before the third")
+	assert_eq(Rules.hp_floor(320.0, 3), 0.0, "nothing holds her up from the third exposure on")
 	var best := 320.0
 	var ex := 0
 	while best > 0.0 and ex < 10:
@@ -204,11 +212,33 @@ func test_scorch_keeps_her_from_being_a_health_sponge() -> void:
 		if best <= 0.0:
 			break
 		ex += 1
-		best -= 320.0 * Rules.scorch_fraction(ex)          # the flare
+		best -= Rules.scorch_damage(320.0, best, ex, Rules.hp_floor(320.0, ex))    # the flare
 		best = maxf(best - per_window, Rules.hp_floor(320.0, ex))
-	assert_eq(ex, 2, "the fastest win takes exactly two exposures")
-	# ...and the floors never stop a win: after the second exposure the scorch + one window can end it
-	assert_true(Rules.hp_floor(320.0, 1) - 320.0 * Rules.scorch_fraction(2) <= per_window, "exposure two can finish her")
+	assert_eq(ex, 3, "the fastest win takes exactly three exposures")
+	# ...and the floors never stop a win: after the third exposure the scorch + one window can end it
+	assert_true(Rules.hp_floor(320.0, 2) - 320.0 * Rules.scorch_fraction(3) <= per_window, "exposure three can finish her")
+
+
+## QA CH2-007: ONE exposure crosses at most ONE phase boundary. Whatever she has left when a flare exposes her
+## (from full health down to the floor held before it) and however hard Krystal hits in that window, exposure 1
+## and exposure 2 leave her standing (so phase 3 is always played); and every window still has hp to take.
+func test_one_exposure_crosses_at_most_one_phase_boundary() -> void:
+	var mx := 320.0
+	for n in [1, 2]:
+		assert_eq(Rules.phase_for(n), n + 1, "exposure %d opens phase %d" % [n, n + 1])
+		var fl := Rules.hp_floor(mx, n)
+		assert_true(fl > 0.0, "exposure %d's window can never defeat her (floor %.0f)" % [n, fl])
+		var start := mx
+		while start >= Rules.hp_floor(mx, n - 1) - 0.001:
+			var after := start - Rules.scorch_damage(mx, start, n, fl)
+			assert_true(after >= fl - 0.001, "exposure %d from %.0f hp: the scorch stops at the floor (%.1f)" % [n, start, after])
+			start -= 8.0
+	for n in [1, 2, 3]:
+		assert_true(Rules.window_room(mx, n) >= 0.05 * mx, "exposure %d's window has room for blows even at the floor (%.0f hp)" % [n, Rules.window_room(mx, n)])
+	# the engagement rule's shape: each phase's rotation opens with the threads and then ITS new attack
+	assert_eq(Rules.rotation(1).slice(0, 2), ["threads", "pounce"], "phase 1: threads, then the pounce")
+	assert_eq(Rules.rotation(2).slice(0, 2), ["threads", "delayed"], "phase 2: threads, then the delayed pounce")
+	assert_eq(Rules.rotation(3).slice(0, 2), ["threads", "release"], "phase 3: threads, then the release")
 
 
 func test_sac_spots_are_in_front_never_underfoot() -> void:

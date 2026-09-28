@@ -145,6 +145,7 @@ func _busy_phase_two(b: Node, d: Node3D, spawned: Array) -> void:
 	b.field.begin_sacs(1, 3.0, d.global_position)
 	b.field.spawn_minion(Vector3(8, 0, 0))
 	b.set("_release_done", true)
+	b.set("_kit_shown", true)              # mid-phase: its first phase-2 action is behind it
 	b.call("_enter_cling", 0.05)
 
 
@@ -205,6 +206,7 @@ func test_death_mid_channel_never_leaves_a_mismatched_brazier() -> void:
 	_tick_until(b, "cling", 6.0)
 	b.health.set_hp(60.0)
 	b.call("_set_phase", 3)
+	b.set("_kit_shown", true)              # (the phase-3 introduction has its own suite: boss_pacing)
 	(brs[1] as Node).call("light")
 	_tick_until(b, "scorched", 2.0)
 	b.call("_begin_climb")

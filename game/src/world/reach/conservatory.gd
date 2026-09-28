@@ -453,7 +453,8 @@ func _build_outside() -> void:
 	smi.mesh = sm.commit()
 	smi.material_override = Props.wood_mat()
 	sroot.add_child(smi)
-	Props.label(sroot, "Practice\nseam", Vector3(0, 1.1, 0.09), 28, Color("3b2a22"), 0.0, 0.004)
+	Props.sign_text(sroot, "Practice\nseam", Transform3D(Basis(), Vector3(0, 1.1, 0.05)), Vector2(0.8, 0.45), 0.06,
+		{"back": false, "font_size": 40, "px": 0.004, "outline": 6})
 	Props.box_col(_body, Transform3D(Basis(Vector3.UP, sroot.rotation.y), sroot.position + Vector3(0, 0.6, 0)), Vector3(0.8, 1.2, 0.15))
 	seam_sign = Interactable.new()
 	seam_sign.setup({"text": "Read the sign", "size": Vector3(1.0, 1.4, 0.9), "offset": Vector3(0, 0.8, 0.3),

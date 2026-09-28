@@ -137,11 +137,14 @@ func _tick(b: Node, seconds: float) -> void:
 		t += DT
 
 
-## Fight started, clinging, then forced into `phase` with `hp` (as if the thresholds were crossed).
+## Fight started, clinging, then forced into `phase` with `hp` (as if the thresholds were crossed). The
+## phase's kit counts as already shown (its first action performed): these tests exercise the later rules;
+## the introduction rule - a scorch banked until that first action - has its own suite (boss_pacing).
 func _in_phase(b: Node, phase: int, hp: float) -> void:
 	_tick_until(b, "cling", 6.0)
 	b.health.set_hp(hp)
 	b.call("_set_phase", phase)
+	b.set("_kit_shown", true)
 	b.call("_enter_cling", 0.05)
 
 
@@ -397,6 +400,7 @@ func test_phase_three_braziers_reusable_after_a_readable_cooldown() -> void:
 		br._process(0.1)
 	assert_eq(String(br.get_interaction(d)["text"]), "Stoke the brazier", "ready again")
 	_tick_until(b, "cling", 8.0)
+	b.set("_kit_shown", true)              # (its first phase-3 action: see boss_pacing for the banked scorch)
 	b.target_override = d
 	d.global_position = (br as Node3D).global_position + Vector3(0, 0, 1.4)
 	br.interact(d)

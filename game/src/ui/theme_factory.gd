@@ -11,6 +11,10 @@ extends RefCounted
 ##   HudText, HudTitle, HudSmall, RibbonTitle, KeyCapLabel (Label); AccentButton, GhostButton,
 ##   TitleMenuButton, RoundButton, TabLike (Button); Card, Inset, HudCard, HudDark, Pill, Ribbon,
 ##   KeyCap, SlotPanel (PanelContainer).
+## Small windows (visual QA UI-22): canvas_items stretch shrinks everything by the window's height, so at 1280x720 the
+## 21 px "Small" text lands near 13 px on screen. apply_window_scale(window height) - called by the UI root and the
+## title screen, and again whenever the window is resized - steps the small print (Small, Tiny, HudSmall, GhostButton,
+## tooltips) up by SMALL_BOOST px and darkens Small / Tiny a shade below SMALL_WINDOW_H; 1080p and up are unchanged.
 
 const Palette := preload("res://src/art/palette.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -47,11 +51,15 @@ const FS_H3 := 30
 const FS_H2 := 40
 const FS_H1 := 56
 const FS_DISPLAY := 96
+const FS_HUD_SMALL := 19
+const SMALL_WINDOW_H := 800        # window height (px) below which the small print steps up
+const SMALL_BOOST := 2             # px added to the small print there (on the 1920x1080 canvas)
 
 const WEIGHTS := {"body": 600, "body_bold": 800, "body_light": 500, "heading": 600, "heading_bold": 700,
 	"heading_light": 450, "display": 700}
 
 static var _theme: Theme = null
+static var _small_boost := false
 static var _fonts: Dictionary = {}
 static var _paper_mat: ShaderMaterial = null
 
@@ -60,7 +68,36 @@ static var _paper_mat: ShaderMaterial = null
 static func get_theme() -> Theme:
 	if _theme == null:
 		_theme = build()
+		if _small_boost:
+			_apply_small_print(_theme, true)
 	return _theme
+
+
+## Steps the small print up (window shorter than SMALL_WINDOW_H) or back to the authored sizes. Returns true when
+## it changed anything. Safe to call often (idempotent); every themed control updates by itself.
+static func apply_window_scale(window_h: float) -> bool:
+	var want := window_h > 0.0 and window_h < float(SMALL_WINDOW_H)
+	if want == _small_boost:
+		return false
+	_small_boost = want
+	if _theme != null:
+		_apply_small_print(_theme, want)
+	return true
+
+
+static func small_print_boosted() -> bool:
+	return _small_boost
+
+
+static func _apply_small_print(t: Theme, on: bool) -> void:
+	var b := SMALL_BOOST if on else 0
+	t.set_font_size(&"font_size", &"Small", FS_SMALL + b)
+	t.set_color(&"font_color", &"Small", INK_SOFT.darkened(0.2) if on else INK_SOFT)
+	t.set_font_size(&"font_size", &"Tiny", FS_TINY + b)
+	t.set_color(&"font_color", &"Tiny", INK_SOFT.darkened(0.2) if on else INK_SOFT)
+	t.set_font_size(&"font_size", &"HudSmall", FS_HUD_SMALL + b)
+	t.set_font_size(&"font_size", &"GhostButton", FS_SMALL + b)
+	t.set_font_size(&"font_size", &"TooltipLabel", FS_SMALL + b)
 
 
 ## Font by role: body, body_bold, body_light (Nunito); heading, heading_bold, heading_light, display (Fredoka).
@@ -205,7 +242,7 @@ static func _labels(t: Theme) -> void:
 	_label_var(t, "WarnText", "body_bold", FS_SMALL, WARN.darkened(0.3))
 	_label_var(t, "HudText", "body_bold", 23, CREAM, 7, Color(INK, 0.85))
 	_label_var(t, "HudTitle", "heading", 28, CREAM, 8, Color(INK, 0.85))
-	_label_var(t, "HudSmall", "body_bold", 19, CREAM, 6, Color(INK, 0.85))
+	_label_var(t, "HudSmall", "body_bold", FS_HUD_SMALL, CREAM, 6, Color(INK, 0.85))
 	_label_var(t, "RibbonTitle", "heading", 34, CREAM)
 	t.set_color(&"font_shadow_color", &"RibbonTitle", Color(INK, 0.35))
 	t.set_constant(&"shadow_offset_y", &"RibbonTitle", 2)

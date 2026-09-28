@@ -15,6 +15,9 @@ extends Node3D
 ## (ring / disc rim, lane sides, wedge rim + edges, a ring round each spot), steady (never pulsing), toggled live
 ## on Events.settings_changed; the outline meshes and their one material are shared (static cache). The numbers of the footprint (radius, width, arc) are the SAME numbers the attack resolves with,
 ## so what is marked is what hits (tests compare them through footprint()).
+## Contrast (visual QA CR-02 / CR-04): every mark ALSO carries a thin dark ink band just outside its footprint (always
+## on, steady, one shared material, cached band meshes), so a light mark reads on light grass and a red one on a red
+## carpet; the edge lines are drawn a step paler than the fill for the same reason (two-tone marks).
 ##   var m := enemy.mark(); m.show_lane(a, b, 1.6, TelegraphFx.DANGER); m.set_progress(k, locked); m.hide_mark()
 ## Tracking wind-ups move the shown mark instead of re-showing it: move_lane(a, b), move_arc(at, dir), move_ring(at).
 
@@ -23,10 +26,16 @@ const HitFx := preload("res://src/combat/hit_fx.gd")
 const DANGER := Color(0.96, 0.33, 0.24)      # committed melee / charges
 const WARN := Color(1.0, 0.7, 0.28)          # sweeps and swings
 const COOL := Color(0.72, 0.87, 1.0)         # ground scrapes (a different colour from the swing)
-const ROOT := Color(0.64, 0.86, 0.42)        # roots / plant hazards
+const ROOT := Color(0.96, 0.86, 0.62)        # roots / plant hazards: pale root-cream (was green: lost on the meadow)
 const PALE := Color(0.93, 0.92, 0.84)        # pale marks (arachnophobia-friendly leap mark)
 const BOLD := Color("fff1c9")                # Settings "high_visibility_cues": bold cream outline (as the bosses)
 const BOLD_WIDTH := 0.12                     # outline band, as a fraction of the mark's radius / width
+const SHADE := Color(0.17, 0.12, 0.16, 0.5)  # the always-on dark contrast band (ink, like the creatures' outlines)
+const SHADE_WIDTH := 0.06                    # ... as a fraction of the radius / width (at most)
+const SHADE_ABS := 0.12                      # ... and about this many metres on big marks (never a heavy stripe)
+const SHADE_MIN := 0.012
+const SHADE_SPOT_WIDTH := 0.16               # spots are small: a bolder band
+const EDGE_LIGHTEN := 0.22                   # edge lines are this much paler than the fill (two-tone)
 const LEVELS := 8
 const Y_OFFSET := 0.06
 const MAX_SPOTS := 8
@@ -54,6 +63,8 @@ var _head: MeshInstance3D
 var _spots: Array = []
 var _bold: MeshInstance3D                    # high_visibility_cues outline of ring / disc / lane / arc
 var _bold_spots: Array = []                  # ...and one bold ring per spot
+var _shade: MeshInstance3D                   # always-on dark contrast band of ring / disc / lane / arc
+var _shade_spots: Array = []                 # ...and one per spot
 var high_vis := false                        # Settings "high_visibility_cues" (live)
 var _fill_mats: Array = []
 var _edge_mats: Array = []
@@ -89,6 +100,8 @@ func _ensure_parts() -> void:
 	_head = _new_part()
 	_bold = _new_part()
 	_bold.material_override = _bold_mat()
+	_shade = _new_part()
+	_shade.material_override = _shade_mat()
 
 
 func _new_part() -> MeshInstance3D:
@@ -109,6 +122,7 @@ func show_ring(at: Vector3, r: float, col: Color = DANGER) -> void:
 	_set_part(_fill, _disc_mesh(), Vector3(r, 1.0, r), Vector3.ZERO)
 	_set_part(_edge, _ring_mesh(), Vector3(r, 1.0, r), Vector3(0.0, 0.004, 0.0))
 	_set_bold(_bold_ring_mesh(), Vector3(r, 1.0, r))
+	_set_part(_shade, _band_ring_mesh(_shade_frac(r)), Vector3(r, 1.0, r), Vector3(0.0, 0.002, 0.0))
 	_finish_show()
 
 
@@ -119,6 +133,7 @@ func show_disc(at: Vector3, r: float, col: Color = DANGER) -> void:
 	global_transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * Y_OFFSET)
 	_set_part(_edge, _disc_mesh(), Vector3(r, 1.0, r), Vector3.ZERO)
 	_set_bold(_bold_ring_mesh(), Vector3(r, 1.0, r))
+	_set_part(_shade, _band_ring_mesh(_shade_frac(r)), Vector3(r, 1.0, r), Vector3(0.0, 0.002, 0.0))
 	_finish_show()
 
 
@@ -137,6 +152,7 @@ func show_lane(a: Vector3, b: Vector3, w: float, col: Color = DANGER) -> void:
 	var head_len := minf(w * 0.8, maxf(length * 0.4, 0.05))
 	_set_part(_head, _arrow_mesh(), Vector3(w * 0.9, 1.0, head_len), Vector3(0.0, 0.006, -(length - head_len)))
 	_set_bold(_bold_lane_mesh(), Vector3(w, 1.0, maxf(length, 0.01)))
+	_set_part(_shade, _band_lane_mesh(_shade_frac(w)), Vector3(w, 1.0, maxf(length, 0.01)), Vector3(0.0, 0.002, 0.0))
 	_finish_show()
 
 
@@ -154,6 +170,7 @@ func move_lane(a: Vector3, b: Vector3) -> void:
 	_fill.scale = Vector3(width, 1.0, maxf(length, 0.01))
 	_edge.scale = _fill.scale
 	_bold.scale = _fill.scale
+	_shade.scale = _fill.scale
 	var head_len := minf(width * 0.8, maxf(length * 0.4, 0.05))
 	_head.scale = Vector3(width * 0.9, 1.0, head_len)
 	_head.position = Vector3(0.0, 0.006, -(length - head_len))
@@ -194,6 +211,7 @@ func show_arc(at: Vector3, dir: Vector3, r: float, arc: float, col: Color = WARN
 	_set_part(_fill, _sector_mesh(arc_deg), Vector3(r, 1.0, r), Vector3.ZERO)
 	_set_part(_edge, _sector_rim_mesh(arc_deg), Vector3(r, 1.0, r), Vector3(0.0, 0.004, 0.0))
 	_set_bold(_bold_sector_mesh(arc_deg), Vector3(r, 1.0, r))
+	_set_part(_shade, _band_sector_mesh(arc_deg, _shade_frac(r)), Vector3(r, 1.0, r), Vector3(0.0, 0.002, 0.0))
 	_finish_show()
 
 
@@ -212,8 +230,13 @@ func show_spots(at: Array, r: float, col: Color = ROOT) -> void:
 			bs.mesh = _bold_ring_mesh()
 			bs.material_override = _bold_mat()
 			_bold_spots.append(bs)
+			var ss := _new_part()
+			ss.mesh = _band_ring_mesh(SHADE_SPOT_WIDTH)
+			ss.material_override = _shade_mat()
+			_shade_spots.append(ss)
 		var mi: MeshInstance3D = _spots[i]
 		var bmi: MeshInstance3D = _bold_spots[i]
+		var smi: MeshInstance3D = _shade_spots[i]
 		if i < at.size() and at[i] is Vector3:
 			var p: Vector3 = at[i]
 			points.append(p)
@@ -223,8 +246,12 @@ func show_spots(at: Array, r: float, col: Color = ROOT) -> void:
 			mi.visible = true
 			bmi.position = p + Vector3.UP * (Y_OFFSET + 0.008)
 			bmi.scale = Vector3(r, 1.0, r)
+			smi.position = p + Vector3.UP * (Y_OFFSET + 0.002)
+			smi.scale = Vector3(r, 1.0, r)
+			smi.visible = true
 		else:
 			mi.visible = false
+			smi.visible = false
 	_finish_show()
 
 
@@ -247,6 +274,13 @@ func bold_visible() -> bool:
 	if kind == "spots":
 		return not _bold_spots.is_empty() and (_bold_spots[0] as MeshInstance3D).visible
 	return _bold != null and _bold.visible
+
+
+## True while the always-on dark contrast band of the current mark is shown (tests).
+func shade_visible() -> bool:
+	if kind == "spots":
+		return not _shade_spots.is_empty() and (_shade_spots[0] as MeshInstance3D).visible
+	return _shade != null and _shade.visible
 
 
 ## Settings "high_visibility_cues" on/off for this mark (normally driven by Events.settings_changed).
@@ -364,13 +398,15 @@ func _clear() -> void:
 	points = []
 	visible = false
 	set_process(false)
-	for mi in [_fill, _edge, _head, _bold]:
+	for mi in [_fill, _edge, _head, _bold, _shade]:
 		if mi != null:
 			(mi as MeshInstance3D).visible = false
 			(mi as MeshInstance3D).mesh = null
 	for mi in _spots:
 		(mi as MeshInstance3D).visible = false
 	for mi in _bold_spots:
+		(mi as MeshInstance3D).visible = false
+	for mi in _shade_spots:
 		(mi as MeshInstance3D).visible = false
 
 
@@ -424,7 +460,8 @@ static func _mat_levels(col: Color, edge: bool) -> Array:
 		m.disable_receive_shadows = true
 		m.render_priority = 1
 		var a := (0.35 + 0.09 * float(l)) if edge else (0.08 + 0.045 * float(l))
-		m.albedo_color = Color(col.r, col.g, col.b, clampf(a, 0.0, 1.0))
+		var c := col.lerp(Color(1.0, 0.97, 0.9), EDGE_LIGHTEN) if edge else col
+		m.albedo_color = Color(c.r, c.g, c.b, clampf(a, 0.0, 1.0))
 		out.append(m)
 	_mats[key] = out
 	return out
@@ -445,38 +482,76 @@ static func _bold_mat() -> Material:
 	return m
 
 
+## Band width as a fraction of a mark of `size` m: ~SHADE_ABS metres, at most SHADE_WIDTH of it, quantised so the
+## cached band meshes stay few.
+static func _shade_frac(size: float) -> float:
+	return snappedf(clampf(SHADE_ABS / maxf(size, 0.01), SHADE_MIN, SHADE_WIDTH), 0.004)
+
+
+## The always-on dark contrast band material (shared by every mark): ink, unshaded, drawn under the fills.
+static func _shade_mat() -> Material:
+	if _mats.has("shade"):
+		return _mats["shade"]
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.disable_receive_shadows = true
+	m.render_priority = 0
+	m.albedo_color = SHADE
+	_mats["shade"] = m
+	return m
+
+
 ## Bold band just outside a unit circle (rings, discs, spots).
 static func _bold_ring_mesh() -> Mesh:
-	if _meshes.has("bold_ring"):
-		return _meshes["bold_ring"]
-	var m := _annulus(1.0, 1.0 + BOLD_WIDTH, -PI, PI, FAN_SEGMENTS)
-	_meshes["bold_ring"] = m
+	return _band_ring_mesh(BOLD_WIDTH)
+
+
+## A band of `w` (fraction of the radius) just outside a unit circle (cached per width).
+static func _band_ring_mesh(w: float) -> Mesh:
+	var key := "band_ring|%.3f" % w
+	if _meshes.has(key):
+		return _meshes[key]
+	var m := _annulus(1.0, 1.0 + w, -PI, PI, FAN_SEGMENTS)
+	_meshes[key] = m
 	return m
 
 
 ## Bold side bands just outside the unit lane (x in [-0.5, 0.5], z from 0 to -1), full length.
 static func _bold_lane_mesh() -> Mesh:
-	if _meshes.has("bold_lane"):
-		return _meshes["bold_lane"]
+	return _band_lane_mesh(BOLD_WIDTH)
+
+
+## Side bands of `w` (fraction of the width) just outside the unit lane (cached per width).
+static func _band_lane_mesh(w: float) -> Mesh:
+	var key := "band_lane|%.3f" % w
+	if _meshes.has(key):
+		return _meshes[key]
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_normal(Vector3.UP)
 	for side in [-1.0, 1.0]:
 		var x0: float = side * 0.5
-		var x1: float = side * (0.5 + BOLD_WIDTH)
+		var x1: float = side * (0.5 + w)
 		var p := [Vector3(x0, 0, 0), Vector3(x1, 0, 0), Vector3(x1, 0, -1), Vector3(x0, 0, -1)]
 		for i in [0, 2, 1, 0, 3, 2]:
 			st.add_vertex(p[i])
 	var m := st.commit()
-	_meshes["bold_lane"] = m
+	_meshes[key] = m
 	return m
 
 
 ## Bold outline of a wedge of `arc` degrees (radius 1): a band outside the arc plus a band outside each
 ## straight edge (cached per whole degree, like the sector meshes).
 static func _bold_sector_mesh(arc: float) -> Mesh:
+	return _band_sector_mesh(arc, BOLD_WIDTH)
+
+
+## A band of `w` outside a wedge of `arc` degrees (radius 1): outside the arc and each straight edge (cached).
+static func _band_sector_mesh(arc: float, w: float) -> Mesh:
 	var deg := clampi(int(round(arc)), 1, 360)
-	var key := "bold_sector|%d" % deg
+	var key := "band_sector|%d|%.3f" % [deg, w]
 	if _meshes.has(key):
 		return _meshes[key]
 	var half := deg_to_rad(float(deg)) * 0.5
@@ -489,16 +564,16 @@ static func _bold_sector_mesh(arc: float) -> Mesh:
 		var a1 := -half + 2.0 * half * float(i + 1) / float(segs)
 		var p0 := _fan_point(a0, 1.0)
 		var p1 := _fan_point(a1, 1.0)
-		var q0 := _fan_point(a0, 1.0 + BOLD_WIDTH)
-		var q1 := _fan_point(a1, 1.0 + BOLD_WIDTH)
+		var q0 := _fan_point(a0, 1.0 + w)
+		var q1 := _fan_point(a1, 1.0 + w)
 		for v in [p0, q0, q1, p0, q1, p1]:
 			st.add_vertex(v)
 	if deg < 360:
 		for side in [-1.0, 1.0]:
 			var a: float = half * float(side)
-			var tip := _fan_point(a, 1.0 + BOLD_WIDTH)
-			# outward normal of this straight edge (away from the wedge), BOLD_WIDTH long
-			var out := _fan_point(a + float(side) * PI * 0.5, BOLD_WIDTH)
+			var tip := _fan_point(a, 1.0 + w)
+			# outward normal of this straight edge (away from the wedge), w long
+			var out := _fan_point(a + float(side) * PI * 0.5, w)
 			for v in [Vector3.ZERO, tip, tip + out, Vector3.ZERO, tip + out, out]:
 				st.add_vertex(v)
 	var m := st.commit()

@@ -246,6 +246,35 @@ func test_echo_trial_patterns() -> void:
 	assert_false(ItemDB.parts_for_slot("hat").has("masquerade_mask"))
 
 
+## Integration pass 3 palette decisions (R3-26..R3-30; visual review AV-10, AV-13, AV-14, AV-15). Only the presets and
+## part channels change: a saved look stores swatch ids, so it keeps its own colours.
+func test_pass3_preset_palettes_and_channels() -> void:
+	var gl: Dictionary = AppearanceData.OUTFITS["ghostlight_party"]
+	assert_eq(String(gl["hair_color"]), "lavender", "R3-26: Ghostlight Party suggests lavender hair")
+	assert_eq(gl["palette"], {"primary": "sky", "secondary": "snow", "accent": "lavender"}, "R3-26: sky cloth, snow trim")
+	var pp: Dictionary = AppearanceData.OUTFITS["pumpkin_patch"]
+	assert_eq(String(pp["hair_color"]), "espresso", "R3-27: Pumpkin Patch suggests espresso hair")
+	assert_eq(pp["palette"], {"primary": "caramel", "secondary": "cream", "accent": "moss"}, "R3-27: pumpkin-and-vine palette")
+	assert_eq(AppearanceData.PARTS["harvest_skirt"]["channels"], {"skirt": "accent"}, "the harvest skirt follows the moss accent")
+	assert_eq(AppearanceData.PARTS["leaf_clip"]["channels"], {}, "the leaf clip keeps its fixed orange")
+	assert_eq(AppearanceData.PARTS["mushroom_beret"]["channels"], {"beret": "accent"}, "R3-28: the beret is a toadstool (accent)")
+	var md: Dictionary = AppearanceData.OUTFITS["mushroom_dungarees"]
+	assert_eq(String(md["palette"]["accent"]), "berry", "berry red toadstool in the Mushroom Dungarees preset")
+	assert_ne(md["palette"]["accent"], md["palette"]["primary"], "the beret no longer matches the dungarees")
+	var cap: Dictionary = AppearanceData.PARTS["chorister_capelet"]["channels"]
+	assert_eq(cap, {"capelet": "secondary", "collar": "accent"}, "R3-30: capelet secondary, collar accent")
+	assert_eq(String(cap.values()[0]), "secondary", "the wardrobe tile (first channel) shows the capelet colour")
+	# the reviewed looks read clearly: the suggested hair never blends into the main cloth (the avatar's own contrast
+	# metric, accessory_builder.gd _close) and no preset is a pale blob (near-white hair on near-white cloth)
+	for oid in AppearanceData.OUTFITS:
+		var o: Dictionary = AppearanceData.OUTFITS[oid]
+		var hair: Color = AppearanceData.HAIR_COLORS[o["hair_color"]]["base"]
+		var cloth := ItemDB.swatch_color(String(o["palette"]["primary"]))
+		var d := absf(hair.r - cloth.r) + absf(hair.g - cloth.g) + absf(hair.b - cloth.b)
+		assert_true(d >= 0.18, "%s: %s hair stands out from the %s cloth (%.2f)" % [oid, o["hair_color"], o["palette"]["primary"], d])
+		assert_false(hair.get_luminance() > 0.8 and cloth.get_luminance() > 0.8, "%s is not an all-white figure" % oid)
+
+
 func test_sanitize_look_keeps_a_safe_visible_default() -> void:
 	var ok := ItemDB.sanitize_look(AppearanceData.LEGACY_LOOK)
 	assert_eq(ok["look"], SPEC_LEGACY_LOOK)

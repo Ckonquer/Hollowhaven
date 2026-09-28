@@ -108,46 +108,95 @@ func _build_brook() -> void:
 	add_child(mi)
 
 
-## Still water: one quad per water sample of each pond (matches the carved basin exactly).
+## Still water: one disc per pond (a single indexed mesh, every vertex shared, so nothing is blended twice)
+## reaching a little under the banks, where the rising terrain hides its edge and the water shader draws the
+## depth-faded shoreline. Triangles over dry cut-outs (the Bellhouse tower base and the stairwell under it) are
+## left out; their jagged edge stays inside the tower / stair walls.
+const POND_OVERHANG := 0.6
+const POND_RING_STEP := 0.5
+const POND_SEGMENTS := 128
+
+
 func _build_ponds() -> void:
 	for p in terrain.ponds:
-		var c: Vector2 = p[0]
-		var r: float = float(p[1]) + 1.0
-		var level: float = p[2]
-		var verts := PackedVector3Array()
-		var uvs := PackedVector2Array()
-		var idx := PackedInt32Array()
-		for j in range(int(floor(c.y - r)), int(ceil(c.y + r)) + 1):
-			for i in range(int(floor(c.x - r)), int(ceil(c.x + r)) + 1):
-				var x := float(i)
-				var z := float(j)
-				if float(terrain.water_level_at(x, z)) <= -999.0:
-					continue
-				var base := verts.size()
-				for q in [Vector2(-0.55, -0.55), Vector2(0.55, -0.55), Vector2(0.55, 0.55), Vector2(-0.55, 0.55)]:
-					var v := Vector3(x + q.x, level, z + q.y)
-					verts.append(v)
-					uvs.append(Vector2((v.x - c.x) / (2.0 * r) + 0.5, (v.z - c.y) / (2.0 * r) + 0.5))
-				idx.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
-		if verts.is_empty():
+		var mesh := pond_mesh(p[0], float(p[1]), float(p[2]), pond_cutouts(p[0]))
+		if mesh == null:
 			continue
-		var norms := PackedVector3Array()
-		norms.resize(verts.size())
-		norms.fill(Vector3.UP)
-		var arrays := []
-		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = verts
-		arrays[Mesh.ARRAY_NORMAL] = norms
-		arrays[Mesh.ARRAY_TEX_UV] = uvs
-		arrays[Mesh.ARRAY_INDEX] = idx
-		var mesh := ArrayMesh.new()
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 		var mi := MeshInstance3D.new()
 		mi.name = "StillWater"
 		mi.mesh = mesh
 		mi.material_override = pond_material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
+
+
+## Dry rectangles inside a pond (world XZ): the Bellhouse tower base and its stairwell, shrunk by 0.3 m so the
+## water still runs under the walls' inner faces (the walls hide the cut).
+static func pond_cutouts(center: Vector2) -> Array:
+	var B: Dictionary = Reach.BELLHOUSE
+	if center.distance_to(B["pond"]) > 0.5:
+		return []
+	var tower: Rect2 = B["tower"]
+	var sx: float = B["stair_x"]
+	var wo: float = float(B["wall_outer"]) - 0.3
+	var top_z: float = B["ramp_top_z"]
+	var end_z: float = B["bottom_end_z"]
+	return [tower.grow(-0.3), Rect2(sx - wo, end_z - 0.5, wo * 2.0, top_z + 0.5 - (end_z - 0.5))]
+
+
+## A flat polar disc at `level` (centre at the disc's centre, local), radius + POND_OVERHANG; triangles whose
+## centroid falls in a cut-out rectangle (world XZ) are dropped. UV = world XZ / (2 r) + 0.5 (as before).
+static func pond_mesh(center: Vector2, radius: float, level: float, cutouts: Array) -> ArrayMesh:
+	var r := radius + POND_OVERHANG
+	var rings := int(ceil(r / POND_RING_STEP))
+	var verts := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	verts.append(Vector3(center.x, level, center.y))
+	uvs.append(Vector2(0.5, 0.5))
+	for k in range(1, rings + 1):
+		var rr := r * float(k) / float(rings)
+		for s in POND_SEGMENTS:
+			var a := TAU * float(s) / float(POND_SEGMENTS)
+			var q := center + Vector2(cos(a), sin(a)) * rr
+			verts.append(Vector3(q.x, level, q.y))
+			uvs.append(Vector2((q.x - center.x) / (2.0 * r) + 0.5, (q.y - center.y) / (2.0 * r) + 0.5))
+	var idx := PackedInt32Array()
+	var add_tri := func(a: int, b: int, c: int) -> void:
+		var ctr := (verts[a] + verts[b] + verts[c]) / 3.0
+		for rc in cutouts:
+			if (rc as Rect2).has_point(Vector2(ctr.x, ctr.z)):
+				return
+		idx.append_array(PackedInt32Array([a, b, c]))
+	for s in POND_SEGMENTS:
+		add_tri.call(0, 1 + (s + 1) % POND_SEGMENTS, 1 + s)
+	for k in range(1, rings):
+		var b0 := 1 + (k - 1) * POND_SEGMENTS
+		var b1 := 1 + k * POND_SEGMENTS
+		for s in POND_SEGMENTS:
+			var s1 := (s + 1) % POND_SEGMENTS
+			add_tri.call(b0 + s, b0 + s1, b1 + s)
+			add_tri.call(b0 + s1, b1 + s1, b1 + s)
+	if idx.is_empty():
+		return null
+	# clockwise seen from above = front face up (Godot): flip if the winding came out the other way
+	var n0 := (verts[idx[1]] - verts[idx[0]]).cross(verts[idx[2]] - verts[idx[0]])
+	if n0.y > 0.0:
+		for t in range(0, idx.size(), 3):
+			var tmp := idx[t + 1]
+			idx[t + 1] = idx[t + 2]
+			idx[t + 2] = tmp
+	var norms := PackedVector3Array()
+	norms.resize(verts.size())
+	norms.fill(Vector3.UP)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 static func _reed_mesh(variant: int) -> ArrayMesh:

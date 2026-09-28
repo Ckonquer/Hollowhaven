@@ -7,6 +7,7 @@ extends "res://tests/test_case.gd"
 ## void, zones / safety follow spec §7.3, at most 3 shadowed lights, node ids are deterministic.
 
 const Layout := preload("res://data/manor_layout.gd")
+const Builder := preload("res://src/world/manor/manor_builder.gd")
 const SCENE := "res://scenes/moonveil_manor.tscn"
 const CAP_R := 0.32
 const CAP_H := 1.6
@@ -233,6 +234,32 @@ func test_floors_collide_everywhere_and_rooms_are_closed() -> void:
 				var q := PhysicsRayQueryParameters3D.create(from, from + Vector3(cos(a), 0, sin(a)) * 150.0)
 				q.collision_mask = 1 | 32
 				assert_false(_space().intersect_ray(q).is_empty(), "%s: ray %d at %.1f m leaves the house" % [id, k, hgt])
+
+
+## A taller room over a lower neighbour's shared wall is closed up to its own ceiling (VISUAL_BUGS IN-02: a
+## full-width strip of void over the Cloakroom doorway in the Looking-Glass Hall). Data: the Hall's south band
+## is a height step; scene: rays out of every roofed room just under its ceiling always hit something.
+func test_no_void_above_a_lower_neighbour() -> void:
+	var steps: Array = Builder.height_steps()
+	var hall_south := steps.filter(func(s: Dictionary) -> bool: return String(s["room"]) == "hall" and String(s["side"]) == "s")
+	assert_eq(hall_south.size(), 1, "the Hall's south side over the Cloakroom is a height step")
+	if hall_south.size() == 1:
+		var s: Dictionary = hall_south[0]
+		assert_almost(float(s["ylo"]), float(Layout.ROOMS["cloakroom"]["h"]), 0.01, "from the Cloakroom's wall top")
+		assert_almost(float(s["yhi"]), float(Layout.ROOMS["hall"]["h"]), 0.01, "up to the Hall's ceiling")
+		assert_true(float(s["a"]) <= float(Layout.ROOMS["hall"]["x0"]) - Layout.WALL_T + 0.01 and float(s["b"]) >= float(Layout.ROOMS["hall"]["x1"]) + Layout.WALL_T - 0.01, "across the full width incl. the corners")
+	await _load(["mm_ballroom_solved", "ch2_velour_defeated", "mm_balcony_shortcut"])
+	for id in Layout.ROOM_ORDER:
+		var r: Dictionary = Layout.ROOMS[id]
+		if bool(r.get("open_sky", false)):
+			continue
+		var top := float(r["y"]) + float(r["h"]) - 0.35
+		var c := Vector3((float(r["x0"]) + float(r["x1"])) * 0.5, top, (float(r["z0"]) + float(r["z1"])) * 0.5)
+		for k in 16:
+			var a := TAU * float(k) / 16.0
+			var q := PhysicsRayQueryParameters3D.create(c, c + Vector3(cos(a), 0, sin(a)) * 150.0)
+			q.collision_mask = 1 | 32
+			assert_false(_space().intersect_ray(q).is_empty(), "%s: ray %d just under the ceiling leaves the house" % [id, k])
 
 
 # --- Lights, environment, determinism ----------------------------------------------------------------------------

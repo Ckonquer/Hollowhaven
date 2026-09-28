@@ -203,7 +203,11 @@ func win_velour(a: Node3D) -> void:
 	c.call("darken", null)
 	c.call("light", d)
 	tick(boss, 1.0)
-	(boss.get("health") as Node).call("apply_damage", 99999.0, d, Vector3.FORWARD)
+	# R3-09: leave him one hp before the finishing blow, so the blow can't be trimmed by an attack window's cap
+	# (velour_health.gd window_room lets only a defeating blow past it) whatever his hp was after the phase jump.
+	var h: Node = boss.get("health")
+	h.call("set_hp", 1.0)
+	h.call("apply_damage", 99999.0, d, Vector3.FORWARD)
 	await wait_frames(2)
 
 

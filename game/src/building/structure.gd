@@ -10,6 +10,7 @@ const U := preload("res://src/building/model_util.gd")
 const Shapes := preload("res://src/building/shapes.gd")
 const Palette := preload("res://src/art/palette.gd")
 const Tints := preload("res://src/building/tints.gd")
+const PlacementRules := preload("res://src/building/placement.gd")
 
 const LAYER_INTERACT := 16
 const LAYER_STRUCTURE := 32
@@ -23,11 +24,15 @@ var _bodies: Array = []
 var _highlighted := false
 var _removing := false
 var _scale_tween: Tween
+var _extra_opts: Dictionary = {}      # model options given at creation (previews without a saved record)
 
 
 func setup(params: Dictionary) -> void:
 	uid = String(params.get("uid", uid))
 	structure_id = String(params.get("id", structure_id))
+	var mo: Variant = params.get("model_opts")
+	if mo is Dictionary:
+		_extra_opts = (mo as Dictionary).duplicate()
 
 
 func _ready() -> void:
@@ -51,12 +56,24 @@ func _setup_behaviour() -> void:
 	pass
 
 
-## Model options from the saved record (Chapter Two): {"face": pumpkin face id} when set. Subclasses may add.
+## Model options from the saved record (Chapter Two): {"face": pumpkin face id} when set, "level" (>= 1 for
+## pieces upstairs: wall panels drop their stone footing), "mount_dir" (wall decor on a window: which way the
+## window centre lies, see placement.gd mount_info). Preview nodes take them from setup({"model_opts": {...}}).
+## Subclasses may add.
 func model_opts() -> Dictionary:
-	var o := {}
-	var data: Variant = record().get("data", {})
+	var o := _extra_opts.duplicate()
+	var rec := record()
+	var data: Variant = rec.get("data", {})
 	if data is Dictionary and (data as Dictionary).has("face"):
 		o["face"] = String((data as Dictionary)["face"])
+	if not rec.is_empty():
+		var lv := PlacementRules.level_of(rec)
+		if lv >= 1:
+			o["level"] = lv
+		if PlacementRules.is_wall_mount(def):
+			var md := PlacementRules.mount_dir_of(rec, GameState.structures)
+			if md != 0:
+				o["mount_dir"] = md
 	return o
 
 
@@ -64,13 +81,13 @@ func model_opts() -> Dictionary:
 func _apply_saved_tint() -> void:
 	var t := Tints.tint_of(record())
 	if t != Tints.NATURAL:
-		Tints.apply(model, t)
+		Tints.apply(model, t, String(def.get("tint_family", "")))
 
 
 ## Recolours the model in place (the record's data.tint is the caller's job: BuildOps.recolor).
 func apply_tint(tint_id: String) -> void:
 	if model != null:
-		Tints.apply(model, tint_id)
+		Tints.apply(model, tint_id, String(def.get("tint_family", "")))
 
 
 ## Rebuilds the model from the saved record (e.g. a new pumpkin face), keeping colliders and behaviour.

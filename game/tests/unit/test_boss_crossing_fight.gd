@@ -7,7 +7,11 @@ extends "res://tests/test_case.gd"
 ## the Intense feint), the capped release INSTEAD of - never with - a pounce (caps per intensity), line of
 ## sight / no pounce through the deck, companions only in exposed phases, the reset policy, the defeat
 ## committed exactly once before any presentation (weaver_defeated untouched), the arachnophobia swap, and the
-## scorch that keeps her from being a health sponge. Headless, no saves written.
+## scorch that keeps her from being a health sponge. QA CH2-007: the light burns her off her anchor only once
+## she has committed this round (a pounce dropped, or her release's sacs opened) - before that it CATCHES the
+## anchor and her next pounce's landing exposes her - and one exposure crosses at most one phase boundary (the
+## exposure that opens phase 3 can't end the fight). The brood of the phase-3 release is a stub here (Krystal
+## clears it in _expose); real Brood Skitters are covered by test_boss_crossing_arena. Headless, no saves written.
 
 const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Boss := preload("res://src/enemies/crossing_matron.gd")
@@ -24,6 +28,7 @@ var _nodes: Array = []
 var _events: Array = []
 var _caps: Array = []
 var _saved := {}
+var _brood: Array = []
 
 
 class Dummy extends CharacterBody3D:
@@ -70,6 +75,7 @@ func before_each() -> void:
 	_nodes.clear()
 	_events.clear()
 	_caps.clear()
+	_brood.clear()
 	for k in ["arachnophobia", "timing_assist", "high_visibility_cues", "reduce_flashing"]:
 		_saved[k] = Settings.get_value(k)
 		Settings.set_value(k, false)
@@ -177,7 +183,25 @@ func _boss(target: Node3D, brs: Array, level: int = 1) -> Node:
 	add_child(b)
 	b.set_process(false)
 	_nodes.append(b)
+	b.release_node().set("minion_override", _stub_minion)      # the phase-3 brood: stubs Krystal clears
 	return b
+
+
+func _stub_minion(pos: Vector3, _params: Dictionary) -> Node:
+	var m := Node3D.new()
+	m.name = "StubBrood"
+	add_child(m)
+	m.global_position = pos
+	_nodes.append(m)
+	_brood.append(m)
+	return m
+
+
+## Krystal clears the brood (a phase-3 release blocks her pounces while it lives).
+func _kill_brood() -> void:
+	for m in _brood:
+		if is_instance_valid(m) and not (m as Node).is_queued_for_deletion():
+			(m as Node).queue_free()
 
 
 func _setup(level: int = 1, kpos: Vector3 = Vector3(74.0, -18.0, 2.0)) -> Array:
@@ -216,14 +240,23 @@ func _to_cling(b: Node) -> void:
 	_to_state(b, "cling", 20.0)
 
 
-## Exposes her through the real rule: the line-brazier under her anchor flares; then waits out the window.
+## Exposes her through the real rule: the line-brazier under her anchor flares at her next cling - at once if
+## she has committed this round, else the light catches the anchor and her next pounce's landing exposes her
+## (Krystal clears any brood meanwhile). Returns when the exposure is made.
 func _expose(b: Node, brs: Array) -> void:
 	_to_cling(b)
+	var n0 := int(b.exposures)
 	var br: Node = brs[int(b.held_line)]
 	if bool(br.call("is_lit")):
 		br.call("flare")
 	else:
 		br.call("light")
+	var t := 0.0
+	while int(b.exposures) == n0 and t < 40.0 and not bool(b.is_defeated()):
+		_kill_brood()
+		b.tick(DT)
+		t += DT
+	assert_true(int(b.exposures) > n0 or bool(b.is_defeated()), "the exposure came (%.1f s)" % t)
 
 
 # --- Tests -------------------------------------------------------------------------------------------------
@@ -320,11 +353,20 @@ func test_exposure_only_under_her_anchor_then_she_changes_sides() -> void:
 	assert_true(_caps.has("[the light flares under an empty anchor]"), "captioned (muted play)")
 	assert_true(b.is_overhead())
 	(brs[2] as Node).call("light")
-	assert_eq(int(b.exposures), 1, "the brazier under HER anchor exposes her")
-	assert_eq(String(b.state), "scorch_fall")
+	# QA CH2-007: she has not committed yet - the light CATCHES her anchor; her next pounce exposes her
+	assert_eq(int(b.exposures), 0, "before she has pounced, the light only catches her anchor")
+	assert_true(bool(b.is_primed()) and not bool(b.is_engaged()))
+	assert_eq(int(b.stats["primed"]), 1)
+	assert_true(_caps.has("[the light catches her anchor - she clings on]"), "captioned (muted play)")
+	assert_true(bool(b.anchor_marks().call("exposed_glowing", 2)), "the caught anchor glows")
+	assert_true(b.is_overhead(), "she clings on")
+	assert_false(_events.has(["phase", ID, 2]), "no phase change yet")
+	assert_true(_until(b, func() -> bool: return int(b.exposures) == 1, 30.0) < INF, "her next pounce lands...")
+	assert_true(int(b.stats["pounces"]) >= 1, "...a committed pounce first")
+	assert_false(bool(b.is_primed()), "the caught anchor is spent")
 	assert_true(_events.has(["phase", ID, 2]), "boss_phase_changed(crossing_matron, 2)")
 	assert_eq(int(b.phase), 2)
-	assert_true(_to_state(b, "exposed", 2.0))
+	assert_true(_to_state(b, "exposed", 2.0), "burned off it where she landed")
 	assert_almost(float(b.health.hp), 320.0 * (1.0 - Rules.SCORCH_FRAC), 0.01, "the flare scorched her (10%)")
 	assert_true(b.is_vulnerable())
 	assert_almost(float(b.health.damage_taken_mult), Rules.EXPOSED_MULT, 0.001)
@@ -344,6 +386,73 @@ func test_exposure_only_under_her_anchor_then_she_changes_sides() -> void:
 			assert_true(p.y >= high - 0.5, "away from where she lay only under the ceiling (y %.2f at step %d)" % [p.y, i])
 	_to_cling(b)
 	assert_true(Rules.flat(b.global_position, Layout.CROSSING["anchors"][1]) < 0.5, "hanging from the south anchor")
+
+
+## QA CH2-007: once she has committed this round (a pounce dropped), the light burns her off her anchor at once.
+func test_once_she_has_pounced_the_light_burns_her_off_at_once() -> void:
+	var s: Array = await _setup()
+	var b: Node = s[0]
+	var brs: Array = s[2]
+	assert_true(_to_state(b, "pounce_tele", 20.0))
+	assert_false(bool(b.is_engaged()), "a telegraph is not a commitment yet")
+	assert_true(_to_state(b, "drop", 3.0))
+	assert_true(bool(b.is_engaged()), "she let go: committed")
+	_to_cling(b)
+	(brs[int(b.held_line)] as Node).call("light")
+	assert_eq(int(b.exposures), 1, "exposed at once")
+	assert_eq(String(b.state), "scorch_fall")
+	assert_eq(int(b.stats["primed"]), 0)
+	assert_false(bool(b.is_engaged()), "a new round starts with the new phase")
+
+
+## QA CH2-007, phase 3: her release is her commitment once its sacs have opened - then the light burns her off
+## (and the brood scatters); while the sacs still shake it only catches the anchor.
+func test_phase_three_her_release_counts_once_its_sacs_have_opened() -> void:
+	var s: Array = await _setup()
+	var b: Node = s[0]
+	var k: Dummy = s[1]
+	var brs: Array = s[2]
+	b.exposures = 2
+	b.phase = 3
+	b.side = Rules.side_for(2)
+	_to_cling(b)
+	b._step = 1                   # the rotation slot of the release
+	k.global_position = Vector3(76.0, -18.0, 2.0)
+	b.set("_state_len", 0.0)
+	b.tick(DT)
+	assert_eq(String(b.state), "release")
+	assert_true(bool(b.sacs_pending()))
+	assert_false(bool(b.is_engaged()), "shaking sacs are not a commitment yet")
+	var br: Node = brs[int(b.held_line)]
+	br.call("light")
+	assert_eq(int(b.exposures), 2, "the light only catches her anchor while the sacs shake")
+	assert_true(bool(b.is_primed()))
+	assert_true(bool(b.sacs_pending()), "the release goes on")
+	b.release_node().call("tick", float(Rules.SAC_WARN[1]) + 0.2, k, true)
+	assert_false(bool(b.sacs_pending()))
+	assert_eq(int(b.minions_alive()), 2, "the brood is out")
+	assert_true(bool(b.is_engaged()), "the release has been played: committed")
+	br.call("flare")
+	assert_eq(int(b.exposures), 3, "now the light burns her off")
+	assert_eq(int(b.minions_alive()), 0, "and the brood scatters")
+
+
+## QA CH2-007 + RESET POLICY: a caught anchor and her commitment belong to the round - a fall lets go of both.
+func test_a_caught_anchor_lets_go_when_the_fight_resets() -> void:
+	var s: Array = await _setup()
+	var b: Node = s[0]
+	var brs: Array = s[2]
+	_to_cling(b)
+	(brs[int(b.held_line)] as Node).call("light")
+	assert_true(bool(b.is_primed()))
+	Events.player_died.emit()
+	assert_false(bool(b.is_primed()), "the caught anchor lets go with the reset")
+	assert_false(bool(b.is_engaged()))
+	b.start_fight()
+	assert_true(_to_state(b, "drop", 30.0), "the retry: her pounce again")
+	_until(b, func() -> bool: return String(b.state) != "drop", 2.0)
+	assert_eq(int(b.exposures), 0, "no exposure from the old attempt's flare")
+	assert_true(String(b.state) in ["rebound", "stranded"])
 
 
 func test_delayed_pounce_has_an_audible_and_visible_final_tell() -> void:
@@ -490,7 +599,7 @@ func test_companions_only_in_exposed_phases() -> void:
 	b.health.apply_damage(30.0, comp, Vector3.ZERO)
 	assert_almost(float(b.health.hp), hp0, 0.001, "armoured")
 	(brs[int(b.held_line)] as Node).call("light")
-	_to_state(b, "exposed", 2.0)
+	_to_state(b, "exposed", 30.0)
 	assert_true(bool(b.can_be_hit_by(comp)), "companions attack the exposed phase")
 	var e := _dummy(Vector3(88.0, -18.0, 0.0), ["enemy"])
 	assert_false(bool(b.can_be_hit_by(e)), "enemies never hit her")
@@ -605,7 +714,7 @@ func test_arachnophobia_swap_mid_telegraph_keeps_the_fight() -> void:
 	assert_eq(ItemDB.enemy_display_name(ID), "The Hollow Mother", "the boss bar name")
 	for kind in ["rattle", "skitter", "drop", "shriek", "threads", "final", "feint"]:
 		assert_false(String(b.sound_name(kind)).begins_with("weaver") or String(b.sound_name(kind)).contains("web"), "no spider sound for %s" % kind)
-	for kind in ["intro", "threads", "pounce", "delayed", "feint", "final", "exposed", "side", "release", "wrong", "defeat"]:
+	for kind in ["intro", "threads", "pounce", "delayed", "feint", "final", "exposed", "side", "release", "wrong", "primed", "defeat"]:
 		var c := String(b.caption_text(kind)).to_lower()
 		for bad in ["silk", "web", "thread", "sac", "spider", "matron", "leg"]:
 			assert_false(c.contains(bad), "caption '%s' avoids '%s'" % [c, bad])
@@ -626,12 +735,7 @@ func test_scorch_ends_it_even_without_weapon_damage() -> void:
 	var n := 0
 	while not bool(b.is_defeated()) and n < 10:
 		k.global_position = Vector3(88.0, -18.0, 0.0)
-		_to_cling(b)
-		var br: Node = brs[int(b.held_line)]
-		if bool(br.call("is_lit")):
-			br.call("flare")
-		else:
-			br.call("light")
+		_expose(b, brs)
 		n += 1
 		_until(b, func() -> bool: return String(b.state) == "climb" or bool(b.is_defeated()), 12.0)
 	assert_true(bool(b.is_defeated()), "the flares alone end it")
@@ -639,7 +743,8 @@ func test_scorch_ends_it_even_without_weapon_damage() -> void:
 	assert_eq(_count("defeated"), 1, "once")
 
 
-func test_good_damage_ends_it_in_two_or_three_exposures() -> void:
+func test_good_damage_ends_it_in_exactly_three_exposures_one_per_phase() -> void:
+	GameState.give_item("lantern", 1)           # as in play: the line-braziers need it (and the floors apply)
 	var s: Array = await _setup()
 	var b: Node = s[0]
 	var k: Dummy = s[1]
@@ -656,7 +761,8 @@ func test_good_damage_ends_it_in_two_or_three_exposures() -> void:
 			_tick(b, 0.5)
 			t += 0.5
 	assert_true(bool(b.is_defeated()), "defeated")
-	assert_true(n >= 2 and n <= 3, "two or three exposures plus damage (%d)" % n)
+	assert_eq(n, 3, "one exposure per phase plus damage (QA CH2-007: never two)")
+	assert_true(int(b.stats["pounces"]) >= 1 and int(b.stats["delayed"]) >= 1 and int(b.stats["releases"]) == 1, "her whole kit came first")
 
 
 func test_the_pounce_goes_through_krystals_damage_intake_once() -> void:
@@ -697,7 +803,7 @@ func test_a_companions_real_melee_lands_only_in_an_exposed_window() -> void:
 	var Combat := preload("res://src/combat/combat.gd")
 	_to_cling(b)
 	(brs[int(b.held_line)] as Node).call("light")
-	assert_true(_to_state(b, "exposed", 2.0))
+	assert_true(_to_state(b, "exposed", 30.0))
 	comp.global_position = b.global_position + Vector3(1.4, 0.0, 0.0)
 	var hp0: float = float(b.health.hp)
 	var hits: Array = Combat.melee(comp, comp.global_position + Vector3.UP * 0.8, Vector3(-1, 0, 0), 2.0, 120.0, 10.0, ["enemy"], 0.0)
@@ -785,7 +891,7 @@ func test_the_fight_never_starts_while_krystal_is_down() -> void:
 	assert_eq(_count("enc"), 1)
 
 
-func test_a_strong_weapon_still_needs_two_exposures() -> void:
+func test_a_strong_weapon_still_needs_one_exposure_per_phase() -> void:
 	GameState.give_item("lantern", 1)           # the brazier rule is playable (boss_brazier needs the Lantern)
 	var s: Array = await _setup()
 	var b: Node = s[0]
@@ -812,20 +918,30 @@ func test_a_strong_weapon_still_needs_two_exposures() -> void:
 	assert_eq(k.hits, 0, "dodged")
 	assert_eq(String(b.state), "rebound", "no stranded window while blows can't wound her")
 	assert_false(b.is_vulnerable())
-	# first exposure: the scorch still burns through; now the floor is 25%
+	# first exposure (she has pounced: the light burns her off at once): the scorch burns 10%; now the floor is 35%
+	assert_true(bool(b.is_engaged()), "that pounce was her commitment this round")
 	_expose(b, brs)
 	assert_true(_to_state(b, "exposed", 2.0))
-	assert_almost(float(b.health.hp), 320.0 * 0.6 - 32.0, 0.01, "the flare's scorch is never held by the floor")
+	assert_almost(float(b.health.hp), 320.0 * 0.6 - 32.0, 0.01, "the flare's scorch burns through the old floor")
 	b.health.apply_damage(1000.0, k, Vector3.ZERO)
 	assert_false(bool(b.is_defeated()), "one exposure is not enough")
-	assert_almost(float(b.health.hp), 320.0 * 0.25, 0.01, "held at the 25% floor")
-	# second exposure: nothing holds her up any more
+	assert_almost(float(b.health.hp), 320.0 * 0.35, 0.01, "held at the 35% floor")
+	# second exposure (phase 3 opens): QA CH2-007 - it can't carry her across the last boundary too
 	_expose(b, brs)
+	assert_true(_to_state(b, "exposed", 2.0))
+	assert_eq(int(b.phase), 3)
+	assert_almost(float(b.health.hp), 320.0 * 0.35 - 32.0, 0.01, "the scorch")
+	b.health.apply_damage(1000.0, k, Vector3.ZERO)
+	assert_false(bool(b.is_defeated()), "the exposure that opens phase 3 never ends the fight")
+	assert_almost(float(b.health.hp), 320.0 * 0.2, 0.01, "held at the 20% floor")
+	# third exposure (after her release): nothing holds her up any more
+	_expose(b, brs)
+	assert_eq(int(b.stats["releases"]), 1, "phase 3 showed the release first")
 	assert_true(_to_state(b, "exposed", 2.0))
 	b.health.apply_damage(1000.0, k, Vector3.ZERO)
 	Events.hint.disconnect(hcb)
-	assert_true(bool(b.is_defeated()), "the second exposure lets a strong weapon finish her")
-	assert_eq(int(b.exposures), 2)
+	assert_true(bool(b.is_defeated()), "the third exposure lets a strong weapon finish her")
+	assert_eq(int(b.exposures), 3)
 	assert_eq(_count("defeated"), 1)
 
 
@@ -888,7 +1004,7 @@ func test_a_reset_mid_exposure_moves_her_anchor_marks_with_her() -> void:
 	_to_cling(b)
 	assert_eq(int(b.anchor_marks().get("held")), 2)
 	(brs[2] as Node).call("light")
-	assert_true(_to_state(b, "exposed", 2.0))
+	assert_true(_to_state(b, "exposed", 30.0))
 	Events.player_died.emit()                 # she falls mid-window: the reset puts the Matron on her new side
 	assert_eq(int(b.side), 1)
 	assert_eq(int(b.held_line), 1, "the south line after one exposure")

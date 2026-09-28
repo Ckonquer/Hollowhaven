@@ -2,7 +2,11 @@ extends Node3D
 ## The Candleyard (Hallowmere Reach district, module C2; MP §9 / §15 / §17): whimsical leaning memory stones with
 ## carved moons and stars (never graves, never gore), moonflowers, candles, an old Candle Tree, the
 ## groundskeepers' shed and tools inside a low broken lilac wall with five wide gates - very readable violet
-## night light (emissive candles/moonflowers + three unshadowed violet lamps that brighten at night).
+## night light (emissive moonflowers + three unshadowed violet lamps that brighten at night) warmed by real candle
+## light: amber teardrop flames with soft halos, candle-lit lantern globes on the gates and the Candle Tree, and
+## warm light pools at night inside the light budget: one unshadowed omni over the Candle Tree ring and one at
+## each lit gate (Data.CANDLE_LIGHTS, GATE_LIGHT_*), and warm glow decals under the other candle clusters
+## (Data.CANDLE_POOLS: emission-only Decals, not lights). Nothing here casts shadows.
 ##   * Small optional loops: Hollow Drudges (hr_sp_candleyard_drudges) and Patchwalkers
 ##     (hr_sp_candleyard_patchwalkers) patrol stone clusters in the north half; spawners are guarded when the
 ##     enemy scripts are missing. The activities sit in the calmer south half.
@@ -34,13 +38,23 @@ const LIGHT_TICK := 1.0
 const DAY_LIGHT_MULT := 0.45
 const BENCH_HEAL := 15.0
 const BENCH_COOLDOWN_MS := 20000
+const FLAME_COLOR := Color("ffc46b")
+const GLASS_WARM := Color("ffca7a")
+const HALO_CANDLE := 0.34            # halo card size around a candle flame (m)
+const HALO_LANTERN := 0.85           # ... around a lantern globe
+const GATE_LIGHT_RANGE := 5.5
+const GATE_LIGHT_ENERGY := 1.3
+const POOL_ENERGY := 0.55            # glow decal emission at full night (x the pool's strength)
+const POOL_HEIGHT := 2.4             # decal box height (projects onto the ground, grass and stone feet)
 
 var area: Node3D = null
 var build_ms: int = 0
 var nodes: Dictionary = {}
 var spawners: Dictionary = {}
 var interactables: Dictionary = {}
-var lights: Array = []                # [OmniLight3D, night energy]
+var lights: Array = []                # [OmniLight3D, night energy] (the violet lamps)
+var candle_lights: Array = []         # [OmniLight3D, night energy] (warm: the Candle Tree ring + lit gates; off by day)
+var candle_pools: Array = []          # [Decal, night strength] (warm glow on the ground at candle clusters; off by day)
 var solids: StaticBody3D = null
 var gate_openings: Array = []         # [Vector2 centre, float width] of the wall gates (tests)
 var instant: bool = false             # tests: skip the bloom / hat tweens
@@ -48,6 +62,7 @@ var instant: bool = false             # tests: skip the bloom / hat tweens
 var _marker_candle: Node3D
 var _nook_flowers: Node3D
 var _nook_light: OmniLight3D
+var _marker_pool: Decal
 var _hat: Node3D
 var _pattern_ribbon: Node3D
 var _pattern_stone: Node3D
@@ -93,11 +108,25 @@ func _process(delta: float) -> void:
 		update_lights()
 
 
-## Violet lamps: full strength at night, softer by day (always readable, never dark).
+## Violet lamps: full strength at night, softer by day (always readable, never dark). The warm candle pools fade
+## in with the dark (the sky's night amount, or the clock's night) and are switched off by day.
 func update_lights() -> void:
-	var mult := 1.0 if GameState.is_night() else DAY_LIGHT_MULT
+	var night_clock := GameState.is_night()
+	var mult := 1.0 if night_clock else DAY_LIGHT_MULT
 	for l in lights:
 		(l[0] as OmniLight3D).light_energy = float(l[1]) * mult
+	var warm := maxf(Art.night_amount(), 1.0 if night_clock else 0.0)
+	for c in candle_lights:
+		var o := c[0] as OmniLight3D
+		o.light_energy = float(c[1]) * warm
+		o.visible = warm > 0.02
+	for pl in candle_pools:
+		var d := pl[0] as Decal
+		d.emission_energy = POOL_ENERGY * float(pl[1]) * warm
+		d.visible = warm > 0.02
+	if _marker_pool != null:
+		_marker_pool.emission_energy = POOL_ENERGY * float(Data.MARKER_POOL[1]) * warm
+		_marker_pool.visible = warm > 0.02 and is_light_placed()
 
 
 # --- Wall, paths, tree, stones ----------------------------------------------------------------------------------
@@ -140,7 +169,11 @@ func _build_wall() -> void:
 			glass.append(Transform3D(Basis(), B.ground(area, lp, 1.97)))
 			B.cylinder(solids, B.ground(area, lp), 0.09, 1.9)
 	B.multi(self, Art.iron_lantern_post(), prop, posts, "GateLanternPosts", 110.0)
-	B.multi(self, NV._sph(0.11, 5, 8), Art.glow(Art.VIOLET_FLAME, 2.2), glass, "GateLanternGlass", 140.0, false)
+	B.multi(self, Art.lantern_globe(), Art.glow(GLASS_WARM, 2.2), glass, "GateLanternGlass", 140.0, false)
+	_halos(glass, HALO_LANTERN, "GateLanternHalos")
+	for g3 in [90.0, 51.0]:
+		var gp3 := Data.gate_point(g3)
+		_add_warm_light(B.ground(area, gp3 + (c - gp3).normalized() * 0.8, 1.9), GATE_LIGHT_RANGE, GATE_LIGHT_ENERGY, "GateLight")
 
 
 func _build_paths() -> void:
@@ -166,7 +199,11 @@ func _build_tree() -> void:
 		cages.append(Transform3D(Basis(), p))
 		glass.append(Transform3D(Basis(), p + Vector3(0, -0.19, 0)))
 	B.multi(self, Art.hanging_lantern(), Art.prop_material(), cages, "TreeLanterns", 120.0)
-	B.multi(self, NV._sph(0.09, 5, 8), Art.glow(Art.VIOLET_FLAME, 2.4), glass, "TreeLanternGlass", 140.0, false)
+	var globes: Array = []
+	for g in glass:
+		globes.append(Transform3D(Basis.from_scale(Vector3.ONE * 0.8), (g as Transform3D).origin))
+	B.multi(self, Art.lantern_globe(), Art.glow(GLASS_WARM, 2.4), globes, "TreeLanternGlass", 140.0, false)
+	_halos(glass, HALO_LANTERN * 0.8, "TreeLanternHalos")
 
 
 func _build_stones() -> void:
@@ -223,7 +260,7 @@ func _build_flowers_and_candles() -> void:
 			var q := p + to_tree * 0.45 + Vector2(-to_tree.y, to_tree.x) * (0.25 * float(j * 2 - 1) if k % 2 == 1 else 0.0)
 			var hsc := 0.8 + 0.3 * float(posmod(hash("c|%d|%d" % [k, j]), 3))
 			bodies.append(Transform3D(Basis.from_scale(Vector3(1, hsc, 1)), B.ground(area, q)))
-			flames.append(Transform3D(Basis.from_scale(Vector3(1.0, 1.6, 1.0)), B.ground(area, q, 0.14 * hsc + 0.04)))
+			flames.append(Transform3D(Basis(), B.ground(area, q, 0.14 * hsc + 0.004)))
 		k += 1
 	for i in 10:
 		var a2 := TAU * float(i) / 10.0 + 0.2
@@ -231,9 +268,38 @@ func _build_flowers_and_candles() -> void:
 		if q2.distance_to(Data.HAT["stand"]) < 1.0:
 			continue
 		bodies.append(Transform3D(Basis(), B.ground(area, q2)))
-		flames.append(Transform3D(Basis.from_scale(Vector3(1.0, 1.6, 1.0)), B.ground(area, q2, 0.18)))
+		flames.append(Transform3D(Basis(), B.ground(area, q2, 0.144)))
 	B.multi(self, Art.candle(0), Art.soft_material(), bodies, "Candles", 60.0, false)
-	B.multi(self, Art.flame(), Art.glow(Art.VIOLET_FLAME, 3.0), flames, "CandleFlames", 90.0, false)
+	B.multi(self, Art.flame(), Art.glow(FLAME_COLOR, 3.2), flames, "CandleFlames", 90.0, false)
+	var halo_at: Array = []
+	for f in flames:
+		halo_at.append(Transform3D(Basis(), (f as Transform3D).origin + Vector3(0, 0.045, 0)))
+	_halos(halo_at, HALO_CANDLE, "CandleHalos")
+
+
+## Soft additive glow cards (billboards) around flames / lantern globes: faint by day, full at night.
+func _halos(at: Array, size: float, node_name: String) -> void:
+	var xs: Array = []
+	for t in at:
+		xs.append(Transform3D(Basis.from_scale(Vector3.ONE * size), (t as Transform3D).origin))
+	B.multi(self, Art.halo_mesh(), Art.halo_material(), xs, node_name, 80.0, false)
+
+
+func _add_warm_light(pos: Vector3, reach: float, energy: float, node_name: String) -> OmniLight3D:
+	var o := OmniLight3D.new()
+	o.name = node_name
+	o.light_color = Data.CANDLE_WARM
+	o.omni_range = reach
+	o.omni_attenuation = 1.4
+	o.shadow_enabled = false
+	o.light_specular = 0.2
+	o.distance_fade_enabled = true
+	o.distance_fade_begin = 55.0
+	o.distance_fade_length = 15.0
+	o.position = pos
+	add_child(o)
+	candle_lights.append([o, energy])
+	return o
 
 
 ## Decor never lands on a route, an activity, a node, a stone or a gate.
@@ -279,6 +345,28 @@ func _build_lights() -> void:
 		o.position = B.ground(area, p, float(l[1]))
 		add_child(o)
 		lights.append([o, float(l[3])])
+	for w in Data.CANDLE_LIGHTS:
+		_add_warm_light(B.ground(area, w[0], float(w[1])), float(w[2]), float(w[3]), "CandleLight")
+	for pw in Data.CANDLE_POOLS:
+		candle_pools.append([_glow_pool(pw[0], float(pw[1])), float(pw[2])])
+
+
+## A warm glow decal (emission only: not a light) projected down onto the ground, grass and stone feet at p.
+func _glow_pool(p: Vector2, radius: float) -> Decal:
+	var d := Decal.new()
+	d.name = "CandlePool"
+	d.size = Vector3(radius * 2.0, POOL_HEIGHT, radius * 2.0)
+	d.texture_emission = Art.pool_texture()
+	d.modulate = Data.CANDLE_WARM
+	d.emission_energy = 0.0
+	d.upper_fade = 0.5
+	d.lower_fade = 0.5
+	d.distance_fade_enabled = true
+	d.distance_fade_begin = 55.0
+	d.distance_fade_length = 15.0
+	d.position = B.ground(area, p, POOL_HEIGHT * 0.3)
+	add_child(d)
+	return d
 
 
 # --- Shed, notes, marker, nook, pattern ------------------------------------------------------------------
@@ -362,16 +450,17 @@ func _build_groundskeeper() -> void:
 	var prop := Art.prop_material()
 	# Note 2: a little tin box at the foot of a leaning stone by the west wall.
 	var n2: Vector2 = Data.NOTE_2
-	B.mesh_at(self, Art.box_mesh(Vector3(0.3, 0.16, 0.22)), Art.tinted(Color("8fa3ad"), 0.0, 0.5),
-		Transform3D(Basis(Vector3.UP, 0.4), B.ground(area, n2, 0.08)), "TinBox")
+	B.mesh_at(self, Art.tin_box(), Art.prop_material(), Transform3D(Basis(Vector3.UP, 0.4), B.ground(area, n2, -0.01)), "TinBox")
 	_note_interactable("groundskeeper_note_2", n2, Data.LORE_GROUNDSKEEPER_2, Data.FLAG_NOTE_2, "Read the note in the tin box")
 	# The fixed empty marker: a stone plinth with an empty candle dish.
 	var mp: Vector2 = Data.MARKER
 	B.mesh_at(self, Art.marker_plinth(), prop, Transform3D(Basis(), B.ground(area, mp)), "EmptyMarker")
-	B.cylinder(solids, B.ground(area, mp), 0.36, 0.95)
+	B.cylinder(solids, B.ground(area, mp), 0.36, Art.MARKER_DISH_Y + 0.12)
+	_marker_pool = _glow_pool(mp, float(Data.MARKER_POOL[0]))
+	_marker_pool.name = "MarkerCandlePool"
 	_marker_candle = Node3D.new()
 	_marker_candle.name = "MarkerCandle"
-	_marker_candle.position = B.ground(area, mp, 0.92)
+	_marker_candle.position = B.ground(area, mp, Art.MARKER_DISH_Y + 0.012)
 	add_child(_marker_candle)
 	var cm := MeshInstance3D.new()
 	cm.mesh = Art.candle(2)
@@ -380,10 +469,17 @@ func _build_groundskeeper() -> void:
 	_marker_candle.add_child(cm)
 	var fl := MeshInstance3D.new()
 	fl.mesh = Art.flame()
-	fl.material_override = Art.glow(Color("f2ecff"), 3.2)
-	fl.position = Vector3(0, 0.34, 0)
-	fl.scale = Vector3(1.6, 2.6, 1.6)
+	fl.material_override = Art.glow(FLAME_COLOR, 3.4)
+	fl.position = Vector3(0, 0.26 * 1.4 + 0.005, 0)
+	fl.scale = Vector3.ONE * 1.4
 	_marker_candle.add_child(fl)
+	var halo := MeshInstance3D.new()
+	halo.mesh = Art.halo_mesh()
+	halo.material_override = Art.halo_material()
+	halo.position = fl.position + Vector3(0, 0.07, 0)
+	halo.scale = Vector3.ONE * 0.55
+	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_marker_candle.add_child(halo)
 	var it: Node3D = WestInteractable.new()
 	it.setup({"id": "groundskeeper_marker", "size": Vector3(1.4, 1.6, 1.4), "offset": Vector3(0, 0.8, 0),
 		"text_func": Callable(self, "_marker_text"), "handler": Callable(self, "_on_marker"), "marker": true, "marker_radius": 0.8})
@@ -490,15 +586,16 @@ func _build_hat() -> void:
 		var hsc := 1.0 + 0.15 * float(i % 3)
 		stakes.append(Transform3D(Basis.from_scale(Vector3(1, hsc, 1)), g))
 		var knot := g + Vector3(0, 1.1 * hsc, 0)
-		var xf := Transform3D(Basis(Vector3.UP, float(i) * 0.9) * Basis(Vector3.BACK, 0.9), knot)
+		# ribbons hang from the knot and flutter (the strip is flipped: its free ends point down)
+		var xf := Transform3D(Basis(Vector3.UP, float(i) * 0.9) * Basis(Vector3.BACK, PI - 0.45), knot)
 		(rib_a if i % 2 == 0 else rib_b).append(xf)
 		B.cylinder(solids, g, 0.05, 1.1 * hsc)
 		i += 1
 	var branch_knot := B.ground(area, Data.HAT["pos"], float(Data.HAT["height"]) + 0.35) + Vector3(-0.3, 0, -0.2)
-	rib_a.append(Transform3D(Basis(Vector3.BACK, 1.1), branch_knot))
+	rib_a.append(Transform3D(Basis(Vector3.BACK, PI - 0.35), branch_knot))
 	B.multi(self, Art.stake(), Art.prop_material(), stakes, "RibbonStakes", 80.0)
-	B.multi(self, Art.ribbon_strip(0.75), Art.ribbon_material(Art.RIBBON_PLUM), rib_a, "HatRibbonsPlum", 90.0, false)
-	B.multi(self, Art.ribbon_strip(0.75), Art.ribbon_material(Art.ROSEBERRY), rib_b, "HatRibbonsRose", 90.0, false)
+	B.multi(self, Art.ribbon_strip(0.6), Art.ribbon_material(Art.RIBBON_PLUM), rib_a, "HatRibbonsPlum", 90.0, false)
+	B.multi(self, Art.ribbon_strip(0.6), Art.ribbon_material(Art.ROSEBERRY), rib_b, "HatRibbonsRose", 90.0, false)
 	_hat = Node3D.new()
 	_hat.name = "WitchHat"
 	_hat.position = B.ground(area, Data.HAT["pos"], float(Data.HAT["height"]))
@@ -579,6 +676,8 @@ func _apply_state(animate: bool = false) -> void:
 		_marker_candle.visible = placed
 	if _nook_light != null:
 		_nook_light.visible = placed
+	if _marker_pool != null:
+		_marker_pool.visible = placed and _marker_pool.emission_energy > 0.0
 	if _nook_flowers != null:
 		var petals: Node3D = _nook_flowers.get_node_or_null("NookPetals")
 		if petals != null:

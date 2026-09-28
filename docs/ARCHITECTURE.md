@@ -42,7 +42,9 @@ several people build modules in parallel and integration depends on these contra
 10. **Comfort**: camera shake / flashes go through `Events.camera_shake` / `Events.screen_flash`; the
     camera/UI consumer scales them by `reduce_shake` / `reduce_flashing`. Never hard-flash the screen.
 11. **Physics layers** (bit values): world=1, player=2, companion=4, enemy=8, interact=16, structure=32,
-    pickup=64, trigger=128, hitbox=256. Player collides with world|structure (1|32). Enemies/companions
+    pickup=64, trigger=128, hitbox=256, camera=512 (layer 10: camera-only blockers, `src/camera/camera_block.gd`;
+    only `CameraRig.COLLISION_MASK` = 1|32|512 includes it, so every other body and query ignores them - any new
+    ray / shape query must set an explicit mask). Player collides with world|structure (1|32). Enemies/companions
     collide with world|structure. Interaction ray/shape queries use layer 16 (interact) — every
     interactable/harvestable owns an `Area3D` or `StaticBody3D` on layer 16 whose parent chain contains
     the script implementing the interaction methods (see below).
@@ -297,12 +299,13 @@ Always use `timeout` and `--max-seconds` / `--quit-at` so no process is left run
 * **Stalker**: Krystal's own light only repels it during the rattle directly above her; director passes
   recoil only from light at the stalker's own position. Retreats never step toward Krystal.
 
-## Chapter Two conventions (Waves B-D + integration passes 1 and 2)
+## Chapter Two conventions (Waves B-D + integration passes 1-3)
 The binding contract for Chapter Two is `docs/CHAPTER_TWO_SPEC.md`; what the foundation delivered is `docs/ch2/WAVE_A_REPORT.md`
 (schema v2, ChapterLog / OptionalLog, the rewards & flags rule, data catalogue, Game flow, music director). This section lists the
-conventions Waves B-D and the two integration passes added; each points to the code map with the details (`docs/ch2/maps/*.md`,
+conventions Waves B-D and the integration passes added; each points to the code map with the details (`docs/ch2/maps/*.md`,
 the "Chapter Two ... as built" sections). Module ownership: `docs/ch2/WAVES.md`; decisions: `docs/ch2/INTEGRATION_WAVE_BC.md`
-(pass 1, after Waves B/C) and `docs/ch2/INTEGRATION_WAVE_D.md` (pass 2, after Wave D).
+(pass 1, after Waves B/C), `docs/ch2/INTEGRATION_WAVE_D.md` (pass 2, after Wave D) and `docs/ch2/INTEGRATION_PASS3.md` (pass 3,
+after bug-fix round 1 CH2-001..017 and the visual fixes; its evidence is `QA_REPORT.md` §10).
 * **New Game / look** (ui.md §11): title → overwrite confirm → comfort → "Meet Krystal" (`src/ui/screens/creation_screen.gd`) →
   `Game.new_game(look)`. Nothing is written before Confirm. A non-empty look sets `c1x_look_chosen` and `wardrobe.notice_shown`.
   The avatar (player_avatar.md §7) follows `GameState.appearance` / `wardrobe.show_armor` / `equipment` through
@@ -324,7 +327,10 @@ the "Chapter Two ... as built" sections). Module ownership: `docs/ch2/WAVES.md`;
 * **Chapter Two quest rows** (state_save_data.md §14): a `data/quests_ch2.gd` objective may carry `"display": true` - a signpost row
   listed with its real done state (`ChapterLog.check_objective` / `objective_status`, the row carries `"display": true`) that never
   counts for completion (`step_done()` ignores it; a step needs at least one non-display objective). `ch2_quarry` shows "Calm the
-  Quarry Warden" and "Mend the mineral winch" this way before its lamp (pass 2 F03, the old R38).
+  Quarry Warden" and "Mend the mineral winch" this way before its lamp (pass 2 F03, the old R38). Pass 3: the lamp search
+  `ch2_outer_lamps` is in step group `"lamps"` with the three lamp roads (each lit lamp pays its road at once, CH2-001); a step key
+  `"hint_when"` (an objective) holds the step's hint until it holds; `ChapterLog.from_dict()` adds silent baselines only when no current
+  step has one (state_save_data.md §14).
 * **Stats and damage** (combat_enemies.md §11): `src/core/stats.gd` is static and recomputed from saved state (never cached across a
   load). Player damage order, once per hit: i-frames → `Stats.damage_reduction()` (cap 45%) → transient shield
   (`Game.player.add_shield(amount, seconds, source)`, read with `Stats.player_shield()`; never `GameState`) → Health. A hit fully
@@ -357,17 +363,32 @@ the "Chapter Two ... as built" sections). Module ownership: `docs/ch2/WAVES.md`;
   (the Choir); `telegraph_fx.move_ring(at)`; `expose(seconds)` only on the light-fearing Velvet Wing (breaks a drain) and Borrowed
   Wisp (forced reveal) - never on bosses. Setup keys: `pumpkin_mimic` `dormant` (never passed by spawners) / `seed`; `quarry_warden`
   `arena`, `arena_center`, `arena_radius`, `pillars` (leash = arena radius + 6 m within a 3 m height band; timing assist ×1.5; the
-  charge lane is clipped 1 m inside the arena and a ledge bonks). Bosses take `"mode": "story" | "trial"` (trial: no flags, no
-  `boss_defeated`): `count_velour` (in group "enemy" only while fighting; one clean reset rule), `crossing_matron` (arena
-  `boss_params()` incl. `rail`; HP floor 60 % / 25 % until the first / second exposure; `retreat_seconds()`; `crossing_rules.gd`
-  assumes the bridge centre line at z = 0), `borrowed_choir` (three exposures per phase; holds an attack token while committed).
+  charge lane is clipped 1 m inside the arena and a ledge bonks; one exposure takes at most `EXPOSE_CAP` 35 % and phase 2 owes its
+  three pulses, `PULSE_FLOOR_RATIO` 30 % floor until they played - pass 3). Bosses take `"mode": "story" | "trial"` (trial: no
+  flags, no `boss_defeated`): `count_velour` (in group "enemy" only while fighting; one clean reset rule; one window ≤ `WINDOW_CAP`
+  16 % through `velour_health.window_room`, checked before the blow lands, a finishing blow never trimmed), `crossing_matron` (arena
+  `boss_params()` incl. `rail`; with a Lantern the HP floor `Rules.HP_FLOOR` is 60 / 35 / 20 % before exposures 1 / 2 / 3 and the
+  flare's scorch stops at the floor of its own exposure, so a win takes three exposures, one per phase; a flare under her anchor
+  exposes her only once she has committed this round - before that it primes the anchor and her next pounce landing exposes her
+  (`is_engaged()` / `is_primed()`); `retreat_seconds()`, ceiling run ≤ `RETREAT_RUN_MAX` 3 s; `crossing_rules.gd` assumes the bridge
+  centre line at z = 0), `borrowed_choir` (three exposures per phase; holds an attack token while committed). The Chapter One
+  Weaver Matron: one stun window ≤ `WINDOW_CAP` 40 % in phase 1 / `LATE_WINDOW_CAP` 15 % in phases 2-3, a blow crossing 144 / 72 HP
+  stops on it (`next_phase_hp()`), a phase 2-3 scorch before that phase's first action is banked (`scorch_banked()`). Weaver and
+  Warden trim even a would-be lethal blow; Velour never trims a finishing blow (accepted difference, pass 3 R3-10).
+* **Lost sight (pass 3, CH2-006)**: an ordinary `enemy_base` enemy that has not seen Krystal for `lose_sight_seconds()` (5 s; data
+  `"lose_sight"`; sight or her hit resets `unseen_time()`) drops the chase and goes home, so it stops blocking saves and travel;
+  elites and bosses (data `elite` / `boss`) never give up this way.
 * **Areas and loading** (world_areas.md §8): `Game.prefetch_area(area_id, extra := []) -> int` compiles an area's scene and its
   `AREA_WARMUP` scripts on loader threads (idempotent, never blocks, EnemyFactory first on the main thread); `load_area` uses it, and
   the waygate / Bellhouse stair call it early behind `has_method` guards; since pass 2 (P38) the Reach, the Chapter Two bosses and
   the Echo Trial arenas are warmed too. `Game.wire_session_systems()` (idempotent; the test runner re-wires between suites): mastery
   listeners, the Chapter Two activity tracker, and since pass 2 (P34) `init()` of Expeditions, the Music Box and the Echo Trial's gift
   payer plus `attach(self)` of the onboarding hints - each safe-loaded and optional. A position saved on an upper storey is restored
-  after the structures exist.
+  after the structures exist. Pass 3: `quit_game()` and the window close request call `Game.release_prefetches()` (claims every
+  outstanding threaded load, CH2-011); `Game.is_landmark_zone(area, zone)` is false for a helper zone (its `zones` entry carries
+  `"landmark": false`, set by `annexes.gd` `mark_helper_zone()`: the Woods waygate circle), which is never a discovery or Lumi bond XP;
+  camera-only blockers (`CameraBlock.add_box()`, layer 512) sit on the waygate lintel, Lantern Road arch tops, Works lift roofs and the
+  Echo Trial pale door, and arrival spawns keep ~5 m clear behind them (`test_camera_spawn_clearance.gd`).
 * **Echo Trials** (world_areas.md §8; spec §1): one area `echo_trial`, the table `data/trials.gd` (`matron`, `velour`, `choir`),
   arena builders `src/world/trial/{velour,choir}_trial.gd` (`static build(area) -> Dictionary`, the real bosses in mode "trial"),
   echo stones `src/world/trial/trial_entry.gd` at each origin checkpoint (Below `cp_arena`, manor `manor_ballroom`, Works

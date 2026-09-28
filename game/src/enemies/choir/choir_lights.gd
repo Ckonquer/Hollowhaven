@@ -3,8 +3,10 @@ extends Node3D
 ##   * the true flame hangs from a lantern anchor's hook on a short chain (anchored: it never floats free), is a
 ##     real OmniLight3D + light source (choir_true_flame.gd) and washes its SECTOR of the floor with warm light
 ##     (a lit wedge from the centre to the perimeter walk) - the one safe place from the hush inside the ring;
-##   * the false cozy lights are round paper-lantern glows that bob over the other sectors: warm and inviting,
-##     but emissive only - no Light3D, not light sources, their floor stays dark (the Borrowed Porch rule);
+##   * the false cozy lights are round paper lanterns that bob over the other sectors (a warm glowing paper globe in
+##     a cage of four wooden ribs, a wooden cap with a hanger loop and a wooden base, a ribbon tail - CR-14: never a
+##     warm sphere with dark polar caps, which read as eyeballs): warm and inviting, but emissive only - no Light3D,
+##     not light sources, their floor stays dark (the Borrowed Porch rule);
 ##   * high_visibility_cues: a bold outlined ring round the true flame's anchor and bold bars along its sector
 ##     edges (shape, never colour alone).
 ## Visual + geometry only; the boss owns timing and damage (Rules.in_hush / in_lit_sector use the same numbers).
@@ -20,6 +22,10 @@ const Rules := preload("res://src/enemies/choir/choir_rules.gd")
 
 const MAX_FALSE := 3
 const FALSE_Y := 2.2
+const LANTERN_PAPER := Color("ffb870")
+const LANTERN_RIB := Color("c0703a")
+const LANTERN_WOOD := Color("8a5a3c")
+const LANTERN_RIBS := 4
 
 var center: Vector3 = Vector3.ZERO
 var hv: bool = false
@@ -78,15 +84,40 @@ func _ready() -> void:
 		var f := Node3D.new()
 		f.name = "FalseLight_%d" % i
 		add_child(f)
-		# a round paper lantern: warm, cozy, and lighting nothing at all
-		Kit.add(f, Kit.sphere(0.32, Mat.glow(Color("ffb870"), 1.6), 10, 12), Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.85, 1.0))
-		Kit.add(f, Kit.cylinder(0.14, 0.14, 0.06, Mat.toon(Color("3b3238")), 10), Vector3(0, 0.3, 0))
-		Kit.add(f, Kit.cylinder(0.14, 0.14, 0.06, Mat.toon(Color("3b3238")), 10), Vector3(0, -0.3, 0))
-		Art.ribbon(f, Vector3(0, -0.32, 0), 0.5, Art.RIBBONS[(i + 1) % Art.RIBBONS.size()], 0.05)
+		_build_lantern(f, i)
 		_false.append(f)
 		_false_home.append(Vector3.ZERO)
 	clear()
 	set_process(false)
+
+
+## A round paper lantern: warm, cozy, and lighting nothing at all (emissive paper, no Light3D). Shared meshes /
+## materials, no shadows (it floats; a shadow blob under it would suggest real light).
+static func _build_lantern(f: Node3D, i: int) -> void:
+	var paper := Kit.sphere(0.3, Mat.glow(LANTERN_PAPER, 1.6), 10, 12)
+	paper.name = "Paper"
+	Kit.add(f, paper, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.08, 1.0))
+	var parts: Array = [paper]
+	var rib := Mat.toon(LANTERN_RIB, {"rim": 0.3})
+	for k in LANTERN_RIBS:
+		var r := Kit.torus(0.285, 0.315, rib)
+		r.name = "Rib%d" % k
+		Kit.add(f, r, Vector3.ZERO, Vector3(90.0, 180.0 / float(LANTERN_RIBS) * float(k), 0.0), Vector3(1.0, 1.0, 1.08))
+		parts.append(r)
+	var wood := Mat.toon(LANTERN_WOOD, {"rim": 0.3})
+	var cap := Kit.cylinder(0.17, 0.2, 0.07, wood, 12)
+	cap.name = "Cap"
+	Kit.add(f, cap, Vector3(0, 0.3, 0))
+	var hanger := Kit.torus(0.05, 0.075, wood)
+	hanger.name = "Hanger"
+	Kit.add(f, hanger, Vector3(0, 0.38, 0), Vector3(90, 0, 0))
+	var base := Kit.cylinder(0.2, 0.17, 0.07, wood, 12)
+	base.name = "Base"
+	Kit.add(f, base, Vector3(0, -0.3, 0))
+	parts.append_array([cap, hanger, base])
+	for mi in parts:
+		(mi as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	Art.ribbon(f, Vector3(0, -0.34, 0), 0.5, Art.RIBBONS[(i + 1) % Art.RIBBONS.size()], 0.05)
 
 
 func begin(n_false: int, c: Vector3) -> void:

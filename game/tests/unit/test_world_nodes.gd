@@ -11,6 +11,7 @@ const MasteryData := preload("res://data/mastery.gd")
 const ReachVegetation := preload("res://src/world/reach/reach_vegetation.gd")
 
 var _holder: Node3D
+var _bursts := 0
 
 
 func before_each() -> void:
@@ -210,13 +211,13 @@ func test_drop_table_ranges() -> void:
 	assert_true(seeds > 50 and seeds < 160, "~25%% seed chance (%d / 400)" % seeds)
 
 
-## One-shot particle bursts (fx.gd) currently under the test holder: the hit / felling feedback of its nodes.
-func _bursts() -> int:
-	var n := 0
-	for c in _holder.get_children():
+## Counts the one-shot particle bursts (fx.gd) spawned under the test holder from now on (the hit / felling
+## feedback of its nodes; bursts free themselves, so a running count, not a child scan).
+func _count_bursts() -> void:
+	_bursts = 0
+	_holder.child_entered_tree.connect(func(c: Node) -> void:
 		if c is CPUParticles3D:
-			n += 1
-	return n
+			_bursts += 1)
 
 
 ## Angle (radians) between a node's local up axis and straight up: 0 = standing, ~1.5 = lying on the ground.
@@ -243,11 +244,13 @@ func test_reach_tree_fells_falls_and_respawns() -> void:
 	player.position = Vector3(0, 0, 3)
 	GameState.give_item("stone_axe", 1)
 	var wood := GameState.count_item("wood")
+	_count_bursts()
 	t.harvest_hit(player, "stone_axe")
-	assert_eq(_bursts(), 2, "a chop shows the leaf and the chip burst")
+	assert_eq(_bursts, 2, "a chop shows the leaf and the chip burst")
 	for i in 3:
 		t.harvest_hit(player, "stone_axe")
 	assert_true(t.depleted, "the 4th stone-axe hit fells it")
+	var at_fell := _bursts
 	assert_true(GameState.count_item("wood") - wood >= 3, "wood granted")
 	assert_true(GameState.is_depleted("test_hr_tree_1"), "the felling persists")
 	assert_true(stump.visible, "the stump shows")
@@ -258,8 +261,11 @@ func test_reach_tree_fells_falls_and_respawns() -> void:
 	assert_false(top.visible, "the fallen top is gone")
 	assert_true(stump.visible, "the stump remains")
 	assert_false(bool(t.get("_busy")), "the fall finished")
-	assert_true(_bursts() >= 4, "the landing burst leaves and dust (%d bursts)" % _bursts())
-	var solid := t.get_node("Solid/CollisionShape3D") as CollisionShape3D
+	assert_true(_bursts - at_fell >= 3, "the landing and the vanishing top burst leaves and dust (%d)" % (_bursts - at_fell))
+	var solid := t.get("_solid_shape") as CollisionShape3D
+	assert_not_null(solid, "a Reach tree is solid")
+	if solid == null:
+		return
 	assert_almost(float((solid.shape as CylinderShape3D).height), 0.55, 0.01, "only the stump collides")
 	# The respawn check (every RESPAWN_CHECK_SECONDS of _process) brings it back once its time has passed.
 	GameState.total_minutes += 1441.0

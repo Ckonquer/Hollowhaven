@@ -20,6 +20,7 @@ const LoreDB := preload("res://src/core/lore_db.gd")
 const HintCard := preload("res://src/ui/hud/hint_card.gd")
 
 const TAB_ALIASES := {"goals": "story", "optional goals": "optional", "masteries": "mastery"}
+const TABS_MIN := Vector2(1440, 830)     # the tab pages (was 1440 x 700 and the window followed each page)
 const CH1_TITLE := "Chapter One"
 const CH1_SUBTITLE := "The Dimming Ward"
 const CH2_TITLE := "Chapter Two"
@@ -48,7 +49,10 @@ func setup(p_args: Dictionary) -> void:
 
 func _build() -> void:
 	tabs = TabContainer.new()
-	tabs.custom_minimum_size = Vector2(1440, 700)
+	# One size for every tab, so the parchment never jumps when E cycles them (visual QA UI-14): tall enough for the
+	# tallest page (Mastery, whose wrapped rewards measure taller while hidden), and hidden pages count too.
+	tabs.custom_minimum_size = TABS_MIN
+	tabs.use_hidden_tabs_for_min_size = true
 	body.add_child(tabs)
 	goals_box = Kit.hbox(30)
 	goals_box.name = "Story"

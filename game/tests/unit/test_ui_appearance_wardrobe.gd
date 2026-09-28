@@ -442,6 +442,42 @@ func test_notice_can_be_dismissed_and_is_skipped_when_already_seen() -> void:
 	assert_true(bool(GameState.wardrobe["notice_shown"]))
 
 
+## CH2-009: a Chapter One save whose player finds the wardrobe herself (Esc > Wardrobe) before the card is due,
+## restyles and saves a preset has been told about it: the card is no longer pending, never appears, the save
+## remembers it, and onboarding's ob_wardrobe tip still arms from the same flag.
+func test_using_the_wardrobe_first_retires_the_notice() -> void:
+	assert_true(ui.wardrobe_notice_pending(), "an older save that never saw it")
+	ui.open("pause")
+	await wait_frames(2)
+	(ui.panels["pause"] as Control).get("wardrobe_btn").pressed.emit()
+	await wait_frames(2)
+	assert_eq(ui.top_panel(), "wardrobe", "Esc > Wardrobe")
+	var w: Control = ui.panels["wardrobe"]
+	w.editor.choose("hair", "bob")
+	(w._preset_rows[0]["save"] as Button).pressed.emit()
+	assert_eq(Wardrobe.Looks.presets().size(), 1, "a preset saved")
+	ui.close_all()
+	await wait_frames(2)
+	assert_true(bool(GameState.wardrobe["notice_shown"]), "using the wardrobe counts as being told about it")
+	assert_false(ui.wardrobe_notice_pending(), "the card is no longer due")
+	for i in 40:
+		assert_false(ui.tick_wardrobe_notice(0.25), "the card never appears")
+	assert_false(ui.is_open("confirm"))
+	var ob: Node = load("res://src/world/story_ch2/onboarding_hints.gd").new()
+	add_child(ob)
+	var hints_before: Variant = Settings.values.get("show_hints", true)
+	Settings.values["show_hints"] = true
+	ob.call("tick", 0.5)
+	assert_true((ob.call("armed_ids") as Array).has("ob_wardrobe"), "the ob_wardrobe tip still arms from the same flag")
+	Settings.values["show_hints"] = hints_before
+	ob.queue_free()
+	assert_true(SaveSystem.save_game(true))
+	GameState.reset()
+	assert_true(SaveSystem.load_game())
+	GameState.active = true
+	assert_false(ui.wardrobe_notice_pending(), "remembered in the save")
+
+
 ## The notice never lands on a chapter card, death or ending screen (anything in the overlay layer, e.g. the
 ## Chapter Two card shown 2.2 s after the Ward Stone choice): it waits for 3 s of quiet play after it.
 func test_notice_waits_for_cards_and_overlays() -> void:

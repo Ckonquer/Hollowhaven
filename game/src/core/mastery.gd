@@ -15,7 +15,8 @@ extends RefCounted
 ##   Mastery.rank("gathering") -> int                0..5
 ##   Mastery.gather_power() / bonus_yield_chance() / furnace_queue_bonus() / station_time_mult() /
 ##   meal_buff_bonus() / sprint_stamina_save()        small effects for Stats / stations / food (data values)
-##   Mastery.apply_legacy_credit() -> {track: xp}     once per save (recorded), conservative, capped
+##   Mastery.apply_legacy_credit() -> {track: xp}     once per save (recorded), conservative, capped; also records the
+##                                                    Chapter One landmarks the save proves visited as seen (no xp)
 ##   Mastery.known_spots(area) -> [{"kind", "pos": Vector2}]   recorded resource spots (Wayfinding 2 map pins)
 ##   Mastery.cache_hints(area) -> [{"id", "pos": Vector2, "district"}]   unfound caches in discovered districts
 ##   Mastery.resource_pins_on() / cache_hints_on() / highlight_radius()   rank rewards the map / world read
@@ -467,11 +468,30 @@ static func apply_legacy_credit() -> Dictionary:
 	var added := {}
 	# Record FIRST (like the reward ledger): a failure below can never make it apply twice.
 	GameState.mastery["legacy_credit"] = {"applied": true, "at": float(GameState.total_minutes), "xp": credit.duplicate()}
+	mark_legacy_landmarks()
 	for track in credit:
 		var n := _add_xp(String(track), int(credit[track]), false)
 		if n > 0:
 			added[track] = n
 	return added
+
+
+## Records the Chapter One landmarks this save proves visited (data LEGACY_LANDMARKS: any listed flag set) as
+## already-seen wayfinding "landmark" kinds: no xp, no toast - the legacy credit stands in for them (CH2-010). Called
+## by apply_legacy_credit() only, so it runs once per save and never for a new journey's first area load (no flags).
+## Returns the kinds newly recorded.
+static func mark_legacy_landmarks() -> Array:
+	var out: Array = []
+	for entry in MasteryData.LEGACY_LANDMARKS:
+		var kind := "landmark:" + String((entry as Dictionary).get("landmark", ""))
+		if kind == "landmark:" or has_seen("wayfinding", kind):
+			continue
+		for f in (entry as Dictionary).get("flags", []):
+			if _truthy(GameState.get_flag(String(f))):
+				_seen_list("wayfinding").append(kind)
+				out.append(kind)
+				break
+	return out
 
 
 ## Any xp or first-time kind recorded on any track.

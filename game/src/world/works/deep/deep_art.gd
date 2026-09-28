@@ -37,6 +37,7 @@ const PUMPKIN := Color("f08a2e")
 const RIBBONS := [Color("e4665c"), Color("f2c14e"), Color("b48ad8"), Color("6fae4f"), Color("f28bb0")]
 
 const HV_COLOR := Color("fff1c8")
+const SYMBOL_DARK := Color(0.12, 0.09, 0.12)
 const HV_OUTLINE := Color(0.08, 0.05, 0.1)
 
 
@@ -92,23 +93,49 @@ static func label(parent: Node3D, text: String, pos: Vector3, size: int = 48, co
 	l.outline_size = 10
 	l.outline_modulate = Color(0.08, 0.05, 0.08, 0.9)
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED if billboard else BaseMaterial3D.BILLBOARD_DISABLED
+	# An authored sign is read from its front only: seen from behind, a double-sided label shows mirrored
+	# letters through / past its board (VISUAL_BUGS IN-08). A caller that mirrors a label on purpose (scale.x < 0,
+	# the false lift's backwards sign) must set double_sided back to true: a mirrored single-sided label is culled
+	# from the front.
+	l.double_sided = billboard
 	l.position = pos
 	parent.add_child(l)
 	return l
 
 
+## Width in metres a label's text takes on screen (font + outline, at its pixel size).
+static func label_width(l: Label3D) -> float:
+	var f: Font = l.font if l.font != null else ThemeDB.fallback_font
+	var w := 0.0
+	for line in l.text.split("\n"):
+		w = maxf(w, f.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, l.font_size).x)
+	return (w + float(l.outline_size)) * l.pixel_size
+
+
+## Shrinks a label's font until its text fits inside `max_width` metres (its board). Returns the new width.
+static func fit_label(l: Label3D, max_width: float) -> float:
+	var w := label_width(l)
+	while w > max_width and l.font_size > 8:
+		l.font_size = maxi(int(floorf(float(l.font_size) * max_width / w)), 8) if w > max_width * 1.05 else l.font_size - 1
+		w = label_width(l)
+	return w
+
+
 ## A large readable symbol plate shape (+ its name as a label below it, never colour alone). Faces +z.
 ## Known ids: moon, leaf, bell, star, flame, key, heart; anything else shows its first letter.
-static func symbol(parent: Node3D, symbol_id: String, size: float, color: Color, display_name: String = "") -> Node3D:
+## `backdrop`: the colour of whatever the symbol is painted on - the Moon's "bite" uses it, so on a light board
+## the crescent reads as a crescent instead of a black hole (VISUAL_BUGS IN-11). Default: a dark plate.
+static func symbol(parent: Node3D, symbol_id: String, size: float, color: Color, display_name: String = "", backdrop: Color = SYMBOL_DARK) -> Node3D:
 	var n := Node3D.new()
 	n.name = "Symbol_" + symbol_id
 	parent.add_child(n)
 	var mat := Mat.outlined(Mat.toon(color, {"emission": color, "emission_energy": 0.35, "rim": 0.4}), 0.03)
-	var dark := Mat.toon(Color(0.12, 0.09, 0.12))
+	var dark := Mat.toon(SYMBOL_DARK)
+	var bite: Material = dark if backdrop == SYMBOL_DARK else Mat.toon(backdrop, {"emission": backdrop, "emission_energy": 0.12, "rim": 0.0, "noise": 0.0})
 	match symbol_id:
 		"moon":
 			Kit.add(n, Kit.cylinder(size * 0.5, size * 0.5, 0.06, mat, 24), Vector3.ZERO, Vector3(90, 0, 0))
-			Kit.add(n, Kit.cylinder(size * 0.42, size * 0.42, 0.08, dark, 24), Vector3(size * 0.22, size * 0.08, 0.02), Vector3(90, 0, 0))
+			Kit.add(n, Kit.cylinder(size * 0.42, size * 0.42, 0.08, bite, 24), Vector3(size * 0.22, size * 0.08, 0.02), Vector3(90, 0, 0))
 		"leaf":
 			Kit.add(n, Kit.sphere(size * 0.5, mat, 10, 14), Vector3.ZERO, Vector3(0, 0, 35), Vector3(0.55, 1.0, 0.12))
 			Kit.add(n, Kit.box(Vector3(0.05, size * 0.95, 0.05), dark), Vector3(0, 0, 0.07), Vector3(0, 0, 35))

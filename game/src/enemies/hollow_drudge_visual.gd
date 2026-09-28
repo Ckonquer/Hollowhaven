@@ -13,6 +13,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const COAT_COLOR := Color("6b5646")
 const COAT_DARK := Color("4e3e33")
@@ -48,7 +49,10 @@ var _tint_mat: StandardMaterial3D
 var _pick_tint: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
+var _tint_level_now: float = 0.0
 var _pick_tint_on := false
+
+static var _coat_mesh: ArrayMesh
 
 
 func _ready() -> void:
@@ -60,7 +64,7 @@ func body_height() -> float:
 
 
 func _build() -> void:
-	_tint_mat = HitFx.new_tint()
+	_tint_mat = CreatureFx.new_tint()
 	_pick_tint = HitFx.new_tint()
 	_root = Node3D.new()
 	_root.name = "Root"
@@ -78,18 +82,21 @@ func _build() -> void:
 	_torso = Node3D.new()
 	_torso.name = "Torso"
 	Kit.add(_root, _torso, Vector3(0, HIP_Y, 0))
-	var coat_mat := Mat.outlined(Mat.toon(COAT_COLOR, {"rim": 0.35, "noise": 0.18}), 0.016)
-	var coat_dark := Mat.outlined(Mat.toon(COAT_DARK, {"rim": 0.3, "noise": 0.18}), 0.014)
-	var coat := Kit.cylinder(0.27, 0.42, 0.95, coat_mat, 14)
-	Kit.add(_torso, coat, Vector3(0, 0.22, 0))
+	# CR-08: the coat was a hard-edged cylinder slab with a flat ring hem and box lapels (broken outlines, read as a
+	# placeholder). Now a soft, slumped bell of cloth (a stretched blob), a rolled hem, rounded lapels and a
+	# heavier ink line for its 2 m size.
+	var coat_mat := Mat.outlined(Mat.toon(COAT_COLOR, {"rim": 0.35, "noise": 0.18}), 0.022)
+	var coat_dark := Mat.outlined(Mat.toon(COAT_DARK, {"rim": 0.3, "noise": 0.18}), 0.018)
+	var coat := MeshInstance3D.new()
+	coat.mesh = coat_mesh()
+	coat.material_override = coat_mat
+	Kit.add(_torso, coat, Vector3(0, -0.02, 0.02), Vector3.ZERO, Vector3(1.0, 1.0, 0.86))
 	_tint_meshes.append(coat)
 	var chest := Kit.blob(0.3, coat_mat, 31, 0.06, 1.0, 3)
 	Kit.add(_torso, chest, Vector3(0, 0.62, -0.02), Vector3.ZERO, Vector3(1.15, 0.85, 0.9))
 	_tint_meshes.append(chest)
-	var hem := Kit.cylinder(0.42, 0.46, 0.08, coat_dark, 14)
-	Kit.add(_torso, hem, Vector3(0, -0.24, 0))
 	for sx in [-1.0, 1.0]:
-		Kit.add(_torso, Kit.box(Vector3(0.1, 0.5, 0.04), coat_dark), Vector3(sx * 0.1, 0.5, -0.29), Vector3(8, 0, sx * 6.0))
+		Kit.add(_torso, Kit.capsule(0.055, 0.5, coat_dark), Vector3(sx * 0.1, 0.48, -0.3), Vector3(8, 0, sx * 6.0), Vector3(1.0, 1.0, 0.4))
 	# Mineral crust (teal + amber crystals, no gore)
 	var teal := Mat.outlined(Mat.toon(CRUST_TEAL, {"rim": 0.6, "emission": CRUST_TEAL, "emission_energy": 0.25}), 0.008)
 	var amber := Mat.outlined(Mat.toon(CRUST_AMBER, {"rim": 0.6, "emission": CRUST_AMBER, "emission_energy": 0.2}), 0.008)
@@ -99,12 +106,15 @@ func _build() -> void:
 	for c in crystals:
 		Kit.add(_torso, Kit.cone(0.06, 0.26, c[2], 6), c[0], c[1])
 	# Hood, helmet with a dead lamp, two faint glints (the only "face")
-	var hood := Kit.sphere(0.23, Mat.outlined(Mat.toon(HOOD_COLOR, {"rim": 0.2, "noise": 0.0}), 0.012), 12, 16)
+	var hood := Kit.sphere(0.23, Mat.outlined(Mat.toon(HOOD_COLOR, {"rim": 0.2, "noise": 0.0}), 0.014), 12, 16)
 	Kit.add(_torso, hood, Vector3(0, 0.98, -0.12), Vector3.ZERO, Vector3(1.0, 1.05, 1.0))
-	var helmet := Kit.cylinder(0.2, 0.27, 0.16, Mat.outlined(Mat.toon(HELMET_COLOR, {"rim": 0.4, "specular": 0.4}), 0.01), 14)
-	Kit.add(_torso, helmet, Vector3(0, 1.16, -0.1), Vector3(-10, 0, 8))
+	# a dome helmet with a rolled brim (was a flat-topped cylinder)
+	var helmet_mat := Mat.outlined(Mat.toon(HELMET_COLOR, {"rim": 0.4, "specular": 0.4}), 0.014)
+	var helmet := Kit.sphere(0.25, helmet_mat, 10, 14)
+	Kit.add(_torso, helmet, Vector3(0, 1.1, -0.1), Vector3(-10, 0, 8), Vector3(1.0, 0.72, 1.05))
 	_tint_meshes.append(helmet)
-	Kit.add(_torso, Kit.cylinder(0.06, 0.06, 0.06, Mat.glow(Color("6a5a40"), 0.4), 10), Vector3(0, 1.18, -0.33), Vector3(80, 0, 0))
+	Kit.add(_torso, Kit.torus(0.22, 0.3, helmet_mat), Vector3(0, 1.08, -0.1), Vector3(-10, 0, 8), Vector3(1.0, 0.35, 1.0))
+	Kit.add(_torso, Kit.cylinder(0.06, 0.06, 0.06, Mat.glow(Color("6a5a40"), 0.4), 10), Vector3(0, 1.18, -0.34), Vector3(80, 0, 0))
 	for sx in [-1.0, 1.0]:
 		var glint := Kit.sphere(0.025, Mat.glow(GLINT_COLOR, 1.3), 6, 8)
 		glint.set_meta("no_flash", true)
@@ -131,6 +141,43 @@ func _build() -> void:
 		var tip := Kit.cone(0.05, 0.34, metal, 7)
 		Kit.add(_pick, tip, Vector3(0, sy * 0.2, -0.86), Vector3(0 if sy > 0 else 180, 0, 0))
 		_tint_meshes.append(tip)
+
+
+## The long coat: a smooth surface of revolution (shared, cached) that flares from the shoulders to a ragged,
+## slightly wavy hem - soft normals so the ink outline stays unbroken (the Hollow Shade's robe is built the same way).
+static func coat_mesh() -> ArrayMesh:
+	if _coat_mesh != null:
+		return _coat_mesh
+	# profile (radius, height) from the hem up to the collar
+	var prof := [Vector2(0.45, -0.24), Vector2(0.43, -0.14), Vector2(0.39, 0.08), Vector2(0.33, 0.34), Vector2(0.3, 0.52),
+		Vector2(0.28, 0.66), Vector2(0.2, 0.76), Vector2(0.0, 0.8)]
+	var segs := 18
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rings: Array = []
+	for r in prof.size():
+		var ring: Array = []
+		for k in segs + 1:
+			var a := TAU * float(k) / float(segs)
+			var pt: Vector2 = prof[r]
+			var y := pt.y
+			var rad := pt.x
+			if r == 0:
+				y += 0.045 * sin(a * 4.0 + 0.6) + 0.02 * sin(a * 9.0)
+				rad += 0.02 * sin(a * 6.0)
+			ring.append(Vector3(cos(a) * rad, y, sin(a) * rad))
+		rings.append(ring)
+	for r in prof.size() - 1:
+		for k in segs:
+			var v0: Vector3 = rings[r][k]
+			var v1: Vector3 = rings[r][k + 1]
+			var v2: Vector3 = rings[r + 1][k + 1]
+			var v3: Vector3 = rings[r + 1][k]
+			for v in [v0, v1, v2, v0, v2, v3]:
+				st.add_vertex(v)
+	st.generate_normals()
+	_coat_mesh = st.commit()
+	return _coat_mesh
 
 
 func set_state(new_state: String, length: float = 0.0) -> void:
@@ -254,14 +301,16 @@ func _process(delta: float) -> void:
 
 
 func _apply_tint(tint: float, col: Color) -> void:
-	var c := Color(0, 0, 0, 0)
+	# CR-09: a capped wash + a fresnel rim in the tell colour (CreatureFx), so the shading and outlines stay.
+	var on := false
 	if _flash_t > 0.0:
-		c = Color(HitFx.FLASH_COLOR, HitFx.flash_strength(0.75))
-	elif tint > 0.0:
-		c = Color(col, clampf(tint, 0.0, 1.0))
-	var on := c.a > 0.01
-	if on:
-		_tint_mat.albedo_color = c
+		_tint_level_now = HitFx.flash_strength(0.75)
+		CreatureFx.apply_flash(_tint_mat, HitFx.FLASH_COLOR, _tint_level_now)
+		on = true
+	elif tint > 0.01:
+		_tint_level_now = clampf(tint, 0.0, 1.0)
+		CreatureFx.apply_tint(_tint_mat, col, _tint_level_now)
+		on = true
 	if on != _tint_on:
 		_tint_on = on
 		for m in _tint_meshes:

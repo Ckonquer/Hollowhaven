@@ -4,10 +4,14 @@ extends Control
 ## play() is awaitable and returns when the player continues.
 ## Chapter Two variant (setup({"variant": "chapter_two"}), module C9; MP §17): "Chapter Two Complete - The
 ## Lanterns of Hallowmere" with autumn ornaments, the Chapter Two ending card (MP §17, verbatim), the credits
-## (still "For Krystal" / "from Ali" with the hearts, plus the Chapter Two line), then "Chapter Two complete"
+## (still "For Krystal" / "from Ali" with the hearts, plus the Chapter Two line), then "Chapter Two Complete"
 ## with what the Lanternwake left at home, and Continue = free play in the same save. The Chapter Two variant
 ## asks for no music: the music director plays Every Road Leads Home (m27) on Events.chapter2_completed.
 ## The default variant ("chapter_one") is exactly the Chapter One ending it always was.
+## Visual QA (UI-09, UI-15): the Chapter Two card reads over the bright, busy Haven - a deeper warm dim from the start
+## (CH2_DIM_TITLE / CH2_DIM_FINAL) and the ending paragraph in bold cream with a thicker outline at a narrower
+## measure - and its closing card says "Chapter Two Complete" like the opening one. The UI root holds toasts and
+## banners while any ending shows.
 
 signal finished
 
@@ -24,16 +28,24 @@ const VARIANT_TWO := "chapter_two"
 const CH2_ENDING_CARD := "The lanterns shine beyond the trees. The quiet below is quiet again. There are pumpkins to plant, walls to raise, and friends waiting by the fire. The road will keep. Tonight is yours."
 const CH2_TITLE := "Chapter Two Complete"
 const CH2_SUBTITLE := "The Lanterns of Hallowmere"
-const CH2_FINAL := "Chapter Two complete"
+const CH2_FINAL := "Chapter Two Complete"
 const CH2_FINAL_SUB := "The lanterns stay lit. Build, grow, dress up and wander both woods with your friends."
 const CH2_CONTINUE := "  Continue exploring  "
 const CH2_RECAP_PREFIX := "Waiting for you: "
 const STORY_SCRIPT := "res://src/world/story_ch2/story_ch2.gd"
 const AUTUMN_LEAF := Color("e9a15b")
+const CH1_DIM_TITLE := 0.42         # Chapter One: unchanged
+const CH1_DIM_FINAL := 0.55
+const CH2_DIM_TITLE := 0.6          # Chapter Two: its card is a whole paragraph over the daytime Haven
+const CH2_DIM_FINAL := 0.64
+const CH2_CARD_W := 1180.0
+const CH2_CARD_OUTLINE := 9
+const CH2_SHADE_ALPHA := 0.5
 
 var variant: String = VARIANT_ONE
 var recap: Array = []            # chapter two: what the Lanternwake left at home (from story_ch2 when not given)
 var bg: ColorRect
+var card_shade: TextureRect = null    # Chapter Two: a warm dark vignette under the card text (follows title_box)
 var title_box: VBoxContainer
 var thanks: Label
 var credits_clip: Control
@@ -69,6 +81,9 @@ func _ready() -> void:
 	bg.color = Color(0.1, 0.07, 0.11, 0.0)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(Kit.full_rect(bg))
+	if two:
+		card_shade = _make_card_shade()
+		add_child(card_shade)
 	# Title
 	title_box = Kit.vbox(6)
 	title_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -97,8 +112,13 @@ func _ready() -> void:
 	title_box.add_child(orn)
 	title_box.add_child(Kit.spacer(0, 40))
 	var thanks_text := CH2_ENDING_CARD if two else "The Ward Stone shines again. The Heartseed is home, and your friends are safe.\nSomething still stirs in the deep... but tonight, the lights are on."
-	thanks = Kit.wrap_label(thanks_text, "HudText", 1400, HORIZONTAL_ALIGNMENT_CENTER)
+	thanks = Kit.wrap_label(thanks_text, "HudText", CH2_CARD_W if two else 1400.0, HORIZONTAL_ALIGNMENT_CENTER)
 	thanks.add_theme_font_size_override("font_size", 30)
+	if two:
+		thanks.add_theme_font_override("font", ThemeFactory.font("body_bold"))
+		thanks.add_theme_constant_override("outline_size", CH2_CARD_OUTLINE)
+		thanks.add_theme_color_override("font_outline_color", Color(ThemeFactory.INK, 0.95))
+		thanks.add_theme_constant_override("line_spacing", 6)
 	thanks.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	thanks.modulate.a = 0.0
 	title_box.add_child(thanks)
@@ -121,6 +141,10 @@ func _ready() -> void:
 	final_box.add_child(fl)
 	var fs := Kit.label(CH2_FINAL_SUB if two else "Build, farm, decorate, and spend time with Mochi, Pebble and Lumi.", "HudText", HORIZONTAL_ALIGNMENT_CENTER)
 	fs.add_theme_font_size_override("font_size", 28)
+	if two:
+		fs.add_theme_font_override("font", ThemeFactory.font("body_bold"))
+		fs.add_theme_constant_override("outline_size", CH2_CARD_OUTLINE)
+		fs.add_theme_color_override("font_outline_color", Color(ThemeFactory.INK, 0.95))
 	final_box.add_child(fs)
 	if two and not recap.is_empty():
 		var rl := Kit.wrap_label(recap_text(recap), "HudSmall", 1200, HORIZONTAL_ALIGNMENT_CENTER)
@@ -173,7 +197,7 @@ func play() -> void:
 	if not is_chapter_two():
 		Audio.request_music("restoration", "music_ending", 2.0)     # no restart: the restoration already asked for m14
 	var tw := Kit.retween(self, _tw, "main")
-	tw.tween_property(bg, "color:a", 0.42, 1.2)
+	tw.tween_property(bg, "color:a", CH2_DIM_TITLE if is_chapter_two() else CH1_DIM_TITLE, 1.2)
 	tw.parallel().tween_property(title_box, "modulate:a", 1.0, 1.6).set_delay(0.4)
 	tw.tween_interval(1.6)
 	tw.tween_property(thanks, "modulate:a", 1.0, 1.2)
@@ -208,7 +232,7 @@ func _show_final() -> void:
 	final_box.visible = true
 	final_box.modulate.a = 0.0
 	skip_l.visible = false
-	tw.tween_property(bg, "color:a", 0.55, 1.0)
+	tw.tween_property(bg, "color:a", CH2_DIM_FINAL if is_chapter_two() else CH1_DIM_FINAL, 1.0)
 	tw.parallel().tween_property(final_box, "modulate:a", 1.0, 1.0)
 	tw.tween_callback(func() -> void:
 		if is_instance_valid(continue_btn):
@@ -226,7 +250,38 @@ func _finish() -> void:
 		queue_free())
 
 
+## A soft oval of warm dark behind the title and the ending paragraph (it fades with them).
+static func _make_card_shade() -> TextureRect:
+	var g := Gradient.new()
+	g.set_color(0, Color(0.09, 0.05, 0.08, CH2_SHADE_ALPHA))
+	g.set_color(1, Color(0.09, 0.05, 0.08, 0.0))
+	g.add_point(0.62, Color(0.09, 0.05, 0.08, CH2_SHADE_ALPHA * 0.85))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.width = 256
+	gt.height = 128
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	var tr := TextureRect.new()
+	tr.texture = gt
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tr.anchor_left = 0.08
+	tr.anchor_right = 0.92
+	tr.anchor_top = 0.2
+	tr.anchor_bottom = 0.7
+	tr.modulate.a = 0.0
+	return tr
+
+
 func _process(delta: float) -> void:
+	if card_shade != null:
+		var a := title_box.modulate.a if title_box.visible else 0.0
+		if final_box.visible:
+			a = maxf(a, final_box.modulate.a)
+		card_shade.modulate.a = a
 	_t += delta
 	if _phase < 3 and _t > SKIPPABLE_AFTER and skip_l.modulate.a < 1.0:
 		skip_l.modulate.a = minf(skip_l.modulate.a + delta * 2.0, 0.85)

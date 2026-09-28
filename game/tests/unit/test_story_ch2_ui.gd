@@ -82,7 +82,7 @@ func test_chapter_two_ending_variant() -> void:
 	var t := _texts(es)
 	var expected: Array = ["Chapter Two Complete", "The Lanterns of Hallowmere", MP_ENDING_CARD]
 	expected.append_array(_credit_lines(true))
-	expected.append_array(["Chapter Two complete", EndingScreen.CH2_FINAL_SUB,
+	expected.append_array(["Chapter Two Complete", EndingScreen.CH2_FINAL_SUB,
 		"Waiting for you: the Lanternwake festival outfit and a Wardlight for your home.", "  Continue exploring  ",
 		"Press any key to skip"])
 	assert_eq(t, expected, "Chapter Two ending text, in order")
@@ -98,7 +98,7 @@ func test_chapter_two_ending_variant() -> void:
 	await wait_frames(2)
 	assert_false(bool(state["done"]))
 	es.call("_show_final")
-	assert_true((es.get("final_box") as Control).visible, "Chapter Two complete + Continue")
+	assert_true((es.get("final_box") as Control).visible, "Chapter Two Complete + Continue")
 	es.call("_finish")
 	for i in 30:
 		if bool(state["done"]):

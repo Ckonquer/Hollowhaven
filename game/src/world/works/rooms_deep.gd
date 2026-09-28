@@ -45,11 +45,15 @@ const Interactable := preload("res://src/world/below/below_interactable.gd")
 
 const OUT := {"outline": true, "outline_w": 0.018}
 const WINCH_ROCK := [Color("4e4038"), Color("5c4a3e"), Color("43362f")]
+const WINCH_DRESS := {"height_frac": 0.72, "size": 1.15, "spacing": 1.55}
 const SLATE_ROCK := [Color("46505e"), Color("3b4452"), Color("515c6a")]
 const PORCH_ROCK := [Color("3a3044"), Color("2e2638"), Color("463a52")]
 const SAND_ROCK := [Color("a88a62"), Color("97795a"), Color("b8986c")]
 const BRIDGE_IRON := Color("56606e")
 const ROPE := Color("c9a66b")
+## Wrong-landing lift signs: on the face of the recess lintel (the opening is 3.4 m tall), 4 cm proud of it.
+const SIGN_ON_LINTEL_Y := 3.74
+const SIGN_ON_LINTEL_GAP := 0.04
 
 
 static func build(area: Node3D, b: Builder) -> void:
@@ -245,7 +249,12 @@ static func _winch(b: Builder, area: Node3D, ctl: Node3D, decor: Node3D) -> void
 	Props.timber_frame(b, 42.0, -2.0, 2.0, y, 3.6, "z")
 	var n := b.begin("hw_winch")
 	b.shell("hw_winch", Art.PLATE, Color("4a3c34"), Color("2e2628"))
-	b.dress_room_rock("hw_winch", WINCH_ROCK, {"height_frac": 0.72, "size": 1.15, "spacing": 1.55})
+	# The hall's east wall backs onto the low crossing-gate room: rocks dressed just above its 3.4 m gate opening sit
+	# inside that room's 4 m volume and one hung into the doorway, cutting the bridge sign's top line from the
+	# crossing_gate arrival camera (fix_cameras/after_crossing/crop_sign.png; integration pass 3 R3-35). The east
+	# wall is dressed as if its gate opening were as tall as the gate room (the RNG is kept, see _dress_rock_as).
+	var gate_h := float(b.rooms["hw_crossing_gate"]["h"])
+	_dress_rock_as(b, "hw_winch", {"e": [[-1.6, 1.6, gate_h]]}, WINCH_ROCK, WINCH_DRESS)
 	# riveted iron floor plates
 	for i in 6:
 		for j in 6:
@@ -325,7 +334,7 @@ static func _winch(b: Builder, area: Node3D, ctl: Node3D, decor: Node3D) -> void
 	cage.name = "Lift_hw_winch_cage"
 	n.add_child(cage)
 	cage.position = cage_d["pos"]
-	cage.rotation.y = PI                  # mouth (local -z) faces south, into the hall
+	cage.rotation.y = PI                  # mouth (local -z) faces south, into the hall (deep_lift.gd fits the sign)
 	(ctl.get("lifts") as Dictionary)["hw_winch_cage"] = cage
 	# the teaching nook: behind a thread veil, the work-lamp switch
 	var nook := b.begin("hw_winch_nook")
@@ -369,6 +378,28 @@ static func _winch(b: Builder, area: Node3D, ctl: Node3D, decor: Node3D) -> void
 	ctl.set("winch", wm)
 
 
+## b.dress_room_rock(id, ...) with some of the room's openings replaced for the dressing only (`open`: side -> spans,
+## e.g. a taller keep-clear span over a doorway); the room's walls keep their real openings. Skipped rocks draw fewer
+## random numbers, so the builder's RNG is then set to where the unchanged dressing would have left it: every room
+## dressed after this one keeps exactly the rocks it had.
+static func _dress_rock_as(b: Builder, id: String, open: Dictionary, colors: Array, opts: Dictionary) -> void:
+	var start := b.rng.state
+	var replay := Builder.new(null, 0, b.rooms)
+	replay.rng.state = start
+	replay.dress_room_rock(id, colors, opts)        # nothing is built: its batches are never finished
+	var room: Dictionary = (b.rooms[id] as Dictionary).duplicate(true)
+	var ops: Dictionary = (room.get("open", {}) as Dictionary).duplicate(true)
+	ops.merge(open, true)
+	room["open"] = ops
+	var real_rooms: Dictionary = b.rooms
+	var rooms := real_rooms.duplicate()
+	rooms[id] = room
+	b.rooms = rooms
+	b.dress_room_rock(id, colors, opts)
+	b.rooms = real_rooms
+	b.rng.state = replay.rng.state
+
+
 static func _read_winch_plate(ctl: Node3D) -> void:
 	var w: Variant = ctl.get("winch")
 	if w is Node:
@@ -388,9 +419,16 @@ static func _gate(b: Builder, area: Node3D, ctl: Node3D) -> void:
 	b.vbox(Vector3(67.4, y + 3.75, 0.0), Vector3(0.5, 0.35, 4.4), Art.IRON, Basis.IDENTITY, OUT)
 	for i in 7:
 		b.vbox(Vector3(67.4, y + 3.55, -1.5 + float(i) * 0.5), Vector3(0.06, 0.4, 0.06), Art.IRON_RUST, Basis.IDENTITY, {"shadows": false})
-	var lbl := Art.label(n, "SERVICE BRIDGE - MIND THE RAILS", Vector3(64.5, y + 2.9, -2.35), 26, Color("f3e6c8"))
-	lbl.rotation_degrees = Vector3.ZERO
-	b.vbox(Vector3(64.5, y + 2.9, -2.38), Vector3(2.8, 0.36, 0.04), Color("3a3238"), Basis.IDENTITY, {"shadows": false})
+	# The bridge sign hangs on the gate lintel, facing the arrival (west), above the doorway - out of the camera's
+	# path in this low room (it sat on the north wall at camera height: VISUAL_BUGS IN-06). Two lines on a board
+	# they fit; the text also hides when the camera is right under it.
+	var lbl := Art.label(n, "SERVICE BRIDGE\nMIND THE RAILS", Vector3(66.98, y + 3.26, 0.0), 26, Color("f3e6c8"))
+	lbl.rotation_degrees = Vector3(0, -90, 0)
+	Art.fit_label(lbl, 2.0)
+	lbl.visibility_range_begin = 1.6
+	b.vbox(Vector3(67.02, y + 3.26, 0.0), Vector3(0.04, 0.62, 2.3), Color("3a3238"), Basis.IDENTITY, {"shadows": false})
+	for sz in [-0.9, 0.9]:
+		b.vbox(Vector3(67.04, y + 3.66, sz), Vector3(0.03, 0.22, 0.03), Art.IRON_RUST, Basis.IDENTITY, {"shadows": false})
 	Props.barrel(b, Vector3(63.5, y, 1.9), 0.3, 0.8)
 	_checkpoint(area, ctl, n, "hw_crossing_gate")
 
@@ -529,8 +567,12 @@ static func _wrong_landing(b: Builder, _area: Node3D, ctl: Node3D) -> void:
 		b.shell(id, Art.TILE_DARK, Art.GREEN_WALL.darkened(0.15), Art.GREEN_IRON)
 		var ld: Dictionary = Layout.LIFTS[id]
 		var l: Node3D = LiftScript.new()
+		# the recess lintel (the landing's north wall above its 3.4 m opening) hid both lift signs - and with
+		# them the false lift's backwards sign, its second non-colour cue: hang them on the lintel's face instead
+		# (the cage is turned half round, so local -z is world +z: the lintel face is (pos.z - z0) behind the mouth)
+		var lintel_z := (float((ld["pos"] as Vector3).z) - float(b.rooms["hw_wrong_landing"]["z0"])) - SIGN_ON_LINTEL_GAP
 		l.setup({"id": id, "kind": String(ld["kind"]), "text": "Ride the lift up", "sign": "LIFT - REFUGE LEVEL",
-			"handler": Callable(ctl, "_on_lift")})
+			"sign_pos": Vector3(0.0, SIGN_ON_LINTEL_Y, lintel_z), "handler": Callable(ctl, "_on_lift")})
 		l.name = "Lift_" + String(id)
 		rn.add_child(l)
 		l.position = ld["pos"]

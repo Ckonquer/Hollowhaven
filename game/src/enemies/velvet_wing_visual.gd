@@ -13,6 +13,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const FUR := Color("4a2d5a")
 const FUR_LIGHT := Color("7a5a8a")
@@ -26,6 +27,8 @@ const TWIG := Color("5e3b28")
 const DASH_TINT := Color(0.98, 0.34, 0.26)
 const DRAIN_TINT := Color(0.86, 0.36, 0.62)
 const PREVIEW_HEIGHT := 1.2
+const FOOT_Y := -0.2                   # root space: the little feet under the belly...
+const TWIG_Y := -0.265                 # ...grip the roost twig here (CR-01: above the body once it hangs upside down)
 
 var state: String = "idle"
 var state_len: float = 0.0
@@ -46,10 +49,12 @@ var _eye_mat: Material
 var _eye_glow_mat: Material
 var _eyes_glow := false
 var _twig: Node3D
+var _feet: Array = []
 var _stars: Node3D
 var _tint_mat: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
+var _tint_level_now: float = 0.0
 
 
 func _ready() -> void:
@@ -61,7 +66,7 @@ func body_height() -> float:
 
 
 func _build() -> void:
-	_tint_mat = HitFx.new_tint()
+	_tint_mat = CreatureFx.new_tint()
 	_root = Node3D.new()
 	_root.name = "Root"
 	add_child(_root)
@@ -119,12 +124,23 @@ func _build() -> void:
 			_tint_meshes.append(seg)
 		Kit.add(pivot, Kit.cone(0.02, 0.08, Mat.toon(FUR), 5), Vector3(sx * 0.1, 0.1, 0.0), Vector3(0, 0, sx * -30.0))
 		_wings.append(pivot)
-	# The roost twig (shown while hanging)
+	# Two little hooked feet under the belly (they grip the twig while it hangs)
+	var claw := Mat.outlined(Mat.toon(FUR, {"rim": 0.5}), 0.006)
+	_feet = []
+	for sx in [-1.0, 1.0]:
+		var foot := Node3D.new()
+		foot.name = "Foot"
+		Kit.add(_body, foot, Vector3(sx * 0.055, FOOT_Y + 0.03, 0.02))
+		Kit.add(foot, Kit.capsule(0.022, 0.08, claw), Vector3.ZERO)
+		Kit.add(foot, Kit.cone(0.02, 0.05, claw, 5), Vector3(0, -0.05, -0.012), Vector3(160, 0, 0))
+		_feet.append(foot)
+	# The roost twig (shown while hanging): at the FEET in root space, so it sits above the flipped bat
 	_twig = Node3D.new()
 	_twig.name = "Twig"
 	_root.add_child(_twig)
+	_twig.position = Vector3(0, TWIG_Y, 0)
 	Kit.add(_twig, Kit.cylinder(0.025, 0.03, 0.7, Mat.outlined(Mat.toon(TWIG), 0.008), 6), Vector3(0, 0, 0), Vector3(0, 0, 90))
-	Kit.add(_twig, Kit.sphere(0.05, Mat.toon(Palette.FOLIAGE_AUTUMN), 6, 8), Vector3(0.28, 0.02, 0.02), Vector3.ZERO, Vector3(1.4, 0.5, 1.0))
+	Kit.add(_twig, Kit.sphere(0.05, Mat.toon(Palette.FOLIAGE_AUTUMN), 6, 8), Vector3(0.28, -0.02, 0.02), Vector3(0, 0, 180), Vector3(1.4, 0.5, 1.0))
 	_stars = Node3D.new()
 	_stars.name = "Stars"
 	_root.add_child(_stars)
@@ -220,7 +236,6 @@ func _process(delta: float) -> void:
 	fold = lerpf(fold, want_fold, k_s)
 	hanging = hang
 	_twig.visible = hang
-	_twig.position = Vector3(0, 0.42, 0)
 	var root_rot := Vector3(0.0, 0.0, PI if hang else 0.0)
 	if hang:
 		root_rot.z += sin(_t * 1.2) * 0.05
@@ -245,6 +260,21 @@ func _process(delta: float) -> void:
 	_apply_tint(tint, tint_col)
 
 
+## World height of the roost twig above the body centre while hanging (tests: > 0, it hangs FROM the twig).
+func twig_height() -> float:
+	return _twig.global_position.y - _body.global_position.y
+
+
+## Gap (m) between the nearest foot tip and the twig axis (tests: the feet really grip the twig).
+func foot_to_twig() -> float:
+	var best := INF
+	for f in _feet:
+		var tip: Vector3 = (f as Node3D).global_transform * Vector3(0, -0.07, 0)
+		var q: Vector3 = _twig.global_transform.affine_inverse() * tip
+		best = minf(best, Vector2(q.y, q.z).length())
+	return best
+
+
 func eyes_glowing() -> bool:
 	return _eyes_glow
 
@@ -256,19 +286,22 @@ func _tint_level(k: float) -> float:
 
 
 func _apply_tint(tint: float, col: Color) -> void:
-	var c := Color(0, 0, 0, 0)
+	# CR-09: a capped wash + a fresnel rim in the tell colour (CreatureFx), so the shading and outlines stay.
+	var on := false
 	if _flash_t > 0.0:
-		c = Color(HitFx.FLASH_COLOR, HitFx.flash_strength(0.75))
-	elif tint > 0.0:
-		c = Color(col, clampf(tint, 0.0, 1.0))
-	var on := c.a > 0.01
-	if on:
-		_tint_mat.albedo_color = c
+		_tint_level_now = HitFx.flash_strength(0.75)
+		CreatureFx.apply_flash(_tint_mat, HitFx.FLASH_COLOR, _tint_level_now)
+		on = true
+	elif tint > 0.01:
+		_tint_level_now = clampf(tint, 0.0, 1.0)
+		CreatureFx.apply_tint(_tint_mat, col, _tint_level_now)
+		on = true
 	if on != _tint_on:
 		_tint_on = on
 		for m in _tint_meshes:
 			(m as MeshInstance3D).material_overlay = _tint_mat if on else null
 
 
+## The tell strength (the old flat overlay alpha; the drawn wash is capped, the rim carries the colour).
 func tint_alpha() -> float:
-	return _tint_mat.albedo_color.a if _tint_on else 0.0
+	return _tint_level_now if _tint_on else 0.0

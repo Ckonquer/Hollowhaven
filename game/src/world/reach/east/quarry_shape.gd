@@ -159,6 +159,10 @@ static func _decorate(terrain: Object) -> void:
 			terrain.call("tint_disc", to_world(Vector2(float(t[0]), float(t[1]))), float(t[2]), float(t[3]), t[4], float(t[5]))
 	if terrain.has_method("add_stone_disc"):
 		terrain.call("add_stone_disc", Q.CENTER, Q.RIM_FLAT - 0.6)
+	# the quarry's cut faces are its own copper stone, not the region's pale grey rock (no pale "teeth" between
+	# the cliff boulders)
+	if terrain.has_method("paint_rock_disc"):
+		terrain.call("paint_rock_disc", Q.CENTER, Q.RIM_OUT + 1.0, Q.COL_ROCK_DARK)
 	if terrain.has_method("mark_path"):
 		for road in Q.ROADS:
 			var pts: Array = []

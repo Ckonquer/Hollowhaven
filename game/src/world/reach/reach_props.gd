@@ -3,7 +3,8 @@ extends RefCounted
 ## Convention: a prop's FRONT faces local +Z; face_yaw(from, to) turns that front toward a point.
 ##   stall_mesh(a, b), goods_mesh(kind), table_mesh(), bench_mesh(), hay_mesh(), crate_mesh(),
 ##   signpost_mesh(n_arms), road_post_mesh(), catenary(a, b, sag, n), wire(merger, pts, r, color),
-##   label(parent, text, pos, size_px, color) (painted, shaded Label3D), box_col(body, xf, size)
+##   label(parent, text, pos, size_px, color) (painted, shaded Label3D), box_col(body, xf, size),
+##   sign_text(parent, text, board_xf, size, depth, opts) (outward, fitted lettering for every sign board)
 
 const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
@@ -96,6 +97,68 @@ static func label(parent: Node3D, text: String, pos: Vector3, size_px: int = 64,
 	return l
 
 
+## Sign lettering that always reads (the Reach's one sign-text helper). One Label3D per lettered face of a board:
+## each faces OUTWARD (its +Z = that face's normal, so single-sided text is never culled or mirrored), sits just
+## off the face, and is scaled down until the whole text fits inside the board with a margin.
+##   board: the board's transform (origin = board centre, local X along the board, local +Z = the front face);
+##          any scale in it is ignored.  size: board width x height (m).  depth: board thickness (m).
+##   opts: "back" (bool, also letter the back face; default true), "font_size" (int, 64), "px" (the largest
+##         pixel size, default 0.006), "margin" (fraction of the board kept clear on each side, 0.08),
+##         "color", "outline_color", "outline" (px), "shaded" (true: painted, lit like the board).
+static func sign_text(parent: Node3D, text: String, board: Transform3D, size: Vector2, depth: float, opts: Dictionary = {}) -> Array:
+	var fs := int(opts.get("font_size", 64))
+	var outline := int(opts.get("outline", 8))
+	var px := sign_pixel_size(text, fs, outline, size, float(opts.get("px", 0.006)), float(opts.get("margin", 0.08)))
+	var b := board.basis.orthonormalized()
+	var out: Array = []
+	var faces := [1.0, -1.0] if bool(opts.get("back", true)) else [1.0]
+	for side in faces:
+		var l := Label3D.new()
+		l.text = text
+		var f := font()
+		if f != null:
+			l.font = f
+		l.font_size = fs
+		l.pixel_size = px
+		l.modulate = opts.get("color", Color("3b2a22"))
+		l.outline_modulate = opts.get("outline_color", Color("f7ecd6"))
+		l.outline_size = outline
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.double_sided = false
+		l.shaded = bool(opts.get("shaded", true))
+		l.visibility_range_end = clampf(size.x * 40.0, 30.0, 90.0)
+		var face_b := b if float(side) > 0.0 else b * Basis(Vector3.UP, PI)
+		l.transform = Transform3D(face_b, board.origin + b.z * float(side) * (depth * 0.5 + 0.008))
+		l.name = "SignText" if float(side) > 0.0 else "SignTextBack"
+		parent.add_child(l)
+		out.append(l)
+	return out
+
+
+## The pixel size that fits `text` (font_size px, outline px) inside a board of `size` m with `margin` of it kept
+## clear on each side, capped at max_px. Measured with the sign font (a generous estimate without it).
+static func sign_pixel_size(text: String, font_size: int, outline: int, size: Vector2, max_px: float, margin: float = 0.08) -> float:
+	var ext := sign_text_extent(text, font_size, outline)
+	var room := size * (1.0 - 2.0 * margin)
+	return minf(max_px, minf(room.x / maxf(ext.x, 1.0), room.y / maxf(ext.y, 1.0)))
+
+
+## Text extent in pixels (width, height) at font_size, outline included.
+static func sign_text_extent(text: String, font_size: int, outline: int) -> Vector2:
+	var f := font()
+	var ext := Vector2.ZERO
+	if f != null:
+		ext = f.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
+	if ext.x <= 1.0:
+		var lines := text.split("\n")
+		var longest := 0
+		for ln in lines:
+			longest = maxi(longest, ln.length())
+		ext = Vector2(float(longest) * 0.62 * float(font_size), float(lines.size()) * 1.25 * float(font_size))
+	return ext + Vector2(outline * 2, outline * 2)
+
+
 ## Points along a sagging wire from a to b (n segments -> n + 1 points).
 static func catenary(a: Vector3, b: Vector3, sag: float, n: int) -> PackedVector3Array:
 	var out := PackedVector3Array()
@@ -125,6 +188,11 @@ static func wire(m: Variant, pts: PackedVector3Array, radius: float, color: Colo
 
 # --- Stalls -------------------------------------------------------------------------------------------
 
+## Stall name board (painted face size, centre in stall space); commons.gd letters it with sign_text().
+const STALL_BOARD := Vector2(1.95, 0.5)
+const STALL_BOARD_POS := Vector3(0, 3.3, -0.4)
+
+
 ## A festival stall 3.2 m wide: counter at the front (+Z), posts, a striped sloping awning, a name board.
 static func stall_mesh(kind: String) -> ArrayMesh:
 	var key := "stall|" + kind
@@ -153,9 +221,10 @@ static func stall_mesh(kind: String) -> ArrayMesh:
 		var x := lerpf(-w * 0.5, w * 0.5, (float(i) + 0.5) / float(stripes))
 		m.add(NodeVisuals._box(Vector3(w / float(stripes) + 0.01, 0.05, 2.1)), Transform3D(slope, Vector3(x, 2.78, -0.05)), ca if i % 2 == 0 else cb)
 		m.add(NodeVisuals._sph(w / float(stripes) * 0.5, 4, 8), Transform3D(Basis().scaled(Vector3(1.0, 0.55, 0.3)), Vector3(x, 2.42, 1.0)), ca if i % 2 == 0 else cb)
-	# a name board on top
-	m.add(NodeVisuals._box(Vector3(1.6, 0.42, 0.08)), Transform3D(Basis(), Vector3(0, 3.28, -0.4)), Palette.WOOD_LIGHT)
-	m.add(NodeVisuals._box(Vector3(1.7, 0.08, 0.1)), Transform3D(Basis(), Vector3(0, 3.5, -0.4)), Palette.WOOD_DARK)
+	# a name board on top: cream paint in a dark frame so the lettering reads from the Commons path
+	m.add(NodeVisuals._box(Vector3(STALL_BOARD.x + 0.1, STALL_BOARD.y + 0.1, 0.07)), Transform3D(Basis(), STALL_BOARD_POS + Vector3(0, 0, -0.01)), Palette.WOOD_DARK)
+	m.add(NodeVisuals._box(Vector3(STALL_BOARD.x, STALL_BOARD.y, 0.08)), Transform3D(Basis(), STALL_BOARD_POS), Color("f3e6c8"))
+	m.add(NodeVisuals._box(Vector3(STALL_BOARD.x + 0.2, 0.08, 0.12)), Transform3D(Basis(), STALL_BOARD_POS + Vector3(0, STALL_BOARD.y * 0.5 + 0.08, 0)), Palette.WOOD_DARK)
 	var mesh := m.commit()
 	_cache[key] = mesh
 	return mesh
@@ -274,15 +343,32 @@ static func bench_mesh() -> ArrayMesh:
 	return mesh
 
 
+## A chunky rectangular hay bale (1.25 x 0.78 x 0.85) with soft rounded edges, two twine bands wrapped round it
+## and a few loose straws (the same look as the orchard's bales: a bale, not a capsule between two boards).
 static func hay_mesh() -> ArrayMesh:
 	if _cache.has("hay"):
 		return _cache["hay"]
 	var m := NodeVisuals.Merger.new()
+	var sz := Vector3(1.25, 0.78, 0.85)
 	var fn := func(p: Vector3, n: Vector3) -> Color:
-		return Color("c9a24a").lerp(Color("ecd07a"), clampf(n.y * 0.5 + p.y, 0.0, 1.0))
-	m.add(Kit.blob_mesh(0.5, 7601, 0.08, 1.0, 2), Transform3D(Basis().scaled(Vector3(1.25, 0.8, 0.85)), Vector3(0, 0.4, 0)), fn)
+		var c := Color("c9a24a").lerp(Color("e6c56e"), clampf(p.y / sz.y, 0.0, 1.0))
+		return c.lerp(Color("f3d98a"), clampf(n.y, 0.0, 1.0) * 0.3)
+	var r := 0.1
+	m.add(NodeVisuals._box(Vector3(sz.x, sz.y - r * 2.0, sz.z)), Transform3D(Basis(), Vector3(0, sz.y * 0.5, 0)), fn)
+	m.add(NodeVisuals._box(Vector3(sz.x - r * 2.0, sz.y, sz.z - r * 2.0)), Transform3D(Basis(), Vector3(0, sz.y * 0.5, 0)), fn)
+	for sy in [r, sz.y - r]:
+		for sz2 in [-1.0, 1.0]:
+			m.add(NodeVisuals._cyl(r, r, sz.x - r * 2.0, 8), Transform3D(Basis(Vector3.BACK, PI * 0.5), Vector3(0, float(sy), float(sz2) * (sz.z * 0.5 - r))), fn)
+		for sx in [-1.0, 1.0]:
+			m.add(NodeVisuals._cyl(r, r, sz.z - r * 2.0, 8), Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(float(sx) * (sz.x * 0.5 - r), float(sy), 0)), fn)
 	for sx in [-0.3, 0.3]:
-		m.add(NodeVisuals._box(Vector3(0.04, 0.7, 0.9)), Transform3D(Basis(), Vector3(float(sx), 0.4, 0)), Color("8a6a3a"))
+		m.add(NodeVisuals._box(Vector3(0.045, sz.y + 0.02, sz.z + 0.02)), Transform3D(Basis(), Vector3(float(sx), sz.y * 0.5, 0)), Color("8a6a3a"))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7602
+	for i in 8:
+		var ex := -1.0 if i % 2 == 0 else 1.0
+		var q := Vector3(ex * (sz.x * 0.5 + 0.02), rng.randf_range(0.12, sz.y - 0.1), rng.randf_range(-0.3, 0.3))
+		m.add(NodeVisuals._box(Vector3(0.12, 0.012, 0.012)), Transform3D(Basis.from_euler(Vector3(0, deg_to_rad(rng.randf_range(-30, 30)), deg_to_rad(rng.randf_range(-35, 35)))), q), Color("ecd07a"))
 	var mesh := m.commit()
 	_cache["hay"] = mesh
 	return mesh

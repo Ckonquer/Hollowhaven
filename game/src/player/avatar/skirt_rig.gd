@@ -5,6 +5,9 @@ extends RefCounted
 ##           + a little running flutter, then pushed OUT by the legs (hard constraint from the thigh / shin
 ##           points of the current pose so legs never poke through), clamped to [min_flare, max_flare];
 ##   side  = the tangential part of the trail (panels swing sideways), clamped to +-max_side.
+## Neighbouring panels never differ by more than MAX_STEP (a pushed panel lifts its neighbours a little instead of
+## splitting away from them, so running legs don't open tall slits). While she rolls the panels bunch up
+## (len_scale < 1: krystal_avatar.gd shortens the pivots by the same factor) and hug the tucked legs.
 ## Pure math on packed arrays (no allocation per frame); krystal_avatar.gd feeds it after posing the joints.
 ## Model space: +Z forward, +X = Krystal's left. Leg joints sit at (+-LEG_X, LEG_Y, 0) under the hips.
 
@@ -14,6 +17,10 @@ const THIGH := 0.235
 const THIGH_R := 0.082
 const SHIN_R := 0.07
 const MARGIN := 0.025
+## Largest flare difference (rad) between neighbouring panels (only ever raises the lower one: legs stay inside).
+const MAX_STEP := 0.13
+## How much of their length the panels gather up while tucked into a roll (0.4 = 60 % of the length shows).
+const ROLL_BUNCH := 0.4
 
 var count: int = 0
 var radius: float = 0.18
@@ -23,6 +30,7 @@ var base_flare: float = 0.2
 var min_flare: float = 0.04
 var max_flare: float = 1.3
 var max_side: float = 0.3
+var len_scale: float = 1.0              # panel length factor of the last update (1 = full length)
 var theta := PackedFloat32Array()
 var flare := PackedFloat32Array()
 var side := PackedFloat32Array()
@@ -72,9 +80,10 @@ func reset() -> void:
 ## lv / acc: local velocity / acceleration (model space); legs / knees: the pose Euler rotations of the leg and
 ## knee joints (left, right); t: time; run_w: 0..1 running weight; turn: yaw rate.
 func update(dt: float, lv: Vector3, acc: Vector3, leg_l: Vector3, leg_r: Vector3, knee_l: Vector3, knee_r: Vector3,
-		t: float, run_w: float, turn: float) -> void:
+		t: float, run_w: float, turn: float, length_scale: float = 1.0) -> void:
 	if count == 0:
 		return
+	len_scale = clampf(length_scale, 0.3, 1.0)
 	var tgt := Vector2(clampf(-lv.x * 0.07 - acc.x * 0.008, -0.45, 0.45), clampf(-lv.z * 0.07 - acc.z * 0.008, -0.5, 0.5))
 	_trail_v += ((tgt - _trail) * 60.0 - _trail_v * 7.0) * dt
 	_trail += _trail_v * dt
@@ -90,6 +99,26 @@ func update(dt: float, lv: Vector3, acc: Vector3, leg_l: Vector3, leg_r: Vector3
 		f = maxf(f, required_flare(i))
 		flare[i] = clampf(f, min_flare, max_flare)
 		side[i] = clampf(_trail.x * o.y - _trail.y * o.x, -max_side, max_side)
+	if len_scale > 0.999:
+		_limit_neighbours()
+
+
+## Raises panels that lag far behind a neighbour (two passes round the ring, both directions): the skirt opens as one
+## piece instead of splitting into separate blades.
+func _limit_neighbours() -> void:
+	for pass_i in 2:
+		for k in count:
+			var i := k
+			var j := (k + count - 1) % count
+			if pass_i == 1:
+				i = count - 1 - k
+				j = (i + 1) % count
+			if flare[i] < flare[j] - MAX_STEP:
+				flare[i] = minf(flare[j] - MAX_STEP, max_flare)
+	for k in count:
+		var j := (k + count - 1) % count
+		if flare[k] < flare[j] - MAX_STEP:
+			flare[k] = minf(flare[j] - MAX_STEP, max_flare)
 
 
 ## Minimum flare of panel i so the current leg sample points stay inside the skirt (ignores points below
@@ -105,7 +134,7 @@ func required_flare(i: int) -> float:
 			continue
 		var h := y0 - p.y
 		var reach := Vector2(rho - radius, h).length()
-		if reach > length + _rad[k]:
+		if reach > length * len_scale + _rad[k]:
 			continue
 		need = maxf(need, atan2(out, maxf(h, 0.001)))
 	return need

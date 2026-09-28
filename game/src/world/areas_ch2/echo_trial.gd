@@ -42,6 +42,7 @@ extends "res://src/world/areas_ch2/placeholder_area.gd"
 const Brazier := preload("res://src/enemies/boss_brazier.gd")
 const BelowLayout := preload("res://src/world/below/below_layout.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
+const CameraBlock := preload("res://src/camera/camera_block.gd")
 const TrialsData := preload("res://data/trials.gd")
 const BOSS_SCRIPT := "res://src/enemies/weaver_boss.gd"
 
@@ -53,8 +54,21 @@ const WALL_SEGMENTS := 32
 const WALL_HEIGHT := 9.0
 const CEILING_Y := 12.0
 const CORRIDOR_HALF := 2.5
-const CORRIDOR_END := 25.0
+## The corridor runs 5.2 m past the pad's spawn to the end wall, so the follow camera has its full arm behind
+## Krystal on arrival (visual QA IN-00: it used to wedge between the pale door and the end wall).
+const CORRIDOR_END := 28.0
 const PAD_Z := 22.0
+## The pale door stands flush against the end wall (its posts are 0.25 m deep): no gap to park the camera in.
+const EXIT_INSET := 0.14
+## Camera-only box over the pale door (local to the door node): the arm stops in front of the door.
+const DOOR_BLOCK_CENTER := Vector3(0.0, 1.6, 0.0)
+const DOOR_BLOCK_SIZE := Vector3(2.0, 3.2, 0.3)
+## The title plate and record line (billboards at camera height) fade out while the camera is close, so it never
+## flies through giant letters on the way into the arena (IN-01). Label3D visibility range, fading itself.
+const PLATE_FADE_BEGIN := 4.5
+const PLATE_FADE_MARGIN := 1.5
+## The plates never run into the corridor walls: the text is scaled down to fit this width (metres).
+const MATRON_PLATE_WIDTH := CORRIDOR_HALF * 2.0 - 0.6
 const RETURN_DELAY := 6.0
 
 ## Which trial the next load of this area hosts (set by begin(); consumed in _ready()).
@@ -371,11 +385,15 @@ func _ready() -> void:
 	add_zone("trial", Vector3(0, floor_y, 5.0), 22.0, false)
 	add_safe_spot(Vector3(0, floor_y, PAD_Z + 0.8), 2.8)
 	var door := add_exit("leave", {"text": String(trial_info(trial_id).get("exit_text", "Leave the echo (back to the chamber door)")), "use_respawn": true, "style": "stair"},
-		Vector3(0, floor_y, CORRIDOR_END - 0.6), PI)
+		Vector3(0, floor_y, CORRIDOR_END - EXIT_INSET), PI)
 	door.set_meta("trial_exit", true)
+	CameraBlock.add_box(door, DOOR_BLOCK_CENTER, DOOR_BLOCK_SIZE)
 	var plate := add_label(entry_text(trial_id).replace(" (", "\n("), Vector3(0, 3.3, PAD_Z - 1.2), 40)
 	plate.modulate = Color(0.85, 0.8, 1.0, 0.85)
+	fade_near_camera(plate)
+	fit_width(plate, MATRON_PLATE_WIDTH)
 	_add_record_label(Vector3(0, 2.55, PAD_Z - 1.2))
+	fit_width(record_label, MATRON_PLATE_WIDTH)
 	_build_encounter()
 	_connect_flow()
 
@@ -414,10 +432,15 @@ func _build_from_builder() -> bool:
 	var door := add_exit("leave", {"text": String(trial_info(trial_id).get("exit_text", "Leave the echo")), "use_respawn": true, "style": "stair"},
 		arena.get("exit", pad + Vector3(0, 0, 2.5)), float(arena.get("exit_yaw", PI)))
 	door.set_meta("trial_exit", true)
+	CameraBlock.add_box(door, DOOR_BLOCK_CENTER, DOOR_BLOCK_SIZE)
 	var plate_pos: Vector3 = arena.get("plate", pad + Vector3(0, 3.3, -2.0))
 	var plate := add_label(entry_text(trial_id).replace(" (", "\n("), plate_pos, 40)
 	plate.modulate = Color(0.85, 0.8, 1.0, 0.85)
+	fade_near_camera(plate)
+	var plate_w := float(arena.get("plate_width", MATRON_PLATE_WIDTH))
+	fit_width(plate, plate_w)
 	_add_record_label(plate_pos + Vector3(0, -0.75, 0))
+	fit_width(record_label, plate_w)
 	var b: Variant = arena.get("boss")
 	if b is Node and is_instance_valid(b):
 		boss = b
@@ -429,6 +452,35 @@ func _build_from_builder() -> bool:
 func _add_record_label(pos: Vector3) -> void:
 	record_label = add_label(record_line(trial_id), pos, 26)
 	record_label.modulate = Color(0.85, 0.8, 1.0, 0.7)
+	fade_near_camera(record_label)
+
+
+## A plate that hangs at camera height fades itself out while the camera is within ~PLATE_FADE_BEGIN m of it.
+static func fade_near_camera(l: Label3D) -> void:
+	l.visibility_range_begin = PLATE_FADE_BEGIN
+	l.visibility_range_begin_margin = PLATE_FADE_MARGIN
+	l.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+
+
+## Width (metres) of a Label3D's longest line (measured with its font, like the renderer lays it out).
+static func label_width(l: Label3D) -> float:
+	var f: Font = l.font
+	if f == null and ThemeDB.get_project_theme() != null:
+		f = ThemeDB.get_project_theme().get_font("font", "Label3D")
+	if f == null:
+		f = ThemeDB.fallback_font
+	var w := 0.0
+	for line in l.text.split("\n"):
+		w = maxf(w, f.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, l.font_size).x)
+	return (w + float(l.outline_size)) * l.pixel_size
+
+
+## Scales a billboard plate's text down (pixel size, so the glyphs stay crisp) until it fits `max_width` metres:
+## a plate wider than its corridor pokes through the walls and reads clipped ("o Trial: The Last W").
+static func fit_width(l: Label3D, max_width: float) -> void:
+	var w := label_width(l)
+	if w > max_width and w > 0.0:
+		l.pixel_size *= max_width / w
 
 
 func _wire_boss() -> void:

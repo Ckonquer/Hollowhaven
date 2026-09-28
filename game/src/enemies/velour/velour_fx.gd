@@ -16,14 +16,18 @@ extends Node3D
 
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const SHADOW := Color(0.1, 0.03, 0.1)
 const Y_DROP := 0.035
 const Y_LANE := 0.045
 const LANE_WIDTH := 1.1
 
-const BAT_FUR := Color("3a2244")
-const BAT_WING := Color("2a1830")
+const BAT_FUR := Color("5a3570")          # plum, a step lighter than the Gallery's dark walls (CR-04)
+const BAT_WING := Color("4a2a5c")
+const BAT_BELLY := Color("c9a3d6")        # a pale lilac belly + wing edge: they read against dark walls AND the carpet
+const BAT_EDGE := Color(0.9, 0.78, 1.0)
+const BAT_SIZE := 1.5                     # every bat is built 1.5x (the old ones were specks); `scale` multiplies it
 const COLLAR := Color("8a1f45")
 const COLLAR_LINING := Color("e6a0b8")
 const GOLD := Color("e2bd5e")
@@ -154,39 +158,57 @@ static func _ear_mesh() -> PrismMesh:
 static func bat_node(scale: float = 1.0, true_bat: bool = false) -> Node3D:
 	var root := Node3D.new()
 	root.name = "TrueBat" if true_bat else "Bat"
-	var fur := Mat.outlined(Mat.toon(BAT_FUR, {"rim": 0.55, "noise": 0.2}), 0.01)
-	var wing := Mat.toon(BAT_WING, {"rim": 0.4})
-	Kit.add(root, Kit.sphere(0.1, fur, 8, 10), Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.1, 1.2))
+	# The body hangs under one "Look" node at BAT_SIZE (the wings are scaled the same), so `root.scale` keeps its
+	# meaning for the swarm (decoys shrink by setting it) and the true bat stays the biggest.
+	var look := Node3D.new()
+	look.name = "Look"
+	look.scale = Vector3.ONE * BAT_SIZE
+	root.add_child(look)
+	var fur: Material = _bat_fur()
+	var wing: Material = _bat_wing()
+	Kit.add(look, Kit.sphere(0.1, fur, 8, 10), Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.1, 1.2))
+	Kit.add(look, Kit.sphere(0.06, Mat.toon(BAT_BELLY, {"rim": 0.4}), 6, 8), Vector3(0, -0.02, -0.07), Vector3.ZERO, Vector3(1.0, 1.1, 0.6))
 	var wings: Array = []
 	for s in [-1.0, 1.0]:
-		Kit.add(root, Kit.cone(0.035, 0.1, fur, 6), Vector3(float(s) * 0.05, 0.11, -0.02), Vector3(0, 0, float(s) * -18.0))
+		Kit.add(look, Kit.cone(0.035, 0.1, fur, 6), Vector3(float(s) * 0.05, 0.11, -0.02), Vector3(0, 0, float(s) * -18.0))
 		var w := Node3D.new()
 		w.name = "WingL" if s < 0.0 else "WingR"
 		w.set_meta("wing", float(s))
-		w.position = Vector3(float(s) * 0.07, 0.02, 0.0)
+		w.position = Vector3(float(s) * 0.07, 0.02, 0.0) * BAT_SIZE
+		w.scale = Vector3.ONE * BAT_SIZE               # the wings stay direct children (flap() / tests read them)
 		root.add_child(w)
 		wings.append(w)
 		Kit.add(w, Kit.sphere(0.16, wing, 6, 8), Vector3(float(s) * 0.15, 0.0, 0.02), Vector3.ZERO, Vector3(1.0, 0.12, 0.62))
-	var eye := Mat.glow(Color("ffd27a") if true_bat else Color("ff8fb0"), 1.6)
+	var eye := Mat.glow(Color("ffd27a") if true_bat else Color("ff8fb0"), 2.0)
 	for s in [-1.0, 1.0]:
-		Kit.add(root, Kit.sphere(0.018, eye, 4, 6), Vector3(float(s) * 0.035, 0.03, -0.1))
+		Kit.add(look, Kit.sphere(0.024, eye, 4, 6), Vector3(float(s) * 0.035, 0.03, -0.1))
 	if true_bat:
 		var collar := Mat.outlined(Mat.toon(COLLAR, {"rim": 0.55}), 0.012)
 		var lining := Mat.toon(COLLAR_LINING, {"rim": 0.4})
 		var gold := Mat.toon(GOLD, {"rim": 0.6, "specular": 0.45})
 		for s in [-1.0, 1.0]:
-			Kit.add(root, Kit.sphere(0.13, collar, 8, 10), Vector3(float(s) * 0.09, 0.08, 0.06), Vector3(0, 0, float(s) * -20.0), Vector3(0.9, 1.3, 0.2))
-			Kit.add(root, Kit.sphere(0.11, lining, 8, 10), Vector3(float(s) * 0.085, 0.075, 0.05), Vector3(0, 0, float(s) * -20.0), Vector3(0.75, 1.1, 0.12))
-		Kit.add(root, Kit.torus(0.07, 0.1, gold), Vector3(0, -0.04, 0))
-		Kit.add(root, Kit.cylinder(0.045, 0.04, 0.04, gold, 8), Vector3(0.0, 0.14, 0.0), Vector3(0, 0, -10))
+			Kit.add(look, Kit.sphere(0.13, collar, 8, 10), Vector3(float(s) * 0.09, 0.08, 0.06), Vector3(0, 0, float(s) * -20.0), Vector3(0.9, 1.3, 0.2))
+			Kit.add(look, Kit.sphere(0.11, lining, 8, 10), Vector3(float(s) * 0.085, 0.075, 0.05), Vector3(0, 0, float(s) * -20.0), Vector3(0.75, 1.1, 0.12))
+		Kit.add(look, Kit.torus(0.07, 0.1, gold), Vector3(0, -0.04, 0))
+		Kit.add(look, Kit.cylinder(0.045, 0.04, 0.04, gold, 8), Vector3(0.0, 0.14, 0.0), Vector3(0, 0, -10))
 		for k in 5:
 			var a := TAU * float(k) / 5.0
-			Kit.add(root, Kit.cone(0.012, 0.04, gold, 5), Vector3(cos(a) * 0.04, 0.18, sin(a) * 0.04), Vector3(0, 0, -10))
+			Kit.add(look, Kit.cone(0.012, 0.04, gold, 5), Vector3(cos(a) * 0.04, 0.18, sin(a) * 0.04), Vector3(0, 0, -10))
 	root.set_meta("wings", wings)          # flap() reads this: no get_children() array per frame
 	root.scale = Vector3.ONE * scale
 	for mi in root.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return root
+
+
+## Shared bat materials: plum fur with an ink outline and a pale lilac edge light (reads on dark walls), wings with
+## the same edge light (cached: every bat shares them).
+static func _bat_fur() -> Material:
+	return CreatureFx.toon_outlined_edge(Mat.toon(BAT_FUR, {"rim": 0.7, "noise": 0.2}), 0.012, Color(0.17, 0.12, 0.16), BAT_EDGE, 0.55)
+
+
+static func _bat_wing() -> Material:
+	return CreatureFx.toon_outlined_edge(Mat.toon(BAT_WING, {"rim": 0.6}), 0.008, Color(0.17, 0.12, 0.16), BAT_EDGE, 0.5)
 
 
 ## Wing beat for a bat_node (t = seconds, amount 0..1).

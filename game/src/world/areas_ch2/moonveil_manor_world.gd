@@ -132,6 +132,7 @@ func _ready() -> void:
 	_build_stair()
 	_build_balcony()
 	_build_landing()
+	builder.close_height_steps()          # a taller room over a lower neighbour's wall: no strip of void
 	builder.finish()
 	_register_spawns()
 	_add_zones()
@@ -206,14 +207,19 @@ func _build_cloakroom() -> void:
 	for z in [-2.0, -5.0, -8.0]:
 		b.vbox(Vector3(0, 3.45, float(z)), Vector3(10.4, 0.28, 0.32), WOOD_DARK.darkened(0.15))
 	b.rug(Vector3(0, 0, -5.2), Vector2(3.4, 6.2), Color("7a2f52"), GOLD)
-	# Coat pegs along the west wall with cloaks and hats (the guests never came back for them).
+	# Striped wallpaper above the wainscot (Chapter One's rooms have texture; plain plum read flat - IN-15).
+	var paper := PLUM.lightened(0.07)
+	_wallpaper(b, Vector3(-5.0, 0, -9.7), Vector3(-5.0, 0, -0.3), Vector3(1, 0, 0), 3.6, paper, [])
+	_wallpaper(b, Vector3(5.0, 0, -9.7), Vector3(5.0, 0, -0.3), Vector3(-1, 0, 0), 3.6, paper, [[-7.3, -5.7]])
+	_wallpaper(b, Vector3(-4.7, 0, 0.0), Vector3(4.7, 0, 0.0), Vector3(0, 0, -1), 3.6, paper, [[-1.6, 1.6]])
+	_wallpaper(b, Vector3(-4.7, 0, -10.0), Vector3(4.7, 0, -10.0), Vector3(0, 0, 1), 3.6, paper, [[-1.45, 1.45]])
+	# Coat pegs along the west wall with cloaks and hats (the guests never came back for them): shoulders,
+	# a collar, two hanging sleeves, buttons and a hem - coats, not cones.
 	b.vbox(Vector3(-4.93, 1.95, -5.0), Vector3(0.1, 0.12, 6.4), WOOD_DARK)
 	var cloak_cols := [Color("3d2a5a"), Color("b0486e"), Color("2f5a5e"), Color("7d1e3c"), Color("5a4a2e")]
 	for i in 5:
 		var z := -2.4 - float(i) * 1.3
-		b.vcyl(Vector3(-4.75, 1.98, z), 0.03, 0.2, GOLD, Basis(Vector3.FORWARD, PI * 0.5), {"shadows": false})
-		b.vtaper(Vector3(-4.62, 1.2, z), 0.36, 0.16, 1.4, cloak_cols[i])
-		b.vsphere(Vector3(-4.66, 1.95, z), Vector3(0.34, 0.2, 0.3), cloak_cols[i].darkened(0.1))
+		_coat(b, Vector3(-4.62, 0.0, z), cloak_cols[i], 1.0 + float((i * 3) % 4) * 0.06, i % 2 == 0)
 	for z in [-3.05, -5.65]:
 		b.vcone(Vector3(-4.6, 2.35, float(z)), 0.18, 0.45, Color("2a1830"), Basis(Vector3.FORWARD, -0.2), {"shadows": false})
 		b.vcyl(Vector3(-4.62, 2.14, float(z)), 0.32, 0.03, Color("2a1830"), Basis(Vector3.FORWARD, -0.2), {"shadows": false})
@@ -257,7 +263,8 @@ func _build_hall() -> void:
 		for sx in [-1.0, 1.0]:
 			b.vbox(Vector3(float(sx) * (3.5 - pw * 0.5), 2.8, z), Vector3(pw, 5.0, pw), Color("e6dcc0"), Basis.IDENTITY, {"shadows": false})
 	# Looking-glasses in the west wall: gilt frames, silvered glass (solid to the touch).
-	var glass := Mat.transparent(Color(0.8, 0.84, 0.98, 0.16), false)
+	# silvered, slightly darkening glass (a clear pane read as an opening into a lit room: IN-14)
+	var glass := Mat.transparent(Color(0.42, 0.46, 0.62, 0.3), false)
 	for o in Layout.ROOMS["hall"]["walls"]["w"]:
 		var z0 := float(o[0])
 		var z1 := float(o[1])
@@ -266,6 +273,7 @@ func _build_hall() -> void:
 		var bot := float(o[3])
 		b.col_box(Vector3(-3.75, (top + bot) * 0.5, zc), Vector3(0.5, top - bot, z1 - z0))
 		b.batch(Builder.unit_box(), glass, Transform3D(Basis.IDENTITY.scaled_local(Vector3(0.02, top - bot, z1 - z0)), Vector3(-3.52, (top + bot) * 0.5, zc)), Color.WHITE, false)
+		_glass_sheen(b, bot, top, z0, z1)
 		for side in [-1.0, 1.0]:
 			b.vbox(Vector3(-3.44, (top + bot) * 0.5, zc + float(side) * ((z1 - z0) * 0.5 + 0.07)), Vector3(0.14, top - bot + 0.1, 0.16), GOLD, Basis.IDENTITY, {"shadows": false})
 		b.vbox(Vector3(-3.44, bot - 0.05, zc), Vector3(0.18, 0.12, z1 - z0 + 0.3), GOLD, Basis.IDENTITY, {"shadows": false})
@@ -300,6 +308,77 @@ func _build_hall() -> void:
 	b.lamp(Vector3(0, 4.6, -14.5), Color("d8d0ff"), 0.7, 9.0)
 	b.lamp(Vector3(0, 4.6, -25.5), Color("d8d0ff"), 0.7, 9.0)
 	b.lamp(Vector3(2.6, 2.2, -20.0), FLAME, 0.6, 5.0)
+
+
+## Vertical wallpaper stripes on a wall's inner face, from the wainscot to just under the crown trim. p0 -> p1
+## runs along the face (y ignored), inward = into the room, skip = [[from, to], ...] spans (in the coordinate
+## that varies along the wall) left bare for doors and windows.
+func _wallpaper(b: Builder, p0: Vector3, p1: Vector3, inward: Vector3, room_h: float, color: Color, skip: Array) -> void:
+	var along := Vector3(p1.x - p0.x, 0.0, p1.z - p0.z)
+	var length := along.length()
+	if length < 0.3:
+		return
+	var dir := along / length
+	var face := Basis.looking_at(-inward, Vector3.UP)
+	var y0 := Builder.WAINSCOT_H + 0.02
+	var y1 := room_h - 0.3
+	var t := 0.2
+	var k := 0
+	while t < length - 0.1:
+		var p := p0 + dir * t
+		var a := p.x if absf(dir.x) > 0.5 else p.z
+		var bare := false
+		for s in skip:
+			if a > float(s[0]) - 0.08 and a < float(s[1]) + 0.08:
+				bare = true
+		if not bare:
+			var w := 0.09 if k % 2 == 0 else 0.035
+			b.vbox(Vector3(p.x, (y0 + y1) * 0.5, p.z) + inward * 0.012, Vector3(w, y1 - y0, 0.012), color if k % 2 == 0 else GOLD.darkened(0.2).lerp(color, 0.35), face, {"shadows": false})
+		t += 0.22 if k % 2 == 0 else 0.3
+		k += 1
+
+
+## A guest's coat on a peg (x = the wall side, facing +x): peg, rounded shoulders, a turned-up collar, a
+## flared body, two sleeves hanging a little forward, buttons down the front and a darker hem.
+func _coat(b: Builder, at: Vector3, col: Color, length: float, cape: bool) -> void:
+	var z := at.z
+	var o := {"shadows": false}
+	b.vcyl(Vector3(-4.75, 1.98, z), 0.03, 0.2, GOLD, Basis(Vector3.FORWARD, PI * 0.5), o)
+	var flat := Basis.IDENTITY.scaled(Vector3(0.62, 1.0, 1.0))
+	var h := 1.4 * length
+	b.vtaper(Vector3(at.x + 0.02, 1.9 - h * 0.5, z), 0.4 if cape else 0.34, 0.2, h, col, flat)
+	b.vsphere(Vector3(at.x - 0.02, 1.9, z), Vector3(0.3, 0.2, 0.46), col.darkened(0.08))
+	b.vtaper(Vector3(at.x + 0.04, 2.04, z), 0.14, 0.17, 0.14, col.darkened(0.25), flat, o)
+	b.vring(Vector3(at.x + 0.02, 1.9 - h + 0.05, z), 0.36 if cape else 0.31, 0.5, col.darkened(0.3), flat, o)
+	if not cape:
+		for s in [-1.0, 1.0]:
+			var sleeve := Basis(Vector3.RIGHT, float(s) * 0.08) * Basis(Vector3.FORWARD, -0.1)
+			b.vtaper(Vector3(at.x + 0.1, 1.45, z + float(s) * 0.25), 0.075, 0.1, 0.8, col.darkened(0.05), sleeve)
+			b.vsphere(Vector3(at.x + 0.12, 1.06, z + float(s) * 0.26), Vector3(0.12, 0.08, 0.12), col.darkened(0.3), Basis.IDENTITY, o)
+	for k in 3:
+		b.vsphere(Vector3(at.x + 0.2 - float(k) * 0.02, 1.72 - float(k) * 0.26, z), Vector3(0.05, 0.05, 0.05), GOLD, Basis.IDENTITY, o)
+
+
+## Reads as GLASS, not an opening (VISUAL_BUGS IN-14): a soft darker vignette just inside the gilt frame and
+## two slanted highlight streaks on the pane (hall side, x just in front of the glass at -3.52).
+func _glass_sheen(b: Builder, bot: float, top: float, z0: float, z1: float) -> void:
+	var box := Builder.unit_box()
+	var w := z1 - z0
+	var h := top - bot
+	var zc := (z0 + z1) * 0.5
+	var shade := Mat.transparent(Color(0.16, 0.12, 0.26, 0.34), true)
+	var x := -3.506
+	var band := 0.16
+	for sz in [-1.0, 1.0]:
+		b.batch(box, shade, Transform3D(Basis.IDENTITY.scaled_local(Vector3(0.004, h, band)), Vector3(x, bot + h * 0.5, zc + float(sz) * (w - band) * 0.5)), Color.WHITE, false)
+	for sy in [-1.0, 1.0]:
+		b.batch(box, shade, Transform3D(Basis.IDENTITY.scaled_local(Vector3(0.004, band, w - band * 2.0)), Vector3(x, bot + h * 0.5 + float(sy) * (h - band) * 0.5, zc)), Color.WHITE, false)
+	var shine := Mat.transparent(Color(1.0, 0.98, 1.0, 0.15), true)
+	var tilt := Basis(Vector3.RIGHT, deg_to_rad(-32.0))
+	var across := tilt * Vector3(0, 0, 1)
+	var c := Vector3(x - 0.002, bot + h * 0.64, zc - w * 0.08)
+	b.batch(box, shine, Transform3D(tilt.scaled_local(Vector3(0.004, minf(h * 0.5, 1.35), w * 0.1)), c), Color.WHITE, false)
+	b.batch(box, shine, Transform3D(tilt.scaled_local(Vector3(0.004, minf(h * 0.3, 0.8), w * 0.045)), c + across * w * 0.16 + Vector3.UP * 0.05), Color.WHITE, false)
 
 
 ## A little bat figure (the Looking-Glass Hall lesson). facing: -1 = faces -X (toward the mirror).
@@ -374,6 +453,24 @@ func _build_powder() -> void:
 	b.vcyl(Vector3(7.4, 0.25, -21.4), 0.28, 0.5, Color("7a2f52"))
 	b.col_cyl(Vector3(7.4, 0.25, -21.4), 0.3, 0.5, "wood")
 	b.rug(Vector3(6.6, 0, -20.2), Vector2(2.6, 3.6), Color("f0c8d6"), Color("a85a78"))
+	# Rose wallpaper stripes, a towel rail, scent bottles on the vanity, a little framed landscape, a hat-box
+	# stack and a fern: a lived-in powder room (IN-15). Visual only, clear of the walk from the hall door.
+	var rose := Color("e8b3c2")
+	_wallpaper(b, Vector3(4.3, 0, -23.0), Vector3(8.7, 0, -23.0), Vector3(0, 0, 1), 3.2, rose, [])
+	_wallpaper(b, Vector3(4.3, 0, -17.5), Vector3(8.7, 0, -17.5), Vector3(0, 0, -1), 3.2, rose, [])
+	_wallpaper(b, Vector3(9.0, 0, -22.7), Vector3(9.0, 0, -17.8), Vector3(-1, 0, 0), 3.2, rose, [])
+	b.vcyl(Vector3(6.4, 1.3, -17.62), 0.025, 1.1, GOLD, Basis(Vector3.FORWARD, PI * 0.5), {"shadows": false})
+	b.vbox(Vector3(6.4, 1.02, -17.6), Vector3(0.62, 0.62, 0.05), CREAM, Basis.IDENTITY, {"shadows": false})
+	b.vbox(Vector3(6.4, 0.78, -17.59), Vector3(0.62, 0.08, 0.055), Color("a85a78"), Basis.IDENTITY, {"shadows": false})
+	for k in 4:
+		var bp := Vector3(8.45 + float(k % 2) * 0.12, 0.92, -19.95 + float(k) * 0.12)
+		b.vsphere(bp + Vector3(0, 0.07, 0), Vector3(0.09, 0.12, 0.09), [Color("c98fd8"), Color("ffb89a"), Color("9ad0c8"), Color("f6d25a")][k], Basis.IDENTITY, {"shadows": false, "rim": 0.8})
+		b.vcyl(bp + Vector3(0, 0.16, 0), 0.015, 0.06, GOLD, Basis.IDENTITY, {"shadows": false})
+	b.portrait(Vector3(6.5, 1.9, -22.98), Vector3(0, 0, 1), Vector2(0.9, 0.65), GOLD, Color("f3e6d0"), Color("b0677f"), "landscape")
+	for k in 3:
+		b.vcyl(Vector3(4.7, 0.16 + float(k) * 0.26, -22.5), 0.3 - float(k) * 0.05, 0.24, [Color("7a2f52"), Color("f0d6e2"), Color("b0486e")][k], Basis.IDENTITY, {"segments": 16})
+		b.vcyl(Vector3(4.7, 0.29 + float(k) * 0.26, -22.5), 0.31 - float(k) * 0.05, 0.03, GOLD, Basis.IDENTITY, {"shadows": false, "segments": 16})
+	b.potted_plant(Vector3(8.5, 0, -22.5), Color("f0d6e2"), Color("5f8a4f"), 0.9)
 	# The ribbon continues from the hall to the vanity.
 	for k in 4:
 		var t := float(k) / 3.0
@@ -610,14 +707,13 @@ func _build_balcony() -> void:
 		var d := 48.0 + float(k % 3) * 9.0
 		var hp := Vector3(sin(a) * d, sky_y, -90.0 - cos(a) * d)
 		b.vsphere(hp, Vector3(22.0, 9.0 + float(k % 2) * 4.0, 16.0), Color("241a36").lightened(float(k % 3) * 0.05), Basis.IDENTITY, {"shadows": false})
-	for k in 14:
-		var a2 := -1.1 + float(k) * 0.17
-		var d2 := 30.0 + float((k * 5) % 7) * 2.0
-		var tp := Vector3(sin(a2) * d2, sky_y + 5.0, -90.0 - cos(a2) * d2)
-		b.vcone(tp + Vector3(0, 3.0, 0), 2.2, 6.0, Color("2e2040"), Basis.IDENTITY, {"shadows": false, "segments": 8})
-		b.vsphere(tp + Vector3(0, 5.2, 0), Vector3(2.4, 2.0, 2.4), Color("c8703a").darkened(0.45), Basis.IDENTITY, {"shadows": false, "segments": 8})
-	b.glow_sphere(Vector3(-18.0, 34.0, -150.0), Vector3(9.0, 9.0, 9.0), Color("f2ecd8"), 1.6)
-	b.glow_sphere(Vector3(-15.5, 35.5, -146.0), Vector3(8.2, 8.2, 8.2), Color("140c1a"), 0.0)
+	_night_trees(b, sky_y + 5.0)
+	# A low crescent moon over the hills, in view from the balcony under the glass canopy (the old one sat too
+	# high to be seen); bitten by a sky-coloured disc, the scene's glow gives it a soft halo. Kept within ~70 m
+	# of the balcony cameras: batches stop drawing at builder.visibility_end (75 m).
+	var moon_at := Vector3(-12.0, 18.5, -140.0)
+	b.glow_sphere(moon_at, Vector3(7.0, 7.0, 7.0), Color("f2ecd8"), 1.8)
+	b.glow_sphere(moon_at + Vector3(1.9, 1.0, 2.7), Vector3(6.4, 6.4, 6.4), Color("140c1a"), 0.0)
 	for k in 40:
 		var sa := float(k) * 2.39
 		var sp := Vector3(cos(sa) * (40.0 + float(k % 7) * 9.0), 22.0 + float((k * 13) % 17) * 2.2, -120.0 - sin(sa) * 30.0 - float(k % 5) * 8.0)
@@ -634,6 +730,48 @@ func _build_balcony() -> void:
 	for t in [[-0.14, 0.34, 0.2], [0.1, 0.46, -0.25]]:
 		b.vbox(pk + Vector3(float(t[0]), -float(t[1]) * 0.5, 0.37), Vector3(0.07, float(t[1]), 0.025), Color("e8862f"), Basis(Vector3.FORWARD, float(t[2])), {"shadows": false})
 	b.lamp(Vector3(-4.0, y + 2.4, -86.0), FLAME, 0.6, 6.0)
+
+
+## The woods beyond the balustrade (VISUAL_BUGS IN-13: no more even row of identical cones): two rows of
+## storybook silhouettes - stacked firs and round-crowned trees of varied height, spacing and lean, a few
+## late-autumn crowns, the far row paler (depth). Batched, no collision, no shadows; a fixed seed keeps every
+## build identical.
+func _night_trees(b: Builder, base_y: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6173
+	var opts := {"shadows": false, "segments": 10}
+	var near_cols := [Color("2a1f3e"), Color("30244a"), Color("261c36"), Color("352848")]
+	var autumn := [Color("5e3226"), Color("6a3e24"), Color("573048")]
+	for row in 2:
+		var far := row == 1
+		var count := 11 if far else 15
+		var a := -1.28
+		for k in count:
+			a += (2.56 / float(count)) * rng.randf_range(0.7, 1.3)
+			var d := (43.0 if far else 29.0) + rng.randf_range(-3.0, 3.5)
+			var p := Vector3(sin(a) * d, base_y + (1.5 if far else 0.0) + rng.randf_range(-0.6, 0.6), -90.0 - cos(a) * d)
+			var s := rng.randf_range(0.75, 1.3) * (0.8 if far else 1.0)
+			var col: Color = near_cols[rng.randi() % near_cols.size()]
+			if far:
+				col = col.lerp(Color("3e3058"), 0.45)
+			var lean := Basis(Vector3.FORWARD, rng.randf_range(-0.06, 0.06))
+			if rng.randf() < 0.55:
+				# fir: three stacked tiers on a short trunk
+				b.vcyl(p + Vector3.UP * 0.8 * s, 0.25 * s, 1.6 * s, col.darkened(0.2), lean, opts)
+				for t in 3:
+					var ty := (1.6 + float(t) * 1.9) * s
+					var tr := (2.1 - float(t) * 0.55) * s
+					b.vcone(p + lean * (Vector3.UP * (ty + 1.3 * s)), tr, 2.9 * s, col.lightened(float(t) * 0.03), lean, opts)
+			else:
+				# round crown: a trunk and three overlapping blobs (sometimes late-autumn coloured)
+				var crown: Color = col
+				if not far and rng.randf() < 0.35:
+					crown = autumn[rng.randi() % autumn.size()]
+				b.vcyl(p + Vector3.UP * 1.6 * s, 0.3 * s, 3.2 * s, col.darkened(0.25), lean, opts)
+				for c in 3:
+					var off := Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.4, 0.6), rng.randf_range(-0.6, 0.6)) * s
+					var r := rng.randf_range(1.6, 2.3) * s
+					b.vsphere(p + Vector3.UP * 4.4 * s + off, Vector3(r * 1.1, r * 0.95, r), crown.darkened(float(c) * 0.06), Basis.IDENTITY, opts)
 
 
 func _build_landing() -> void:

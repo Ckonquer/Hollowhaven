@@ -10,7 +10,7 @@ const Batch := preload("res://src/building/batch.gd")
 
 const HEADING_FONT := "res://assets/fonts/Fredoka-Variable.ttf"
 
-static var BRASS: Color = Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04)
+static var BRASS: Color = U.keep(Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04))   # never dyed
 static var SHARD: Color = Color("b9a3f0")      # matches the echo_shard item colour
 static var SHINY: Color = Color("9fd3e6")      # matches the shiny_pebble item colour
 

@@ -179,9 +179,12 @@ func test_window_cap_ends_stun_early() -> void:
 	for i in 3:
 		b.health.apply_damage(20.0)       # 30 each while scorched
 	assert_eq(b.state, "scorched", "still down after 90")
-	b.health.apply_damage(20.0)           # 120 >= 40% of 240
+	b.health.apply_damage(20.0)           # 120 >= 40% of 240 - and past the 60% threshold
 	assert_eq(b.state, "climb", "scrambles back up after 40% in one window")
-	assert_almost(float(b.health.hp), 120.0, 0.001)
+	# QA CH2-003 (weaver_boss.gd PACING): the blow that crosses the 60% threshold stops exactly on it, so the
+	# 40% phase-1 window ends at 144 hp and phase 2 starts whole (later phases' 15% cap: boss_pacing suite).
+	assert_almost(float(b.health.hp), 144.0, 0.001)
+	assert_eq(int(b.phase), 2)
 
 
 func test_hits_glance_off_through_combat_melee() -> void:

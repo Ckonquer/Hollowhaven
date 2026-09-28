@@ -8,7 +8,8 @@ extends Node3D
 ##     No legs, no eyes cluster, no body segments: a tall narrow floating silhouette (~0.35 m wide, ~0.95 m tall).
 ## Faces -Z, local origin on the ground.
 ## States (set_state): idle / wander / chase / return (skitter: quick leg cycle; sprout: bob + tendril sway),
-## telegraph (skitter: legs DRAW IN tight and the body crouches; sprout: the roots CURL UP under it), leap
+## telegraph (skitter: the bent legs GATHER fore-and-aft, the knees fold higher as the body sinks and the front pair
+## lifts - a coiled crouch; sprout: the roots CURL UP under it), leap
 ## (skitter: legs stretched back; sprout: the front root lashes forward and down), recover / stunned (dazed
 ## wobble), flinch, dead. Telegraph tint: steady with reduce_flashing.
 
@@ -16,6 +17,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 # Skitter
 const BODY_COLOR := Color("5b4d6b")
@@ -52,6 +54,7 @@ var _tendrils: Array = []            # sprout: tendril pivots
 var _tint_mat: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
+var _tint_level_now: float = 0.0
 
 
 func setup(params: Dictionary) -> void:
@@ -59,7 +62,7 @@ func setup(params: Dictionary) -> void:
 
 
 func _ready() -> void:
-	_tint_mat = HitFx.new_tint()
+	_tint_mat = CreatureFx.new_tint()
 	_root = Node3D.new()
 	_root.name = "Root"
 	add_child(_root)
@@ -137,8 +140,8 @@ func _animate_skitter(delta: float, speed: float) -> void:
 	match state:
 		"telegraph":
 			draw = clampf(_st / 0.3, 0.0, 1.0)
-			body_y -= 0.07 * draw
-			tilt.x = 0.12 * draw
+			body_y -= 0.033 * draw
+			tilt.x = -0.1 * draw               # rear down, head up: coiled to spring
 		"leap":
 			stretch = 1.0
 			tilt.x = -0.3
@@ -163,9 +166,14 @@ func _animate_skitter(delta: float, speed: float) -> void:
 		var side: float = l["side"]
 		var idx: int = l["index"]
 		var step := sin(ph + float(idx) * PI * 0.5 + (0.0 if side > 0.0 else PI)) * 0.25 * gait
-		var yaw: float = l["yaw"] * (1.0 - 0.55 * draw) + step - stretch * side * 0.5
-		var elev := deg_to_rad(ELEV + 28.0 * draw - 25.0 * stretch)
-		var drop := deg_to_rad(DROP + 20.0 * draw - 50.0 * stretch)
+		# Telegraph (CR-10): the legs keep their bent-knee shape and GATHER fore-and-aft along the body (the narrow,
+		# coiled silhouette), the knees fold a little higher as the body sinks, and the front pair lifts off the
+		# ground - a crouch before the spring, not the old near-vertical legs that read as planks round a crate.
+		var front := idx == 0
+		var yaw0: float = l["yaw"]
+		var yaw: float = yaw0 + signf(yaw0) * deg_to_rad(25.0) * draw + step - stretch * side * 0.5
+		var elev := deg_to_rad(ELEV + (20.0 if front else 12.0) * draw - 25.0 * stretch)
+		var drop := deg_to_rad(DROP + (-25.0 if front else 2.0) * draw - 50.0 * stretch)
 		hip.rotation.y = lerp_angle(hip.rotation.y, yaw, k_s)
 		femur.rotation.z = lerpf(femur.rotation.z, side * elev, k_s)
 		knee.rotation.z = lerpf(knee.rotation.z, -side * (elev + drop), k_s)
@@ -292,14 +300,16 @@ func _process(delta: float) -> void:
 
 
 func _apply_tint(tint: float) -> void:
-	var c := Color(0, 0, 0, 0)
+	# CR-09: a capped wash + a fresnel rim in the tell colour (CreatureFx), so the shading and outlines stay.
+	var on := false
 	if _flash_t > 0.0:
-		c = Color(HitFx.FLASH_COLOR, HitFx.flash_strength(0.75))
-	elif tint > 0.0:
-		c = Color(SPROUT_TINT if sprout else SKITTER_TINT, clampf(tint, 0.0, 1.0))
-	var on := c.a > 0.01
-	if on:
-		_tint_mat.albedo_color = c
+		_tint_level_now = HitFx.flash_strength(0.75)
+		CreatureFx.apply_flash(_tint_mat, HitFx.FLASH_COLOR, _tint_level_now)
+		on = true
+	elif tint > 0.01:
+		_tint_level_now = clampf(tint, 0.0, 1.0)
+		CreatureFx.apply_tint(_tint_mat, SPROUT_TINT if sprout else SKITTER_TINT, _tint_level_now)
+		on = true
 	if on != _tint_on:
 		_tint_on = on
 		for m in _tint_meshes:

@@ -211,3 +211,132 @@ static func face_relief(b: Builder, pos: Vector3, facing: Vector3, s: float = 1.
 		b.vbox(hp, Vector3(0.05, 0.05, 0.4), IRON_DARK, basis, {"shadows": false})
 		b.vcyl(hp + basis * Vector3(0, -0.28, 0.18), 0.1, 0.3, IRON_DARK, Basis.IDENTITY, {"segments": 8})
 		b.vcone(hp + basis * Vector3(0, -0.08, 0.18), 0.11, 0.12, IRON_DARK)
+
+
+# --- Wall texture and lived-in dressing (VISUAL_BUGS IN-15: the first rooms read flat next to Chapter One's
+# plank-lined Below). All visual, batched, no collision; `skip` = [[from, to], ...] spans (in the coordinate
+# that varies along the wall) left bare for doorways.
+
+static var _tapers: Dictionary = {}
+
+
+## Batched truncated cone (bottom radius, top radius, height) centred at `center` (cached unit meshes).
+static func taper(b: Builder, center: Vector3, bottom_r: float, top_r: float, height: float, col: Color, basis: Basis = Basis.IDENTITY, shadows: bool = true) -> void:
+	var ratio := snappedf(clampf(top_r / maxf(bottom_r, 0.001), 0.0, 4.0), 0.05)
+	var key := "%.2f" % ratio
+	if not _tapers.has(key):
+		var m := CylinderMesh.new()
+		m.top_radius = 0.5 * ratio
+		m.bottom_radius = 0.5
+		m.height = 1.0
+		m.radial_segments = 12
+		m.rings = 1
+		_tapers[key] = m
+	b.batch(_tapers[key], Builder.tint_mat(), Transform3D(basis.scaled_local(Vector3(bottom_r * 2.0, height, bottom_r * 2.0)), center), col, shadows)
+
+
+## True when `a` falls inside one of the skip spans (with a margin).
+static func _skipped(a: float, skip: Array, margin: float = 0.1) -> bool:
+	for s in skip:
+		if a > float(s[0]) - margin and a < float(s[1]) + margin:
+			return true
+	return false
+
+
+## Vertical tongue-and-groove boards on the lower part of a wall (height h from the floor y), with a cap rail.
+## p0 -> p1 runs along the wall's inner face; inward = into the room.
+static func plank_wainscot(b: Builder, p0: Vector3, p1: Vector3, inward: Vector3, y: float, h: float, col: Color = TIMBER, skip: Array = []) -> void:
+	var along := Vector3(p1.x - p0.x, 0.0, p1.z - p0.z)
+	var length := along.length()
+	if length < 0.3:
+		return
+	var dir := along / length
+	var face := Basis.looking_at(-inward, Vector3.UP)
+	var w := 0.2
+	var n := int(length / w)
+	for i in n:
+		var p := p0 + dir * ((float(i) + 0.5) * length / float(n))
+		if _skipped(p.x if absf(dir.x) > 0.5 else p.z, skip):
+			continue
+		var hh := h - (0.04 if i % 3 == 1 else 0.0)
+		b.vbox(Vector3(p.x, y + hh * 0.5, p.z) + inward * 0.03, Vector3(length / float(n) - 0.025, hh, 0.04), b.vary(col.darkened(0.06 if i % 2 == 0 else 0.0), 0.05), face, {"shadows": false})
+	var t := 0.0
+	while t < length:
+		var t1 := minf(length, t + 2.0)
+		var mid := p0 + dir * ((t + t1) * 0.5)
+		if not _skipped(mid.x if absf(dir.x) > 0.5 else mid.z, skip, 0.6):
+			b.vbox(Vector3(mid.x, y + h + 0.03, mid.z) + inward * 0.06, Vector3(t1 - t, 0.07, 0.1), col.darkened(0.25), face, {"shadows": false})
+		t = t1
+
+
+## Riveted plate seams on an iron wall: horizontal seams at the given heights (above y) and vertical seams
+## every `pitch` metres, rivet heads along both. p0 -> p1 runs along the wall's inner face.
+static func plate_seams(b: Builder, p0: Vector3, p1: Vector3, inward: Vector3, y: float, rows: Array, top: float, pitch: float = 2.4, col: Color = PLATE_DARK, skip: Array = []) -> void:
+	var along := Vector3(p1.x - p0.x, 0.0, p1.z - p0.z)
+	var length := along.length()
+	if length < 0.5:
+		return
+	var dir := along / length
+	var face := Basis.looking_at(-inward, Vector3.UP)
+	for ry in rows:
+		var t := 0.0
+		while t < length - 0.05:
+			var t1 := minf(length, t + 1.2)
+			var mid := p0 + dir * ((t + t1) * 0.5)
+			if not _skipped(mid.x if absf(dir.x) > 0.5 else mid.z, skip, 0.2) or float(ry) > 3.6:
+				b.vbox(Vector3(mid.x, y + float(ry), mid.z) + inward * 0.02, Vector3(t1 - t, 0.06, 0.03), col, face, {"shadows": false})
+				var r := t + 0.3
+				while r < t1:
+					var rp := p0 + dir * r
+					b.vsphere(Vector3(rp.x, y + float(ry) + 0.1, rp.z) + inward * 0.03, Vector3(0.05, 0.05, 0.03), RIVET, face, {"shadows": false})
+					r += 0.6
+			t = t1
+	var v := pitch * 0.5
+	while v < length:
+		var p := p0 + dir * v
+		if not _skipped(p.x if absf(dir.x) > 0.5 else p.z, skip, 0.3):
+			b.vbox(Vector3(p.x, y + top * 0.5, p.z) + inward * 0.02, Vector3(0.05, top, 0.03), col, face, {"shadows": false})
+		v += pitch
+
+
+## A paper notice pinned to a wall: sheet, a few ink lines, a brass pin. normal = into the room.
+static func notice(b: Builder, pos: Vector3, normal: Vector3, w: float = 0.42, h: float = 0.56, tilt: float = 0.0) -> void:
+	var face := Basis.looking_at(-normal, Vector3.UP) * Basis(Vector3(0, 0, 1), tilt)
+	b.vbox(pos + normal * 0.012, Vector3(w, h, 0.012), b.vary(Color("e9dfc6"), 0.04), face, {"shadows": false})
+	b.vbox(pos + normal * 0.02 + face * Vector3(0, h * 0.34, 0), Vector3(w * 0.7, 0.045, 0.01), Color("5a4a44"), face, {"shadows": false})
+	for i in 3:
+		b.vbox(pos + normal * 0.02 + face * Vector3(-w * 0.08, h * (0.12 - float(i) * 0.14), 0), Vector3(w * (0.72 - float(i % 2) * 0.18), 0.02, 0.01), Color("7a6a60"), face, {"shadows": false})
+	b.vsphere(pos + normal * 0.03 + face * Vector3(0, h * 0.44, 0), Vector3(0.05, 0.05, 0.03), BRASS, face, {"shadows": false})
+
+
+## A miner's work jacket hanging from a wall hook (shoulders, body, two sleeves, pocket) with an optional
+## hard hat on the hook above. normal = into the room.
+static func work_jacket(b: Builder, hook: Vector3, normal: Vector3, col: Color, hat: bool = true) -> void:
+	var face := Basis.looking_at(-normal, Vector3.UP)
+	var o := {"shadows": false}
+	b.vbox(hook + normal * 0.08, Vector3(0.05, 0.05, 0.16), IRON_DARK, face, o)
+	var flat := face * Basis.IDENTITY.scaled(Vector3(1.0, 1.0, 0.55))
+	taper(b, hook + normal * 0.15 + Vector3.DOWN * 0.55, 0.3, 0.22, 0.85, col, flat)
+	b.vsphere(hook + normal * 0.14 + Vector3.DOWN * 0.12, Vector3(0.5, 0.18, 0.26), col.darkened(0.06), face)
+	for s in [-1.0, 1.0]:
+		taper(b, hook + normal * 0.2 + face * Vector3(s * 0.25, -0.45, 0), 0.07, 0.09, 0.7, col.darkened(0.08), face * Basis(Vector3(0, 0, 1), s * 0.08))
+	b.vbox(hook + normal * 0.27 + face * Vector3(0.1, -0.62, 0), Vector3(0.14, 0.12, 0.02), col.darkened(0.25), face, o)
+	b.vbox(hook + normal * 0.26 + face * Vector3(0, -0.5, 0), Vector3(0.5, 0.05, 0.02), Color("e8c860"), face, o)
+	if hat:
+		b.vsphere(hook + normal * 0.16 + Vector3.UP * 0.2, Vector3(0.34, 0.2, 0.34), Color("e0a83a"), Basis.IDENTITY)
+		b.vcyl(hook + normal * 0.16 + Vector3.UP * 0.12, 0.23, 0.03, Color("c8902e"), Basis.IDENTITY, o)
+
+
+## A plank shelf on two iron brackets with tins, jars and a folded cloth. normal = into the room.
+static func wall_shelf(b: Builder, pos: Vector3, normal: Vector3, length: float = 1.6) -> void:
+	var face := Basis.looking_at(-normal, Vector3.UP)
+	var o := {"shadows": false}
+	b.vbox(pos + normal * 0.16, Vector3(length, 0.05, 0.3), b.vary(TIMBER, 0.05), face, OUT)
+	for s in [-1.0, 1.0]:
+		b.vbox(pos + normal * 0.12 + face * Vector3(s * (length * 0.5 - 0.15), -0.12, 0), Vector3(0.04, 0.22, 0.22), IRON_DARK, face, o)
+	var cols := [Color("b8764a"), Color("5f8a9a"), Color("c9a25a"), Color("8a5a3c"), Color("7d8898")]
+	var n := int(length / 0.3)
+	for i in n:
+		var x := -length * 0.5 + 0.18 + float(i) * (length - 0.36) / float(maxi(n - 1, 1))
+		var hh := 0.14 + float((i * 5) % 3) * 0.05
+		b.vcyl(pos + normal * 0.16 + face * Vector3(x, 0.025 + hh * 0.5, 0), 0.06 + float(i % 2) * 0.015, hh, cols[i % cols.size()], Basis.IDENTITY, {"shadows": false, "segments": 10})

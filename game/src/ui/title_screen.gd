@@ -6,6 +6,9 @@ extends Node
 ## New Game -> comfort screen -> "Meet Krystal" creation screen -> Game.new_game(look). Back / Esc on the
 ## creation screen returns to the comfort screen, Esc there returns to the title: nothing is written or
 ## deleted until Confirm (the old save stays byte-identical).
+## Visual QA: while a panel is open the logo and the menu fade out (UI-16: sliced words peeked out beside Settings,
+## Credits and the comfort screen) and come back when it closes; the footer sits on a small dark pill so it reads
+## on the bright grass (UI-17); Credits name Chapter Two once the save has reached it (UI-04).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -18,6 +21,8 @@ const ConfirmDialog := preload("res://src/ui/screens/confirm_dialog.gd")
 const SettingsPanel := preload("res://src/ui/panels/settings_panel.gd")
 const CreditsPanel := preload("res://src/ui/panels/credits_panel.gd")
 const FOOTERS := {1: "Chapter One  ·  The Dimming Ward", 2: "Chapter Two  ·  The Lanterns of Hallowmere"}
+const MENU_FADE_OUT := 0.18
+const MENU_FADE_IN := 0.3
 
 var diorama: Node3D
 var canvas: CanvasLayer
@@ -30,6 +35,9 @@ var new_btn: Button
 var msg_l: Label
 var fade: ColorRect
 var footer_l: Label
+var footer_pill: PanelContainer
+var _intro_tw: Tween
+var _menu_tw: Tween
 var _panel: Control = null
 var _busy := false
 var _save_meta: Dictionary = {}
@@ -50,6 +58,8 @@ func _ready() -> void:
 	root.theme = ThemeFactory.get_theme()
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(root)
+	_apply_window_scale()
+	get_window().size_changed.connect(_apply_window_scale)
 	_build_backdrop_shade()
 	_build_logo_and_menu()
 	_build_footer()
@@ -63,12 +73,20 @@ func _ready() -> void:
 	logo_box.modulate.a = 0.0
 	menu.modulate.a = 0.0
 	var tw := create_tween()
+	_intro_tw = tw
 	tw.tween_property(fade, "color:a", 0.0, 1.4).set_ease(Tween.EASE_OUT)
 	tw.parallel().tween_property(logo_box, "modulate:a", 1.0, 1.6).set_delay(0.5)
 	tw.parallel().tween_property(menu, "modulate:a", 1.0, 1.0).set_delay(1.2)
 	_focus_menu.call_deferred()
 	if Debug.is_cheat_allowed() and Debug.has_arg("title-show"):
 		_debug_show.call_deferred(Debug.arg("title-show"))
+
+
+## Slightly larger small print in small windows (ThemeFactory.apply_window_scale, UI-22). Not headless.
+func _apply_window_scale() -> void:
+	if DisplayServer.get_name() == "headless" or not is_inside_tree():
+		return
+	ThemeFactory.apply_window_scale(float(get_window().size.y))
 
 
 func _build_backdrop_shade() -> void:
@@ -164,15 +182,19 @@ func _menu_button(text: String, cb: Callable) -> Button:
 
 
 func _build_footer() -> void:
+	var pill := Kit.panel("Pill")
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	pill.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	pill.offset_right = -30
+	pill.offset_bottom = -22
+	root.add_child(pill)
 	var v := Kit.label(footer_text({}), "HudSmall", HORIZONTAL_ALIGNMENT_RIGHT)
-	v.modulate.a = 0.75
-	v.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	v.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	v.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	v.offset_right = -36
-	v.offset_bottom = -26
-	root.add_child(v)
+	v.add_theme_color_override("font_color", ThemeFactory.CREAM)
+	pill.add_child(v)
 	footer_l = v
+	footer_pill = pill
 
 
 ## "Chapter One  ·  The Dimming Ward  ·  v1.0" (Chapter Two once the save being continued is in it). Pure.
@@ -257,7 +279,24 @@ func _open_panel(p: Control) -> void:
 	if "focus_behavior_recursive" in menu:
 		menu.set("focus_behavior_recursive", 1)
 	fade.move_to_front()
+	_fade_menu(false)
 	Audio.play_ui("ui_open")
+
+
+## The logo, the menu and the footer step back while a panel is open (hidden = 0) and return after it.
+func _fade_menu(shown: bool) -> void:
+	if _intro_tw != null and _intro_tw.is_valid():
+		_intro_tw.kill()           # the intro would fade the menu back in under the panel
+		fade.color.a = 0.0
+	if _menu_tw != null and _menu_tw.is_valid():
+		_menu_tw.kill()
+	var a := 1.0 if shown else 0.0
+	var t := MENU_FADE_IN if shown else MENU_FADE_OUT
+	_menu_tw = create_tween().set_parallel(true)
+	_menu_tw.tween_property(logo_box, "modulate:a", a, t)
+	_menu_tw.tween_property(menu, "modulate:a", a, t)
+	if footer_pill != null:
+		_menu_tw.tween_property(footer_pill, "modulate:a", a, t)
 
 
 func _close_panel() -> void:
@@ -277,6 +316,7 @@ func _close_panel() -> void:
 		p.animate_out_and_free()
 	else:
 		p.queue_free()
+	_fade_menu(true)
 	Audio.play_ui("ui_close")
 	_focus_menu.call_deferred()
 
@@ -379,7 +419,7 @@ func _on_settings() -> void:
 
 func _on_credits() -> void:
 	var p := CreditsPanel.new()
-	p.setup({})
+	p.setup({"chapter": CreditsPanel.credits_chapter(_save_meta)})
 	_open_panel(p)
 
 

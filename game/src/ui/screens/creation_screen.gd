@@ -54,6 +54,7 @@ func _build() -> void:
 	ed.look_changed.connect(_on_look_changed)
 	cols.add_child(ed)
 	editor = ed
+	Wardrobe.bind_face_preview(ed, preview)
 	var bottom := Kit.hbox(18)
 	body.add_child(bottom)
 	back_btn = Kit.button("Back", _back, "GhostButton")

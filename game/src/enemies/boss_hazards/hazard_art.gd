@@ -13,6 +13,8 @@ const VEIL := Color(0.8, 0.9, 0.78)
 const VEIL_SHEET := Color(0.78, 0.9, 0.8, 0.38)
 const ROOT := Color("cdbfa3")
 const ROOT_DARK := Color("8a7560")
+const POST_STONE := Color("a39a8e")      # trip-line posts: a PALE stone peg (CR-03: dark blobs read as shadow critters)
+const POST_ROOT := Color("b9a384")       # ... and a pale root stake with arachnophobia on
 const SAC := Color("ddd6e6")
 const SAC_VEIN := Color("9d8fb4")
 const POD := Color("d9f2c4")
@@ -86,8 +88,32 @@ static func high_vis() -> bool:
 static func post_mat(alt: bool) -> Material:
 	var key := "post|%s" % alt
 	if not _cache.has(key):
-		_cache[key] = Mat.outlined(Mat.toon(ROOT_DARK if alt else Palette.RUIN_STONE_DARK, {"rim": 0.3, "noise": 0.15}), 0.012)
+		# a faint self-light: the Matron's arenas are dark, and an unlit pale peg still reads as a black blob there
+		var c := POST_ROOT if alt else POST_STONE
+		_cache[key] = Mat.outlined(Mat.toon(c, {"rim": 0.45, "noise": 0.2, "emission": c, "emission_energy": 0.32}), 0.012)
 	return _cache[key]
+
+
+## A trip-line post that reads as an OBJECT (CR-03): a pale stone peg on a low plinth with a rounded cap (silk
+## look) or a gnarled pale root stake with little root feet (arachnophobia), the glowing strand wound tight round
+## its neck - no dark round blob with two pale "eye" crescents. Built under `holder` (origin = floor point).
+## Shared meshes / materials; ~5 meshes per post, no shadows.
+static func build_post(holder: Node3D, alt: bool) -> void:
+	var m := post_mat(alt)
+	var parts: Array = []
+	if alt:
+		parts.append(Kit.add(holder, Kit.cylinder(0.08, 0.13, 0.62, m, 8), Vector3(0, 0.31, 0), Vector3(0, 0, 4)))
+		parts.append(Kit.add(holder, Kit.sphere(0.1, m, 8, 10), Vector3(0.01, 0.63, 0), Vector3.ZERO, Vector3(1.0, 0.7, 1.0)))
+		for i in 3:
+			var a := TAU * float(i) / 3.0 + 0.4
+			parts.append(Kit.add(holder, Kit.cone(0.05, 0.28, m, 6), Vector3(cos(a) * 0.12, 0.06, sin(a) * 0.12), Vector3(cos(a) * -70.0, 0, sin(a) * 70.0)))
+	else:
+		parts.append(Kit.add(holder, Kit.cylinder(0.2, 0.25, 0.12, m, 12), Vector3(0, 0.06, 0)))
+		parts.append(Kit.add(holder, Kit.cylinder(0.085, 0.11, 0.5, m, 10), Vector3(0, 0.36, 0)))
+		parts.append(Kit.add(holder, Kit.sphere(0.12, m, 10, 12), Vector3(0, 0.62, 0), Vector3.ZERO, Vector3(1.0, 0.65, 1.0)))
+	parts.append(Kit.add(holder, Kit.torus(0.075, 0.12, strand_mat(alt)), Vector3(0, 0.5, 0), Vector3.ZERO, Vector3(1.0, 0.7, 1.0)))
+	for mi in parts:
+		(mi as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 static func sac_mat(alt: bool) -> Material:

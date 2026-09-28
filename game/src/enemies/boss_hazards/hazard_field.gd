@@ -33,7 +33,6 @@ const Art := preload("res://src/enemies/boss_hazards/hazard_art.gd")
 const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Combat := preload("res://src/combat/combat.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
-const Kit := preload("res://src/art/mesh_kit.gd")
 
 ## Live fans + lines by phase: [Gentle, Standard, Intense]. Phase 3 = ONE ground hazard at a time.
 const HAZARD_CAP := {2: [2, 3, 3], 3: [1, 1, 1]}
@@ -774,24 +773,23 @@ static func default_chords(p_posts: Array, p_entrance: Variant) -> Array:
 	return out
 
 
+## The fixed trip-line anchors: a pale stake / root peg per post (hazard_art.build_post, CR-03 - never the old dark
+## blob with two pale "eye" crescents). Rebuilt on an arachnophobia swap; the old posts leave the tree at once so
+## a swap never shows (or counts) both sets.
 func _build_posts() -> void:
 	for n in _post_nodes:
 		if is_instance_valid(n):
-			n.queue_free()
+			if (n as Node).get_parent() == self:
+				remove_child(n)
+			(n as Node).queue_free()
 	_post_nodes.clear()
-	var m := Art.post_mat(alt)
-	var ring := Art.strand_mat(alt)
-	for p in posts:
+	for k in posts.size():
+		var p: Vector3 = posts[k]
 		var holder := Node3D.new()
-		holder.name = "TripPost"
+		holder.name = "TripPost%d" % k
 		add_child(holder)
 		holder.global_position = p
-		var knob := Kit.blob(0.22, m, 5 if alt else 3, 0.25, 1.4, 2)
-		Kit.add(holder, knob, Vector3(0, 0.2, 0))
-		knob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var band := Kit.torus(0.17, 0.2, ring)
-		Kit.add(holder, band, Vector3(0, 0.32, 0), Vector3.ZERO, Vector3(1, 0.6, 1))
-		band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		Art.build_post(holder, alt)
 		_post_nodes.append(holder)
 
 

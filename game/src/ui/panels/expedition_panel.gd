@@ -21,6 +21,7 @@ const JOURNAL_PANEL := "journal"
 const JOURNAL_ARGS := {"tab": "optional"}
 const INTRO := "Optional routes through Hallowmere Reach, for whenever you feel like an outing. Go when you like, stop when you like: setting one aside costs nothing, and nothing here is ever needed for the story."
 const CALM_NOTE := "No timers and no daily limits. Every reward can also be gathered or made at home."
+const UNDER_WAY := "Under way"
 const ICON_TEMPLATES := {"orchard_patrol": "pumpkin", "quarry_circuit": "iron_ore", "manor_afterglow": "lantern_wax"}
 
 var selected: String = ""
@@ -106,15 +107,31 @@ func _make_card(id: String) -> Button:
 	var v := Kit.vbox(2)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(v)
+	var head := Kit.hbox(10)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(head)
 	var name_l := Kit.label("", "CardTitle")
 	name_l.name = "Name"
-	v.add_child(name_l)
+	head.add_child(name_l)
+	# "Under way" badge (visual QA UI-06: appended to the one-line subtitle it ran past the card's edge)
+	var badge := PanelContainer.new()
+	badge.name = "UnderWay"
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.add_theme_stylebox_override("panel", ThemeFactory.box(Color(ThemeFactory.GOLD, 0.35), 10, 2,
+		ThemeFactory.GOLD.darkened(0.3), [10, 1, 10, 2]))
+	var bl := Kit.label(UNDER_WAY, "Tiny")
+	bl.add_theme_color_override("font_color", ThemeFactory.INK)
+	badge.add_child(bl)
+	badge.visible = false
+	head.add_child(badge)
 	var row := Kit.hbox(6)
 	row.name = "Row"
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(row)
 	b.set_meta("name_label", name_l)
 	b.set_meta("row", row)
+	b.set_meta("badge", badge)
 	_cards[id] = b
 	return b
 
@@ -170,9 +187,8 @@ func _fill_card(id: String) -> void:
 	var sub := "%s  ·  %d stops" % [String(pv["difficulty_name"]), (pv["stops"] as Array).size()]
 	if not bool(pv["unlocked"]):
 		sub = "Not yet open"
-	elif String(Ex.active().get("template", "")) == id:
-		sub += "  ·  under way"
 	row.add_child(Kit.label(sub, "Small"))
+	(b.get_meta("badge") as Control).visible = bool(pv["unlocked"]) and String(Ex.active().get("template", "")) == id
 	b.modulate = Color.WHITE if bool(pv["unlocked"]) else Color(1, 1, 1, 0.6)
 	b.set_pressed_no_signal(id == selected)
 

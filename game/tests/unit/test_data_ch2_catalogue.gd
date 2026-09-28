@@ -561,7 +561,12 @@ func test_boss_rows_describe_their_rules() -> void:
 	assert_true(alt.contains("whisper") and alt.contains("pale root"), "alt tell: whisper + pale root")
 	for word in ["silk", "spider", "web", "strand", "thread", "rattle"]:
 		assert_false(alt.contains(word), "arachnophobia tell avoids '%s'" % word)
-	assert_true(String(mt["desc"]).contains("burned her twice") and String(mt["alt_desc"]).contains("burned her twice"))
+	# R3-06: the rules need one exposure per phase (three), so the bestiary must not say "twice".
+	var burned := "burned her three times, once in each phase"
+	assert_true(String(mt["desc"]).contains(burned) and String(mt["alt_desc"]).contains(burned), "desc / alt_desc: " + burned)
+	assert_false(String(mt["desc"]).contains("twice") or String(mt["alt_desc"]).contains("twice"), "no stale 'twice'")
+	assert_eq(CrossingRules.EXPOSURES_TARGET, 3, "the wording matches the rules' exposure count")
+	assert_eq(CrossingRules.HP_FLOOR.size(), 3, "one exposure floor per phase")
 
 
 # --- icons ---------------------------------------------------------------------------------------------------

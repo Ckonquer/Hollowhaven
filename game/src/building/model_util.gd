@@ -6,11 +6,17 @@ extends RefCounted
 const Mat := preload("res://src/art/mat.gd")
 const Palette := preload("res://src/art/palette.gd")
 const Batch := preload("res://src/building/batch.gd")
+const Tints := preload("res://src/building/tints.gd")
 
 static var _cache: Dictionary = {}
 
 
 # --- Materials -----------------------------------------------------------------------------------
+
+## A vertex colour that recolouring never dyes (brass and gold fittings, book spines, patchwork): see tints.gd.
+static func keep(c: Color) -> Color:
+	return Tints.keep(c)
+
 
 ## Vertex-coloured toon material (shared).
 static func vc_mat(opts: Dictionary = {}) -> Material:

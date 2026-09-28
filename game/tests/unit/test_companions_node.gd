@@ -7,6 +7,7 @@ const CompanionScript := preload("res://src/companions/companion.gd")
 const BoulderScript := preload("res://src/companions/pebble_boulder.gd")
 const Spawner := preload("res://src/companions/companion_spawner.gd")
 const AreaBase := preload("res://src/world/area_base.gd")
+const Annexes := preload("res://src/world/surface/annexes.gd")
 
 var nodes: Array = []
 var said: Array = []
@@ -15,6 +16,7 @@ var _floor: StaticBody3D
 var player: CharacterBody3D
 var _saved_area_id := ""
 var _saved_area: Node = null
+var _saved_ui: Node = null
 
 
 class FakePlayer extends CharacterBody3D:
@@ -40,6 +42,17 @@ class FakeBush extends Node3D:
 		return {"tool": "hand", "name": "Berry Bush"}
 
 
+## Records the panels the companion asks Game.ui to open (Game.open_panel -> ui.open).
+class FakeUI extends Node:
+	var opened: Array = []
+
+	func open(panel: String, _args: Dictionary = {}) -> void:
+		opened.append(panel)
+
+	func is_open(panel: String) -> bool:
+		return opened.has(panel)
+
+
 class FakeEnemy extends Node3D:
 	var health: Node
 
@@ -60,6 +73,7 @@ func before_each() -> void:
 	Events.say.connect(_say_cb)
 	_saved_area_id = Game.area_id
 	Game.area_id = ""
+	_saved_ui = Game.ui
 	# Recovery never pops a pet into a boss fight (Game.boss_active()): no encounter or boss arena may be left
 	# over from an earlier suite (a boss freed mid-encounter, an area with fight_active).
 	_saved_area = Game.area if is_instance_valid(Game.area) else null
@@ -93,6 +107,8 @@ func after_each() -> void:
 	Game.area_id = _saved_area_id
 	Game.area = _saved_area if is_instance_valid(_saved_area) else null
 	_saved_area = null
+	Game.ui = _saved_ui if is_instance_valid(_saved_ui) else null
+	_saved_ui = null
 	Game._bosses.clear()
 	if is_instance_valid(player):
 		player.queue_free()
@@ -356,6 +372,63 @@ func test_zone_bond_through_events() -> void:
 	m.command("wait")
 	Events.zone_entered.emit("quarry")
 	assert_eq(int(GameState.companion("mochi")["bond_xp"]), 3, "only while adventuring together")
+
+
+## QA: Lumi earned new-zone bond for stepping into the surface waygate's small safe circle ("ch2_waygate"). It is a
+## helper zone, not a place explored together (annexes.gd mark_helper_zone, Game.is_landmark_zone - the map
+## discovery rule, CH2-010): no bond and it is not remembered; the area's landmark zones still pay exactly as before.
+func test_zone_bond_skips_helper_zones() -> void:
+	var area: Node3D = AreaBase.new()
+	add_child(area)
+	nodes.append(area)
+	area.add_zone("glade", Vector3(0, 0, 0), 20.0)
+	area.add_zone(Annexes.WAYGATE_ZONE, Vector3(30, 0, 0), 4.5, true)
+	Annexes.mark_helper_zone(area, Annexes.WAYGATE_ZONE)
+	Game.area = area
+	assert_false(bool(Game.is_landmark_zone(area, "ch2_waygate")), "precondition: the waygate circle is a helper zone")
+	var l := _make("lumi", "follow", Vector3(1, 0.05, 4))
+	_befriend("lumi", "follow")
+	Events.zone_entered.emit("ch2_waygate")
+	assert_eq(int(GameState.companion("lumi")["bond_xp"]), 0, "no new-zone bond for the waygate's helper circle")
+	var zv: Variant = GameState.companion("lumi").get("zones")
+	assert_false(zv is Array and (zv as Array).has("ch2_waygate"), "nor is it remembered as explored")
+	Events.zone_entered.emit("glade")
+	Events.zone_entered.emit("glade")
+	assert_eq(int(GameState.companion("lumi")["bond_xp"]), 3, "a landmark zone of the same area: +3, first time only")
+	Events.zone_entered.emit("quarry")
+	assert_eq(int(GameState.companion("lumi")["bond_xp"]), 6, "a zone the area never listed is a legacy landmark: +3")
+	assert_true(is_instance_valid(l))
+
+
+## QA: during the Borrowed Choir's phase B plate sequence "Talk to Lumi" showed among the plate prompts and could steal
+## the interaction focus. While a boss fight is on (Game.boss_active()) a FOLLOWING companion offers no talk / menu
+## interaction (commands and skills keep their own keys); a waiting companion, and every companion outside a fight,
+## keep it exactly as before.
+func test_a_following_companion_offers_no_talk_prompt_during_a_boss_fight() -> void:
+	var ui := FakeUI.new()
+	add_child(ui)
+	nodes.append(ui)
+	Game.ui = ui
+	var l := _make("lumi", "follow", Vector3(1, 0.05, 4))
+	_befriend("lumi", "follow")
+	var talk := {"text": "Talk to %s" % l.get_display_name(), "enabled": true}
+	assert_eq(l.get_interaction(player), talk, "outside a fight: the talk prompt")
+	Events.boss_encounter_changed.emit("borrowed_choir", true)
+	assert_true(bool(Game.boss_active()), "precondition: a boss fight is on")
+	assert_eq(l.get_interaction(player), {}, "during the fight the follower offers no talk prompt")
+	l.interact(player)
+	assert_eq(ui.opened, [], "and an interact on it opens no companion menu")
+	assert_eq(String(l.get("mode")), "follow", "nor toggles follow / wait")
+	assert_true(bool(_cmd(l, "wait").get("ok", true)), "the command key still works mid-fight")
+	assert_eq(String(l.get("mode")), "wait")
+	assert_eq(l.get_interaction(player), talk, "a waiting companion is not at her heels: its prompt stays")
+	_cmd(l, "follow")
+	assert_eq(l.get_interaction(player), {}, "following again: hushed again")
+	Events.boss_encounter_changed.emit("borrowed_choir", false)
+	assert_false(bool(Game.boss_active()))
+	assert_eq(l.get_interaction(player), talk, "the fight over: the talk prompt is back")
+	l.interact(player)
+	assert_eq(ui.opened, ["companion"], "and interacting opens the companion menu as before")
 
 
 func test_pebble_mining_assist() -> void:

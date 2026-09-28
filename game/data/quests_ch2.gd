@@ -21,12 +21,20 @@ extends RefCounted
 ## Optional "display": true on an objective makes it a signpost row: shown (tracker / journal) with its real
 ## done state, but never required - completion reads only the other objectives (src/core/chapter_log.gd), so
 ## a save that meets them without the display row never stalls. Every step keeps at least one real objective.
-## Step keys: id, title, text, hint (shown once when the step starts), target (landmark / zone id for the
+## Step keys: id, title, text, hint (shown once when the step starts; the journal also shows it as the step's
+## tip while it is current, so it must read true wherever Krystal is), hint_when (optional objective, same
+## types as below: the hint waits until it holds while the step is current - a place-bound hint shown where
+## it applies, e.g. when that lamp is found), target (landmark / zone id for the
 ## map and tracker, a String exactly like data/quests.gd; "" = none) + target_area (the area that landmark is
 ## in: surface ids are data/world_layout.gd LANDMARKS, Reach ids data/hallowmere_layout.gd LANDMARKS (spec
 ## §7.2), Works ids the spec §7.2 zone ids), group (steps sharing a group are shown TOGETHER and can be done
-## in any order), skip_if_flag (once set the step counts as done and passes silently - a failsafe so a
-## sequence break never stalls the chain), on_complete {"give": {item: n}, "flags": [...], "message"}.
+## in any order; they must be consecutive in STEPS), skip_if_flag (once set the step counts as done and passes
+## silently - a failsafe so a sequence break never stalls the chain), on_complete {"give": {item: n}, "flags":
+## [...], "message"}.
+## The lamp group (MP §9 / §11 steps 4-7): the lamp search ch2_outer_lamps and the three lamp roads are current
+## TOGETHER from the moment the Commons is done, so each lit lamp completes its own road at once (seal, recipe
+## flags, message) and records it independently of the other lamps (MP §9). The search completes when all
+## three lamps are found; it never holds a road back (CH2-001).
 ## on_complete is granted through GameState.grant_once("rw_" + step id, ...): exactly once, ever. When
 ## data/sources.gd REWARDS declares the same reward id, its items / flags must be identical (a test checks
 ## it): Game.complete_chapter_two() grants rw_ch2_feast from this file too, and whichever path runs first
@@ -100,7 +108,9 @@ const STEPS := [
 			{"type": "flag", "flag": "ch2_read_festival_map", "label": "Read the festival map"}],
 		"on_complete": {"give": {"pumpkin_seeds": 3, "sunflax_seeds": 2, "roseberry_seeds": 2},
 			"message": "A stallkeeper's seed pouch was left for whoever lit the arch."}},
-	{"id": "ch2_outer_lamps", "title": "Three Lamps, Three Roads", "target": "hr_conservatory", "target_area": REACH,
+	# The lamp search: in the lamp group (shown with the three roads, never holding them back). Its target is the
+	# Conservatory, the hub the three roads start from.
+	{"id": "ch2_outer_lamps", "title": "Find the Three Lamps", "group": "lamps", "target": "hr_conservatory", "target_area": REACH,
 		"skip_if_flag": "ch2_lamps_linked",
 		"text": "The festival map marks three sleeping lamps: one in the orchard, one at the quarry, one at the manor.",
 		"hint": "Open the map with {map}. The three roads start at the Conservatory; take them in any order.",
@@ -108,16 +118,18 @@ const STEPS := [
 			{"type": "flag", "flag": "ch2_found_orchard_lamp", "label": "Find the orchard lamp"},
 			{"type": "flag", "flag": "ch2_found_quarry_lamp", "label": "Find the quarry lamp"},
 			{"type": "flag", "flag": "ch2_found_manor_lamp", "label": "Find the manor lamp"}],
-		"on_complete": {"message": "Three lamps, three roads. Wake them in whatever order you like."}},
+		"on_complete": {"message": "All three festival lamps found. Wake any still sleeping, in whatever order you like."}},
 	{"id": "ch2_orchard", "title": "Pumpkins With Opinions", "group": "lamps", "target": "hr_orchard", "target_area": REACH,
 		"text": "Pumpkintide Orchard is overgrown and suspicious. Its garden lamp needs water, light and a little courage.",
 		"hint": "Send the irrigation water back to the beds. Pumpkins in the marked pockets are not all pumpkins.",
+		"hint_when": {"type": "flag", "flag": "ch2_found_orchard_lamp"},
 		"objectives": [{"type": "flag", "flag": "ch2_garden_lamp_lit", "label": "Light the garden lamp"}],
 		"on_complete": {"give": {"garden_seal": 1, "pumpkin_seeds": 3}, "flags": ["ch2_orchard_restored"],
 			"message": "The Garden Seal glows warm in your pouch. New recipes: carved pumpkins and pumpkin cooking."}},
 	{"id": "ch2_quarry", "title": "The Quarry's Pulse", "group": "lamps", "target": "hr_quarry", "target_area": REACH,
 		"text": "Ashbell Quarry rings with a slow, heavy pulse. Something large guards the lamp shelf.",
 		"hint": "The Quarry Warden guards the lamp. Mend the old winch to reach the upper terraces.",
+		"hint_when": {"type": "flag", "flag": "ch2_found_quarry_lamp"},
 		"objectives": [
 			{"type": "flag", "flag": "hr_warden_defeated", "label": "Calm the Quarry Warden", "display": true},
 			{"type": "flag", "flag": "ch2_winch_repaired", "label": "Mend the mineral winch", "display": true},
@@ -127,6 +139,7 @@ const STEPS := [
 	{"id": "ch2_manor", "title": "A Most Peculiar Invitation", "group": "lamps", "target": "hr_manor_grounds", "target_area": REACH,
 		"text": "Moonveil Manor's door stands open, candles lit, the invitation written in someone else's handwriting.",
 		"hint": "Candles and mirrors tell the truth in Moonveil Manor. Follow the light, not the invitation.",
+		"hint_when": {"type": "flag", "flag": "ch2_found_manor_lamp"},
 		"objectives": [{"type": "flag", "flag": "ch2_manor_lamp_lit", "label": "Light the manor lamp"}],
 		"on_complete": {"give": {"manor_seal": 1}, "flags": ["ch2_manor_restored"],
 			"message": "The Manor Seal is cool as moonlight. New tailoring patterns: Ribbon Witch and Velvet Vampire."}},
@@ -145,7 +158,7 @@ const STEPS := [
 	{"id": "ch2_service_gate", "title": "The Key Still Fits", "target": "hr_bellhouse", "target_area": REACH,
 		"skip_if_flag": "ch2_choir_defeated",
 		"text": "The Bellhouse stair ends at a service gate stamped with the old mine's mark. The Foreman's Key might remember it.",
-		"hint": "The Foreman's Key is in your key pouch ({inventory}). Using it here does not use it up.",
+		"hint": "The Foreman's Key is in your key pouch ({inventory}). Opening the gate with it does not use it up.",
 		"objectives": [{"type": "flag", "flag": "ch2_service_gate_open", "label": "Open the service gate with the Foreman's Key"}],
 		"on_complete": {"message": "The Foreman's Key turns once, then goes back into your pouch."}},
 	{"id": "ch2_true_signal", "title": "Hask's Rail", "target": "hw_rails", "target_area": WORKS,
@@ -181,7 +194,7 @@ const STEPS := [
 		"target": "hw_crossing", "target_area": WORKS, "skip_if_flag": "ch2_choir_defeated",
 		"text": "Pale threads span the bridge ahead. The Matron escaped the Ward's light, and she remembers you.",
 		"alt_text": "Pale roots choke the bridge ahead. The Hollow Mother escaped the Ward's light, and she remembers you.",
-		"hint": "Light, patience and a clear path out worked once. They will work again. The checkpoint is just behind you.",
+		"hint": "Light, patience and a clear path out worked once. They will work again. A checkpoint lantern waits just before the bridge.",
 		"objectives": [{"type": "flag", "flag": "ch2_crossing_cleared", "label": "Clear the crossing"}],
 		"on_complete": {"give": {"thread_veil": 1}, "message": "The crossing is clear. A pale veil drape is yours to hang at home, and your Heartseed stays in its stone."}},
 	{"id": "ch2_false_home", "title": "The House That Isn't", "target": "hw_porch", "target_area": WORKS,
@@ -198,7 +211,7 @@ const STEPS := [
 	{"id": "ch2_routes_restored", "title": "Lanterns on Every Road", "target": "hr_commons", "target_area": REACH,
 		"skip_if_flag": "chapter_two_complete",
 		"text": "The quiet below is quiet again. Up in the Reach, the festival lamps are waking along every road.",
-		"hint": "Take the refuge shortcut or the Bellhouse stair back up into Hallowmere Reach.",
+		"hint": "Ride the vault's bell-lift up to the Sunken Bellhouse, back in Hallowmere Reach. The refuge shortcut works too.",
 		"objectives": [{"type": "flag", "flag": "ch2_returned_to_reach", "label": "Return to Hallowmere Reach"}],
 		"on_complete": {"flags": ["ch2_trials_open"],
 			"message": "The festival roads are bright again. Old echoes stir, should you ever want a trial."}},

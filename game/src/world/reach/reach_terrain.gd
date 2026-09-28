@@ -24,6 +24,7 @@ extends RefCounted
 ##   each_in(center: Vector2, radius, fn: Callable(k, x, z, d)), flatten(center, flat_r, blend_r, height),
 ##   blend_to(center, r0, r1, height, strength), raise(center, radius, amount), set_water(x, z, level),
 ##   set_water_disc(center, radius, level), add_stone_disc(center, radius), tint_disc(center, r0, r1, color, amount),
+##   paint_rock_disc(center, radius, color) (steep ground in the disc is that rock colour, not the grey splat),
 ##   mark_path(points: Array[Vector2], half_width, strength).
 
 const Reach := preload("res://data/hallowmere_layout.gd")
@@ -37,6 +38,7 @@ const CHUNK := 32
 const NO_WATER := -1000.0
 const FAR := 999.0
 const PATH_EDGE := 1.3
+const GORGE_BEND := 13.0      # metres the brook's exit gorge swings west by the terrain's south edge
 
 # Autumn ground palette.
 const G_BASE := Color("a39c50")
@@ -65,6 +67,8 @@ var plaza_heights: Dictionary = {}     # plaza id -> float
 var ponds: Array = []                  # [[Vector2 centre, float radius, float level], ...] still water
 var stone_discs: Array = []            # [[Vector2 centre, float radius], ...] footsteps "stone"
 var tint_ops: Array = []               # [[centre, r0, r1, Color, amount], ...] applied by the colour pass
+var soft_rock: Array = []              # [[centre, r0, r1, keep], ...] carved banks that stay grassy (not rock)
+var rock_paint: Array = []             # [[centre, radius, Color], ...] steep ground painted this colour (not grey rock)
 var bellhouse_level := 0.0             # forecourt height of the Sunken Bellhouse
 var gen_ms := 0.0
 var times: Dictionary = {}
@@ -171,6 +175,8 @@ func generate_base() -> void:
 	ponds.clear()
 	stone_discs.clear()
 	tint_ops.clear()
+	soft_rock.clear()
+	rock_paint.clear()
 	plaza_heights.clear()
 	var steps := [_base_pass, _plaza_pass, _path_pass, _brook_pass, _bellhouse_pass]
 	var names := ["base", "plazas", "paths", "brook", "bellhouse"]
@@ -304,6 +310,16 @@ func tint_disc(center: Vector2, r0: float, r1: float, color: Color, amount: floa
 		tint_ops.append([center, r0, r1, color, clampf(amount, 0.0, 1.0)])
 
 
+## Steep ground inside the disc is painted `color` (its own rock, e.g. the quarry's copper stone) instead of the
+## region's grey rock splat; it stays bare (no grass). Recorded now, applied by the colour pass (clamped to the
+## shaping limit).
+func paint_rock_disc(center: Vector2, radius: float, color: Color) -> void:
+	if limit.z >= 0.0:
+		radius = minf(radius, maxf(limit.z - center.distance_to(Vector2(limit.x, limit.y)), 0.0))
+	if radius > 0.0:
+		rock_paint.append([center, radius, color])
+
+
 ## Paints a path weight along a polyline (Catmull-Rom smoothed); does not change heights.
 func mark_path(points: Array, half_width: float, strength: float = 1.0) -> void:
 	var curve := catmull_rom(points, 0.5)
@@ -383,6 +399,13 @@ func _path_pass() -> void:
 ## flowing downhill (running minimum), carved like the Woods stream.
 func _brook_pass() -> void:
 	var curve := catmull_rom(Reach.BROOK_POINTS, 0.75)
+	# Beyond the south wall the brook's gorge bends away west through the hills, so looking down the brook from
+	# the Commons ends on a hillside, never on the bare edge of the world (the playable part is unchanged).
+	for k in curve.size():
+		var cp := curve[k]
+		var bend := smooth(Reach.WALL_HALF_Z + 1.0, 127.0, cp.y)
+		if bend > 0.0:
+			curve[k] = Vector2(cp.x - bend * bend * GORGE_BEND, cp.y)
 	var levels := PackedFloat32Array()
 	levels.resize(curve.size())
 	var prev := 1e9
@@ -467,6 +490,8 @@ func _bellhouse_pass() -> void:
 	var depth: float = B["depth"]
 	var end_z: float = B["bottom_end_z"]
 	ponds.append([pc, pr, level])
+	# the basin's steep carved banks keep grass and earth colours instead of a bare, noisy rock patch
+	soft_rock.append([pc, pr + 5.0, pr + 8.0, 0.12])
 	each_in(pc, pr + 4.5, func(k: int, x: float, z: float, d: float) -> void:
 		if absf(x - sx) <= wall_outer + 0.6 and z <= top_z + 0.5:
 			return
@@ -526,6 +551,12 @@ func _normal_pass() -> void:
 			var n := Vector3(h[row + im] - h[row + ip], 2.0, h[jm + i] - h[jp + i]).normalized()
 			nrm[row + i] = n
 			rock[row + i] = smooth(0.8, 0.63, n.y)
+	for sr in soft_rock:
+		var keep := float(sr[3])
+		var r0 := float(sr[1])
+		var r1 := float(sr[2])
+		each_in(sr[0], r1, func(k: int, _x: float, _z: float, d: float) -> void:
+			rock[k] *= lerpf(keep, 1.0, smooth(r0, r1, d)))
 
 
 func _tint(center: Vector2, r0: float, r1: float, color: Color, amount: float, g_h: float, g_v: float, g_d: float) -> void:
@@ -607,6 +638,23 @@ func _color_pass() -> void:
 				if pd < 2.5:
 					var k := j * NX + i
 					shore[k] = maxf(shore[k], (1.0 - smooth(0.2, 2.5, pd)) * 0.8)
+	# Painted rock: per-sample paint weight + colour (only near the discs: cheap).
+	var paint_w := PackedFloat32Array()
+	var paint_c := PackedColorArray()
+	if not rock_paint.is_empty():
+		paint_w.resize(total)
+		paint_w.fill(0.0)
+		paint_c.resize(total)
+		for rp in rock_paint:
+			var rc: Color = rp[2]
+			var saved := limit
+			limit = Vector3(0.0, 0.0, -1.0)
+			each_in(rp[0], float(rp[1]), func(k: int, _x: float, _z: float, d: float) -> void:
+				var w := 1.0 - smooth(float(rp[1]) - 1.5, float(rp[1]), d)
+				if w > paint_w[k]:
+					paint_w[k] = w
+					paint_c[k] = rc)
+			limit = saved
 	splat.resize(total * 4)
 	for k in total:
 		var hh := h[k]
@@ -635,9 +683,14 @@ func _color_pass() -> void:
 			dens = 0.0
 		_dens[k] = dens
 		var si := k * 4
+		var rk_splat := rk
+		if not paint_w.is_empty() and paint_w[k] > 0.0 and rk > 0.2:
+			var pt2 := clampf((rk - 0.2) / 0.3, 0.0, 1.0) * paint_w[k]
+			col[k] = col[k].lerp(paint_c[k], pt2)
+			rk_splat = rk * (1.0 - paint_w[k])
 		splat[si] = int(clampf(pw, 0.0, 1.0) * 255.0)
 		splat[si + 1] = int(clampf(sand, 0.0, 1.0) * 255.0)
-		splat[si + 2] = int(clampf(rk, 0.0, 1.0) * 255.0)
+		splat[si + 2] = int(clampf(rk_splat, 0.0, 1.0) * 255.0)
 		splat[si + 3] = int(under * 255.0)
 		grass[si] = int(clampf(_dens[k], 0.0, 1.0) * 255.0)
 		grass[si + 1] = int(clampf(_gh[k], 0.0, 1.0) * 255.0)

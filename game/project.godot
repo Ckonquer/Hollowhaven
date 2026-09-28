@@ -64,6 +64,7 @@ ui_accept={
 3d_physics/layer_7="pickup"
 3d_physics/layer_8="trigger"
 3d_physics/layer_9="hitbox"
+3d_physics/layer_10="camera"
 
 [physics]
 

@@ -31,15 +31,22 @@ const HITSTOP_HEAVY := 0.06
 ## Areas whose threats scale with the horror intensity setting (underground: the Below and the Chapter Two
 ## underground areas, spec section 9). Surface, the Reach and interiors never scale.
 const INTENSITY_SCALED_AREAS := ["below", "tobin_annex", "hushed_works"]
+const GLANCE_NUDGE := 0.08               # m the wall-glance spark sits off the obstacle toward the swing
 
 static var _light_nodes: Array = []
 static var _light_frame: int = -1
+## Wall-glance sparks shown by player swings (melee) and where the last one was; read by tests.
+static var los_glances: int = 0
+static var last_los_glance: Variant = null
 
 
 ## Sphere/arc melee query. Hits every node of `target_groups` whose aim point lies within `reach`
 ## (+ the target's hit radius) and inside the horizontal arc around `forward`, with a clear line of
 ## sight (world|structure). Applies damage through the target's health, knockback if supported,
 ## impact feedback and a tiny hitstop. Returns the nodes that actually took damage.
+## A player swing (attacker in group "player") that lands on nothing because a wall stood between the
+## blade and an enemy (group "enemy") shows ONE silent glance spark where the ray met the obstacle
+## (QA CH2-005: a blow that silently vanishes reads as a bug). Visual only: no damage, sound, hint or hitstop.
 static func melee(attacker: Node3D, origin: Vector3, forward: Vector3, reach: float, arc_deg: float, damage: float, target_groups: Array, knockback: float) -> Array:
 	var hits: Array = []
 	var tree := Engine.get_main_loop() as SceneTree
@@ -57,6 +64,9 @@ static func melee(attacker: Node3D, origin: Vector3, forward: Vector3, reach: fl
 		space = attacker.get_world_3d().direct_space_state
 	var seen := {}
 	var heavy := false
+	var player_swing := attacker != null and is_instance_valid(attacker) and attacker.is_in_group("player")
+	var glance: Variant = null           # nearest obstacle point of an enemy dropped only for line of sight
+	var answered := false                # some target already gave feedback (hit or on_hit_blocked)
 	for g in target_groups:
 		for n in tree.get_nodes_in_group(String(g)):
 			if n == attacker or seen.has(n) or not (n is Node3D) or not is_instance_valid(n):
@@ -68,19 +78,26 @@ static func melee(attacker: Node3D, origin: Vector3, forward: Vector3, reach: fl
 			var aim := aim_point(t)
 			if not in_arc(origin, fwd, aim, reach + target_radius(t), arc_deg, MAX_VERTICAL_REACH):
 				continue
-			if space != null and not has_line_of_sight(space, origin, aim, [attacker, t]):
-				continue
+			if space != null:
+				var block: Variant = line_of_sight_block(space, origin, aim, [attacker, t])
+				if block != null:
+					if player_swing and t.is_in_group("enemy") and _alive_health(t) \
+							and (glance == null or origin.distance_to(block) < origin.distance_to(glance)):
+						glance = block
+					continue
 			var h := find_health(t)
 			if h == null:
 				continue
 			var dir := Vector3(aim.x - origin.x, 0.0, aim.z - origin.z)
 			dir = dir.normalized() if dir.length_squared() > 0.0001 else fwd
 			if not can_hit(t, attacker):
+				answered = true
 				if t.has_method("on_hit_blocked"):
 					t.on_hit_blocked(attacker, dir)
 				continue
 			var dealt: float = float(h.apply_damage(damage, attacker, dir))
 			if dealt <= 0.0:
+				answered = true
 				if t.has_method("on_hit_blocked"):
 					t.on_hit_blocked(attacker, dir)
 				continue
@@ -92,6 +109,8 @@ static func melee(attacker: Node3D, origin: Vector3, forward: Vector3, reach: fl
 			HitFx.impact(aim - dir * 0.25, dealt, col if col is Color else HitFx.DEFAULT_IMPACT)
 	if not hits.is_empty():
 		Events.hitstop.emit(HITSTOP_HEAVY if heavy else HITSTOP_LIGHT)
+	elif glance != null and not answered:
+		_glance_spark(glance, origin)
 	return hits
 
 
@@ -117,6 +136,21 @@ static func in_arc(origin: Vector3, forward: Vector3, point: Vector3, reach: flo
 static func has_line_of_sight(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3, exclude_nodes: Array = [], mask: int = LOS_MASK) -> bool:
 	if space == null:
 		return true
+	return space.intersect_ray(_los_query(from, to, exclude_nodes, mask)).is_empty()
+
+
+## The same ray as has_line_of_sight(), but returns WHERE it is blocked: the first obstacle point (Vector3), or
+## null when the line is clear (or there is no physics space).
+static func line_of_sight_block(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3, exclude_nodes: Array = [], mask: int = LOS_MASK) -> Variant:
+	if space == null:
+		return null
+	var hit: Dictionary = space.intersect_ray(_los_query(from, to, exclude_nodes, mask))
+	if hit.is_empty():
+		return null
+	return hit.get("position", to)
+
+
+static func _los_query(from: Vector3, to: Vector3, exclude_nodes: Array, mask: int) -> PhysicsRayQueryParameters3D:
 	var q := PhysicsRayQueryParameters3D.create(from, to, mask)
 	var ex: Array[RID] = []
 	for e in exclude_nodes:
@@ -124,7 +158,23 @@ static func has_line_of_sight(space: PhysicsDirectSpaceState3D, from: Vector3, t
 			ex.append((e as CollisionObject3D).get_rid())
 	q.exclude = ex
 	q.collide_with_areas = false
-	return space.intersect_ray(q).is_empty()
+	return q
+
+
+## Glance spark of a player blow stopped by a wall (see melee): HitFx.spark()'s burst WITHOUT its sound, nudged
+## off the surface toward the swing so it isn't buried in the wall. Counted for the tests (headless draws nothing).
+static func _glance_spark(at: Vector3, origin: Vector3) -> void:
+	var back := origin - at
+	var pos := at + back.normalized() * GLANCE_NUDGE if back.length_squared() > 0.0001 else at
+	los_glances += 1
+	last_los_glance = pos
+	HitFx.burst(pos, HitFx.SPARK_COLOR, 9, 4.5, 0.5, -12.0, 0.3, 80.0)
+
+
+## True when the node has a health component that is not dead (a real target, not scenery).
+static func _alive_health(t: Object) -> bool:
+	var h := find_health(t)
+	return h != null and not truthy(h.get("dead"))
 
 
 ## False when the target refuses hits from `attacker` right now (optional `can_be_hit_by(source) -> bool`,

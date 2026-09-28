@@ -12,6 +12,10 @@ extends Node3D
 ## ANCHOR SHE HOLDS flares - lit with the lantern (1.5 s kindle) or, once lit, stoked again after its readable
 ## cooldown (boss_brazier set_reusable) - the anchor is EXPOSED: she is burned off it, falls to the deck and is
 ## vulnerable for a long window. Lighting a brazier under an empty anchor is a wasted flare (a caption says so).
+## ...but only once she has COMMITTED this round (QA CH2-007; Rules "THE ENGAGEMENT RULE"): a pounce or delayed
+## pounce that dropped, or - phase 3 - her release once its sacs have opened. A flare under her anchor before
+## that CATCHES the anchor ("primed": it glows ember-warm, a caption + hint say so) and she is burned off it the
+## moment her next pounce lands (hit or miss) - so every phase shows its new attack before it can be skipped.
 ## Her kit, one readable action at a time (crossing/crossing_rules.gd has every number):
 ##   THREADS  (hazard set)  a floor mark shows where they will land (1.2 s), then cuttable threads (arachno-
 ##            phobia: pale veils/roots, deep_thread.gd) fall ACROSS HER lane either side of the guarded brazier.
@@ -31,11 +35,14 @@ extends Node3D
 ##            of any kind while a sac is pending or a minion lives (never together with the pounce).
 ## At most ONE hazard set (one cast of threads) + ONE committed attack. Every action has a recovery beat.
 ## Phases follow exposures: 1 (north lane) -> exposure -> 2 (she CHANGES SIDES: south, delayed pounce) ->
-## exposure -> 3 (north again, the release) -> ... Two or three exposures plus tuned damage end it: each flare
-## also scorches her (10% of max hp; 25% after the third, so she can never become a health sponge); an
-## exposure window can take at most 40% of her health, a stranded window 20%. A strong weapon can't skip the
-## rule: blows alone never take her below 60% before the first exposure or 25% before the second
-## (Rules.HP_FLOOR; at the floor a missed pounce leaves no opening and a hint points at the brazier).
+## exposure -> 3 (north again, the release) -> exposure -> ... Three exposures (one per phase) plus tuned damage
+## end it: each flare also scorches her (10% of max hp; 25% after the third, so she can never become a health
+## sponge); an exposure window can take at most 40% of her health, a stranded window 20%. A strong weapon can't
+## skip the rule and no exposure crosses more than one phase boundary: blows alone never take her below 60%
+## before the first exposure, 35% before the second or 20% before the third, and a flare's scorch never takes
+## her below the floor of its own exposure (Rules.HP_FLOOR / scorch_damage; at the floor a missed pounce leaves
+## no opening and a hint points at the brazier). Measured pacing (tests/unit/test_boss_crossing_pacing.gd, a
+## scripted Krystal with the copper sword): see that suite's header.
 ## DEFEAT = RETREAT: at 0 hp the victory is COMMITTED FIRST - bar hidden, boss_encounter_changed(false) and
 ## Events.boss_defeated("crossing_matron") exactly once (the arena's listener grants rw_ch2_crossing -> flag
 ## ch2_crossing_cleared, opens the way on, shuts the old service gate and saves) - and only then does she flee
@@ -46,10 +53,11 @@ extends Node3D
 ##
 ## RESET POLICY (one rule, the same as the Chapter One Matron): Krystal falls, or leaves the crossing (the
 ## arena stands the encounter down): the ACTIVE encounter resets cleanly - back up on a line anchor of her
-## current side, dormant, bar hidden, encounter event off; every thread, mark, sac and minion removed. Her
-## wounds, the exposures made (phase, side) and lit braziers are kept (lit braziers stay stokable: never a dead
-## end). Reloading / leaving the Works: nothing unfinished is saved - a fresh encounter. Won progression is
-## never touched: once ch2_crossing_cleared is set she never comes back. The fight never (re)starts while
+## current side, dormant, bar hidden, encounter event off; every thread, mark, sac and minion removed, and the
+## round starts over (a caught anchor lets go, her commitment is forgotten: the retry shows the phase's attack
+## again before the light can burn her). Her wounds, the exposures made (phase, side) and lit braziers are kept
+## (lit braziers stay stokable: never a dead end). Reloading / leaving the Works: nothing unfinished is saved -
+## a fresh encounter. Won progression is never touched: once ch2_crossing_cleared is set she never comes back. The fight never (re)starts while
 ## Krystal is down; a blow that knocks her out ends that pounce at once (the reset already ran inside it).
 ## Comfort: Settings timing_assist stretches warnings, openings and recovery beats x1.5; high_visibility_cues
 ## adds bold outlines (pounce mark, thread landing marks; landed threads via deep_thread); reduce_flashing keeps
@@ -92,6 +100,8 @@ const THREAD_DONE_FREE := 1.0     # a burned / expired / dissolved thread node i
 const RETREAT_SHRIEK := 0.9
 const RETREAT_UP := 0.9
 const RETREAT_SPEED := 9.0
+const RETREAT_RUN_MAX := 3.0    # the ceiling run never takes longer (she hurries from the far end of the bridge:
+                                # since QA CH2-007 the last window is often where her pounce landed, not under an anchor)
 const RETREAT_IN := 0.6
 const RETREAT_WALL_GAP := 2.8   # she runs along the ceiling to this far in front of the crack, then slips in
 const RETREAT_SHRINK := 0.22    # she has withdrawn to this size by the route's mouth (the 4.5 m Hollow Mother
@@ -136,7 +146,7 @@ var require_floor := true            # pounce landings need a floor under them (
 var auto_start := false              # setup "alert": start the fight as soon as she is in the tree
 ## Counters for tests / QA telemetry.
 var stats := {"casts": 0, "threads": 0, "pounces": 0, "delayed": 0, "hits": 0, "final_tells": 0, "feints": 0,
-	"releases": 0, "exposures": 0, "wasted_flares": 0, "resets": 0, "defeat_events": 0}
+	"releases": 0, "exposures": 0, "wasted_flares": 0, "primed": 0, "resets": 0, "defeat_events": 0}
 
 var _state_len: float = 0.0
 var _from := Transform3D.IDENTITY
@@ -149,6 +159,11 @@ var _delayed: Dictionary = {}
 var _final_done := false
 var _feint_done := false
 var _pending_exposure := false
+## This round (since the last exposure / reset; Rules "THE ENGAGEMENT RULE"): a pounce of hers has dropped,
+## her release has begun, and a flare has caught her anchor before she committed.
+var _engaged := false
+var _released_this_round := false
+var _primed := false
 var _window_damage: float = 0.0
 var _window_cap: float = 0.0
 var _scorching := false
@@ -349,6 +364,17 @@ func held_anchor() -> Vector3:
 	return _anchor_of(held_line)
 
 
+## Has she committed this round (Rules "THE ENGAGEMENT RULE")? Only then does a flare under her anchor burn
+## her off it at once: a pounce of hers dropped, or her release's sacs have all opened.
+func is_engaged() -> bool:
+	return _engaged or (_released_this_round and not sacs_pending())
+
+
+## A flare caught her anchor before she committed: her next pounce's landing exposes her.
+func is_primed() -> bool:
+	return _primed
+
+
 func current_landing() -> Vector3:
 	return _landing
 
@@ -398,7 +424,7 @@ func uses_shade() -> bool:
 ## Seconds of the retreat presentation after the victory was committed (the arena may time its gate by it).
 func retreat_seconds() -> float:
 	var path := retreat_path()
-	return RETREAT_SHRIEK + RETREAT_UP + _leg_time(path[0], path[1], 0.6) + _leg_time(path[1], path[2], 0.4) + RETREAT_IN
+	return RETREAT_SHRIEK + RETREAT_UP + _leg_time(path[0], path[1], 0.6, RETREAT_RUN_MAX) + _leg_time(path[1], path[2], 0.4) + RETREAT_IN
 
 
 ## The retreat's waypoints (her origin): [up under the ceiling where she is, over the old service gate under
@@ -423,8 +449,8 @@ func _retreat_hang() -> float:
 	return 0.4
 
 
-static func _leg_time(a: Vector3, b: Vector3, min_t: float) -> float:
-	return maxf(a.distance_to(b) / RETREAT_SPEED, min_t)
+static func _leg_time(a: Vector3, b: Vector3, min_t: float, max_t: float = INF) -> float:
+	return clampf(a.distance_to(b) / RETREAT_SPEED, min_t, maxf(max_t, min_t))
 
 
 ## Spec section 9: companion attacks and projectiles respect this. True only in an exposed / stranded window,
@@ -496,8 +522,8 @@ func start_fight() -> void:
 	_director_hold(true)
 	_snd("shriek", global_position, -4.0)
 	Events.caption.emit(_caption("intro"))
-	Events.hint.emit("boss_crossing_intro", "She holds one ceiling anchor at a time. Light the line-brazier UNDER HER ANCHOR with {interact} to burn her off it." if not _alt
-		else "She floats beneath one stone seal at a time. Light the line-brazier UNDER HER SEAL with {interact} to break her hold.")
+	Events.hint.emit("boss_crossing_intro", "She holds one ceiling anchor at a time and clings on until she pounces. Light the line-brazier UNDER HER ANCHOR with {interact}: once she has pounced, the light burns her off it." if not _alt
+		else "She floats beneath one stone seal at a time and holds on until she sinks down at you. Light the line-brazier UNDER HER SEAL with {interact}: once she has sunk down, the light breaks her hold.")
 	if _retry and is_story():
 		Events.hint.emit("boss_crossing_retry", "She keeps her wounds, and lit braziers stay lit, while you stay in the Works. Leaving the Works lets her recover fully.")
 	_notice_companions()
@@ -510,6 +536,7 @@ func reset_fight() -> void:
 	if _gone or _defeat_started or not _initialized:
 		return
 	_pending_exposure = false
+	_end_round()
 	_step = 0
 	_away_t = 0.0
 	_release_done = false
@@ -546,6 +573,8 @@ func tick(delta: float) -> void:
 	var check := _check_t <= 0.0
 	if check:
 		_check_t = 0.2
+		if _primed and _marks != null:
+			_marks.call("set_exposed", held_line)     # a caught anchor keeps glowing until she is burned off it
 	var p := _player()
 	_tick_threads(delta)
 	if _release != null:
@@ -1006,6 +1035,7 @@ func final_tell_shown() -> bool:
 
 
 func _begin_drop() -> void:
+	_engaged = true              # she has let go: she committed this round (Rules "THE ENGAGEMENT RULE")
 	_from = global_transform
 	_to = _ground_pose(_landing, _player_pos())
 	_mark.call("set_progress", 1.0)
@@ -1039,6 +1069,10 @@ func _land_pounce() -> void:
 	_pounce_delayed = false
 	if _pending_exposure:
 		_pending_exposure = false
+		_land_exposed()
+	elif _primed:
+		# The light caught her anchor before she committed: she can't climb back to it (hit or miss).
+		_count_exposure()
 		_land_exposed()
 	elif hit:
 		_enter("rebound", Rules.T_REBOUND)
@@ -1095,6 +1129,7 @@ func _begin_release() -> bool:
 	if spots.is_empty():
 		return false
 	_release_done = true
+	_released_this_round = true  # her phase-3 commitment once the sacs have opened (is_engaged)
 	var params := {"damage_scale": float(Rules.MINION_DAMAGE[_i()]), "speed_scale": float(Rules.MINION_SPEED[_i()])}
 	_release.call("begin", spots, _t(float(Rules.SAC_WARN[_i()])), n, params)
 	_release.set("released_count", 0)
@@ -1109,7 +1144,8 @@ func _begin_release() -> bool:
 
 # --- Exposure ---------------------------------------------------------------------------------------------------------
 
-## A line-brazier flared (lit, or stoked again). Under the anchor she holds: EXPOSED. Anywhere else: wasted.
+## A line-brazier flared (lit, or stoked again). Under the anchor she holds: EXPOSED - once she has committed
+## this round (is_engaged); before that the light CATCHES the anchor (_prime_anchor). Anywhere else: wasted.
 func _on_line_fired(line: int, how: String) -> void:
 	if _gone or _defeat_started or not fight_started:
 		return
@@ -1131,6 +1167,9 @@ func _on_line_fired(line: int, how: String) -> void:
 			_count_exposure()
 			_land_exposed()
 		_:
+			if not is_engaged():
+				_prime_anchor()
+				return
 			_count_exposure()
 			_from = global_transform
 			var land := Rules.scorch_landing(global_position, bridge, rail, deck_y, _brazier_positions())
@@ -1138,7 +1177,32 @@ func _on_line_fired(line: int, how: String) -> void:
 			_enter("scorch_fall", Rules.T_SCORCH_FALL)
 
 
+## The light caught her anchor before she committed: it glows (anchor_marks' ember, kept alive by tick) and her
+## next pounce's landing exposes her (_land_pounce). Nothing else changes - no free damage, no skipped attack.
+func _prime_anchor() -> void:
+	_primed = true
+	stats["primed"] = int(stats["primed"]) + 1
+	if _marks != null:
+		_marks.call("set_exposed", held_line)
+	_snd("shriek", global_position, -12.0)
+	Events.caption.emit(_caption("primed"))
+	if sacs_pending() or minions_alive() > 0:
+		Events.hint.emit("boss_crossing_primed_brood", "The light has caught her anchor, but she won't let go while her brood is out. Clear them - her next pounce can't bring her back up to a burning anchor." if not _alt
+			else "The light has caught her seal, but she won't let go while her pale sprouts are out. Clear them - after her next drop she can't rise back to a burning seal.")
+	else:
+		Events.hint.emit("boss_crossing_primed", "The light has caught her anchor, but she clings on until she pounces. Dodge her next pounce - she can't climb back to a burning anchor!" if not _alt
+			else "The light has caught her seal, but she holds on until she sinks down. Dodge her next drop - she can't rise back to a burning seal!")
+
+
+## A new round (an exposure made, or the encounter reset): she has not committed yet and holds her anchor fast.
+func _end_round() -> void:
+	_engaged = false
+	_released_this_round = false
+	_primed = false
+
+
 func _count_exposure() -> void:
+	_end_round()
 	exposures += 1
 	stats["exposures"] = exposures
 	_line_exposures[held_line] = int(_line_exposures.get(held_line, 0)) + 1
@@ -1164,8 +1228,9 @@ func _land_exposed() -> void:
 	_enter("exposed", _t(float(Rules.T_EXPOSED[_i()])))
 	Events.hint.emit("boss_crossing_exposed", "The light burned her off the anchor! Strike now with {attack}!" if not _alt
 		else "The light broke her hold! Strike now with {attack}!")
-	# The flare scorches her too (never a health sponge). Not Krystal's blow: no window accounting.
-	var scorch: float = float(health.max_hp) * Rules.scorch_fraction(exposures)
+	# The flare scorches her too (never a health sponge) - never past the floor of this exposure (Rules
+	# scorch_damage: a flare can't skip a phase either). Not Krystal's blow: no window accounting.
+	var scorch := Rules.scorch_damage(float(health.max_hp), float(health.hp), exposures, hp_floor())
 	_scorching = true
 	health.damage_taken_mult = 1.0
 	health.apply_damage(scorch, null, Vector3.ZERO)
@@ -1282,7 +1347,7 @@ func _begin_defeat() -> void:
 		tw.tween_interval(RETREAT_SHRIEK)
 		tw.tween_callback(_retreat_lift.bind(path[0]))
 		tw.tween_property(self, "global_position", path[0], RETREAT_UP).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		tw.tween_property(self, "global_position", path[1], _leg_time(path[0], path[1], 0.6)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(self, "global_position", path[1], _leg_time(path[0], path[1], 0.6, RETREAT_RUN_MAX)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		tw.tween_callback(_retreat_wall)
 		var down := _leg_time(path[1], path[2], 0.4)
 		tw.tween_property(self, "global_position", path[2], down).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
@@ -1756,6 +1821,8 @@ func _caption(kind: String) -> String:
 			return "[pale pods on the bridge begin to tremble]" if s else "[egg sacs on the bridge begin to shake]"
 		"wrong":
 			return "[the light flares under an empty seal]" if s else "[the light flares under an empty anchor]"
+		"primed":
+			return "[the light catches her seal - she holds on]" if s else "[the light catches her anchor - she clings on]"
 		"defeat":
 			return "[the Hollow Mother wails and withdraws past the old service gate]" if s else "[the Matron shrieks and flees for the old service gate]"
 	return ""

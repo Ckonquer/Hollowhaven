@@ -243,8 +243,8 @@ const ENEMIES := {
 				"alt_tell": "Pale roots are cast across one route. Cut them or burn them at a line-brazier."}],
 		"drops": [],
 		"sound": "weaver", "alt_sound": "shade", "voice": "crossing_matron", "alt_voice": "hollow_mother", "area": "hushed_works", "areas": ["hushed_works", "echo_trial"], "zones": ["hw_crossing", "trial"],
-		"desc": "The escaped Matron guards the service bridge. Light the line-braziers and clear the threads to expose her anchors. Blows alone can't drive her off until the light has burned her twice.",
-		"alt_desc": "The Hollow Mother floats between old stone seals. Light the line-braziers and clear the pale roots to expose her. Blows alone can't drive her off until the light has burned her twice.",
+		"desc": "The escaped Matron guards the service bridge. Light the line-braziers and clear the threads to expose her anchors. Blows alone can't drive her off until the light has burned her three times, once in each phase.",
+		"alt_desc": "The Hollow Mother floats between old stone seals. Light the line-braziers and clear the pale roots to expose her. Blows alone can't drive her off until the light has burned her three times, once in each phase.",
 	},
 	"borrowed_choir": {
 		"name": "The Borrowed Choir", "alt_name": "",

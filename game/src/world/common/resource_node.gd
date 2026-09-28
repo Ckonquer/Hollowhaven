@@ -301,6 +301,13 @@ func _build_visual() -> void:
 	_visual_scale = _visual.scale
 
 
+## The NodeVisuals id this node was set up with ("oak", "blossom", ...); "" for a custom Node3D visual (every
+## Hallowmere Reach tree / stick / tuft). Never String() on the param itself: an Object has no String constructor.
+func _visual_id() -> String:
+	var v: Variant = params.get("visual", "")
+	return String(v) if v is String or v is StringName else ""
+
+
 func _meta(key: String) -> Variant:
 	if _visual != null and _visual.has_meta(key):
 		return _visual.get_meta(key)
@@ -567,10 +574,7 @@ func _apply_depleted(animate: bool, dir: Vector3) -> void:
 				_anim_tw = create_tween()
 				_anim_tw.tween_property(_visual, "scale", _visual_scale * Vector3(1.18, 0.72, 1.18), 0.07)
 				_anim_tw.tween_property(_visual, "scale", _visual_scale * 0.01, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-				_anim_tw.tween_callback(func() -> void:
-					_visual.visible = false
-					_visual.scale = _visual_scale
-					_busy = false)
+				_anim_tw.tween_callback(_settle_depleted)
 			else:
 				_visual.visible = false
 	_check_t = 0.0
@@ -597,7 +601,7 @@ func _fell(animate: bool, dir: Vector3) -> void:
 	axis = (_visual.global_transform.basis.inverse() * axis.normalized()).normalized()
 	var fall := deg_to_rad(86.0)
 	var fx_h := float(_meta("fx_height"))
-	var leaf_fx := "blossom" if String(params.get("visual", "")) == "blossom" else "leaves"
+	var leaf_fx := "blossom" if _visual_id() == "blossom" else "leaves"
 	var set_fall := func(a: float) -> void:
 		if is_instance_valid(top):
 			top.transform.basis = Basis(axis, a)
@@ -614,10 +618,25 @@ func _fell(animate: bool, dir: Vector3) -> void:
 	_anim_tw.tween_property(top, "scale", Vector3.ONE * 0.02, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	_anim_tw.tween_callback(func() -> void:
 		Fx.burst(get_parent(), global_position + dir * 2.0 + Vector3.UP * 0.4, "dust", 0.8)
-		top.visible = false
-		top.scale = Vector3.ONE
-		top.transform.basis = Basis()
-		_busy = false)
+		_settle_depleted())
+
+
+## The last step of a depletion animation: the depleted look it ends in (a fallen tree's top hidden and reset,
+## other kinds' visual hidden at its rest scale) and `_busy` cleared. The respawn check also calls it when an
+## animation died before this step, so a node can never stay busy (and never respawn).
+func _settle_depleted() -> void:
+	_busy = false
+	if _visual == null:
+		return
+	if base_kind == "tree":
+		var top := _visual.get_node_or_null("Top") as Node3D
+		if top != null:
+			top.visible = false
+			top.scale = Vector3.ONE
+			top.transform.basis = Basis()
+	elif base_kind != "bush":
+		_visual.visible = false
+		_visual.scale = _visual_scale
 
 
 ## Brings the node back (respawn). animate = grow in.
@@ -670,6 +689,8 @@ func _process(delta: float) -> void:
 		set_process(false)
 		return
 	_check_t += delta
+	if _busy and (_anim_tw == null or not _anim_tw.is_valid()):
+		_settle_depleted()   # the depletion animation died before its last step (killed / aborted): never wait on it
 	if _check_t < RESPAWN_CHECK_SECONDS or _busy:
 		return
 	_check_t = 0.0
@@ -713,7 +734,7 @@ func _hit_feedback(dir: Vector3, final_hit: bool) -> void:
 	if hs != "":
 		Audio.play_3d(hs, global_position + Vector3.UP * 0.8, -2.0)
 	var fx_kind := String(params.get("fx", def["fx"]))
-	if base_kind == "tree" and String(params.get("visual", "")) == "blossom":
+	if base_kind == "tree" and _visual_id() == "blossom":
 		fx_kind = "blossom"
 	var fx_h := float(_meta("fx_height")) * scale.y
 	if base_kind == "tree":

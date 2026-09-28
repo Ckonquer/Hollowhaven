@@ -4,7 +4,9 @@ extends RefCounted
 ##   * Tobin's side door: a small timbered adit set into the mine cliff 6.8 m east of the legacy mine mouth
 ##     (between two of the legacy cliff-foot boulders, its front 2.2 m out on the apron) -> tobin_annex /
 ##     annex_entry. Jammed until the mine mouth's rubble is cleared (flag mine_opened). Spawn "annex_door"
-##     2.2 m in front of it, facing out onto the apron.
+##     5.6 m in front of it (7.8 m out on the apron, a clear walk of a few steps back to the door), facing out
+##     onto the apron: far enough out that the arrival camera behind her frames the adit instead of ending in
+##     its door leaf, name plate or the cliff (tests/unit/test_camera_spawn_clearance.gd).
 ##   * The surface end of the annex shortcut hatch: an iron hatch in the ground on the west side of the apron
 ##     (bolted from below until ta_hatch_open; then it leads down to annex_hatch_below). Spawn "annex_hatch"
 ##     beside it, facing the mine path.
@@ -22,7 +24,7 @@ const DOOR_SPAWN := "annex_door"
 const HATCH_SPAWN := "annex_hatch"
 ## Sites in the mine entrance frame's local (x, z): see the header.
 const DOOR_LOCAL := Vector2(6.8, 2.2)
-const DOOR_SPAWN_LOCAL := Vector2(6.8, 4.4)
+const DOOR_SPAWN_LOCAL := Vector2(6.8, 7.8)
 const HATCH_LOCAL := Vector2(-7.8, 3.6)
 const HATCH_SPAWN_LOCAL := Vector2(-6.1, 4.9)
 const DOOR_CLEAR_RADIUS := 2.6      # grass cleared in front of the door

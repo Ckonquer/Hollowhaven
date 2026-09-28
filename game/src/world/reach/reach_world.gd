@@ -41,6 +41,7 @@ const ArchScript := preload("res://src/world/common/lantern_arch.gd")
 const WaygateScript := preload("res://src/world/surface/waygate.gd")
 const AreaExit := preload("res://src/world/areas_ch2/area_exit.gd")
 const ResourceNode := preload("res://src/world/common/resource_node.gd")
+const WestArt := preload("res://src/world/reach/west/west_art.gd")
 
 const SPAWN_LIFT := 0.08
 const ORIGIN := Vector2(-160.0, -128.0)
@@ -49,6 +50,7 @@ const SAMPLES := Vector2(321.0, 257.0)
 const SKY_TINT := Color(1.07, 0.87, 1.02, 0.6)
 const SUN_TINT := Color(1.0, 0.72, 0.4, 0.35)
 const REFUGE_FLAG := "ch2_refuge_shortcut"
+const LOT_EARTH := Color("a88a5e")
 ## Story module C9's region dressing (optional; see _build_story_dressing).
 const STORY_DRESSING := "res://src/world/story_ch2/reach_dressing.gd"
 
@@ -100,6 +102,8 @@ func _ready() -> void:
 	terrain = TerrainScript.new()
 	terrain.generate_base()
 	Districts.shape_all(terrain, districts)
+	# the Commons cottage lot: packed earth inside its footing outline (the grass is cleared there as well)
+	terrain.tint_disc(Reach.OUTPOST_BUILD_AREA["center"], 2.2, 3.5, LOT_EARTH, 0.6)
 	terrain.finish()
 	_mark("terrain_gen")
 	build_times["terrain_detail"] = terrain.times
@@ -209,6 +213,8 @@ func _clear_set_piece_grass() -> void:
 	var fc: Vector2 = Reach.BELLHOUSE["forecourt"]
 	terrain.clear_grass(fc.x, fc.y, 6.0)
 	terrain.clear_grass(Reach.POINTS["refuge_hatch"].x, Reach.POINTS["refuge_hatch"].y, 1.8)
+	var lot: Vector2 = Reach.OUTPOST_BUILD_AREA["center"]
+	terrain.clear_grass(lot.x, lot.y, 3.6)
 	for f in district_footprints:
 		terrain.clear_grass(f[0].x, f[0].y, float(f[1]))
 
@@ -586,6 +592,8 @@ func _process(delta: float) -> void:
 
 func _update_daylight() -> void:
 	var dl: float = float(sky.get("daylight")) if sky != null else 1.0
+	# carved pumpkin faces (dark cuts by day, warm glows at night) and candle halos share one day/night signal
+	WestArt.set_daylight(dl)
 	if commons != null:
 		commons.set_daylight(dl)
 	if conservatory != null:

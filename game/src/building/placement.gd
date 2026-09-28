@@ -13,6 +13,11 @@ extends RefCounted
 ## Edge keys are Vector3i(k, m, dir): dir 0 spans x in [2k, 2k+2] at z = 2m, dir 1 spans z in [2m, 2m+2]
 ## at x = 2k. Cell keys are Vector2i(x, z) for the 1 m cell [x, x+1] x [z, z+1].
 ##
+## Wall decor (Chapter Two, data `mount: "wall"`): a 1x1 piece whose back edge must lie on a 2 m wall line with an
+## edge piece of its storey that it fits (mount_on / panel kinds; mount_info), e.g. no gothic trim across a window
+## and nothing in a doorway. mount_snap() puts it on the nearest wall, turned away from it; a wall with decor on it
+## can't be taken down (build_ops.gd). Window variants (curtain pair, centred flower box) come from mount_info's dir.
+##
 ## Storeys (Chapter Two): a structure record's data.level (absent = 0; upper floors are always 1). Level 0
 ## keeps the legacy occupancy keys byte-identical ("floor", "edge", ...); level n uses "<layer>@n". An upper
 ## floor tile sits LEVEL_HEIGHT above the base of what holds it up: a full-height wall/window/doorway on one
@@ -77,6 +82,21 @@ const MSG_STAIR_ROOF := "A roof is in the way of the stairs"
 const MSG_ROOF_OVER_UPPER := "There's an upper floor here: roofs go on the walls upstairs"
 const MSG_UPPER_UNDER_ROOF := "There's a roof here. Take it down to build upstairs"
 const MSG_STAIR_HEIGHT := "The stairs wouldn't reach that floor: the ground here is too uneven"
+const MSG_MOUNT := "This hangs on a wall. Point at a wall"
+const MSG_MOUNT_PANEL := "That doesn't fit on a %s"
+const MSG_MOUNT_OWN_BOX := "This window already has its own flower box on this side"
+const MSG_MOUNT_TAKEN := "The %s already hangs on this window"
+
+## Wall-mounted decor (data `mount: "wall"`, see data/structures.gd): the back of its 1 m cell must lie on a wall
+## line with a panel of its storey there. The wall face (plank front) is MOUNT_FACE from the grid line, so a
+## mount model's back sits at MOUNT_BACK in its cell (cell centre = origin, back edge at z = -0.5).
+const MOUNT_FACE := 0.08
+const MOUNT_BACK := -0.5 + MOUNT_FACE
+const MOUNT_SNAP := 0.95             # a cursor this close to a wall line snaps wall decor onto that wall
+const MOUNT_DEFAULT_ON := ["wall"]
+## Chapter One edge pieces as mount panels (their data entries never change; new edge pieces say `panel`).
+const LEGACY_PANELS := {"wood_wall": "wall", "wood_window": "window", "wood_doorway": "door"}
+const PANEL_NAMES := {"wall": "wall", "window": "window", "arch": "arched window", "door": "doorway", "half": "half wall"}
 
 
 # --- Basics -------------------------------------------------------------------------------------
@@ -587,6 +607,180 @@ static func upper_rest_reason(def: Dictionary, fp: Dictionary, ctx: Dictionary) 
 	return ""
 
 
+# --- Wall-mounted decor ----------------------------------------------------------------------------------
+
+static func is_wall_mount(def: Dictionary) -> bool:
+	return String(def.get("mount", "")) == "wall"
+
+
+## Mount panel kind of an edge piece ("" = nothing hangs on it, e.g. a railing).
+static func panel_of(structure_id: String) -> String:
+	var d := def_of(structure_id)
+	if d.has("panel"):
+		return String(d["panel"])
+	return String(LEGACY_PANELS.get(structure_id, ""))
+
+
+static func mount_accepts(def: Dictionary) -> Array:
+	var on: Variant = def.get("mount_on", MOUNT_DEFAULT_ON)
+	return on if on is Array else MOUNT_DEFAULT_ON
+
+
+## The wall edge behind a 1x1 mount footprint: {"edge": Vector3i, "side": 1 (the piece hangs on the +Z / +X side
+## of the line) or -1, "cell": Vector2i, "sibling": Vector2i (the other cell of the same 2 m panel, same side),
+## "toward": Vector3 (world direction from the cell centre to the panel centre)}, or {} when the back edge is not
+## on a 2 m wall line. Rot 0 = back toward -Z, 90 = -X, 180 = +Z, 270 = +X (the model's local -Z).
+static func mount_edge(fp: Dictionary) -> Dictionary:
+	var cells: Array = fp.get("cells", [])
+	if cells.size() != 1:
+		return {}
+	var c: Vector2i = cells[0]
+	var rot := int(fp.get("rot", 0))
+	if rot == 0 or rot == 180:
+		var line := c.y if rot == 0 else c.y + 1
+		if posmod(line, 2) != 0:
+			return {}
+		var k := floori(float(c.x) / TILE)
+		var sib := Vector2i(k * 2 + (1 if c.x == k * 2 else 0), c.y)
+		return {"edge": Vector3i(k, line / 2, 0), "side": 1 if rot == 0 else -1, "cell": c, "sibling": sib,
+			"toward": Vector3(signf(float(k * 2 + 1) - (float(c.x) + 0.5)), 0.0, 0.0)}
+	var line2 := c.x if rot == 90 else c.x + 1
+	if posmod(line2, 2) != 0:
+		return {}
+	var m := floori(float(c.y) / TILE)
+	var sib2 := Vector2i(c.x, m * 2 + (1 if c.y == m * 2 else 0))
+	return {"edge": Vector3i(line2 / 2, m, 1), "side": 1 if rot == 90 else -1, "cell": c, "sibling": sib2,
+		"toward": Vector3(0.0, 0.0, signf(float(m * 2 + 1) - (float(c.y) + 0.5)))}
+
+
+## Which face of an edge record looks toward +Z (dir 0) / +X (dir 1): 1 when its model's front (+Z) does.
+static func _front_side(rec: Dictionary) -> int:
+	var r := posmod(int(roundf(float(rec.get("rot", 0.0)) / 90.0)) * 90, 360)
+	return 1 if (r == 0 or r == 90) else -1
+
+
+## Mount check for a wall piece at `fp` (its storey = fp.level): {"reason": "" (it hangs on a panel it accepts)
+## or the refusal, "blocker": uid, "panel": kind, "dir": the model's panel-centre direction in local x (-1/1;
+## 0 on plain walls or for pieces without mount_centre/mount_pair), "wall": wall uid}. Non-mount pieces: reason "".
+static func mount_info(structure_id: String, def: Dictionary, fp: Dictionary, ctx: Dictionary) -> Dictionary:
+	var out := {"reason": "", "blocker": "", "panel": "", "dir": 0, "wall": ""}
+	if not is_wall_mount(def):
+		return out
+	var me := mount_edge(fp)
+	if me.is_empty():
+		out["reason"] = MSG_MOUNT
+		return out
+	var lv := int(fp.get("level", 0))
+	var occ := _occupancy(ctx)
+	var recs := _records(ctx)
+	var edges: Dictionary = occ.get(layer_key("edge", lv), {})
+	var e: Vector3i = me["edge"]
+	if not edges.has(e) or not recs.has(edges[e]):
+		out["reason"] = MSG_MOUNT
+		return out
+	var wuid := String(edges[e])
+	var wrec: Dictionary = recs[wuid]
+	var wid := String(wrec.get("id", ""))
+	var panel := panel_of(wid)
+	out["wall"] = wuid
+	out["panel"] = panel
+	if panel == "":
+		out["reason"] = MSG_MOUNT
+		return out
+	if not mount_accepts(def).has(panel):
+		out["reason"] = MSG_MOUNT_PANEL % String(PANEL_NAMES.get(panel, panel))
+		return out
+	if bool(def.get("sill", false)) and wid == "wood_window" and int(me["side"]) == _front_side(wrec):
+		out["reason"] = MSG_MOUNT_OWN_BOX
+		return out
+	var windowed := panel == "window" or panel == "arch"
+	if windowed and (bool(def.get("mount_centre", false)) or bool(def.get("mount_pair", false))):
+		var rot := int(fp.get("rot", 0))
+		var local_x := Vector3(cos(deg_to_rad(float(rot))), 0.0, -sin(deg_to_rad(float(rot))))
+		out["dir"] = int(roundf((me["toward"] as Vector3).dot(local_x)))
+	if windowed and bool(def.get("mount_centre", false)):
+		# Centred on the window: one per window side (the other half of the panel must not hold another).
+		var objs: Dictionary = occ.get(layer_key("object", lv), {})
+		var sib: Vector2i = me["sibling"]
+		if objs.has(sib) and recs.has(objs[sib]):
+			var other: Dictionary = recs[objs[sib]]
+			var odef := def_of(String(other.get("id", "")))
+			if bool(odef.get("mount_centre", false)):
+				var ofp := record_footprint(other)
+				var ome := mount_edge(ofp)
+				if not ome.is_empty() and ome["edge"] == e and int(ome["side"]) == int(me["side"]):
+					out["reason"] = MSG_MOUNT_TAKEN % ItemDB.structure_display_name(String(other.get("id", "")))
+					out["blocker"] = String(objs[sib])
+	return out
+
+
+## The model option for a saved wall piece: its "dir" toward the window centre (0 = none / not on a window).
+static func mount_dir_of(rec: Dictionary, structures: Dictionary) -> int:
+	var sid := String(rec.get("id", ""))
+	var def := def_of(sid)
+	if not is_wall_mount(def):
+		return 0
+	var ctx := {"structures": structures, "area_id": String(rec.get("area", "surface"))}
+	var info := mount_info(sid, def, record_footprint(rec), ctx)
+	return int(info["dir"]) if String(info["reason"]) == "" else 0
+
+
+## Snaps wall decor onto the nearest wall line (with an edge piece of the cursor's storey) within MOUNT_SNAP of
+## `point`: the cell touching the wall on the cursor's side, turned so its back is against the wall.
+## {"pos": Vector3 (cell centre, y = point.y), "rot": int} or {} when no wall is near.
+static func mount_snap(point: Vector3, ctx: Dictionary) -> Dictionary:
+	var lv := clampi(int(ctx.get("level", 0)), 0, MAX_LEVEL)
+	var edges: Dictionary = _occupancy(ctx).get(layer_key("edge", lv), {})
+	if edges.is_empty():
+		return {}
+	var recs := _records(ctx)
+	var best := {}
+	var best_d := MOUNT_SNAP
+	var m := int(roundf(point.z / TILE))
+	var kx := int(floorf(point.x / TILE))
+	var e0 := Vector3i(kx, m, 0)
+	if edges.has(e0) and recs.has(edges[e0]) and panel_of(String(recs[edges[e0]].get("id", ""))) != "":
+		var lz := float(m) * TILE
+		var d0 := absf(point.z - lz)
+		if d0 <= best_d:
+			best_d = d0
+			var front := point.z >= lz
+			var cx := clampi(int(floorf(point.x)), kx * 2, kx * 2 + 1)
+			var cz := m * 2 if front else m * 2 - 1
+			best = {"pos": Vector3(float(cx) + 0.5, point.y, float(cz) + 0.5), "rot": 0 if front else 180}
+	var k := int(roundf(point.x / TILE))
+	var mz := int(floorf(point.z / TILE))
+	var e1 := Vector3i(k, mz, 1)
+	if edges.has(e1) and recs.has(edges[e1]) and panel_of(String(recs[edges[e1]].get("id", ""))) != "":
+		var lx := float(k) * TILE
+		var d1 := absf(point.x - lx)
+		if d1 < best_d:
+			var front1 := point.x >= lx
+			var cz1 := clampi(int(floorf(point.z)), mz * 2, mz * 2 + 1)
+			var cx1 := k * 2 if front1 else k * 2 - 1
+			best = {"pos": Vector3(float(cx1) + 0.5, point.y, float(cz1) + 0.5), "rot": 90 if front1 else 270}
+	return best
+
+
+## Wall pieces that hang on the edge piece `wall_uid` now and would be left with nothing behind them without it.
+static func decor_on_wall(wall_uid: String, ctx: Dictionary) -> Array:
+	var out: Array = []
+	var recs := _records(ctx)
+	var area_id := _area(ctx)
+	for uid in recs:
+		var r: Dictionary = recs[uid]
+		if String(r.get("area", "surface")) != area_id:
+			continue
+		var sid := String(r.get("id", ""))
+		var d := def_of(sid)
+		if not is_wall_mount(d):
+			continue
+		var info := mount_info(sid, d, record_footprint(r), ctx)
+		if String(info["reason"]) == "" and String(info["wall"]) == wall_uid:
+			out.append(String(uid))
+	return out
+
+
 # --- Stairs ---------------------------------------------------------------------------------------------
 
 ## Where a stair footprint meets the rest of the house: {"top_edge", "bottom_edge", "mid_edge": Vector3i,
@@ -848,7 +1042,7 @@ static func blocked_for(rect: Rect2, ba: Dictionary) -> Array:
 # --- Validation ----------------------------------------------------------------------------------------
 
 ## Full rule check. Returns {"ok": bool, "reason": String, "blocker": uid ("" if none), "y": float,
-## "level": int (the storey the piece goes on)}.
+## "level": int (the storey the piece goes on), "mount_dir": int (wall decor on a window only, see mount_info)}.
 static func validate(structure_id: String, pos: Vector3, rot_deg: float, ctx: Dictionary) -> Dictionary:
 	var def := def_of(structure_id)
 	if def.is_empty():
@@ -896,6 +1090,9 @@ static func validate(structure_id: String, pos: Vector3, rot_deg: float, ctx: Di
 			hs.append(ground_at(p.x, p.y, pos.y, ctx))
 		if float(hs.max()) - float(hs.min()) > MAX_UNEVEN:
 			return _res(false, MSG_UNEVEN, "", y, level)
+	var mount := mount_info(structure_id, def, fp, ctx)
+	if String(mount["reason"]) != "":
+		return _res(false, String(mount["reason"]), String(mount["blocker"]), y, level)
 	var reach := _stair_height_conflict(def, fp, y, ctx)
 	if String(reach["reason"]) != "":
 		return _res(false, String(reach["reason"]), String(reach["blocker"]), y, level)
@@ -909,7 +1106,10 @@ static func validate(structure_id: String, pos: Vector3, rot_deg: float, ctx: Di
 		var why2: Variant = (pf as Callable).call(structure_id, Vector3(pos.x, y, pos.z), int(fp["rot"]))
 		if why2 is String and why2 != "":
 			return _res(false, why2, "", y, level)
-	return _res(true, "", "", y, level)
+	var ok := _res(true, "", "", y, level)
+	if int(mount["dir"]) != 0:
+		ok["mount_dir"] = int(mount["dir"])
+	return ok
 
 
 static func _res(ok: bool, reason: String, blocker: String, y: float, level: int = 0) -> Dictionary:

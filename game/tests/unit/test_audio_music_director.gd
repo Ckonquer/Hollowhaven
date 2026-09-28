@@ -471,6 +471,54 @@ func test_threat_needs_sight_or_engagement() -> void:
 	await wait_frames(1)
 
 
+## CH2-008: a boss that ends (defeated or fled) with nobody else threatening hands straight back to the area: no
+## ordinary combat was latched underneath the fight, no combat cue plays after it, and the engagement grace the
+## fight earned is gone (an enemy still around behind a wall no longer counts without sight).
+func test_director_boss_end_leaves_no_combat_behind() -> void:
+	var d := _director({"mode": "playing", "area": "moonveil_manor", "zone": "", "night": false},
+		{"combat_release_s": [3.0, 3.0]})
+	var root := Node3D.new()
+	add_child(root)
+	var player := Node3D.new()
+	root.add_child(player)
+	var enemy := FakeEnemy.new()
+	enemy.add_to_group("enemy")
+	root.add_child(enemy)
+	enemy.position = Vector3(0, 0, -10)
+	var wall := StaticBody3D.new()
+	wall.collision_layer = 1
+	var cs := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(10, 6, 0.6)
+	cs.shape = box
+	wall.add_child(cs)
+	root.add_child(wall)
+	wall.position = Vector3(0, 1, -5)
+	await wait_seconds(0.3)
+	# the Count's fight: he is the threat, and blows are traded
+	Events.boss_encounter_changed.emit("count_velour", true)
+	d.ctx_override["threat"] = true
+	d.note_engaged()
+	await wait_seconds(0.6)
+	assert_eq(String(d.state()["effective"]), "velour", "the boss context plays")
+	assert_false(bool(d.state()["combat"]), "no ordinary combat latched under the boss")
+	await wait_physics(2)
+	assert_true(d.scan_threat(player), "during the fight the engagement grace counts")
+	# defeated: nothing threatens her any more
+	_cues.clear()
+	d.ctx_override["threat"] = false
+	Events.boss_encounter_changed.emit("count_velour", false)
+	assert_false(d.scan_threat(player), "the fight's engagement grace ended with the boss")
+	await wait_seconds(0.8)
+	assert_false(bool(d.state()["combat"]), "combat never latched after the boss")
+	for c in _cues:
+		var kind := String((MusicData.CUES.get(String(c), {}) as Dictionary).get("kind", ""))
+		assert_ne(kind, "combat", "no combat cue after the boss (%s)" % str(_cues))
+	assert_ne(String(d.state()["effective"]), "combat2", "not serving the combat context")
+	root.queue_free()
+	await wait_frames(1)
+
+
 # --- migrated call sites (the Audio-owned director) --------------------------------------------------------
 
 func test_migrated_call_sites_keep_their_behaviour() -> void:

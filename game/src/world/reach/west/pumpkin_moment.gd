@@ -82,8 +82,9 @@ func _build() -> void:
 	pumpkin.add_child(body)
 	var face := MeshInstance3D.new()
 	face.name = "Face"
-	face.mesh = Art.carved_face()
-	face.material_override = Art.glow(Color("ffb347"), 1.4)
+	# on the rind of the same body variant (never buried); a dark cut by day, a warm glow at night
+	face.mesh = Art.carved_face(1)
+	face.material_override = Art.carved_material()
 	face.scale = Vector3.ONE * RADIUS
 	face.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	pumpkin.add_child(face)

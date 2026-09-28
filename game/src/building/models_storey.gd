@@ -20,8 +20,15 @@ const ARCH_SILL := 0.9
 const ARCH_SPRING := 2.15
 const GABLE_RISE := 1.75
 const GABLE_EAVE := 1.05                        # eave distance from the ridge line (tile half-depth + overhang)
+## Stair balustrade (handrail, balusters, newels) stands this far from the stair's centre line: inside a railing
+## or wall on the stairwell's 2 m grid line (posts reach 0.94..1.06, planks 0.92), so the two never cross.
+const STAIR_RAIL_X := 0.84
 
-static var TRIM: Color = Palette.K_PANTS.darkened(0.25)       # gothic trim: deep plum-brown paint
+static var TRIM: Color = Palette.K_PANTS.darkened(0.25)       # crescent window frame: deep plum-brown paint
+static var CRESCENT_FROST: Color = Palette.MOON.lerp(Palette.FLOWER_PURPLE, 0.35).lightened(0.12)
+## Gothic porch trim: a lighter plum so the strokes read on the planks at gameplay distance, with a pale edge.
+static var GOTHIC: Color = Palette.K_PANTS.lightened(0.12)
+static var GOTHIC_EDGE: Color = Palette.FLOWER_PURPLE.lightened(0.25)
 
 
 # --- Stairs (2 x 4) -------------------------------------------------------------------------------------
@@ -55,20 +62,22 @@ static func wood_stairs(root: Node3D) -> Dictionary:
 		var length := sqrt(h * h + STAIR_RUN * STAIR_RUN) - 0.2
 		for sx in [-1.0, 1.0]:
 			b.rbox(Vector3(0.12, 0.3, length), Vector3(0.94 * sx, h * 0.5 - 0.1, 0.0), Palette.WOOD_DARK, 0.03, Vector3(ang, 0, 0))
-			# Posts under the top end and newel posts with a handrail.
-			b.rbox(Vector3(0.13, h - 0.12, 0.13), Vector3(0.9 * sx, (h - 0.12) * 0.5, -half + 0.1), Palette.WOOD_DARK, 0.03)
-			b.rbox(Vector3(0.11, 0.95, 0.11), Vector3(0.94 * sx, rise + 0.47, half - 0.2), Palette.WOOD, 0.03)
-			b.sphere(0.07, Vector3(0.94 * sx, rise + 0.98, half - 0.2), Palette.WOOD_LIGHT)
-			b.rbox(Vector3(0.11, 0.9, 0.11), Vector3(0.94 * sx, h + 0.45, -half + 0.1), Palette.WOOD, 0.03)
-			b.sphere(0.07, Vector3(0.94 * sx, h + 0.92, -half + 0.1), Palette.WOOD_LIGHT)
+			# Posts under the top end and newel posts with a handrail (inset to STAIR_RAIL_X: a railing or wall
+			# upstairs on the stairwell's grid line runs just outside them instead of through them).
+			var rx: float = STAIR_RAIL_X * sx
+			b.rbox(Vector3(0.13, h - 0.12, 0.13), Vector3(0.87 * sx, (h - 0.12) * 0.5, -half + 0.1), Palette.WOOD_DARK, 0.03)
+			b.rbox(Vector3(0.11, 0.95, 0.11), Vector3(rx, rise + 0.47, half - 0.2), Palette.WOOD, 0.03)
+			b.sphere(0.07, Vector3(rx, rise + 0.98, half - 0.2), Palette.WOOD_LIGHT)
+			b.rbox(Vector3(0.11, 0.9, 0.11), Vector3(rx, h + 0.45, -half + 0.1), Palette.WOOD, 0.03)
+			b.sphere(0.07, Vector3(rx, h + 0.92, -half + 0.1), Palette.WOOD_LIGHT)
 			var rail_len := sqrt(pow(STAIR_RUN - 0.3, 2.0) + pow(h - rise, 2.0))
-			var rail_mid := Vector3(0.94 * sx, (rise + h) * 0.5 + 0.88, -0.05)
+			var rail_mid := Vector3(rx, (rise + h) * 0.5 + 0.88, -0.05)
 			b.rbox(Vector3(0.08, 0.07, rail_len), rail_mid, Palette.WOOD_LIGHT, 0.025, Vector3(ang, 0, 0))
 			for k in 5:
 				var t := (float(k) + 1.0) / 6.0
 				var zb := lerpf(half - 0.2, -half + 0.1, t)
 				var yb := lerpf(rise, h, t) + 0.02
-				b.cyl(0.018, 0.018, 0.86, Vector3(0.94 * sx, yb + 0.43, zb), Palette.WOOD_DARK, Vector3.ZERO, 6)
+				b.cyl(0.018, 0.018, 0.86, Vector3(rx, yb + 0.43, zb), Palette.WOOD_DARK, Vector3.ZERO, 6)
 		# A little heart carved on the bottom riser.
 		b.heart(0.14, Vector3(0, rise * 0.5, half + 0.005), Palette.CLOTH_RED, 0.02)
 	)
@@ -115,11 +124,11 @@ static func wood_railing(root: Node3D) -> Dictionary:
 	return {}
 
 
-static func half_wall(root: Node3D) -> Dictionary:
-	var mesh := U.baked("half_wall", func(b: Batch) -> void:
+static func half_wall(root: Node3D, upper: bool = false) -> Dictionary:
+	var mesh := U.baked("half_wall" + Parts.storey_key(upper), func(b: Batch) -> void:
 		for sx in [-1.0, 1.0]:
 			b.rbox(Vector3(0.24, 1.2, 0.26), Vector3(1.0 * sx, 0.6, 0), Palette.WOOD_DARK, 0.04)
-		Parts._cobbles(b, -1.0, 1.0)
+		Parts._footing(b, -1.0, 1.0, upper)
 		Parts._planks(b, -Parts.INNER, Parts.INNER, Parts.PLANK_BOTTOM, 1.08)
 		b.rbox(Vector3(2.16, 0.09, 0.32), Vector3(0, 1.155, 0), Palette.WOOD_LIGHT, 0.03)
 		b.sphere(0.05, Vector3(-0.4, 1.23, 0.02), Palette.BLOSSOM)
@@ -153,9 +162,9 @@ static func porch_post(root: Node3D) -> Dictionary:
 
 # --- Arched window wall ---------------------------------------------------------------------------------------
 
-static func arched_window(root: Node3D) -> Dictionary:
-	var mesh := U.baked("arched_window", func(b: Batch) -> void:
-		Parts._frame(b)
+static func arched_window(root: Node3D, upper: bool = false) -> Dictionary:
+	var mesh := U.baked("arched_window" + Parts.storey_key(upper), func(b: Batch) -> void:
+		Parts._frame(b, -1.0, 1.0, upper)
 		var w := ARCH_HALF + 0.06
 		var top := ARCH_SPRING + ARCH_HALF
 		Parts._planks(b, -Parts.INNER, -w, Parts.PLANK_BOTTOM, Parts.PLANK_TOP)
@@ -240,10 +249,10 @@ static func poly_slab(outline: Array, inside: Vector2, depth: float) -> ArrayMes
 
 # --- Crescent window wall ---------------------------------------------------------------------------------------
 
-static func crescent_window(root: Node3D) -> Dictionary:
+static func crescent_window(root: Node3D, upper: bool = false) -> Dictionary:
 	var wy := Parts.WINDOW_Y
-	var mesh := U.baked("crescent_window", func(b: Batch) -> void:
-		Parts._frame(b)
+	var mesh := U.baked("crescent_window" + Parts.storey_key(upper), func(b: Batch) -> void:
+		Parts._frame(b, -1.0, 1.0, upper)
 		var h := Parts.WINDOW_HOLE
 		Parts._planks(b, -Parts.INNER, -h, Parts.PLANK_BOTTOM, Parts.PLANK_TOP)
 		Parts._planks(b, h, Parts.INNER, Parts.PLANK_BOTTOM, Parts.PLANK_TOP)
@@ -251,8 +260,10 @@ static func crescent_window(root: Node3D) -> Dictionary:
 		Parts._planks(b, -h, h, wy + h, Parts.PLANK_TOP)
 		for z in [0.095, -0.095]:
 			b.torus(0.4, 0.54, Vector3(0, wy, z), TRIM, Vector3(90, 0, 0))
-			# The dark "night" disc that turns the round pane into a crescent moon.
-			b.cyl(0.33, 0.33, 0.03, Vector3(0.15, wy + 0.05, z * 0.7), Palette.K_PANTS.darkened(0.1), Vector3(90, 0, 0), 22)
+			# The frosted "night" disc that turns the round pane into a crescent moon: soft moonlit lavender glass
+			# (reads as a window, not a dark painted plate), with a slightly deeper rim along the crescent's inner edge.
+			b.cyl(0.33, 0.33, 0.03, Vector3(0.15, wy + 0.05, z * 0.7), CRESCENT_FROST, Vector3(90, 0, 0), 22)
+			b.torus(0.3, 0.335, Vector3(0.15, wy + 0.05, z * 0.72), CRESCENT_FROST.darkened(0.2), Vector3(90, 0, 0), Vector3(1, 0.5, 1))
 		# Little painted stars around the frame (both faces).
 		for sgn in [1.0, -1.0]:
 			for p in [Vector2(-0.62, 2.25), Vector2(0.58, 2.35), Vector2(-0.55, 1.05), Vector2(0.64, 1.15)]:
@@ -280,8 +291,9 @@ static func _thatch_slope(b: Batch, eave: Vector2, ridge: Vector2, width: float,
 	var length := eave.distance_to(ridge)
 	var ang := rad_to_deg(atan2(ridge.y - eave.y, eave.x - ridge.x))
 	var tcols := [Palette.THATCH, Palette.THATCH.lightened(0.07), Palette.THATCH.darkened(0.04), Palette.THATCH.lightened(0.03)]
-	var mid := (eave + ridge) * 0.5
-	b.rbox(Vector3(width, 0.08, length), Vector3(0, mid.y, mid.x), Palette.WOOD_DARK, 0.02, Vector3(ang, 0, 0))
+	# Under-slab: top 0.04 above the slope line, UNDER_SLAB thick so no tilted course pokes through the ceiling.
+	var mid := (eave + ridge) * 0.5 - n * (Parts.UNDER_SLAB - 0.08) * 0.5
+	b.rbox(Vector3(width, Parts.UNDER_SLAB, length), Vector3(0, mid.y, mid.x), Palette.WOOD_DARK, 0.02, Vector3(ang, 0, 0))
 	for i in rows:
 		var t := (float(i) + 0.5) / float(rows)
 		var p := eave.lerp(ridge, t) + n * 0.12
@@ -325,81 +337,116 @@ static func gable_collision_points() -> PackedVector3Array:
 
 
 ## Hip corner joining a roof row that slopes toward +Z (like wood_roof at rot 0) with one sloping toward +X
-## (wood_roof at rot 90): high corner at (-1, rise, -1), both low edges at the eaves.
+## (wood_roof at rot 90): high corner at (-1, rise, -1), both low edges at the eaves. Built from the very same
+## slope pieces as wood_roof (models_building.gd: under-slab, thatch courses, eave fringe): face A is the roof
+## tile's slope cut along the hip plane x = z, face B its mirror image across that plane, so both faces sit at the
+## same height and thickness as the neighbouring roof tiles and meet in a sealed hip under a straw hip roll.
 static func roof_corner(root: Node3D) -> Dictionary:
-	var rise := Parts.ROOF_RISE
-	var e := 1.0 + Parts.ROOF_EAVE
-	var low := -rise * 0.5 * Parts.ROOF_EAVE
 	var mesh := U.baked("roof_corner", func(b: Batch) -> void:
-		var apex := Vector3(-1.0, rise, -1.0)
-		var corner := Vector3(e, low, e)
-		# Two thatch faces (thick triangles) meeting on the hip line.
-		b.add(tri_slab(apex, Vector3(-1.0, low, e), corner, 0.12), Transform3D.IDENTITY, Palette.THATCH)
-		b.add(tri_slab(apex, corner, Vector3(e, low, -1.0), 0.12), Transform3D.IDENTITY, Palette.THATCH.lightened(0.06))
-		# Straw bundles in courses on each face.
-		for i in 3:
-			var t := (float(i) + 0.6) / 3.6
-			for k in 3:
-				var s := (float(k) + 0.5) / 3.0
-				var pz := apex.lerp(Vector3(-1.0 + (e + 1.0) * s, low, e), t) + Vector3(0, 0.1, 0)
-				var px := apex.lerp(Vector3(e, low, -1.0 + (e + 1.0) * s), t) + Vector3(0, 0.1, 0)
-				if pz.x < pz.z - 0.15:
-					b.sphere(0.2, pz, Palette.THATCH.darkened(0.03 * float(k)), Vector3(1.3, 0.45, 0.9), Vector3(-25, 0, 0))
-				if px.z < px.x - 0.15:
-					b.sphere(0.2, px, Palette.THATCH.lightened(0.03 * float(k)), Vector3(0.9, 0.45, 1.3), Vector3(0, 0, 25))
-		# Hip roll along the diagonal and an eave fringe on both low edges.
+		var slope := Batch.new()
+		Parts._roof_slab(slope)
+		Parts._roof_courses(slope)
+		Parts._roof_fringe(slope, true)
+		var keep := Plane(Vector3(1.0, 0.0, -1.0).normalized(), 0.0)      # face A: x <= z
+		var mirror := Transform3D(Basis(Vector3(0, 0, 1), Vector3(0, 1, 0), Vector3(1, 0, 0)), Vector3.ZERO)
+		for part in slope.parts:
+			var cut := clipped(part[0], part[1], keep)
+			if cut.get_surface_count() == 0:
+				continue
+			b.add(cut, Transform3D.IDENTITY, part[2])
+			b.add(cut, mirror, part[2])
+		# Hip roll from the apex down to the eave corner, resting on the thatch where the two faces meet; it
+		# stops at the fringe (never past the eave).
+		var sl := Parts.roof_slope()
+		var e: Vector2 = sl["e"]
+		var r: Vector2 = sl["r"]
+		var apex := Vector3(r.x, r.y, r.x)
+		var corner := Vector3(e.x, e.y, e.x)
 		var d := corner - apex
-		var mid := (apex + corner) * 0.5 + Vector3(0, 0.1, 0)
 		var up := d.normalized()
+		var length := d.length() - HIP_ROLL_R * 1.6
+		var mid := apex + up * (length * 0.5) + Vector3(0, HIP_ROLL_LIFT, 0)
 		var side := up.cross(Vector3.UP).normalized()
 		var fwd := side.cross(up).normalized()
-		b.add(Shapes.prim_cylinder(0.12, 0.12, d.length(), 12), Transform3D(Basis(side, up, fwd), mid), Palette.THATCH.darkened(0.2))
-		for k in 6:
-			var f := float(k) / 5.0
-			b.sphere(0.11, Vector3(-1.0 + (e + 1.0) * f, low + 0.05, e), Palette.THATCH.darkened(0.1), Vector3(1.0, 0.55, 0.85))
-			b.sphere(0.11, Vector3(e, low + 0.05, -1.0 + (e + 1.0) * f), Palette.THATCH.darkened(0.1), Vector3(0.85, 0.55, 1.0))
+		b.add(Shapes.prim_cylinder(HIP_ROLL_R, HIP_ROLL_R, length, 14), Transform3D(Basis(side, up, fwd), mid), Palette.THATCH.darkened(0.2))
+		# Rounded ends (the apex one is shared by the rolls meeting there) and bindings like the ridge roll's.
+		b.add(Shapes.prim_sphere(HIP_ROLL_R, 8, 16), Batch.xf(apex + Vector3(0, HIP_ROLL_LIFT, 0)), Palette.THATCH.darkened(0.2))
+		b.add(Shapes.prim_sphere(HIP_ROLL_R, 8, 16), Transform3D(Basis(side, up, fwd) * Basis.from_scale(Vector3(1, 0.7, 1)), apex + up * length + Vector3(0, HIP_ROLL_LIFT, 0)), Palette.THATCH.darkened(0.2))
+		for t in [0.3, 0.62]:
+			var bp: Vector3 = apex + up * (length * float(t)) + Vector3(0, HIP_ROLL_LIFT, 0)
+			b.add(Shapes.prim_torus(HIP_ROLL_R - 0.01, HIP_ROLL_R + 0.04, 14, 6), Transform3D(Basis(side, up, fwd) * Basis.from_scale(Vector3(1, 0.5, 1)), bp), Palette.WOOD_DARK)
 	)
 	U.instance(root, mesh, U.vc_outlined(0.012))
 	return {}
 
 
-## Triangle a-b-c thickened downward by `thickness` (a closed prism).
-static func tri_slab(a: Vector3, b2: Vector3, c: Vector3, thickness: float) -> ArrayMesh:
-	var key := "tri_slab|%s|%s|%s|%.3f" % [a, b2, c, thickness]
-	if U._cache.has(key):
-		return U._cache[key]
-	var down := Vector3(0, -thickness, 0)
-	var top := [a, b2, c]
-	var bot := [a + down, b2 + down, c + down]
-	var centre := (a + b2 + c) / 3.0 + down * 0.5
+const HIP_ROLL_R := 0.14
+const HIP_ROLL_LIFT := 0.2        # hip roll centre above the hip line (the thatch faces meet ~0.3 above it)
+
+
+## `mesh` moved by `xf`, keeping only the part on the negative side of `plane` (distance_to(p) <= 0); triangles
+## that cross it are cut along it (normals interpolated). Returns an ArrayMesh (no surface when nothing is left).
+static func clipped(mesh: Mesh, xf: Transform3D, plane: Plane) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var norms := PackedVector3Array()
 	var idx := PackedInt32Array()
-	var nt := (b2 - a).cross(c - a).normalized()
-	if nt.y < 0.0:
-		nt = -nt
-	for face in [[top, nt], [bot, -nt]]:
-		var base := verts.size()
-		for p in face[0]:
-			verts.append(p)
-			norms.append(face[1])
-		Shapes._tri_out(idx, verts, base, base + 1, base + 2, face[1])
-	for i in 3:
-		var p0: Vector3 = top[i]
-		var p1: Vector3 = top[(i + 1) % 3]
-		var q1: Vector3 = bot[(i + 1) % 3]
-		var q0: Vector3 = bot[i]
-		var out := (p1 - p0).cross(Vector3.DOWN).normalized()
-		if out.dot((p0 + p1) * 0.5 - centre) < 0.0:
-			out = -out
-		var base2 := verts.size()
-		for p in [p0, p1, q1, q0]:
-			verts.append(p)
-			norms.append(out)
-		Shapes._tri_out(idx, verts, base2, base2 + 1, base2 + 2, out)
-		Shapes._tri_out(idx, verts, base2, base2 + 2, base2 + 3, out)
-	var m := Shapes._array_mesh(verts, norms, idx)
-	U._cache[key] = m
+	var nb := xf.basis.inverse().transposed()
+	var flip := xf.basis.determinant() < 0.0
+	for s in mesh.get_surface_count():
+		var arr := mesh.surface_get_arrays(s)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var nn: PackedVector3Array = arr[Mesh.ARRAY_NORMAL] if arr[Mesh.ARRAY_NORMAL] != null else PackedVector3Array()
+		var ix: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var count := ix.size() if not ix.is_empty() else v.size()
+		for t in range(0, count - 2, 3):
+			var ids: Array = [ix[t], ix[t + 1], ix[t + 2]] if not ix.is_empty() else [t, t + 1, t + 2]
+			if flip:
+				ids = [ids[0], ids[2], ids[1]]
+			var p: Array = []
+			var q: Array = []
+			var dist: Array = []
+			var inside := 0
+			for i in 3:
+				var vi: int = ids[i]
+				var pw: Vector3 = xf * v[vi]
+				p.append(pw)
+				q.append((nb * nn[vi]).normalized() if vi < nn.size() else Vector3.UP)
+				var dd := plane.distance_to(pw)
+				dist.append(dd)
+				if dd <= 0.0:
+					inside += 1
+			if inside == 0:
+				continue
+			var poly_p: Array = p
+			var poly_n: Array = q
+			if inside < 3:
+				poly_p = []
+				poly_n = []
+				for i in 3:
+					var j := (i + 1) % 3
+					var di: float = dist[i]
+					var dj: float = dist[j]
+					if di <= 0.0:
+						poly_p.append(p[i])
+						poly_n.append(q[i])
+					if (di <= 0.0) != (dj <= 0.0):
+						var k := di / (di - dj)
+						poly_p.append((p[i] as Vector3).lerp(p[j], k))
+						poly_n.append((q[i] as Vector3).lerp(q[j], k).normalized())
+			var base := verts.size()
+			for i in poly_p.size():
+				verts.append(poly_p[i])
+				norms.append(poly_n[i])
+			for i in range(1, poly_p.size() - 1):
+				idx.append_array([base, base + i, base + i + 1])
+	var m := ArrayMesh.new()
+	if not verts.is_empty():
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = verts
+		arrays[Mesh.ARRAY_NORMAL] = norms
+		arrays[Mesh.ARRAY_INDEX] = idx
+		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return m
 
 
@@ -410,39 +457,55 @@ static func corner_collision_points() -> PackedVector3Array:
 		Vector3(-e, rise + 0.25, -e), Vector3(e, 0.2, -e), Vector3(-e, 0.2, e), Vector3(e, 0.12, e)])
 
 
-# --- Gothic porch trim (1 x 1, hugs the wall behind its cell) ------------------------------------------------------
+# --- Gothic porch trim (1 x 1, hangs on a plain wall behind its cell) ---------------------------------------------
 
+## A pointed-arch header for the top of a wall panel: a header rail, two short side brackets ending in drop
+## finials, the arch between them with a crescent moon and trefoil rings. Chunky light-plum strokes with a pale
+## edge strip, so it reads as carved trim (not thin cracks) at gameplay distance; it stays clear of the panel's
+## corner posts and never runs down the wall.
 static func gothic_trim(root: Node3D) -> Dictionary:
 	var mesh := U.baked("gothic_trim", func(b: Batch) -> void:
-		var z := -0.43
+		var z := Placement.MOUNT_BACK + 0.035           # strokes 0.07 deep, backs on the wall face
+		var hz := z + 0.045                             # pale edge strips just in front
+		var sxp := GOTHIC_SPRING_X
+		b.rbox(Vector3(sxp * 2.0 + 0.1, 0.1, 0.07), Vector3(0, 2.7, z), GOTHIC, 0.025)
+		b.rbox(Vector3(sxp * 2.0 + 0.04, 0.03, 0.02), Vector3(0, 2.71, hz), GOTHIC_EDGE, 0.008)
 		for sx in [-1.0, 1.0]:
-			b.rbox(Vector3(0.08, 2.9, 0.07), Vector3(0.44 * sx, 1.45, z), TRIM, 0.02)
-			b.sphere(0.05, Vector3(0.44 * sx, 2.93, z), TRIM.lightened(0.15))
-			# Pointed arch: short segments curving from the post tops to the peak.
+			var bx: float = sxp * sx
+			b.rbox(Vector3(0.1, 0.78, 0.07), Vector3(bx, 2.3, z), GOTHIC, 0.025)
+			b.rbox(Vector3(0.03, 0.7, 0.02), Vector3(bx, 2.3, hz), GOTHIC_EDGE, 0.008)
+			b.sphere(0.065, Vector3(bx, 1.9, z + 0.01), GOTHIC, Vector3(1, 1.3, 1))
+			b.cyl(0.0, 0.04, 0.12, Vector3(bx, 1.77, z + 0.01), GOTHIC, Vector3(180, 0, 0), 8)
+			# Pointed arch: segments curving from the bracket to the peak.
 			for k in 6:
-				var t0 := float(k) / 6.0
-				var t1 := float(k + 1) / 6.0
-				var p0 := _gothic_arc(t0, sx)
-				var p1 := _gothic_arc(t1, sx)
+				var p0 := _gothic_arc(float(k) / 6.0, sx)
+				var p1 := _gothic_arc(float(k + 1) / 6.0, sx)
 				var d := p1 - p0
-				b.rbox(Vector3(d.length() + 0.03, 0.06, 0.06), Vector3((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5, z), TRIM, 0.015, Vector3(0, 0, rad_to_deg(atan2(d.y, d.x))))
+				var mid := (p0 + p1) * 0.5
+				var roll := Vector3(0, 0, rad_to_deg(atan2(d.y, d.x)))
+				b.rbox(Vector3(d.length() + 0.05, 0.1, 0.07), Vector3(mid.x, mid.y, z), GOTHIC, 0.025, roll)
+				b.rbox(Vector3(d.length() + 0.012, 0.03, 0.02), Vector3(mid.x, mid.y, hz), GOTHIC_EDGE, 0.008, roll)
 			# Trefoil rings in the spandrels.
-			b.torus(0.05, 0.08, Vector3(0.3 * sx, 2.62, z + 0.01), TRIM, Vector3(90, 0, 0))
-		b.rbox(Vector3(0.94, 0.07, 0.07), Vector3(0, 2.86, z), TRIM, 0.02)
-		# Peak finial with a little crescent moon, and a lace fringe of drops.
-		b.cyl(0.0, 0.05, 0.16, Vector3(0, 2.7, z), TRIM.lightened(0.1), Vector3.ZERO, 8)
-		b.torus(0.05, 0.075, Vector3(0, 2.4, z + 0.02), Palette.FLOWER_YELLOW, Vector3(90, 0, 0))
-		b.sphere(0.052, Vector3(0.028, 2.41, z + 0.035), TRIM, Vector3(1, 1, 0.5))
-		for k in 7:
-			var x := -0.36 + 0.12 * float(k)
-			b.sphere(0.028, Vector3(x, 2.79 - 0.025 * float(k % 2), z + 0.01), TRIM.lightened(0.08), Vector3(1, 1.4, 1))
+			b.torus(0.04, 0.08, Vector3(0.21 * sx, 2.55, z + 0.01), GOTHIC, Vector3(90, 0, 0))
+		# A crescent moon inside the arch, and a lace fringe of drops under the header.
+		b.torus(0.06, 0.1, Vector3(0, 2.3, z + 0.02), Palette.FLOWER_YELLOW, Vector3(90, 0, 0))
+		b.sphere(0.075, Vector3(0.04, 2.315, z + 0.04), GOTHIC, Vector3(1, 1, 0.5))
+		for k in 5:
+			var x := -0.16 + 0.08 * float(k)
+			if absf(x) < 0.05:
+				continue
+			b.sphere(0.03, Vector3(x, 2.62 - 0.03 * float(k % 2), z + 0.01), GOTHIC_EDGE, Vector3(1, 1.4, 1))
 	)
-	U.instance(root, mesh, U.vc_outlined(0.01))
+	U.instance(root, mesh, U.vc_outlined(0.012))
 	return {}
 
 
-## Point on one side (sx) of the pointed arch, t = 0 at the post top (spring), 1 at the peak: each side is an
-## arc centred on the opposite spring point (a classic two-centred arch), flattened a little in y.
+const GOTHIC_SPRING_X := 0.32     # side brackets: clear of the wall panel's corner posts (x 0.38.. from a cell centre)
+
+
+## Point on one side (sx) of the pointed arch, t = 0 at the bracket (spring), 1 at the peak: each side is an arc
+## centred on the opposite spring point (a classic two-centred arch), flattened a little in y.
 static func _gothic_arc(t: float, sx: float) -> Vector2:
 	var a := lerpf(0.0, PI / 3.0, t)
-	return Vector2(-0.44 * sx + 0.88 * cos(a) * sx, 2.1 + 0.88 * sin(a) * 0.68)
+	var span := GOTHIC_SPRING_X * 2.0
+	return Vector2(-GOTHIC_SPRING_X * sx + span * cos(a) * sx, 2.08 + span * sin(a) * 0.88)

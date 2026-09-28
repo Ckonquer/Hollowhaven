@@ -450,11 +450,23 @@ func get_interaction(_player_node: Node = null) -> Dictionary:
 		return {}
 	if not is_befriended():
 		return Logic.wild_prompt(companion_id, def, _wild_context())
+	if talk_hushed_in_fight():
+		return {}
 	return {"text": "Talk to %s" % get_display_name(), "enabled": true}
+
+
+## During a boss fight (Game.boss_active()) a FOLLOWING companion offers no "Talk to ..." prompt / companion menu: no
+## prompt, no interaction focus, so it can never steal the focus from the fight's own interactables (QA: during the
+## Borrowed Choir's phase B plate sequence "Talk to Lumi" showed among the plate prompts). Commands and skills keep
+## working through their own keys (companion_command / companion_skill). Outside fights, or waiting / at home: normal.
+func talk_hushed_in_fight() -> bool:
+	return mode == "follow" and Game.has_method("boss_active") and bool(Game.boss_active())
 
 
 func interact(_player_node: Node = null) -> void:
 	if pinned or override == "befriending" or override == "leaving":
+		return
+	if is_befriended() and talk_hushed_in_fight():
 		return
 	if not is_befriended():
 		var p := get_interaction()
@@ -1557,6 +1569,10 @@ func _on_harvested(node_kind: String, item_id: String, _count: int, pos: Vector3
 
 func _on_zone_entered(zone_id: String) -> void:
 	if mode != "follow" or not is_befriended() or zone_id == "":
+		return
+	# Helper zones (e.g. the surface waygate's small safe circle "ch2_waygate") are no landmarks: exploring
+	# them together is no new place (the same rule as map discovery, Game.is_landmark_zone, CH2-010).
+	if Game.has_method("is_landmark_zone") and not bool(Game.is_landmark_zone(Game.area, zone_id)):
 		return
 	if _player != null and _dist_player() > 25.0:
 		return

@@ -83,7 +83,8 @@ func test_every_new_structure_has_its_own_model_that_fits_its_footprint() -> voi
 		var box := _aabb(root)
 		var size: Vector2i = def.get("size", Vector2i.ONE)
 		var snap := String(def.get("snap", "cell"))
-		var tol := 0.36 if snap == "roof2" else 0.13
+		# Roofs overhang their tile: the Chapter One roof's eave fringe (shared by the roof corner) reaches 0.38 m.
+		var tol := 0.4 if snap == "roof2" else 0.13
 		var hx := float(size.x) * 0.5 + tol
 		var hz := float(size.y) * 0.5 + tol
 		assert_true(box.position.x >= -hx and box.end.x <= hx, "%s fits in x: %s" % [sid, str(box)])

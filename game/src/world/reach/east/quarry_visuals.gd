@@ -105,6 +105,81 @@ static func add_bell(m: NV.Merger, xf: Transform3D, s: float, col: Color = Q.COL
 	m.add(NV._sph(0.07, 5, 8), Transform3D(b, o + b * Vector3(0, -0.6, 0)), col.darkened(0.35))
 
 
+## The Ashbell's profile, [local y, radius] from the lip up to the shoulder (the crown dome sits on top).
+const ASHBELL_PROFILE := [[-0.62, 1.74], [-0.5, 1.7], [-0.32, 1.5], [-0.05, 1.24], [0.35, 1.06], [0.85, 0.97], [1.45, 0.95]]
+
+
+## Radius of the Ashbell's body at local height y (lip ... shoulder), linearly between profile points.
+static func ashbell_radius(y: float) -> float:
+	var pr: Array = ASHBELL_PROFILE
+	if y <= float(pr[0][0]):
+		return float(pr[0][1])
+	for i in range(pr.size() - 1):
+		var a: Array = pr[i]
+		var b: Array = pr[i + 1]
+		if y <= float(b[0]):
+			return lerpf(float(a[1]), float(b[1]), (y - float(a[0])) / (float(b[0]) - float(a[0])))
+	return float(pr[pr.size() - 1][1])
+
+
+## The Ashbell (the quarry's namesake cracked bell), built around xf (origin = where it meets the ground, basis =
+## its tilt): stacked frustums along a bell profile with a flared lip, a dark mouth, a crown loop, bronze that
+## darkens toward the lip with patches of green patina, and a dark zig-zag crack on the side `crack_dir` (local).
+static func add_ashbell(m: NV.Merger, xf: Transform3D, crack_dir: Vector3) -> void:
+	var b := xf.basis
+	var o := xf.origin
+	var bronze := Q.COL_BRONZE
+	var col := func(p: Vector3, n: Vector3) -> Color:
+		var lp := b.inverse() * (p - o)
+		var t := clampf((lp.y + 0.6) / 2.8, 0.0, 1.0)
+		var c := bronze.darkened(0.32).lerp(bronze.lightened(0.12), t)
+		var patina := sin(lp.x * 2.3 + lp.y * 1.7) * sin(lp.z * 2.1 - lp.y * 1.1)
+		if patina > 0.55:
+			c = c.lerp(Color("6fa493"), clampf((patina - 0.55) * 3.0, 0.0, 0.7))
+		return c.lerp(c.lightened(0.2), clampf(n.y, 0.0, 1.0) * 0.2)
+	var pr: Array = ASHBELL_PROFILE
+	for i in range(pr.size() - 1):
+		var y0 := float(pr[i][0])
+		var y1 := float(pr[i + 1][0])
+		m.add(NV._cyl(float(pr[i + 1][1]), float(pr[i][1]), y1 - y0, 24), Transform3D(b, o + b * Vector3(0, (y0 + y1) * 0.5, 0)), col)
+	# the shoulder dome and the crown: a stub and a loop standing up on top
+	m.add(NV._hemi(0.95, 0.72, 22), Transform3D(b, o + b * Vector3(0, 1.45, 0)), col)
+	m.add(NV._cyl(0.26, 0.32, 0.26, 10), Transform3D(b, o + b * Vector3(0, 2.2, 0)), bronze.darkened(0.2))
+	m.add(NV._cyl(0.08, 0.08, 0.1, 8), Transform3D(b, o + b * Vector3(0, 2.36, 0)), bronze.darkened(0.3))
+	var loop := Transform3D(b * Basis(Vector3.RIGHT, PI * 0.5), o + b * Vector3(0, 2.62, 0))
+	m.add(_torus_mesh(0.2, 0.34), loop, bronze.darkened(0.12))
+	# the lip bead and the dark mouth (seen where the tilt lifts the lip clear of the bench)
+	m.add(_torus_mesh(1.66, 1.84), Transform3D(b * Basis.from_scale(Vector3(1.0, 0.7, 1.0)), o + b * Vector3(0, -0.6, 0)), bronze.darkened(0.18))
+	m.add(NV._cyl(1.62, 1.62, 0.04, 24), Transform3D(b, o + b * Vector3(0, -0.56, 0)), Color("2e2018"))
+	# the crack: a dark zig-zag from the lip up the side facing the yard (radius-following, just proud)
+	var az := atan2(crack_dir.x, crack_dir.z)
+	var pts: Array = [[-0.55, 0.0], [-0.2, 0.09], [0.1, -0.05], [0.45, 0.08], [0.8, -0.04], [1.1, 0.05]]
+	for i in range(pts.size() - 1):
+		var pa := _ashbell_point(float(pts[i][0]), az + float(pts[i][1]), 0.025)
+		var pb := _ashbell_point(float(pts[i + 1][0]), az + float(pts[i + 1][1]), 0.025)
+		var w := 0.09 - 0.012 * float(i)
+		add_rod(m, o + b * pa, o + b * pb, w * 0.5, Color("2a1c14"), 5)
+		m.add(NV._sph(w * 0.5, 3, 5), Transform3D(Basis(), o + b * pb), Color("2a1c14"))
+
+
+## A point on the Ashbell's surface at local height y and azimuth az (from +Z), lifted `lift` outward.
+static func _ashbell_point(y: float, az: float, lift: float) -> Vector3:
+	var r := ashbell_radius(y) + lift
+	return Vector3(sin(az) * r, y, cos(az) * r)
+
+
+static func _torus_mesh(inner: float, outer: float) -> TorusMesh:
+	var key := "torus|%.3f|%.3f" % [inner, outer]
+	if not _cache.has(key):
+		var t := TorusMesh.new()
+		t.inner_radius = inner
+		t.outer_radius = outer
+		t.rings = 24
+		t.ring_segments = 8
+		_cache[key] = t
+	return _cache[key]
+
+
 ## A round festival pumpkin sitting at pos (s = radius-ish scale, 1 = 0.35 m).
 static func add_pumpkin(m: NV.Merger, pos: Vector3, s: float, yaw: float) -> void:
 	var b := Basis(Vector3.UP, yaw)

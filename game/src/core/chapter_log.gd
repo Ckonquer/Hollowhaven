@@ -3,7 +3,11 @@ extends RefCounted
 ## completed steps. The layer is AVAILABLE once `chapter_one_complete` is set and ACTIVE once
 ## `ch2_accepted` is set as well; nothing happens (and nothing is shown) before that.
 ## The current steps are the first step that is not done - or, when that step belongs to a group, every
-## not-done step of that group (the three lamps), which can be completed in any order.
+## not-done step of that group (the lamp search + the three lamp roads), which can be completed in any order,
+## each on its own (a lit lamp pays its road at once, whatever the other lamps are doing: MP §9, CH2-001).
+## Hints: a step's hint goes out once when it starts - or, with "hint_when" (an objective), once that holds
+## while the step is current, so a place-bound hint appears where it applies (each lamp road's hint when that
+## lamp is found). Remembered per session here and for good by the HUD hint card (flag "hint_quest_<id>").
 ## Objectives are state checks, so completion latches: a step whose objectives were met before it was
 ## reached completes as soon as it is reached. Rewards go through GameState.grant_once("rw_" + id, ...),
 ## so loading, re-evaluating or repairing a save never grants anything twice.
@@ -20,6 +24,7 @@ const MAX_CASCADE := 64
 var done: Array = []             # ids of completed steps (rewards applied through the ledger)
 var baselines: Dictionary = {}   # step_id -> {counter: value when the step started}; also marks "started"
 var _evaluating := false
+var _hinted: Dictionary = {}     # step ids whose hint went out this session (not saved: see the header)
 
 
 func steps() -> Array:
@@ -162,6 +167,11 @@ func evaluate() -> void:
 				progressed = true
 		if not progressed:
 			break
+	# Place-bound hints of started, open steps whose moment has come (e.g. a lamp road's hint once that lamp
+	# is found). Steps without "hint_when" had their only chance when they started.
+	for s in _pending_front():
+		if s.has("hint_when") and baselines.has(s["id"]) and not step_done(s):
+			_emit_hint(s)
 	_evaluating = false
 	if changed:
 		Events.objectives_changed.emit()
@@ -180,13 +190,29 @@ func _begin_step(s: Dictionary) -> void:
 	# A step that is already complete (latched) or skipped passes straight through without announcements.
 	if step_done(s):
 		return
-	var hint := step_string(s, "hint")
-	if hint != "":
-		Events.hint.emit("quest_" + String(s["id"]), hint)   # same id scheme as the legacy steps (hint_quest_<id> flag)
+	_emit_hint(s)
 	if group_started:
 		return   # a group is announced once, by its title
 	var title := String(Data.GROUPS[group].get("title", "")) if Data.GROUPS.has(group) else step_string(s, "title")
 	Events.notify.emit("New goal: " + title, "quest")
+
+
+## The step's hint, at most once: not before its "hint_when" objective holds, never when the HUD hint card has
+## already shown it (flag "hint_quest_<id>", the same id scheme as the legacy steps).
+func _emit_hint(s: Dictionary) -> void:
+	var id := String(s["id"])
+	if _hinted.has(id):
+		return
+	var hint := step_string(s, "hint")
+	if hint == "":
+		return
+	var when: Variant = s.get("hint_when")
+	if when is Dictionary and not bool(check_objective(when, baselines.get(id, {}))["done"]):
+		return
+	_hinted[id] = true
+	if _truthy(GameState.get_flag("hint_quest_" + id)):
+		return
+	Events.hint.emit("quest_" + id, hint)
 
 
 func _complete(s: Dictionary) -> void:
@@ -244,10 +270,20 @@ func from_dict(d: Dictionary) -> void:
 				if v is int or (v is float and is_finite(v)):
 					b[str(counter)] = int(v)
 			baselines[str(sid)] = b
-	# Current steps need a baseline (silently, like QuestLog.from_dict) so since_start counters work.
+	_hinted = {}
+	# A save from before its current steps started gets their baselines silently (like QuestLog.from_dict), so
+	# since_start counters work and nothing is announced again. When some current step already has one, the
+	# front has grown since the save (a newer build put more steps into a started group - the lamp roads joining
+	# the lamp search, CH2-001): those start in the next evaluate() like any new step (start event, hint; the
+	# group is not announced twice), and a road whose lamp is already lit completes and pays right there.
 	if is_active():
-		for s in _pending_front():
-			if not baselines.has(s["id"]):
+		var front := _pending_front()
+		var started := false
+		for s in front:
+			if baselines.has(s["id"]):
+				started = true
+		if not started:
+			for s in front:
 				baselines[s["id"]] = _baseline_for(s)
 
 

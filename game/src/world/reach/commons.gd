@@ -20,10 +20,23 @@ const Palette := preload("res://src/art/palette.gd")
 const NodeVisuals := preload("res://src/world/common/node_visuals.gd")
 const Interactable := preload("res://src/world/reach/reach_interactable.gd")
 const LoreData := preload("res://data/lore_ch2_reach.gd")
+const WestArt := preload("res://src/world/reach/west/west_art.gd")
+const SurfaceProps := preload("res://src/world/surface/props.gd")
+const JACK_RADIUS := 0.4
+## The cottage lot's footing outline: half size (x, z) and yaw around Reach.OUTPOST_BUILD_AREA["center"].
+const LOT_HALF := Vector2(3.0, 2.4)
+const LOT_YAW := 0.2
 
 const MAP_FLAG := "ch2_read_festival_map"
 const BOARD_LORE := "lore_ch2_festival_board"
 const BOARD_SPEAKER := "Festival Board"
+## Festival map board: where the title sits and where the Manor road ends (relative to the painted Commons dot).
+const BOARD_TITLE_Y := 2.03
+const BOARD_TITLE_PX := 40
+const BOARD_TITLE_PIXEL := 0.0042
+const BOARD_MAP_ORIGIN := Vector3(0, 1.2, 0.07)     # the painted Commons dot
+const MANOR_PIN := Vector3(0.12, 0.61, 0)           # ... and the Manor lamp, relative to it
+const BOARD_PIN_RADIUS := 0.07
 
 var terrain: RefCounted
 var board: Node3D
@@ -35,6 +48,9 @@ var _body: StaticBody3D
 var _bulbs: Array = []           # Transform3D of every string-light bulb
 var _wires := NodeVisuals.Merger.new()
 var _pumpkins: Array = [[], [], [], []]
+var _jacks: Array = []           # Transform3D of every carved jack-o'-lantern (radius-1 space scaled by JACK_RADIUS)
+static var _leaf_mesh: ArrayMesh = null
+static var _leaf_mat: StandardMaterial3D = null
 
 
 func _ready() -> void:
@@ -166,9 +182,10 @@ func _build_stalls() -> void:
 		var a := xf * Vector3(-1.5, 2.5, 0.8)
 		var b := xf * Vector3(1.5, 2.5, 0.8)
 		_string(a, b, 0.12, 7)
-		var name_pos := xf * Vector3(0, 3.28, -0.35)
-		var l := Props.label(self, _stall_name(kind), name_pos, 30, Color("3b2a22"), yaw, 0.004)
-		l.width = 380.0
+		# big, dark, outlined lettering on the cream board, fitted inside it and facing the Commons (front only:
+		# the back of the board faces the stall's own shelf)
+		Props.sign_text(self, _stall_name(kind), xf * Transform3D(Basis(), Props.STALL_BOARD_POS), Props.STALL_BOARD, 0.08,
+			{"back": false, "font_size": 64, "px": 0.0068, "margin": 0.06, "color": Color("3b2418"), "outline_color": Color("fff4dc"), "outline": 10})
 
 
 static func _stall_name(kind: String) -> String:
@@ -262,11 +279,16 @@ func _build_pumpkin_arch() -> void:
 		var z := 0.25 if side == 0 else 0.19
 		var l := Props.label(root, "Lanternwake", Vector3(0, 4.28, z), 72, Color("f7e2b0"), 0.0 if side == 0 else PI, 0.0055)
 		l.outline_modulate = Color("3b2a22")
-	# pumpkins stacked up both posts and along the arc
+	# pumpkins stacked up both posts and along the arc; the front two at each post are carved jack-o'-lanterns
+	# that face the arrival road (a dark cut by day, a warm glow at night)
 	for sx in [-1.0, 1.0]:
 		for k in 4:
 			var s := 0.9 - float(k) * 0.12
-			_pumpkins[k % 4].append(Transform3D(Basis(Vector3.UP, float(k)).scaled(Vector3(s, s, s)), base + Vector3(float(sx) * (half + 0.62), float(k) * 0.02, 0.35 - float(k) * 0.3)))
+			var at := base + Vector3(float(sx) * (half + 0.62), float(k) * 0.02, 0.35 - float(k) * 0.3)
+			if k < 2:
+				_jacks.append(Transform3D(Basis(Vector3.UP, float(sx) * -0.35 * float(k + 1)).scaled(Vector3.ONE * JACK_RADIUS * s), at))
+			else:
+				_pumpkins[k % 4].append(Transform3D(Basis(Vector3.UP, float(k)).scaled(Vector3(s, s, s)), at))
 	for i in 9:
 		var t := (float(i) + 0.5) / 9.0
 		var q: Vector3 = arc.call(t)
@@ -296,7 +318,12 @@ func _build_arrival() -> void:
 		root.add_child(glass)
 		Props.cyl_col(_body, root.position, 0.12, 2.4)
 		for k in 3:
-			_pumpkins[(k + int(sx + 1.0)) % 4].append(Transform3D(Basis(Vector3.UP, float(k)).scaled(Vector3.ONE * (0.9 - float(k) * 0.15)), _v3(q + Vector2(float(sx) * (0.7 + float(k) * 0.55), 0.5 + float(k) * 0.3), -0.04)))
+			var at2 := q + Vector2(float(sx) * (0.7 + float(k) * 0.55), 0.5 + float(k) * 0.3)
+			if k == 0:
+				# a carved jack-o'-lantern beside each arrival lamp, grinning at the traveller
+				_jacks.append(Transform3D(Basis(Vector3.UP, Props.face_yaw(at2, p + Vector2(0, 2.0))).scaled(Vector3.ONE * JACK_RADIUS * 0.9), _v3(at2, -0.04)))
+			else:
+				_pumpkins[(k + int(sx + 1.0)) % 4].append(Transform3D(Basis(Vector3.UP, float(k)).scaled(Vector3.ONE * (0.9 - float(k) * 0.15)), _v3(at2, -0.04)))
 	# a welcome bench beside the arrival, turned toward the festival below
 	var bq := p + Vector2(-4.6, 1.0)
 	var bxf := Transform3D(Basis(Vector3.UP, Props.face_yaw(bq, Reach.COMMONS["pole"])), _v3(bq, -0.03))
@@ -319,32 +346,52 @@ func _build_arrival() -> void:
 func _build_lot() -> void:
 	var c: Vector2 = Reach.OUTPOST_BUILD_AREA["center"]
 	var h: float = terrain.height_at(c.x, c.y)
-	# a flush stone footing outline (visual only: the whole build area stays free for building)
+	# a stone footing outline sitting ON the ground (each stone follows the terrain, ~12 cm proud of it) around a
+	# patch of packed earth (reach_world clears the grass and tints the ground inside it), with corner stakes and a
+	# string line: it reads as "a cottage goes here". Visual only: no colliders, the build area stays free.
 	var m := NodeVisuals.Merger.new()
-	var hw := 3.0
-	var hd := 2.4
-	for i in 14:
-		var t := float(i) / 14.0
-		var per := 2.0 * (hw * 2.0 + hd * 2.0)
-		var s := t * per
-		var q := Vector3.ZERO
-		if s < hw * 2.0:
-			q = Vector3(-hw + s, 0, -hd)
-		elif s < hw * 2.0 + hd * 2.0:
-			q = Vector3(hw, 0, -hd + (s - hw * 2.0))
-		elif s < hw * 4.0 + hd * 2.0:
-			q = Vector3(hw - (s - hw * 2.0 - hd * 2.0), 0, hd)
-		else:
-			q = Vector3(-hw, 0, hd - (s - hw * 4.0 - hd * 2.0))
-		m.add(Kit.blob_mesh(0.5, 7670 + i, 0.2, 0.3, 1), Transform3D(Basis(Vector3.UP, float(i)).scaled(Vector3(1.1, 0.35, 0.8)), q + Vector3(0, -0.05, 0)), Color("b8ab9a"))
+	var hw := LOT_HALF.x
+	var hd := LOT_HALF.y
+	var rot := Basis(Vector3.UP, LOT_YAW)
+	var per := 2.0 * (hw * 2.0 + hd * 2.0)
+	var n_stones := 22
+	for i in n_stones:
+		var s := float(i) / float(n_stones) * per
+		var q := lot_perimeter_point(s)
+		var wq := Vector3(c.x, 0.0, c.y) + rot * q
+		var gy: float = terrain.height_at(wq.x, wq.z) - h
+		m.add(Kit.blob_mesh(0.5, 7670 + i, 0.2, 0.3, 1), Transform3D(Basis(Vector3.UP, float(i)).scaled(Vector3(0.9, 0.5, 0.7)), q + Vector3(0, gy + 0.04, 0)), Color("c2b5a2") if i % 3 != 0 else Color("a89c8b"))
+	var corners: Array = []
+	var ms := NodeVisuals.Merger.new()     # stakes + string: no outline (a hull would swallow a 1.6 cm string)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var cq := Vector3(float(sx) * (hw + 0.25), 0.0, float(sz) * (hd + 0.25))
+			var wc := Vector3(c.x, 0.0, c.y) + rot * cq
+			cq.y = terrain.height_at(wc.x, wc.z) - h
+			corners.append(cq)
+			ms.add(NodeVisuals._cyl(0.03, 0.04, 0.62, 5), Transform3D(Basis(), cq + Vector3(0, 0.26, 0)), Palette.WOOD_DARK)
+			ms.add(NodeVisuals._box(Vector3(0.1, 0.06, 0.02)), Transform3D(Basis(), cq + Vector3(0.05, 0.5, 0)), Props.CLOTH["red"])
+	# the string line between the stakes (0 -> 1 -> 3 -> 2 -> 0 walks the rectangle)
+	for pair in [[0, 1], [1, 3], [3, 2], [2, 0]]:
+		var a: Vector3 = corners[pair[0]] + Vector3(0, 0.46, 0)
+		var b: Vector3 = corners[pair[1]] + Vector3(0, 0.46, 0)
+		Props.wire(ms, Props.catenary(a, b, 0.05, 8), 0.008, Color("efe3c6"))
 	var mi := MeshInstance3D.new()
 	mi.name = "CottageFooting"
 	mi.mesh = m.commit()
 	mi.material_override = Props.stone_mat()
 	mi.position = Vector3(c.x, h, c.y)
-	mi.rotation.y = 0.2
+	mi.rotation.y = LOT_YAW
 	mi.visibility_range_end = 110.0
 	add_child(mi)
+	var stakes_mi := MeshInstance3D.new()
+	stakes_mi.name = "LotStakes"
+	stakes_mi.mesh = ms.commit()
+	stakes_mi.material_override = Mat.toon(Color.WHITE, {"vertex_color": true})
+	stakes_mi.transform = mi.transform
+	stakes_mi.visibility_range_end = 70.0
+	stakes_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(stakes_mi)
 	# the lot sign stands just outside the build area
 	var sp: Vector2 = Reach.COMMONS["lot_sign"]
 	var root := Node3D.new()
@@ -359,13 +406,27 @@ func _build_lot() -> void:
 	smi.mesh = sm.commit()
 	smi.material_override = Props.wood_mat()
 	root.add_child(smi)
-	Props.label(root, "Lot for\na cottage", Vector3(0, 1.2, 0.09), 30, Color("3b2a22"), 0.0, 0.004)
+	Props.sign_text(root, "Lot for\na cottage", Transform3D(Basis(Vector3.BACK, 0.05), Vector3(0, 1.2, 0.05)), Vector2(0.9, 0.5), 0.06,
+		{"back": false, "font_size": 40, "px": 0.004, "outline": 6})
 	Props.box_col(_body, Transform3D(Basis(Vector3.UP, root.rotation.y), root.position + Vector3(0, 0.65, 0)), Vector3(0.9, 1.3, 0.15))
 	lot_sign = Interactable.new()
 	lot_sign.setup({"text": "Read the sign", "size": Vector3(1.2, 1.6, 1.0), "offset": Vector3(0, 0.9, 0.3),
 		"handler": Callable(self, "_read_lot_sign"), "marker_y": 2.1})
 	lot_sign.name = "LotSignInteract"
 	root.add_child(lot_sign)
+
+
+## A point on the lot outline `s` metres along its perimeter (local, y = 0), starting at the (-x, -z) corner.
+static func lot_perimeter_point(s: float) -> Vector3:
+	var hw := LOT_HALF.x
+	var hd := LOT_HALF.y
+	if s < hw * 2.0:
+		return Vector3(-hw + s, 0, -hd)
+	if s < hw * 2.0 + hd * 2.0:
+		return Vector3(hw, 0, -hd + (s - hw * 2.0))
+	if s < hw * 4.0 + hd * 2.0:
+		return Vector3(hw - (s - hw * 2.0 - hd * 2.0), 0, hd)
+	return Vector3(-hw, 0, hd - (s - hw * 4.0 - hd * 2.0))
 
 
 func _read_lot_sign(_player: Node) -> void:
@@ -392,14 +453,15 @@ func _build_board() -> void:
 	m.add(NodeVisuals._box(Vector3(2.16, 0.1, 0.14)), Transform3D(Basis(), Vector3(0, 0.84, 0.02)), Palette.WOOD_DARK)
 	# the painted map: three roads from the Commons (bottom) to three lamps
 	var ink := Color("6a4a3a")
-	var mp := Vector3(0, 1.2, 0.07)
+	var mp := BOARD_MAP_ORIGIN
 	Props.wire(m, PackedVector3Array([mp, mp + Vector3(0, 0.3, 0)]), 0.025, ink)
 	Props.wire(m, PackedVector3Array([mp + Vector3(0, 0.3, 0), mp + Vector3(-0.7, 0.45, 0)]), 0.025, Color("d9822f"))
 	Props.wire(m, PackedVector3Array([mp + Vector3(0, 0.3, 0), mp + Vector3(0.7, 0.4, 0)]), 0.025, Color("b8423a"))
-	Props.wire(m, PackedVector3Array([mp + Vector3(0, 0.3, 0), mp + Vector3(0.15, 0.78, 0)]), 0.025, Color("7a4a7e"))
+	# the Manor road stops well below the title (its lamp must never cover the lettering)
+	Props.wire(m, PackedVector3Array([mp + Vector3(0, 0.3, 0), mp + Vector3(0.12, 0.6, 0)]), 0.025, Color("7a4a7e"))
 	m.add(NodeVisuals._sph(0.07, 4, 8), Transform3D(Basis(), mp + Vector3(-0.72, 0.46, 0)), Color("e9822f"))
 	m.add(NodeVisuals._sph(0.07, 4, 8), Transform3D(Basis(), mp + Vector3(0.72, 0.41, 0)), Color("b8423a"))
-	m.add(NodeVisuals._sph(0.07, 4, 8), Transform3D(Basis(), mp + Vector3(0.15, 0.8, 0)), Color("7a4a7e"))
+	m.add(NodeVisuals._sph(BOARD_PIN_RADIUS, 4, 8), Transform3D(Basis(), mp + MANOR_PIN), Color("7a4a7e"))
 	m.add(NodeVisuals._sph(0.06, 4, 8), Transform3D(Basis(), mp), Color("e2b23e"))
 	# a little roof
 	m.add(NodeVisuals._box(Vector3(2.3, 0.06, 0.6)), Transform3D(Basis(Vector3.RIGHT, 0.35), Vector3(0, 2.52, 0.1)), Props.CLOTH["plum"])
@@ -407,10 +469,10 @@ func _build_board() -> void:
 	mi.mesh = m.commit()
 	mi.material_override = Props.wood_mat()
 	root.add_child(mi)
-	Props.label(root, "Lanternwake", Vector3(0, 2.03, 0.075), 40, Color("5a2e2a"), 0.0, 0.0042)
+	Props.label(root, "Lanternwake", Vector3(0, BOARD_TITLE_Y, 0.075), BOARD_TITLE_PX, Color("5a2e2a"), 0.0, BOARD_TITLE_PIXEL)
 	Props.label(root, "Orchard", Vector3(-0.66, 1.52, 0.075), 20, Color("6a4a3a"), 0.0, 0.0042)
 	Props.label(root, "Quarry", Vector3(0.64, 1.48, 0.075), 20, Color("6a4a3a"), 0.0, 0.0042)
-	Props.label(root, "Manor", Vector3(0.36, 1.92, 0.075), 20, Color("6a4a3a"), 0.0, 0.0042)
+	Props.label(root, "Manor", Vector3(0.43, 1.83, 0.075), 20, Color("6a4a3a"), 0.0, 0.0042)
 	Props.label(root, "Commons", Vector3(0, 1.08, 0.075), 20, Color("6a4a3a"), 0.0, 0.0042)
 	Props.box_col(_body, Transform3D(Basis(Vector3.UP, root.rotation.y), root.position + Vector3(0, 1.3, 0)), Vector3(2.1, 2.6, 0.2))
 	board = Interactable.new()
@@ -498,7 +560,15 @@ func _finish_batches() -> void:
 	var pk_mat := Mat.outlined(Mat.toon(Color.WHITE, {"vertex_color": true, "rim": 0.35, "specular": 0.3}), 0.014)
 	for v in 4:
 		if not (_pumpkins[v] as Array).is_empty():
-			add_child(preload("res://src/world/surface/props.gd").multimesh(Flora.pumpkin_mesh(v), pk_mat, _pumpkins[v], "CommonsPumpkins%d" % v, 110.0))
+			add_child(SurfaceProps.multimesh(Flora.pumpkin_mesh(v), pk_mat, _pumpkins[v], "CommonsPumpkins%d" % v, 110.0))
+	if not _jacks.is_empty():
+		var stems: Array = []
+		for j in _jacks:
+			var jx: Transform3D = j
+			stems.append(jx * Transform3D(Basis(), Vector3(0, WestArt.pumpkin_top(1), 0)))
+		add_child(SurfaceProps.multimesh(WestArt.pumpkin_body(1), WestArt.prop_material(), _jacks, "JackOLanterns", 110.0))
+		add_child(SurfaceProps.multimesh(WestArt.pumpkin_stem(false), WestArt.prop_material(), stems, "JackOLanternStems", 80.0))
+		add_child(SurfaceProps.multimesh(WestArt.carved_face(1), WestArt.carved_material(), _jacks, "JackOLanternFaces", 110.0, false))
 
 
 func _bulbs_node() -> MultiMeshInstance3D:
@@ -534,14 +604,8 @@ func _build_leaves() -> void:
 	p.angular_velocity_max = 90.0
 	p.scale_amount_min = 0.8
 	p.scale_amount_max = 1.4
-	var q := QuadMesh.new()
-	q.size = Vector2(0.14, 0.1)
-	p.mesh = q
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.roughness = 1.0
-	p.material_override = mat
+	p.mesh = leaf_mesh()
+	p.material_override = leaf_material()
 	var g := Gradient.new()
 	g.set_color(0, Color("e9923a"))
 	g.set_color(1, Color("b8423a"))
@@ -549,6 +613,51 @@ func _build_leaves() -> void:
 	p.position = _v3(Reach.COMMONS["pole"], 9.0)
 	p.visibility_aabb = AABB(Vector3(-24, -12, -24), Vector3(48, 16, 48))
 	add_child(p)
+
+
+## A little pointed autumn leaf (~13 x 9 cm): a lobed outline fanned from its stem, with a centre vein fold so it
+## catches the light as it tumbles. Built once.
+static func leaf_mesh() -> ArrayMesh:
+	if _leaf_mesh != null:
+		return _leaf_mesh
+	var outline := PackedVector2Array([Vector2(0.0, 0.07), Vector2(0.03, 0.045), Vector2(0.05, 0.05), Vector2(0.045, 0.015),
+		Vector2(0.06, -0.005), Vector2(0.03, -0.02), Vector2(0.012, -0.045), Vector2(0.0, -0.035), Vector2(-0.012, -0.045),
+		Vector2(-0.03, -0.02), Vector2(-0.06, -0.005), Vector2(-0.045, 0.015), Vector2(-0.05, 0.05), Vector2(-0.03, 0.045)])
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var hub := Vector3(0, -0.01, 0.006)
+	for i in outline.size():
+		var a := outline[i]
+		var b := outline[(i + 1) % outline.size()]
+		# the two halves fold slightly along the vein (x = 0)
+		var va := Vector3(a.x, a.y, -absf(a.x) * 0.25)
+		var vb := Vector3(b.x, b.y, -absf(b.x) * 0.25)
+		var n := (va - hub).cross(vb - hub).normalized()
+		verts.append_array(PackedVector3Array([hub, va, vb]))
+		normals.append_array(PackedVector3Array([n, n, n]))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	_leaf_mesh = ArrayMesh.new()
+	_leaf_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return _leaf_mesh
+
+
+## Two-sided leaf colour (the particle colour ramp); it fades out when it drifts within ~2 m of the camera, so a
+## leaf can never fill the screen as a big flat card.
+static func leaf_material() -> StandardMaterial3D:
+	if _leaf_mat != null:
+		return _leaf_mat
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.roughness = 1.0
+	mat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_DITHER
+	mat.distance_fade_min_distance = 1.2
+	mat.distance_fade_max_distance = 2.6
+	_leaf_mat = mat
+	return mat
 
 
 func set_daylight(daylight: float) -> void:

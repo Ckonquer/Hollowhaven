@@ -4,7 +4,8 @@ extends Node3D
 ## Striking the plates in the required order activates it (signal activated). Each strike shows the plate
 ## lighting up + its name, and a caption names it - never pitch, never colour alone, no timing window
 ## (window_seconds() is INF with timing_assist; boss modules that want a window read it).
-## A wrong plate gives a gentle "flat note" and restarts the sequence (never damage).
+## A wrong plate gives a gentle "flat note" and restarts the sequence (never damage). While `enabled` is false
+## (the Choir's Phases A and C) the plates show no prompt at all (plate_prompt) and strike() returns "idle".
 ##   var r = Resonator.new(); r.setup({"id": "hw_resonator_west", "symbols": Layout.bell_symbols()})
 ##   r.set_sequence(["moon", "leaf", "bell"]); r.strike("moon") -> "progress" | "done" | "wrong" | "idle"
 ## Default sequence = the symbols in their taught order (usable without a boss driving it).
@@ -21,6 +22,8 @@ const Interactable := preload("res://src/world/below/below_interactable.gd")
 
 const PLATE_SIZE := 0.95
 const PLATE_GAP := 1.25
+const PLATE_RADIUS := 0.56         # the bronze plate disc (the lit ring behind it is 0.6)
+const NAME_LIFT := 0.3             # the name label's centre sits this far above the plate rim (on its rod)
 const WINDOW_SECONDS := 12.0
 
 var resonator_id: String = ""
@@ -147,15 +150,24 @@ func _build() -> void:
 		add_child(holder)
 		holder.position = Vector3((float(i) - float(n - 1) * 0.5) * PLATE_GAP, 1.75, 0.0)
 		Kit.add(holder, Kit.cylinder(0.012, 0.012, 1.0, bronze, 5), Vector3(0, 0.75, 0))
-		Kit.add(holder, Kit.cylinder(0.56, 0.56, 0.08, bronze, 20), Vector3.ZERO, Vector3(90, 0, 0))
+		Kit.add(holder, Kit.cylinder(PLATE_RADIUS, PLATE_RADIUS, 0.08, bronze, 20), Vector3.ZERO, Vector3(90, 0, 0))
 		var lit := Kit.cylinder(0.6, 0.6, 0.04, Mat.glow(Palette.LANTERN_GLOW, 1.6), 20)
 		Kit.add(holder, lit, Vector3(0, 0, -0.05), Vector3(90, 0, 0))
 		lit.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		var sym := Art.symbol(holder, sid, PLATE_SIZE * 0.8, Color("f3e6c8"), String(s.get("name", sid.capitalize())))
 		sym.position = Vector3(0, 0, 0.07)
+		# The name sits ABOVE the plate's rim, on its rod (it overlapped the rim, so the next plate hid it when the
+		# rack is seen at an angle: VISUAL_BUGS IN-10). From the usual raised camera a label above the discs is
+		# never behind a nearer disc; it stays flat on the rack so neighbouring names never overlap, even edge-on.
+		var tag: Variant = sym.get_node_or_null("Name")
+		if tag is Label3D:
+			var t := tag as Label3D
+			t.position = Vector3(0, PLATE_RADIUS + NAME_LIFT, 0.05)
+			t.font_size = 36
 		var it: Node3D = Interactable.new()
 		it.setup({"text": "Strike the %s plate" % String(s.get("name", sid.capitalize())), "size": Vector3(1.1, 1.3, 1.0),
-			"offset": Vector3(0, 0, 0.4), "handler": Callable(self, "_on_plate").bind(sid), "id": resonator_id + "_" + sid})
+			"offset": Vector3(0, 0, 0.4), "handler": Callable(self, "_on_plate").bind(sid), "id": resonator_id + "_" + sid,
+			"text_func": Callable(self, "plate_prompt").bind(sid)})
 		it.name = "Strike_" + sid
 		holder.add_child(it)
 		_plates[sid] = {"node": holder, "lit": lit}
@@ -180,6 +192,15 @@ func _build() -> void:
 
 func _on_plate(_player: Node, symbol_id: String) -> void:
 	strike(symbol_id)
+
+
+## A plate's interaction prompt (its Interactable's text_func): none at all while the resonator is disabled (the
+## Choir's Phases A and C switch the plates off - a "Strike" prompt there would promise a strike that does nothing),
+## else "Strike the <name> plate".
+func plate_prompt(symbol_id: String) -> Dictionary:
+	if not enabled:
+		return {}
+	return {"text": "Strike the %s plate" % String(_symbol(symbol_id).get("name", symbol_id.capitalize())), "enabled": true}
 
 
 func _refresh() -> void:

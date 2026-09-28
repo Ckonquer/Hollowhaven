@@ -2,6 +2,8 @@ extends RefCounted
 ## Dispatcher for structure visuals and collision shapes (every id in data/structures.gd).
 ##   var parts := StructureModels.build("storage_chest", model_root)   # -> {"lid": Node3D}
 ##   StructureModels.build("pumpkin_lantern", root, {"face": "cat"})   # Chapter Two model options
+## Model options (structure.gd model_opts): "face" (pumpkin), "level" (>= 1: wall panels upstairs stand on a
+## timber sill instead of the stone footing), "mount_dir" (wall decor on a window, placement.gd mount_info).
 ## Build previews (ghosts) reuse build() and then swap every material for a translucent one.
 ## Chapter Two pieces: models_storey.gd (stairs, upper floors, railings, walls, roofs, trim), models_cozy.gd
 ## (furniture and stations), models_seasonal.gd (lights, keepsakes and Halloween decor).
@@ -22,6 +24,8 @@ static var _shape_cache: Dictionary = {}
 
 
 static func build(structure_id: String, root: Node3D, opts: Dictionary = {}) -> Dictionary:
+	var up := int(opts.get("level", 0)) >= 1
+	var mdir := int(opts.get("mount_dir", 0))
 	match structure_id:
 		"workbench": return Furniture.workbench(root)
 		"storage_chest": return Furniture.storage_chest(root)
@@ -31,9 +35,9 @@ static func build(structure_id: String, root: Node3D, opts: Dictionary = {}) -> 
 		"rug": return Furniture.rug(root)
 		"crop_plot": return CropModels.plot(root)
 		"wood_floor": return Parts.wood_floor(root)
-		"wood_wall": return Parts.wood_wall(root)
-		"wood_window": return Parts.wood_window(root)
-		"wood_doorway": return Parts.wood_doorway(root)
+		"wood_wall": return Parts.wood_wall(root, up)
+		"wood_window": return Parts.wood_window(root, up)
+		"wood_doorway": return Parts.wood_doorway(root, up)
 		"wood_roof": return Parts.wood_roof(root)
 		"fence": return Parts.fence(root)
 		"lantern_post": return Decor.lantern_post(root)
@@ -46,15 +50,15 @@ static func build(structure_id: String, root: Node3D, opts: Dictionary = {}) -> 
 		"wood_stairs": return Storey.wood_stairs(root)
 		"upper_floor": return Storey.upper_floor(root)
 		"wood_railing": return Storey.wood_railing(root)
-		"half_wall": return Storey.half_wall(root)
+		"half_wall": return Storey.half_wall(root, up)
 		"porch_post": return Storey.porch_post(root)
-		"arched_window": return Storey.arched_window(root)
-		"crescent_window": return Storey.crescent_window(root)
+		"arched_window": return Storey.arched_window(root, up)
+		"crescent_window": return Storey.crescent_window(root, up)
 		"gable_roof": return Storey.gable_roof(root)
 		"roof_corner": return Storey.roof_corner(root)
 		"gothic_trim": return Storey.gothic_trim(root)
-		"flower_box": return Cozy.flower_box(root)
-		"curtain": return Cozy.curtain(root)
+		"flower_box": return Cozy.flower_box(root, mdir)
+		"curtain": return Cozy.curtain(root, mdir)
 		"bookshelf": return Cozy.bookshelf(root)
 		"wardrobe": return Cozy.wardrobe(root)
 		"vanity_mirror": return Cozy.vanity_mirror(root)

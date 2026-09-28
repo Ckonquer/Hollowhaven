@@ -5,11 +5,23 @@ extends RefCounted
 ## "roseberry_bush" (hand; drops include the seeds). The FIRST harvest there sets c1x_found_new_crops (objective
 ## flag) and grants the content bundle rw_c1x_gardener (a starter seed packet) once through the ledger. The goal's
 ## own reward and "c1x_grew_new_crop" belong to the optional log / farming module.
-##   MeadowPatch.build(area)
+##   MeadowPatch.build(area)            MeadowPatch.grass_clearings() -> [[Vector2, radius]] (trimmed round the sunflax)
 ## Patch node (group "c1x_meadow_patch"): mark_found() -> bool (true the first time), nodes: Array.
 
 const L := preload("res://data/c1x_layout.gd")
 const Common := preload("res://src/world/surface/c1x/common.gd")
+
+
+## The meadow grass is trimmed around the sunflax clumps (surface annexes.gd clears it before the grass is built),
+## so the golden heads stand clear of the tall Sunny Meadow grass instead of disappearing in it.
+const SUNFLAX_CLEARING := 1.3
+
+
+static func grass_clearings() -> Array:
+	var out: Array = []
+	for d in L.SUNFLAX:
+		out.append([d["pos"], SUNFLAX_CLEARING])
+	return out
 
 
 static func build(area: Node3D) -> void:

@@ -2,6 +2,8 @@ extends RefCounted
 ## Cottage building pieces: wooden floor tile, wall panels (plain / round window / arched doorway),
 ## thatch roof tile and picket fence. Walls run along X at rotation 0, centred on the grid line.
 ## Corner posts sit exactly on the wall ends so neighbouring panels share them seamlessly.
+## Chapter Two: wall panels built upstairs (`upper`, model option "level" >= 1) stand on a timber sill beam
+## instead of the stone footing (a storey line, not a second foundation); the ground-floor meshes are unchanged.
 
 const Palette := preload("res://src/art/palette.gd")
 const U := preload("res://src/building/model_util.gd")
@@ -46,13 +48,28 @@ static func wood_floor(root: Node3D) -> Dictionary:
 
 # --- Walls ----------------------------------------------------------------------------------------------
 
-static func _frame(b: Batch, stone_left: float = -1.0, stone_right: float = 1.0) -> void:
+static func _frame(b: Batch, stone_left: float = -1.0, stone_right: float = 1.0, upper: bool = false) -> void:
 	# Corner posts centred on the panel ends (shared with neighbours), top beam, cobbled footing.
 	for sx in [-1.0, 1.0]:
 		b.rbox(Vector3(0.24, WALL_H, 0.26), Vector3(1.0 * sx, WALL_H * 0.5, 0), Palette.WOOD_DARK, 0.04)
 	b.rbox(Vector3(2.0, 0.22, 0.25), Vector3(0, WALL_H - 0.11, 0), Palette.WOOD_DARK, 0.04)
 	if stone_right > stone_left:
-		_cobbles(b, stone_left, stone_right)
+		_footing(b, stone_left, stone_right, upper)
+
+
+## The panel's footing between x0 and x1: chunky stones on the ground, a timber sill beam upstairs.
+static func _footing(b: Batch, x0: float, x1: float, upper: bool) -> void:
+	if not upper:
+		_cobbles(b, x0, x1)
+		return
+	b.rbox(Vector3(x1 - x0, PLANK_BOTTOM - 0.04, 0.24), Vector3((x0 + x1) * 0.5, (PLANK_BOTTOM - 0.04) * 0.5, 0), Palette.BARK, 0.04)
+	b.rbox(Vector3(x1 - x0, 0.07, 0.28), Vector3((x0 + x1) * 0.5, PLANK_BOTTOM - 0.035, 0), Palette.WOOD_DARK, 0.025)
+	# A peg head every 0.5 m on both faces, like the timber frame downstairs.
+	var n := maxi(1, int(roundf((x1 - x0) / 0.5)))
+	for i in n:
+		var x := x0 + (x1 - x0) * (float(i) + 0.5) / float(n)
+		for sz in [-1.0, 1.0]:
+			b.sphere(0.025, Vector3(x, 0.13, 0.121 * sz), Palette.BARK_DARK, Vector3(1, 1, 0.4))
 
 
 ## A row of chunky rounded footing stones between x0 and x1.
@@ -84,9 +101,14 @@ static func _planks(b: Batch, x0: float, x1: float, y0: float, y1: float) -> voi
 		i += 1
 
 
-static func wood_wall(root: Node3D) -> Dictionary:
-	var mesh := U.baked("wood_wall", func(b: Batch) -> void:
-		_frame(b)
+## Suffix of the baked-mesh key for the upstairs variant ("" on the ground: the legacy key).
+static func storey_key(upper: bool) -> String:
+	return "|up" if upper else ""
+
+
+static func wood_wall(root: Node3D, upper: bool = false) -> Dictionary:
+	var mesh := U.baked("wood_wall" + storey_key(upper), func(b: Batch) -> void:
+		_frame(b, -1.0, 1.0, upper)
 		_planks(b, -INNER, INNER, PLANK_BOTTOM, PLANK_TOP)
 		b.rbox(Vector3(1.8, 0.1, 0.2), Vector3(0, 1.05, 0), Palette.WOOD_DARK, 0.03)
 	)
@@ -94,9 +116,9 @@ static func wood_wall(root: Node3D) -> Dictionary:
 	return {}
 
 
-static func wood_window(root: Node3D) -> Dictionary:
-	var mesh := U.baked("wood_window", func(b: Batch) -> void:
-		_frame(b)
+static func wood_window(root: Node3D, upper: bool = false) -> Dictionary:
+	var mesh := U.baked("wood_window" + storey_key(upper), func(b: Batch) -> void:
+		_frame(b, -1.0, 1.0, upper)
 		var h := WINDOW_HOLE
 		# Planks: full outside the hole, split above/below it inside.
 		_planks(b, -INNER, -h, PLANK_BOTTOM, PLANK_TOP)
@@ -130,11 +152,11 @@ static func wood_window(root: Node3D) -> Dictionary:
 	return {}
 
 
-static func wood_doorway(root: Node3D) -> Dictionary:
-	var mesh := U.baked("wood_doorway", func(b: Batch) -> void:
+static func wood_doorway(root: Node3D, upper: bool = false) -> Dictionary:
+	var mesh := U.baked("wood_doorway" + storey_key(upper), func(b: Batch) -> void:
 		_frame(b, 1.0, 0.0)     # no continuous footing: the opening stays clear
-		_cobbles(b, -1.0, -DOOR_HALF)
-		_cobbles(b, DOOR_HALF, 1.0)
+		_footing(b, -1.0, -DOOR_HALF, upper)
+		_footing(b, DOOR_HALF, 1.0, upper)
 		for sx in [-1.0, 1.0]:
 			b.rbox(Vector3(0.2, DOOR_SPRING, 0.26), Vector3((DOOR_HALF + 0.1) * sx, DOOR_SPRING * 0.5, 0), Palette.WOOD_DARK, 0.035)
 		_planks(b, -INNER, -(DOOR_HALF + 0.19), PLANK_BOTTOM, PLANK_TOP)
@@ -164,6 +186,7 @@ static func wood_doorway(root: Node3D) -> Dictionary:
 
 const ROOF_RISE := 1.2
 const ROOF_EAVE := 0.22        # overhang past the low edge
+const UNDER_SLAB := 0.14       # timber under-slab thickness (top 0.04 above the slope line, as before)
 
 static func roof_profile() -> Dictionary:
 	# Low eave at +Z, ridge at -Z (rotation 0). Pair two tiles back to back for a gable.
@@ -174,39 +197,13 @@ static func roof_profile() -> Dictionary:
 
 static func wood_roof(root: Node3D) -> Dictionary:
 	var mesh := U.baked("wood_roof", func(b: Batch) -> void:
-		var prof := roof_profile()
-		var e: Vector2 = prof["eave"]
-		var r: Vector2 = prof["ridge"]
-		var ang: float = prof["angle"]
-		var dir := (r - e).normalized()          # up the slope in (z, y)
-		var n := Vector2(dir.y, -dir.x)          # surface normal (z, y) pointing up/out
-		if n.y < 0.0:
-			n = -n
-		var length := e.distance_to(r)
-		var mid := (e + r) * 0.5
-		# Timber under-slab (seen from inside) and gable ends
-		b.rbox(Vector3(2.12, 0.08, length), Vector3(0, mid.y, mid.x), Palette.WOOD_DARK, 0.02, Vector3(ang, 0, 0))
+		_roof_slab(b)
 		for sx in [-1.0, 1.0]:
 			b.prism(Vector3(2.0, ROOF_RISE, 0.08), Vector3(0.95 * sx, ROOF_RISE * 0.5, 0), Palette.WOOD, Vector3(0, -90, 0), 0.0)
-		# Puffy thatch courses, each overlapping the one below like shingles
-		var rows := 4
-		var tcols := [Palette.THATCH, Palette.THATCH.lightened(0.07), Palette.THATCH.darkened(0.04), Palette.THATCH.lightened(0.03)]
-		var tufts := 7
-		for i in rows:
-			var t := (float(i) + 0.5) / float(rows)
-			var p := e.lerp(r, t) + n * 0.13
-			# Each course is a row of overlapping straw bundles: rounded ends make a scalloped edge.
-			for k in tufts:
-				var x := -1.13 + (2.26 / float(tufts)) * (float(k) + 0.5) + (0.05 if i % 2 == 1 else 0.0)
-				var col: Color = (tcols[(i + k) % tcols.size()] as Color)
-				var sag := 0.015 * float((k * 3 + i) % 3)
-				b.rbox(Vector3(2.26 / float(tufts) + 0.1, 0.25, length / float(rows) + 0.24), Vector3(x, p.y - sag, p.x), col, 0.12, Vector3(ang + 10.0, 0, 0), false)
-		# Scalloped fringe along the eave
-		for k in 11:
-			var x := -1.08 + 2.16 * float(k) / 10.0
-			var fp := e + n * 0.08 - dir * 0.02
-			b.sphere(0.12, Vector3(x, fp.y, fp.x), Palette.THATCH.darkened(0.1), Vector3(1.0, 0.55, 0.85))
+		_roof_courses(b)
+		_roof_fringe(b)
 		# Ridge roll sits exactly on the tile edge, so back-to-back tiles share one seamless ridge
+		var r: Vector2 = roof_profile()["ridge"]
 		var ry := ROOF_RISE + 0.1
 		b.cyl(0.15, 0.15, 2.24, Vector3(0, ry, r.x), Palette.THATCH.darkened(0.2), Vector3(0, 0, 90), 16)
 		for x in [-0.72, 0.0, 0.72]:
@@ -214,6 +211,65 @@ static func wood_roof(root: Node3D) -> Dictionary:
 	)
 	U.instance(root, mesh, U.vc_outlined(0.012))
 	return {}
+
+
+## Slope frame of the roof tile at rot 0: {"e", "r" (eave / ridge (z, y)), "ang", "dir" (up the slope), "n" (surface
+## normal, up/out), "length", "mid"}. The slope pieces below are shared with the roof corner (models_storey.gd).
+static func roof_slope() -> Dictionary:
+	var prof := roof_profile()
+	var e: Vector2 = prof["eave"]
+	var r: Vector2 = prof["ridge"]
+	var dir := (r - e).normalized()          # up the slope in (z, y)
+	var n := Vector2(dir.y, -dir.x)          # surface normal (z, y) pointing up/out
+	if n.y < 0.0:
+		n = -n
+	return {"e": e, "r": r, "ang": float(prof["angle"]), "dir": dir, "n": n, "length": e.distance_to(r), "mid": (e + r) * 0.5}
+
+
+## Timber under-slab (seen from inside). Its top stays where it always was; it reaches UNDER_SLAB below the
+## slope so the tilted straw courses above never poke through the ceiling.
+static func _roof_slab(b: Batch) -> void:
+	var sl := roof_slope()
+	var n: Vector2 = sl["n"]
+	var slab_mid: Vector2 = (sl["mid"] as Vector2) - n * (UNDER_SLAB - 0.08) * 0.5
+	b.rbox(Vector3(2.12, UNDER_SLAB, float(sl["length"])), Vector3(0, slab_mid.y, slab_mid.x), Palette.WOOD_DARK, 0.02, Vector3(float(sl["ang"]), 0, 0))
+
+
+## Puffy thatch courses, each overlapping the one below like shingles.
+static func _roof_courses(b: Batch) -> void:
+	var sl := roof_slope()
+	var e: Vector2 = sl["e"]
+	var r: Vector2 = sl["r"]
+	var n: Vector2 = sl["n"]
+	var ang: float = sl["ang"]
+	var length: float = sl["length"]
+	var rows := 4
+	var tcols := [Palette.THATCH, Palette.THATCH.lightened(0.07), Palette.THATCH.darkened(0.04), Palette.THATCH.lightened(0.03)]
+	var tufts := 7
+	for i in rows:
+		var t := (float(i) + 0.5) / float(rows)
+		var p := e.lerp(r, t) + n * 0.13
+		# Each course is a row of overlapping straw bundles: rounded ends make a scalloped edge.
+		for k in tufts:
+			var x := -1.13 + (2.26 / float(tufts)) * (float(k) + 0.5) + (0.05 if i % 2 == 1 else 0.0)
+			var col: Color = (tcols[(i + k) % tcols.size()] as Color)
+			var sag := 0.015 * float((k * 3 + i) % 3)
+			b.rbox(Vector3(2.26 / float(tufts) + 0.1, 0.25, length / float(rows) + 0.24), Vector3(x, p.y - sag, p.x), col, 0.12, Vector3(ang + 10.0, 0, 0), false)
+
+
+## Scalloped fringe along the eave (`lean`: lighter spheres, for the roof corner that uses the fringe twice).
+static func _roof_fringe(b: Batch, lean: bool = false) -> void:
+	var sl := roof_slope()
+	var e: Vector2 = sl["e"]
+	var n: Vector2 = sl["n"]
+	var dir: Vector2 = sl["dir"]
+	for k in 11:
+		var x := -1.08 + 2.16 * float(k) / 10.0
+		var fp := e + n * 0.08 - dir * 0.02
+		if lean:
+			b.add(Shapes.prim_sphere(0.12, 6, 10), Batch.xf(Vector3(x, fp.y, fp.x), Vector3.ZERO, Vector3(1.0, 0.55, 0.85)), Palette.THATCH.darkened(0.1))
+		else:
+			b.sphere(0.12, Vector3(x, fp.y, fp.x), Palette.THATCH.darkened(0.1), Vector3(1.0, 0.55, 0.85))
 
 
 ## Convex collision points of the roof slab (local space).

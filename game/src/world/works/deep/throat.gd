@@ -26,6 +26,7 @@ const PracticeScript := preload("res://src/world/works/deep/practice_station.gd"
 
 const CHOICE_FLAG := "hw_throat_choice_seen"
 const CHOICE_Z := 40.5                 # nearing the vault stair (z) triggers the one-time choice
+const ORDER_BOARD_OUT := 0.5          # the bellmakers' order board stands this far out of the east wall
 const NOTE_FALLBACK := {"title": "A miners' note",
 	"text": "Whatever sings in the vault knows our knocks and our festival songs, but it cannot carry a lamp. Raise yours at the anchors and watch the floor: only the true one's light touches the ground."}
 
@@ -223,12 +224,20 @@ func _build_order_board() -> void:
 	var n := Node3D.new()
 	n.name = "OrderBoard"
 	add_child(n)
-	n.position = Layout.THROAT["order_board"]
+	# Stands on two posts ORDER_BOARD_OUT in front of the wall: the room's rock dressing bulges ~0.3-0.6 m out of
+	# the wall and covered the heading and numbers (VISUAL_BUGS IN-11).
+	n.position = Layout.THROAT["order_board"] + Vector3(-ORDER_BOARD_OUT, 0, 0)
 	n.rotation.y = -PI * 0.5             # faces west (-x), into the room
 	var wood := Mat.outlined(Mat.toon(Color("5a3b27")), 0.016)
-	var sheet := Mat.toon(Color("efe0bd"), {"emission": Color("efe0bd"), "emission_energy": 0.12})
+	var sheet_c := Color("efe0bd")
+	var sheet := Mat.toon(sheet_c, {"emission": sheet_c, "emission_energy": 0.12})
 	Kit.add(n, Kit.box(Vector3(2.7, 1.35, 0.08), wood), Vector3(0, 1.9, -0.06))
 	Kit.add(n, Kit.box(Vector3(2.5, 1.15, 0.02), sheet), Vector3(0, 1.9, -0.01))
+	for sx in [-1.0, 1.0]:
+		Kit.add(n, Kit.box(Vector3(0.12, 2.75, 0.12), wood), Vector3(sx * 1.3, 1.375, -0.12))
+		Kit.add(n, Kit.box(Vector3(0.08, 0.08, ORDER_BOARD_OUT), wood), Vector3(sx * 1.1, 2.45, -0.1 - ORDER_BOARD_OUT * 0.5))
+	Kit.add(n, Kit.box(Vector3(2.95, 0.1, 0.3), wood), Vector3(0, 2.66, -0.06))
+	Kit.static_collider(n, _box_shape(Vector3(2.8, 2.7, ORDER_BOARD_OUT + 0.1)), Vector3(0, 1.35, -0.1 - ORDER_BOARD_OUT * 0.5 + 0.05))
 	var title := Art.label(n, "THE BELLMAKERS' ORDER", Vector3(0, 2.36, 0.02), 24, Color("3a2a22"))
 	title.outline_size = 0
 	var syms: Array = Layout.bell_symbols()
@@ -238,7 +247,7 @@ func _build_order_board() -> void:
 		var x := (float(i) - float(k - 1) * 0.5) * 0.6
 		var num := Art.label(n, str(i + 1), Vector3(x, 2.14, 0.02), 26, Color("3a2a22"))
 		num.outline_size = 0
-		var sym := Art.symbol(n, String(s["id"]), 0.36, Color("b0703a"), String(s.get("name", String(s["id"]).capitalize())))
+		var sym := Art.symbol(n, String(s["id"]), 0.36, Color("b0703a"), String(s.get("name", String(s["id"]).capitalize())), sheet_c)
 		sym.position = Vector3(x, 1.86, 0.03)
 		var tag: Variant = sym.get_node_or_null("Name")
 		if tag is Label3D:

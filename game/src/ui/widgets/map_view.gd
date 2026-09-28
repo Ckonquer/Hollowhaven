@@ -21,6 +21,11 @@ extends Control
 ## map, read in prepare(): numbered paper pins for its stops, a candy pin for its cache (done stops faded and
 ## ticked) and a steady ring on the current one; "exp_*" ids resolve through Expeditions.place_disc() so the
 ## tracker / map panel can target them. Nothing is drawn while no run is going (lead decision P35).
+## Reach map readability (visual QA UI-01): the autumn forest is a quiet backdrop, not confetti - fewer, smaller
+## trees (REACH_TREE_COUNT, REACH_TREE_R) in muted paper-washed colours (reach_tree_colors) drawn UNDER the roads
+## and footpaths, and no tree disc touches a pin, sticker or name (reach_tree_discs: cleared per control size
+## against reach_pin_rects). The expedition route is a dashed ribbon line from stop to stop to the cache, and its
+## pins are drawn larger (EXP_MAP_K) with a soft gold halo while still to do.
 ## The static helpers below (map kinds, area / place names, room lists) are shared with the tracker, the
 ## journal and the map panel so every screen names places the same way.
 
@@ -110,6 +115,7 @@ const EXPEDITIONS_PATH := "res://src/expeditions/expeditions.gd"
 const EXP_PREFIX := "exp_"
 const EXP_PIN_R := 12.0           # expedition pin disc radius (px)
 const EXP_RING_R := 19.0          # steady ring around the current stop / cache (px)
+const EXP_MAP_K := 1.3            # expedition pins on the map itself (the legend swatch keeps its own size)
 const BRAMBLEWATCH_NAME := "Bramblewatch"
 const BRAMBLEWATCH_ZONE_DEFAULT := "c1x_bramblewatch"
 const BRAMBLEWATCH_LABEL_SIZE := 20
@@ -181,6 +187,9 @@ var _stream: PackedVector2Array
 var _prepared := ""
 var _reach_trees: Array = []      # fixed candidate trees [pos, radius, colour index]
 var _visible_trees: Array = []    # the candidates outside discovered clearings (rebuilt in prepare())
+var _tree_discs: Array = []       # [[map Vector2, px radius, colour index]] actually drawn (reach_tree_discs)
+var _tree_discs_size := Vector2(-1, -1)
+var _tree_discs_dirty := true
 var _discovered: Array = []       # discovered Reach landmark ids (read in prepare())
 var _label_at: Dictionary = {}     # Reach landmark id -> name baseline centre (see reach_label_at)
 var _label_size := Vector2(-1, -1)
@@ -207,6 +216,7 @@ var expedition_marks: Array = []
 var _bramble_label := Vector2.ZERO
 var _bramble_size := Vector2(-1, -1)
 var frames_drawn := 0             # _draw calls (tests: the drawing code really ran)
+static var _reach_tree_cols: Array = []   # reach_tree_colors(), built once
 
 
 # --- Static helpers (shared by tracker / journal / map panel) -------------------------------------------
@@ -564,14 +574,16 @@ func prepare() -> void:
 			_star.append(Vector2(cos(a), sin(a)) * (9.0 if i % 2 == 0 else 4.0))
 		_star_outline = _star.duplicate()
 		_star_outline.append(_star[0])
+	# (the pins first: the Reach forest keeps clear of them)
+	_prepare_mastery()
+	expedition_marks = expedition_pins(REACH_ID) if map_area == REACH_ID else []
 	if map_area == REACH_ID:
 		_prepare_reach()
 	elif _prepared != "surface":
 		_prepare_surface()
 	_prepared = map_area if map_area == REACH_ID else "surface"
 	_targets_dirty = true
-	_prepare_mastery()
-	expedition_marks = expedition_pins(REACH_ID) if map_area == REACH_ID else []
+	_tree_discs_dirty = true
 
 
 ## Mastery pins / hints and the Bramblewatch name for this map (never per frame).
@@ -589,6 +601,7 @@ func _prepare_mastery() -> void:
 ## Resolves the objective targets to world points on this map once (not every frame).
 func _cache_targets() -> void:
 	_targets_dirty = false
+	_tree_discs_dirty = true
 	_target_ids_all = all_targets()
 	_target_world = PackedVector2Array()
 	for tid in _target_ids_all:
@@ -618,9 +631,17 @@ func _prepare_reach() -> void:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 20261031
 		var tries := 0
-		while _reach_trees.size() < 190 and tries < 3000:
+		# small groves (a few trees round a seeded centre) read as woodland; an even scatter read as confetti
+		var grove := Vector2.ZERO
+		var in_grove := 0
+		while _reach_trees.size() < REACH_TREE_COUNT and tries < 4000:
 			tries += 1
-			var p := Vector2(rng.randf_range(-Reach.HALF_X + 6.0, Reach.HALF_X - 6.0), rng.randf_range(-Reach.HALF_Z + 6.0, Reach.HALF_Z - 6.0))
+			if in_grove <= 0:
+				grove = Vector2(rng.randf_range(-Reach.HALF_X + 10.0, Reach.HALF_X - 10.0), rng.randf_range(-Reach.HALF_Z + 10.0, Reach.HALF_Z - 10.0))
+				in_grove = rng.randi_range(REACH_GROVE_TREES.x, REACH_GROVE_TREES.y)
+			in_grove -= 1
+			var off := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * REACH_GROVE_R
+			var p := Vector2(clampf(grove.x + off.x, -Reach.HALF_X + 6.0, Reach.HALF_X - 6.0), clampf(grove.y + off.y, -Reach.HALF_Z + 6.0, Reach.HALF_Z - 6.0))
 			var near_point := false
 			for pid in Reach.POINTS:
 				if p.distance_to(Reach.POINTS[pid]) < 9.0:
@@ -628,7 +649,7 @@ func _prepare_reach() -> void:
 					break
 			if near_point:
 				continue
-			_reach_trees.append([p, rng.randf_range(3.4, 5.6), rng.randi() % 4])
+			_reach_trees.append([p, rng.randf_range(REACH_TREE_R.x, REACH_TREE_R.y), rng.randi() % 4])
 	_discovered = GameState.discovered_in(REACH_ID)
 	_arches = []
 	for aid in visible_arches():
@@ -840,7 +861,7 @@ func _draw_reach() -> void:
 	var outer := r.grow(16.0)
 	var scale := r.size.x / (REACH_HALF.x * 2.0)
 	draw_style_box(ThemeFactory.box(Color("efdcb4"), 24, 3, ThemeFactory.BORDER_DARK, 0, 8, Vector2(0, 4), Color(0.2, 0.1, 0.1, 0.25)), outer)
-	draw_style_box(ThemeFactory.box(Color("d9c98f"), 18), r)
+	draw_style_box(ThemeFactory.box(REACH_PAPER, 18), r)
 	# discovered districts
 	for id in _discovered:
 		var lm: Dictionary = Reach.LANDMARKS.get(id, {})
@@ -848,6 +869,16 @@ func _draw_reach() -> void:
 			continue
 		var reg: Array = REACH_REGIONS.get(id, [Color("e6d6a2"), 1.0])
 		_soft_disc(to_map(lm["pos"]), float(lm["radius"]) * float(reg[1]) * scale, reg[0])
+	# the autumn forest: a quiet backdrop under every road, path and pin (UI-01)
+	var tree_cols := reach_tree_colors()
+	var shade := Color(0.3, 0.18, 0.1, 0.12)
+	var rim := Color(0.45, 0.3, 0.18, 0.38)
+	for t in reach_tree_discs():
+		var tp: Vector2 = t[0]
+		var tr: float = t[1]
+		draw_circle(tp + Vector2(1.0, 1.5), tr, shade, true, -1.0, true)
+		draw_circle(tp, tr, tree_cols[int(t[2])], true, -1.0, true)
+		draw_arc(tp, tr, 0.0, TAU, 12, rim, 1.0, true)
 	# the festival roads (once the Commons board has been read)
 	if not _routes_world.is_empty():
 		if _routes_size != size:
@@ -866,14 +897,6 @@ func _draw_reach() -> void:
 			pts.append(to_map(_reach_point(String(node))))
 		for i in pts.size() - 1:
 			draw_dashed_line(pts[i], pts[i + 1], Color(Palette.DIRT_DARK, 0.75), 3.0, 9.0, true, true)
-	# autumn trees
-	var tree_cols := [Color("d9822b"), Color("b8452f"), Color("e8b33a"), Palette.FOLIAGE_DARK]
-	for t in _visible_trees:
-		var tp := to_map(t[0])
-		var tr := float(t[1]) * scale * 0.9
-		draw_circle(tp + Vector2(1.5, 2.0), tr, Color(0.3, 0.18, 0.1, 0.25), true, -1.0, true)
-		draw_circle(tp, tr, tree_cols[int(t[2])], true, -1.0, true)
-		draw_arc(tp, tr, 0.0, TAU, 12, Color(0.35, 0.2, 0.12, 0.7), 1.2, true)
 	_forest_frame(r, Color("a35f32"))
 	_draw_mastery_pins(r)
 	var f := ThemeFactory.font("heading")
@@ -906,13 +929,96 @@ func _draw_reach() -> void:
 ## The running expedition's route (read in prepare(); nothing without a run), over the stickers so it stays
 ## readable, under Krystal's arrow; each pin only inside the map rectangle.
 func _draw_expedition(r: Rect2) -> void:
+	var ribbon := ThemeFactory.ACCENT.darkened(0.15)
+	var prev := Vector2.ZERO
+	var have_prev := false
 	for m in expedition_marks:
 		var c := to_map((m as Dictionary).get("pos", Vector2.ZERO))
-		if r.grow(-EXP_PIN_R).has_point(c):
-			draw_expedition_pin(self, c, 1.0, m)
+		if have_prev:
+			var walked := bool((m as Dictionary).get("done", false))
+			draw_dashed_line(prev, c, Color(ThemeFactory.PAPER_LIGHT, 0.55 if walked else 0.85), 6.5, 12.0, true, true)
+			draw_dashed_line(prev, c, Color(ribbon, 0.35 if walked else 0.9), 3.0, 12.0, true, true)
+		prev = c
+		have_prev = true
+	for m2 in expedition_marks:
+		var c2 := to_map((m2 as Dictionary).get("pos", Vector2.ZERO))
+		if not r.grow(-EXP_PIN_R * EXP_MAP_K).has_point(c2):
+			continue
+		if not bool((m2 as Dictionary).get("done", false)):
+			draw_circle(c2, (EXP_PIN_R + 5.0) * EXP_MAP_K, Color(ThemeFactory.GOLD, 0.4), true, -1.0, true)
+		draw_expedition_pin(self, c2, EXP_MAP_K, m2)
+
+
+## Muted autumn tree colours for the Reach map: orange, red, yellow and green washed REACH_TREE_WASH toward the
+## map's paper, so they sit behind the pins instead of competing with them (UI-01).
+static func reach_tree_colors() -> Array:
+	if _reach_tree_cols.is_empty():
+		for c in [Color("d9822b"), Color("b8452f"), Color("e8b33a"), Palette.FOLIAGE_DARK]:
+			_reach_tree_cols.append((c as Color).lerp(REACH_PAPER, REACH_TREE_WASH))
+	return _reach_tree_cols
+
+
+## The Reach trees as drawn at the current size ([[map Vector2, px radius, colour index]]): the visible candidates
+## minus every disc that would touch a pin, sticker, arch or name (reach_pin_rects). Cached per size / targets.
+func reach_tree_discs() -> Array:
+	if not _tree_discs_dirty and _tree_discs_size == size:
+		return _tree_discs
+	if _targets_dirty:
+		_cache_targets()
+	_tree_discs_dirty = false
+	_tree_discs_size = size
+	_tree_discs = []
+	var r := map_rect()
+	var scale := r.size.x / (REACH_HALF.x * 2.0)
+	var blocks := reach_pin_rects()
+	for t in _visible_trees:
+		var c := to_map(t[0])
+		var tr := float(t[1]) * scale * REACH_TREE_DRAW_K
+		var free := true
+		for b in blocks:
+			var br: Rect2 = b
+			var q := Vector2(clampf(c.x, br.position.x, br.end.x), clampf(c.y, br.position.y, br.end.y))
+			if q.distance_to(c) < tr + REACH_TREE_GAP:
+				free = false
+				break
+		if free:
+			_tree_discs.append([c, tr, int(t[2])])
+	return _tree_discs
+
+
+## Screen boxes the forest keeps clear of: discovered stickers and their names, the arches shown, the waygate and
+## its name, "?" pins (objective targets and festival-map branches not found yet), expedition pins (with their
+## halo), the mastery resource pins and cache hints.
+func reach_pin_rects() -> Array:
+	var out: Array = []
+	for b in reach_boxes(false):
+		out.append((b as Dictionary)["rect"])
+	for id in Reach.LANDMARKS:
+		if not _discovered.has(id) and (_target_ids_all.has(id) or _branch_hints.has(id)):
+			out.append(_disc_rect(to_map(Reach.LANDMARKS[id]["pos"]), UNKNOWN_PIN_R))
+	for m in expedition_marks:
+		out.append(_disc_rect(to_map((m as Dictionary).get("pos", Vector2.ZERO)), (EXP_PIN_R + 5.0) * EXP_MAP_K))
+	for pin in resource_pins:
+		out.append(_disc_rect(to_map(pin[0]), PIN_R))
+	for hp in cache_hint_points:
+		out.append(_disc_rect(to_map(hp), HINT_R))
+	return out
+
+
+static func _disc_rect(c: Vector2, rad: float) -> Rect2:
+	return Rect2(c - Vector2(rad, rad), Vector2(rad, rad) * 2.0)
 
 
 const REACH_LABEL_SIZE := 21
+const REACH_TREE_COUNT := 150     # seeded candidate trees, in groves (was an even scatter of 190: confetti)
+const REACH_TREE_R := Vector2(2.8, 4.4)   # tree radius range in metres (was 3.4-5.6)
+const REACH_GROVE_TREES := Vector2i(4, 9)  # trees per grove
+const REACH_GROVE_R := 15.0       # grove radius (metres)
+const REACH_TREE_DRAW_K := 0.9    # drawn disc radius = radius * map scale * this
+const REACH_TREE_WASH := 0.45     # how far the tree colours are washed toward the paper
+const REACH_TREE_GAP := 4.0       # px kept between a tree disc and any pin / sticker / name box
+const REACH_PAPER := Color("d9c98f")
+const UNKNOWN_PIN_R := 17.0       # "?" pin radius (px)
 const ROUTE_WIDTH_M := 3.4        # drawn festival road width (metres, about the real road)
 const ROUTE_CLEAR := 1.5          # trees whose disc comes this close to a known road are left out (metres)
 const REACH_LABEL_GAP := 8.0
@@ -1035,9 +1141,9 @@ func _reach_point(id: String) -> Vector2:
 
 
 func _unknown_pin(c: Vector2, f: Font) -> void:
-	draw_circle(c + Vector2(1.5, 2.5), 17.0, Color(0.2, 0.1, 0.1, 0.25), true, -1.0, true)
-	draw_circle(c, 17.0, ThemeFactory.PAPER_LIGHT, true, -1.0, true)
-	draw_arc(c, 17.0, 0.0, TAU, 24, ThemeFactory.ACCENT.darkened(0.2), 3.0, true)
+	draw_circle(c + Vector2(1.5, 2.5), UNKNOWN_PIN_R, Color(0.2, 0.1, 0.1, 0.25), true, -1.0, true)
+	draw_circle(c, UNKNOWN_PIN_R, ThemeFactory.PAPER_LIGHT, true, -1.0, true)
+	draw_arc(c, UNKNOWN_PIN_R, 0.0, TAU, 24, ThemeFactory.ACCENT.darkened(0.2), 3.0, true)
 	var tw := f.get_string_size("?", HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
 	draw_string(f, c + Vector2(-tw * 0.5, 9.0), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 26, ThemeFactory.INK)
 

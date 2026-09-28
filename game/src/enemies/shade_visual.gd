@@ -10,6 +10,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 var surface_aligned := false          # stays upright; hangs beneath ceilings
 const ROBE_COLOR := Color("262233")
@@ -19,6 +20,9 @@ const FINGER_COLOR := Color("d9d0c2")
 const EYE_COLOR := Color("bfe6ff")
 const EYE_HOT := Color("f2fbff")
 const MARK_COLOR := Color("8f7aa8")
+const BOSS_EDGE := Color(0.74, 0.76, 1.0)     # the Hollow Mother's lavender edge light (CR-06: dark on dark rooms)
+const BOSS_EDGE_STRENGTH := 0.5
+const BOSS_EDGE_POWER := 3.0
 const HEIGHT := 1.95
 const HOVER := 0.22
 
@@ -50,6 +54,8 @@ var _tint_on := false
 
 static var _robe_mesh: ArrayMesh
 static var _robe_mat: Material
+static var _robe_base: ShaderMaterial
+static var _boss_robe_mat: Material
 
 
 func setup(params: Dictionary) -> void:
@@ -67,10 +73,24 @@ func body_height() -> float:
 
 static func robe_material() -> Material:
 	if _robe_mat == null:
-		var m: ShaderMaterial = Mat.toon(ROBE_COLOR, {"rim": 1.1, "noise": 0.1, "softness": 0.18, "emission": Color(0.08, 0.07, 0.16), "emission_energy": 0.5}).duplicate()
-		m.set_shader_parameter("rim_color", RIM_COLOR)
-		_robe_mat = Mat.outlined(m, 0.014, Color(0.05, 0.04, 0.08))
+		_robe_mat = Mat.outlined(_robe_toon(), 0.014, Color(0.05, 0.04, 0.08))
 	return _robe_mat
+
+
+static func _robe_toon() -> ShaderMaterial:
+	if _robe_base == null:
+		_robe_base = Mat.toon(ROBE_COLOR, {"rim": 1.1, "noise": 0.1, "softness": 0.18, "emission": Color(0.08, 0.07, 0.16), "emission_energy": 0.5}).duplicate()
+		_robe_base.set_shader_parameter("rim_color", RIM_COLOR)
+	return _robe_base
+
+
+## The Hollow Mother (boss) robe: the same robe plus a soft lavender EDGE LIGHT that does not need a lamp, so her
+## whole silhouette reads against the navy Echo Trial chamber and the dark Crossing bridge (the ordinary Shades
+## keep the plain robe). Shared by every boss instance.
+static func boss_robe_material() -> Material:
+	if _boss_robe_mat == null:
+		_boss_robe_mat = CreatureFx.toon_outlined_edge(_robe_toon(), 0.014, Color(0.05, 0.04, 0.08), BOSS_EDGE, BOSS_EDGE_STRENGTH, BOSS_EDGE_POWER)
+	return _boss_robe_mat
 
 
 ## Cloak built as a surface of revolution with a tattered, wavy hem.
@@ -120,7 +140,7 @@ func _build() -> void:
 	_tint_mat = HitFx.new_tint()
 	_eye_mat = Mat.glow(EYE_COLOR, 2.2)
 	_eye_hot_mat = Mat.glow(EYE_HOT, 5.0)
-	var rm := robe_material()
+	var rm := boss_robe_material() if is_boss else robe_material()
 	_root = Node3D.new()
 	add_child(_root)
 	_root.scale = Vector3.ONE * size_scale
@@ -213,9 +233,10 @@ func _build() -> void:
 	_smoke.scale_amount_min = 0.8
 	_smoke.scale_amount_max = 1.6
 	var ramp := Gradient.new()
-	ramp.set_color(0, Color(0.1, 0.08, 0.16, 0.0))
-	ramp.set_color(1, Color(0.1, 0.08, 0.16, 0.0))
-	ramp.add_point(0.25, Color(0.1, 0.08, 0.16, 0.55))
+	var smoke := Color(0.46, 0.42, 0.66) if is_boss else Color(0.1, 0.08, 0.16)   # the boss: a pale mist at the hem
+	ramp.set_color(0, Color(smoke, 0.0))
+	ramp.set_color(1, Color(smoke, 0.0))
+	ramp.add_point(0.25, Color(smoke, 0.55))
 	_smoke.color_ramp = ramp
 	_smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_float.add_child(_smoke)

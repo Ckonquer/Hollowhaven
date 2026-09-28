@@ -2,7 +2,8 @@ extends Node3D
 ## The Lanternwake waygate: two old standing stones under a lintel. One stands north of the Moonlit Ruin
 ## in Hollowhaven Woods (side "surface", placed by src/world/surface/annexes.gd), its mirror behind the
 ## arrival point of Hallowmere Reach (side "reach"). Interaction contract: group "interactable" + a
-## layer-16 sphere; solid pillars on layer 1. Surface states (flags, docs/CHAPTER_TWO_SPEC.md 7.1):
+## layer-16 sphere; solid pillars on layer 1; a camera-only blocker (src/camera/camera_block.gd) over the lintel
+## and lanterns so the follow camera never sits inside them. Surface states (flags, docs/CHAPTER_TWO_SPEC.md 7.1):
 ##   cold    - before chapter_one_complete: mossy old stones, a flavour line, nothing to do
 ##   dormant - chapter_one_complete, not ch2_accepted: "a dormant waygate" that points to the Ward Stone
 ##   woken   - ch2_accepted: "Repair the waygate (8 Wood, 4 Stone, 2 Copper Ore)", transactional (every
@@ -20,6 +21,7 @@ const Kit := preload("res://src/art/mesh_kit.gd")
 const NodeVisuals := preload("res://src/world/common/node_visuals.gd")
 const Props := preload("res://src/world/surface/props.gd")
 const Fx := preload("res://src/world/common/fx.gd")
+const CameraBlock := preload("res://src/camera/camera_block.gd")
 
 const REPAIRED_FLAG := "ch2_waygate_repaired"
 const ACCEPTED_FLAG := "ch2_accepted"
@@ -31,6 +33,15 @@ const PILLAR_SIZE := Vector3(0.85, 3.1, 0.75)
 const GLOW := Color("ffc978")
 ## Radius of the ground the gate occupies (pillars + plinths); used by placement checks.
 const FOOTPRINT_RADIUS := 2.4
+## Camera-only blocker over the opening (lintel, rune ring, the two hanging lanterns): the follow camera pulls in
+## in front of the gate instead of parking inside the lintel (visual QA RE-00). Its underside stays above Krystal's
+## camera pivot even at the top of a jump under the lintel. Local to the gate.
+const CAMERA_BLOCK_CENTER := Vector3(0.0, 2.935, 0.06)
+const CAMERA_BLOCK_SIZE := Vector3(4.3, 1.03, 1.18)
+## The shimmer fades out as the camera comes close (no hard-edged sheet across the view): fully clear nearer
+## than VEIL_FADE_NEAR m, full strength beyond VEIL_FADE_FAR m.
+const VEIL_FADE_NEAR := 1.2
+const VEIL_FADE_FAR := 4.0
 ## Krystal within this many metres (XZ) of a lit surface gate -> prefetch the target area once.
 const PREFETCH_RADIUS := 25.0
 const PREFETCH_CHECK_SECONDS := 0.5
@@ -52,6 +63,8 @@ var _prefetched := false
 var _prefetch_t := 0.0
 ## Who receives prefetch_area() (null = the Game autoload; tests pass a recorder).
 var prefetcher: Object = null
+
+static var _veil_tex: GradientTexture2D = null
 
 
 func setup(params: Dictionary) -> void:
@@ -242,8 +255,17 @@ func _build() -> void:
 		var cap := Kit.cylinder(0.02, 0.15, 0.1, Palette.WOOD_DARK, 8)
 		cap.position = Vector3(sx * 1.05, 2.6, 0.2)
 		add_child(cap)
-	# The shimmer between the stones (only once repaired).
-	veil_material = Mat.transparent(Color(GLOW.r, GLOW.g, GLOW.b, 0.0), true)
+	# The shimmer between the stones (only once repaired): a soft oval (radial alpha), faded out near the camera.
+	# Per gate (its alpha breathes with this gate's glow); only one gate is ever loaded at a time.
+	veil_material = StandardMaterial3D.new()
+	veil_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	veil_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	veil_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	veil_material.albedo_color = Color(GLOW.r, GLOW.g, GLOW.b, 0.0)
+	veil_material.albedo_texture = veil_texture()
+	veil_material.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	veil_material.distance_fade_min_distance = VEIL_FADE_NEAR
+	veil_material.distance_fade_max_distance = VEIL_FADE_FAR
 	veil = MeshInstance3D.new()
 	var q := QuadMesh.new()
 	q.size = Vector2(2.2, 2.7)
@@ -278,6 +300,7 @@ func _build() -> void:
 		cs.shape = box
 		cs.position = Vector3(float(sx) * PILLAR_X, PILLAR_SIZE.y * 0.5, 0)
 		body.add_child(cs)
+	CameraBlock.add_box(self, CAMERA_BLOCK_CENTER, CAMERA_BLOCK_SIZE)
 	var ib := StaticBody3D.new()
 	ib.name = "Interact"
 	ib.collision_layer = 16
@@ -296,6 +319,24 @@ func _build() -> void:
 	light.shadow_enabled = false
 	light.position = Vector3(0, 2.2, 0.9)
 	add_child(light)
+
+
+## Soft oval alpha for the veil (white, opaque centre -> clear rim), generated once and shared.
+static func veil_texture() -> Texture2D:
+	if _veil_tex == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		g.add_point(0.6, Color(1, 1, 1, 0.7))
+		var t := GradientTexture2D.new()
+		t.gradient = g
+		t.fill = GradientTexture2D.FILL_RADIAL
+		t.fill_from = Vector2(0.5, 0.5)
+		t.fill_to = Vector2(0.5, 0.0)
+		t.width = 64
+		t.height = 64
+		_veil_tex = t
+	return _veil_tex
 
 
 ## Brightness target for the current state (0 cold/dormant, a faint shimmer when woken, 1 lit).

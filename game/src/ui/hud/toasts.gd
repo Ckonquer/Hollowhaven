@@ -2,6 +2,9 @@ extends VBoxContainer
 ## Notification toasts (Events.notify) and aggregated item pickups (Events.item_added -> "+3 Wood").
 ## Stacked bottom-right, newest at the bottom, each with a kind colour stripe and icon; they fade out.
 ## Quest notifications are shown by the quest banner instead (see quest_banner.gd).
+## held (set by the UI root's hush, visual QA T4): while a chapter card, a full-screen menu / modal or the ending is
+## up, toasts still queue (and merge) but their timers pause; they play out once it ends. A notify chime is not
+## played for a toast that nobody can see yet.
 
 const Kit := preload("res://src/ui/ui_kit.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -12,10 +15,13 @@ const Palette := preload("res://src/art/palette.gd")
 const KIND_COLORS := {"info": Color("8fb6f0"), "success": Color("6fae4f"), "warn": Color("e9a15b"),
 	"item": Color("c48a55"), "quest": Color("f2c14e"), "bond": Color("ff8fa8"), "save": Color("3fa7a0")}
 const KIND_LIFE := {"info": 4.6, "success": 4.2, "warn": 5.2, "item": 3.4, "quest": 5.5, "bond": 5.0}
+const MAX_TEXT_W := 520.0            # longer texts wrap at this width
+const MAX_CARD_W := 620.0            # widest card: text + icon + padding (the UI root keeps this corner clear)
 
 var model: RefCounted = UiUtil.ToastModel.new()
 var views: Dictionary = {}          # entry id -> {panel, label, icon}
 var quest_banner: Node = null        # set by the UI root; receives "quest" notifications
+var held := false                    # UI root hush: queue, but pause the timers (see set_held)
 
 
 func _ready() -> void:
@@ -61,6 +67,8 @@ func _on_notify(text: String, kind: String) -> void:
 		return
 	var e: Dictionary = model.push_text(text, kind, float(KIND_LIFE.get(kind, 4.5)))
 	_sync(e)
+	if held:
+		return
 	match kind:
 		"bond":
 			Audio.play_ui("ui_bond")
@@ -105,9 +113,9 @@ func _sync(e: Dictionary) -> void:
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	# long texts wrap at a comfortable width; short ones stay on one line
 	var w := ThemeFactory.font("body_bold").get_string_size(String(e["text"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-	if w > 520.0:
+	if w > MAX_TEXT_W:
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size.x = 520
+		l.custom_minimum_size.x = MAX_TEXT_W
 	h.add_child(l)
 	add_child(panel)
 	views[id] = {"panel": panel, "label": l}
@@ -133,8 +141,13 @@ static func _kind_icon(kind: String) -> Texture2D:
 	return IconFactory.icon("ui_info", Color.WHITE, 48)
 
 
+## Hold (true) or release the toasts: held toasts keep their place in the queue and their remaining time.
+func set_held(on: bool) -> void:
+	held = on
+
+
 func _process(delta: float) -> void:
-	if views.is_empty():
+	if views.is_empty() or held:
 		return
 	var gone: Array = model.tick(delta)
 	for id in gone:

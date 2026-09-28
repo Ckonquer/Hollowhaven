@@ -22,6 +22,7 @@ extends Node3D
 ##   striking their plates in the symbol order taught on the Bellmaker's Floor (choir_resonance.gd: captions, no
 ##   pitch, timing assist = no window at all): each drops a layer; both = exposed. At most two Borrowed Wisps
 ##   (enemy id borrowed_wisp, Gentle one) guard the resonators - released once per attempt, never refilled.
+##   The lantern anchors are switched off for the whole phase (no prompt, no focus: only the plates answer).
 ## PHASE C "The kept flame" (33% -> 0): false cozy lights (emissive, light nothing) compete with ONE true flame
 ##   anchored on a lantern-anchor hook that lights its floor sector. The hush strikes every unlit place inside the
 ##   ring (the lit sector and the perimeter walk are safe); raise the lantern at the true flame's anchor = exposed.
@@ -47,7 +48,7 @@ extends Node3D
 ##   the trapped echoes rise as gentle chimes, masks and ribbons fall harmlessly and fade. A story save with the flag
 ##   never spawns a live Choir again ("gone" at once); no drops (rewards belong to the quest layer / ledger).
 ## RESET POLICY (one rule): Krystal falls, or leaves the vault (>= LEAVE_TIME outside): the encounter resets CLEANLY
-##   to the start of the phase she reached (a checkpoint) - hazards gone, wisps dismissed, anchors lowered,
+##   to the start of the phase she reached (a checkpoint) - hazards gone, wisps dismissed, anchors lowered + re-enabled,
 ##   resonators reset + re-enabled, forms / lights / layers cleared, hp back to that phase's start, bar hidden,
 ##   music released. Quitting / reloading: nothing about an unfinished fight is saved - a fresh Choir (phase A).
 ##   Mode "trial": no flags, no boss_defeated (the trial module listens to `defeated`).
@@ -237,6 +238,8 @@ func _exit_tree() -> void:
 	_director(false)          # freed mid-fight (trial teardown, debug): never leave the horror director held
 	if fight_started and not _defeat_started and resonance != null:
 		resonance.call("release")     # and never leave the vault's plates disabled (the arena's default state)
+	if fight_started and not _defeat_started:
+		_set_anchors_enabled(true)    # nor its lantern anchors (switched off during Phase B)
 
 
 func _initialize() -> void:
@@ -510,6 +513,7 @@ func reset_fight() -> void:
 	if resonance != null:
 		resonance.call("release")
 	_lower_anchors()
+	_set_anchors_enabled(true)
 	lights.call("clear")
 	layers.call("set_count", 0)
 	for f in forms:
@@ -547,6 +551,7 @@ func dismiss() -> void:
 	_dismiss_wisps()
 	if resonance != null:
 		resonance.call("release")
+	_set_anchors_enabled(true)
 	if lights != null:
 		lights.call("clear")
 	if layers != null:
@@ -756,6 +761,7 @@ func _change_phase(np: int) -> void:
 func _a_gather() -> void:
 	mark_fx.call("hide_mark")
 	resonance.call("disable")
+	_set_anchors_enabled(true)
 	var pts := anchor_positions()
 	var n := mini(pts.size(), forms.size())
 	var g := _rng.randi_range(0, n - 1)
@@ -926,6 +932,7 @@ func _b_gather() -> void:
 	_glide_to(_veil_pos(arena_center), 0.8)
 	layers.call("set_count", 2)
 	resonance.call("begin")
+	_set_anchors_enabled(false)
 	_b_rings_next = true
 	_b_volleys = 0
 	_spawn_wisps()
@@ -1074,6 +1081,7 @@ func _expose_b() -> void:
 
 func _b_reform() -> void:
 	resonance.call("begin")
+	_set_anchors_enabled(false)
 	layers.call("set_count", 2)
 	visual.set_state("veiled")
 	_glide_to(_veil_pos(arena_center), 0.8)
@@ -1141,6 +1149,7 @@ func _prune_wisps() -> void:
 func _c_gather() -> void:
 	_dismiss_wisps()
 	resonance.call("disable")
+	_set_anchors_enabled(true)
 	layers.call("set_count", 0)
 	for f in forms:
 		(f as Node).call("hide_form")
@@ -1407,6 +1416,7 @@ func _begin_defeat() -> void:
 	_clear_hazards()
 	_dismiss_wisps()
 	resonance.call("release")
+	_set_anchors_enabled(true)
 	lights.call("clear")
 	layers.call("set_count", 0)
 	for f in forms:
@@ -1495,6 +1505,16 @@ func _lower_anchors() -> void:
 	for a in anchor_nodes:
 		if is_instance_valid(a) and a is Node and (a as Node).has_method("lower"):
 			(a as Node).call("lower")
+
+
+## Phase B needs only the resonator plates: its lantern anchors are switched off (lantern_anchor.gd `enabled`: no
+## prompt, no focus, raise() refused). The east anchor stands ~2.3 m from the east resonator's Leaf plate and used to
+## take the prompt during the 12 s sequence (CH2-014). Phases A / C, resets, stand-downs, the victory, a dismissal and
+## a mid-fight teardown switch them back on (the arena's default state; its fallback does the same).
+func _set_anchors_enabled(on: bool) -> void:
+	for a in anchor_nodes:
+		if is_instance_valid(a) and a is Node:
+			(a as Node).set("enabled", on)
 
 
 func _clear_hazards() -> void:

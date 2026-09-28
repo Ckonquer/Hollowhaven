@@ -81,6 +81,11 @@ static func _rails(b: Builder, area: Node3D) -> void:
 	# Sign over the eyes passage and over the junction (symbols, not colour)
 	WP.symbol_sign(b, Vector3(-14.5, y + 4.0, 5.95), Vector3(0, 0, -1), "bell", Color.WHITE, 0.6)
 	WP.symbol_sign(b, Vector3(-2.05, y + 5.2, 0.0), Vector3(-1, 0, 0), "refuge", Color.WHITE, 0.8)
+	# Riveted plate seams between the ribs and the lamp-men's notices by the lever frame (VISUAL_BUGS IN-15).
+	WP.plate_seams(b, Vector3(-29.9, y, -6.0), Vector3(-2.1, y, -6.0), Vector3(0, 0, 1), y, [2.2, 4.5], 7.5, 2.6, WP.IRON_DARK, [[-7.0, -4.0]])
+	WP.plate_seams(b, Vector3(-29.9, y, 6.0), Vector3(-2.1, y, 6.0), Vector3(0, 0, -1), y, [2.2, 4.5], 7.5, 2.6, WP.IRON_DARK, [[-16.0, -13.0], [-7.0, -4.0]])
+	WP.notice(b, Vector3(-26.6, y + 1.8, 5.99), Vector3(0, 0, -1), 0.46, 0.6, 0.04)
+	WP.notice(b, Vector3(-22.9, y + 1.9, 5.99), Vector3(0, 0, -1), 0.38, 0.5, -0.06)
 
 
 ## A short dark corridor sealed by a grate: no lamp at all (the false signals knock from here).

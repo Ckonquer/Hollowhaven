@@ -54,6 +54,16 @@ static func _landing(b: Builder, area: Node3D) -> void:
 	for i in 5:
 		b.vbox(Vector3(-69.4 + float(i) * 0.45, y + 1.2, 5.8), Vector3(0.05, 0.9, 0.05), WP.STEEL, Basis(Vector3(1, 0, 0), 0.08))
 	WP.symbol_sign(b, Vector3(-64.1, y + 3.7, -3.2), Vector3(-1, 0, 0), "refuge", Color.WHITE, 0.7)
+	# Timber-lined lower walls, a shelf of tins, pinned notices over the table and the foreman's jacket on its
+	# hook: a warm, lived-in service room like Chapter One's Below (VISUAL_BUGS IN-15). Visual only.
+	WP.plank_wainscot(b, Vector3(-75.9, y, -6.0), Vector3(-64.1, y, -6.0), Vector3(0, 0, 1), y, 1.25, WP.TIMBER)
+	WP.plank_wainscot(b, Vector3(-75.9, y, 6.0), Vector3(-64.1, y, 6.0), Vector3(0, 0, -1), y, 1.25, WP.TIMBER)
+	WP.plank_wainscot(b, Vector3(-76.0, y, -5.9), Vector3(-76.0, y, 5.9), Vector3(1, 0, 0), y, 1.25, WP.TIMBER, [[-1.8, 1.8]])
+	WP.plank_wainscot(b, Vector3(-64.0, y, -5.9), Vector3(-64.0, y, 5.9), Vector3(-1, 0, 0), y, 1.25, WP.TIMBER, [[-1.6, 1.6]])
+	WP.wall_shelf(b, Vector3(-67.9, y + 1.75, -6.0), Vector3(0, 0, 1), 1.8)
+	WP.notice(b, Vector3(-71.7, y + 1.95, 5.99), Vector3(0, 0, -1), 0.44, 0.58, 0.05)
+	WP.notice(b, Vector3(-71.05, y + 2.05, 5.99), Vector3(0, 0, -1), 0.36, 0.46, -0.08)
+	WP.work_jacket(b, Vector3(-75.97, y + 1.95, -3.2), Vector3(1, 0, 0), Color("6a5a44"))
 	# THE REAL LANTERN: a big warm lantern hung low on a chain; its light pools on the flagstones below.
 	WP.chain(b, Vector3(-68.6, y + 4.6, 1.4), 1.6)
 	Props.lamp(n, Vector3(-68.6, y + 3.0, 1.4), {"style": "hanging", "hang": 0.1, "energy": 2.3, "range": 9.5,
@@ -153,6 +163,18 @@ static func _lockers(b: Builder, area: Node3D) -> void:
 		b.vbox(bc + Vector3(-0.08, -0.4, -0.95 + float(i) * 0.25), Vector3(0.015, 0.12, 0.16), [Color("5fa8d0"), Color("c8843e"), Color("e8c860")][i], Basis.IDENTITY, {"shadows": false})
 	Props.lamp(n, Vector3(-38.6, y + 3.4, -4.9), {"style": "wall", "energy": 0.7, "range": 4.0, "color": WP.WARM_LAMP, "yaw": -90.0})
 	WP.symbol_sign(b, Vector3(-38.1, y + 3.7, 2.4), Vector3(-1, 0, 0), "up", Color.WHITE, 0.6)
+	# Riveted plate seams on the painted iron walls, the miners' jackets and hard hats on hooks in the free
+	# north-west corner, a shelf and shift notices by the west door (VISUAL_BUGS IN-15). Visual only, all
+	# against the walls: the middle stays open for the Drudge fight.
+	WP.plate_seams(b, Vector3(-55.9, y, -8.0), Vector3(-38.1, y, -8.0), Vector3(0, 0, 1), y, [2.3, 3.7], 5.0, 2.4)
+	WP.plate_seams(b, Vector3(-55.9, y, 8.0), Vector3(-38.1, y, 8.0), Vector3(0, 0, -1), y, [2.3, 3.7], 5.0, 2.4)
+	WP.plate_seams(b, Vector3(-56.0, y, -7.9), Vector3(-56.0, y, 7.9), Vector3(1, 0, 0), y, [2.3, 3.7], 5.0, 2.4, WP.PLATE_DARK, [[-1.6, 1.6]])
+	WP.plate_seams(b, Vector3(-38.0, y, -7.9), Vector3(-38.0, y, 7.9), Vector3(-1, 0, 0), y, [3.7], 5.0, 2.4, WP.PLATE_DARK, [[-6.7, -3.1], [-1.6, 1.6]])
+	for i in 3:
+		WP.work_jacket(b, Vector3(-54.9 + float(i) * 1.15, y + 1.95, -7.98), Vector3(0, 0, 1), [Color("4a5a6a"), Color("6a5a44"), Color("5a6a58")][i], i != 1)
+	WP.wall_shelf(b, Vector3(-55.98, y + 1.7, -5.2), Vector3(1, 0, 0), 1.6)
+	WP.notice(b, Vector3(-55.98, y + 1.75, 3.4), Vector3(1, 0, 0), 0.48, 0.62, -0.04)
+	WP.notice(b, Vector3(-55.98, y + 1.9, 4.2), Vector3(1, 0, 0), 0.36, 0.44, 0.07)
 
 
 static func _lockers_way(b: Builder, area: Node3D) -> void:

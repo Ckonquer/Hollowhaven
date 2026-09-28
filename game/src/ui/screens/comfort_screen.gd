@@ -36,14 +36,22 @@ func _build() -> void:
 	left.add_child(section_title("Horror intensity"))
 	var hint := Kit.wrap_label("How frightening the deep places are. The surface is always gentle.", "Small", 680)
 	left.add_child(hint)
-	left.add_child(Rows.intensity_picker(700.0, 112.0))
-	left.add_child(Kit.spacer(0, 6))
-	left.add_child(section_title("Volume"))
+	left.add_child(Rows.intensity_picker(700.0, 132.0))
+	# Right: comfort toggles, then the volumes under them (visual QA UI-16: with Volume on the left the right column
+	# stopped half-way down and the card looked lopsided)
+	var right := Kit.vbox(12)
+	right.custom_minimum_size.x = 720
+	cols.add_child(right)
+	right.add_child(section_title("Comfort"))
+	for key in ["arachnophobia", "reduce_shake", "reduce_flashing", "captions"]:
+		right.add_child(Rows.build(key, 720.0, true))
+	right.add_child(Kit.spacer(0, 6))
+	right.add_child(section_title("Volume"))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 2)
-	left.add_child(grid)
+	right.add_child(grid)
 	for key in ["master_volume", "music_volume", "ambience_volume", "sfx_volume", "ui_volume"]:
 		var r: Dictionary = Schema.row(key)
 		var nl := Kit.label(String(r.get("label", key)))
@@ -51,13 +59,6 @@ func _build() -> void:
 		nl.custom_minimum_size.x = 190
 		grid.add_child(nl)
 		grid.add_child(Rows.control(key))
-	# Right: comfort toggles
-	var right := Kit.vbox(12)
-	right.custom_minimum_size.x = 720
-	cols.add_child(right)
-	right.add_child(section_title("Comfort"))
-	for key in ["arachnophobia", "reduce_shake", "reduce_flashing", "captions"]:
-		right.add_child(Rows.build(key, 720.0, true))
 	body.add_child(Kit.spacer(0, 4))
 	var bottom := Kit.hbox(20)
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER

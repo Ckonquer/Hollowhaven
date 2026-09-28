@@ -39,6 +39,7 @@ const MSG_ROOF_ON_ROOF := "Take down the roof tile leaning on this one first."
 const MSG_UPPER_ON_SUPPORT := "Take down the upper floor resting on this first."
 const MSG_UPPER_ON_UPPER := "Take down the upper floor tile leaning on this one first."
 const MSG_UPPER_CARRIES := "Clear what stands on this upper floor first."
+const MSG_DECOR_ON_WALL := "Take down the %s hanging on this wall first."
 const MSG_NOTHING_TO_UNDO := "Nothing to undo."
 ## Set (once, never cleared) when stairs lead onto an upper floor she can step onto: the optional goal "A House
 ## With an Upstairs" (data/optional_goals.gd opt_upstairs, set by building). Checked after every place and
@@ -201,6 +202,12 @@ static func can_dismantle(uid: String) -> Dictionary:
 			var fp := Placement.record_footprint(r)
 			if Placement.roof_supported(fp, now_ctx) and not Placement.roof_supported(fp, after_ctx):
 				return {"ok": false, "reason": MSG_ROOF_ON_WALL if layer == "edge" else MSG_ROOF_ON_ROOF}
+	if layer == "edge":
+		# Wall decor hangs on its wall (data mount "wall"): the wall stays while something hangs on it.
+		var hung := Placement.decor_on_wall(uid, now_ctx)
+		if not hung.is_empty():
+			var hid := String(GameState.structures[hung[0]].get("id", ""))
+			return {"ok": false, "reason": MSG_DECOR_ON_WALL % ItemDB.structure_display_name(hid)}
 	if not others.is_empty():
 		var why := _storey_dependent(Placement.level_of(rec), layer, others, now_ctx, after_ctx, area_id)
 		if why != "":

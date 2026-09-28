@@ -11,6 +11,7 @@ extends Node3D
 ## Also used by the house screenshot harness (build_harness.gd).
 
 const Factory := preload("res://src/building/structure_factory.gd")
+const Placement := preload("res://src/building/placement.gd")
 
 var mode: String = "all"
 var ids: Array = []
@@ -34,8 +35,13 @@ func _ready() -> void:
 			for i in 5:
 				_put("crop_plot", Vector3(-5.0 + i * 2.5, 0, 0), 0, {"stage": i - 1})
 		"upstairs":
-			for e in upstairs_layout():
-				_put(String(e[0]), e[1], int(e[2]), e[3] if e.size() > 3 else {})
+			var lay := upstairs_layout()
+			var mo := layout_model_opts(lay)
+			for i in lay.size():
+				var e: Array = lay[i]
+				var params: Dictionary = (e[3] as Dictionary).duplicate() if e.size() > 3 else {}
+				params["model_opts"] = mo[i]
+				_put(String(e[0]), e[1], int(e[2]), params)
 		"pumpkins":
 			var faces: Array = ItemDB.structure("pumpkin_lantern").get("faces", [])
 			for i in faces.size():
@@ -111,6 +117,28 @@ func house(parent: Node3D) -> void:
 		n.rotation.y = deg_to_rad(float(e[2]))
 
 
+## Model options for each layout entry as its saved record would give them (structure.gd model_opts): pieces one
+## storey up get "level" (walls there stand on a timber sill), wall decor on a window gets its "mount_dir".
+static func layout_model_opts(layout: Array) -> Array:
+	var recs := {}
+	for i in layout.size():
+		var e: Array = layout[i]
+		var pos: Vector3 = e[1]
+		recs["p%d" % i] = {"id": String(e[0]), "area": "surface", "pos": [pos.x, pos.y, pos.z], "rot": float(e[2]),
+			"data": {"level": 1} if pos.y > 1.5 else {}}
+	var out: Array = []
+	for i in layout.size():
+		var rec: Dictionary = recs["p%d" % i]
+		var o := {}
+		if Placement.level_of(rec) >= 1:
+			o["level"] = Placement.level_of(rec)
+		var md := Placement.mount_dir_of(rec, recs)
+		if md != 0:
+			o["mount_dir"] = md
+		out.append(o)
+	return out
+
+
 ## Chapter Two two-storey cottage on a 4 x 6 m footprint (x 0..4, z 0..6; heights as placement.gd computes
 ## them: upper floor 3.0, upstairs walls 3.0, upstairs roofs 6.0). [id, pos, rot, params?]
 static func upstairs_layout() -> Array:
@@ -133,10 +161,11 @@ static func upstairs_layout() -> Array:
 		["wood_wall", Vector3(4, up, 1), 90], ["crescent_window", Vector3(4, up, 3), 90], ["wood_wall", Vector3(4, up, 5), 90],
 		["bed", Vector3(3.5, top, 1.0), 0], ["wardrobe", Vector3(3, top, 4.5), 180], ["companion_bed", Vector3(2.5, top, 2.5), 0],
 		["pumpkin_lantern", Vector3(3.5, top, 5.5), 0, {"face": "cat"}],
-		# Upstairs roofs on the upstairs walls (the stairwell roofs lean on their neighbours).
+		# Upstairs roofs on the upstairs walls (the stairwell roofs lean on their neighbours): a gable over the
+		# bedroom, a ridge along x = 2 over the rest, closed at the balcony end by two hip corners (apex at (2, 4)).
 		["gable_roof", Vector3(1, up * 2.0, 1), 0], ["gable_roof", Vector3(3, up * 2.0, 1), 0],
-		["wood_roof", Vector3(3, up * 2.0, 3), 90], ["wood_roof", Vector3(3, up * 2.0, 5), 90],
-		["roof_corner", Vector3(1, up * 2.0, 3), 0], ["wood_roof", Vector3(1, up * 2.0, 5), 270],
+		["wood_roof", Vector3(3, up * 2.0, 3), 90], ["wood_roof", Vector3(1, up * 2.0, 3), 270],
+		["roof_corner", Vector3(3, up * 2.0, 5), 0], ["roof_corner", Vector3(1, up * 2.0, 5), 270],
 		# Porch and seasonal decor outside the door.
 		["porch_post", Vector3(-0.5, 0, 7.5), 0], ["cottage_bench", Vector3(3, 0, 7.5), 0],
 		["pumpkin_lantern", Vector3(0.5, 0, 7.5), 0, {"face": "friendly"}], ["candy_bowl", Vector3(1.5, 0, 7.5), 0],

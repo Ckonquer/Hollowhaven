@@ -527,7 +527,31 @@ takes the scene with `load_threaded_get()` (plain `change_scene_to_file()` fallb
 `is_prefetching(path)` for tests. Early callers (behind `has_method` guards, once per node): the repaired waygate within ~25 m
 (`prefetch_area("hallowmere_reach")`), the open Bellhouse stair within ~20 m (`prefetch_area("hushed_works")`). The Reach districts warm
 themselves: `reach_districts.warm_up()` / `load_all()` request every district script with `ResourceLoader.load_threaded_request`
-and collect them in order (plain `load()` fallback).
+and collect them in order (plain `load()` fallback). **Quit (pass 3, CH2-011):** `Game.release_prefetches() -> int` claims every
+outstanding threaded request (`load_threaded_get`, result dropped) and clears the kept warm-up scripts; `quit_game()` and
+`_on_close_requested()` call it before quitting (an unclaimed request leaked the loader's objects at exit). Safe any time: a later
+`prefetch_area()` simply requests again. `tests/unit/test_flow_quit_prefetch.gd` (+ `tests/fixtures/prefetch/`).
+
+**Pass 3 additions (bug-fix round 1 and the visual fixes).**
+* Helper zones (CH2-010): `Game.is_landmark_zone(area, zone) -> bool` - every zone is a map landmark (a discovery when entered, and a
+  new place for Lumi's bond) unless its area's `zones` entry carries `Game.ZONE_LANDMARK_KEY` `"landmark": false`;
+  `annexes.gd` `static mark_helper_zone(area, zone_id)` sets it (the Woods waygate's 4.5 m safe circle `ch2_waygate`, which still
+  answers `get_zone_at` / `is_safe_zone`). Game's zone tick and `companion.gd` `_on_zone_entered` both skip helper zones.
+* Camera blockers (visual theme T1: arrival / respawn cameras inside props): `src/camera/camera_block.gd` (RefCounted, static)
+  `add_box(parent, center, size, basis := IDENTITY, body := null) -> StaticBody3D` adds camera-only boxes on physics layer 10 (bit 512,
+  `project.godot` name "camera"), shared `BoxShape3D`s per size. Only `camera_rig.gd` `COLLISION_MASK` (1|32|512) sees them; players,
+  companions, enemies, probes, combat and building queries all use explicit masks without 512. Placed on the Woods / Reach waygate
+  lintel and lanterns, each Lantern Road arch top, the Works lifts' roof / lamp / sign and the Echo Trial pale door, always above
+  Krystal's camera pivot. Arrival spawns moved to leave ~5 m clear behind them (Reach `waygate_arrival`, arch spawns 4.6 m out, trial
+  corridor, `annex_lantern`, `hw_lift_landing`, `vault_exit` facing its lift; on the surface the Woods `waygate` spawn
+  `Annexes.WAYGATE_SPAWN_OFFSET` 5.8 m south of the gate, zone centre at half that, and Tobin's `annex_door` at
+  `TobinDoor.DOOR_SPAWN_LOCAL` (6.8, 7.8), 5.6 m out from the door - pass 3 G2). `tests/unit/test_camera_spawn_clearance.gd` snaps the
+  real rig at every Chapter Two spawn and checks arm length, nothing between Krystal and the lens, near-view cover and sign text.
+* Resource nodes (CH2-002): `resource_node.gd` `_visual_id()` (a custom Node3D visual reads as "", never `String(Object)`);
+  `_settle_depleted()` is the end state of every depletion animation (tree top hidden and reset, other kinds hidden at rest scale,
+  `_busy` cleared) and `_process()` calls it when `_busy` is set but the tween is gone - a node whose animation died still respawns.
+  `src/world/reach/reach_vegetation.gd` `static node_params(list, d) -> Dictionary` builds one planned harvestable's `setup()` params
+  (`list` = trees | rocks | sticks | stones | fibers), used by `_build_resource_nodes()` and by tests that build real Reach nodes.
 
 **Loading details (integration).** `Game.load_area` restores a position saved on an upper storey after the structures exist
 (`UPPER_STOREY_RESTORE` 1 m, R04). `Game.wire_session_systems()` (from `_ready`, idempotent; the test runner calls it between suites)

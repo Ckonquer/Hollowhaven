@@ -80,7 +80,8 @@ const CLOCK := {"minutes_per_second": 1.0, "night_speedup": 2.5, "day_start_hour
 ## --- Chapter Two additions (append-only; docs/CHAPTER_TWO_SPEC.md 7.1) ------------------------------------
 ## Validated sites of new Hollowhaven Woods content. Never inside the legacy Haven (>= 18 m from it),
 ## never on a legacy vegetation node (checked against Vegetation.plan() footprint + 2 m by
-## tests/unit/test_flow_ch2_areas.gd). The waygate spawn "waygate" stands 3 m south of the gate.
+## tests/unit/test_flow_ch2_areas.gd). The waygate spawn "waygate" stands 5.8 m south of the gate
+## (src/world/surface/annexes.gd WAYGATE_SPAWN_OFFSET: room for the arrival camera in front of the arch).
 ##   waygate: the Lanternwake waygate, north of the Moonlit Ruin on its outer side (21 m from the ruin
 ##            centre, 25 m from the ruin_bramblings spawner; flat ground, no tree/rock within 6.5 m).
 const CH2_POINTS := {

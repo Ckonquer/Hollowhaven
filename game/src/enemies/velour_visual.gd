@@ -25,6 +25,7 @@ extends Node3D
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const VELVET := Color("7d1e3c")
 const LINING := Color("c2587e")
@@ -61,7 +62,7 @@ var _eyes_hot := false
 var _crown: Node3D
 var _glint: MeshInstance3D
 var _stars: Node3D
-var _halo: MeshInstance3D
+var _halo: Node3D
 var _tint_mat: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
@@ -197,13 +198,24 @@ func _build() -> void:
 		Kit.add(_stars, st, Vector3(cos(a) * 0.3, 0.0, sin(a) * 0.3))
 		st.set_meta("no_flash", true)
 	_stars.visible = false
-	_halo = Kit.torus(0.62, 0.7, Mat.glow(REVEAL, 1.4))
+	# Candle-light reveal (CR-11: was a torus through the cape at waist height, read as a hula hoop): a soft warm
+	# glow BEHIND the figure (the far half of a glow ball only, so it never veils him) and a thin gold halo ring
+	# floating above the crown.
+	_halo = Node3D.new()
+	_halo.name = "RevealHalo"
 	_body.add_child(_halo)
-	_halo.position = Vector3(0, -0.1, 0)
+	var aura := Kit.sphere(1.3, CreatureFx.soft_glow(Color(REVEAL.r, REVEAL.g, REVEAL.b, 0.8), 1.2, 6.0, true), 14, 18)
+	aura.set_meta("no_flash", true)
+	aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	Kit.add(_halo, aura, Vector3(0, 0.1, 0), Vector3.ZERO, Vector3(0.9, 1.1, 0.9))
+	var ring := Kit.torus(0.14, 0.2, Mat.glow(REVEAL, 1.8))
+	ring.set_meta("no_flash", true)
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	Kit.add(_halo, ring, Vector3(0.03, 1.12, 0.0), Vector3(0, 0, -8))
 	_halo.set_meta("no_flash", true)
 	_halo.visible = false
 	for mi in find_children("*", "MeshInstance3D", true, false):
-		if mi != _glint and mi != _halo and not (mi as Node).has_meta("no_flash"):
+		if mi != _glint and not (mi as Node).has_meta("no_flash"):
 			(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 

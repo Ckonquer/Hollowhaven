@@ -9,7 +9,7 @@ const U := preload("res://src/building/model_util.gd")
 const Shapes := preload("res://src/building/shapes.gd")
 const Batch := preload("res://src/building/batch.gd")
 
-static var BRASS: Color = Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04)
+static var BRASS: Color = U.keep(Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04))   # never dyed
 static var VICE: Color = Palette.TEAL.darkened(0.22)
 
 
@@ -132,7 +132,7 @@ static func bed(root: Node3D) -> Dictionary:
 		b.rbox(Vector3(0.9, 0.08, 1.2), Vector3(0, 0.48, 0.28), Palette.CLOTH_RED, 0.035)
 		for sx in [-1.0, 1.0]:
 			b.rbox(Vector3(0.03, 0.22, 1.2), Vector3(0.455 * sx, 0.39, 0.28), Palette.CLOTH_RED, 0.012)
-		var patch_cols := [Palette.BLOSSOM, Palette.CLOTH_CREAM, Palette.K_SCARF.lightened(0.3), Palette.CLOTH_RED.lightened(0.15)]
+		var patch_cols := [U.keep(Palette.BLOSSOM), U.keep(Palette.CLOTH_CREAM), U.keep(Palette.K_SCARF.lightened(0.3)), U.keep(Palette.CLOTH_RED.lightened(0.15))]
 		for i in 3:
 			for j in 4:
 				b.rbox(Vector3(0.25, 0.012, 0.25), Vector3(-0.28 + i * 0.28, 0.524, -0.15 + j * 0.29), patch_cols[(i + j * 2) % 4], 0.004)

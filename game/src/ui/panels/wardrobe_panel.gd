@@ -19,6 +19,11 @@ const AppearanceData := preload("res://data/appearance.gd")
 ## changed here. The optional log pays its reward; the UI only sets the flag.
 const LOOK_FLAG := "c1x_look_chosen"
 const PRESET_NAME_MAX := 40
+## Column widths (visual QA UI-05: the option grid was 860 px and cut Chapter Two names short; the preview and the
+## Saved looks column give up a little room so the tiles fit most names on one line and wrap the rest).
+const PREVIEW_W := 420.0
+const EDITOR_W := 920.0
+const SIDE_W := 360.0
 const COSMETIC_NOTE := "Styling is always free. Clothes are cosmetic only: they never change Krystal's stats, armor or pockets."
 
 var editor: LookEditor
@@ -41,6 +46,7 @@ func setup(p_args: Dictionary) -> void:
 
 
 func _build() -> void:
+	mark_notice_seen()
 	_opened_raw = Looks.raw_appearance()
 	var head := Kit.hbox(16)
 	body.add_child(head)
@@ -60,19 +66,20 @@ func _build() -> void:
 	cols.add_child(pc)
 	var cur := Looks.current_look()
 	preview = Preview.new()
-	preview.setup({"look": cur, "size": Vector2(440, 600), "show_armor": bool(GameState.wardrobe.get("show_armor", false)),
+	preview.setup({"look": cur, "size": Vector2(PREVIEW_W, 600), "show_armor": bool(GameState.wardrobe.get("show_armor", false)),
 		"equipment": GameState.equipment.duplicate()})
 	pc.add_child(preview)
 	pc.add_child(turn_row(preview))
 	# Editor
 	editor = LookEditor.new()
-	editor.setup({"look": cur, "wardrobe": GameState.wardrobe, "show_locked": true, "width": 860.0,
+	editor.setup({"look": cur, "wardrobe": GameState.wardrobe, "show_locked": true, "width": EDITOR_W,
 		"height": 468.0, "columns": 3, "category": String(args.get("category", "outfit"))})
 	editor.look_changed.connect(_on_look_changed)
 	cols.add_child(editor)
+	bind_face_preview(editor, preview)
 	# Presets, armor, undo / reset
 	var side := Kit.vbox(10)
-	side.custom_minimum_size.x = 400
+	side.custom_minimum_size.x = SIDE_W
 	cols.add_child(side)
 	side.add_child(section_title("Saved looks"))
 	for i in ItemDB.preset_slots():
@@ -85,7 +92,7 @@ func _build() -> void:
 	armor_btn.toggled.connect(_on_armor_toggled)
 	Kit.hook_sounds(armor_btn)
 	side.add_child(armor_btn)
-	side.add_child(Kit.wrap_label("Armor protects Krystal whether it shows or not. Hide it to show off her outfit.", "Small", 390))
+	side.add_child(Kit.wrap_label("Armor protects Krystal whether it shows or not. Hide it to show off her outfit.", "Small", SIDE_W - 10.0))
 	side.add_child(Kit.spacer(0, 4))
 	var row := Kit.hbox(10)
 	side.add_child(row)
@@ -106,6 +113,32 @@ func _build() -> void:
 	_done_btn = Kit.button("Done", request_close, "AccentButton")
 	_done_btn.custom_minimum_size.x = 200
 	bottom.add_child(_done_btn)
+
+
+## Opening the wardrobe (pause menu, hotkey, Ward Stone, furniture or the card itself) counts as being told about
+## it: the one-time "Your wardrobe is ready" card (ui_root.wardrobe_notice_pending) is no longer due and never
+## appears afterwards; onboarding's ob_wardrobe tip arms from the same save flag (CH2-009).
+static func mark_notice_seen() -> void:
+	GameState.wardrobe["notice_shown"] = true
+
+
+## Face-related categories: the preview turns Krystal to the front and frames her face (visual QA UI-08).
+const FACE_CATEGORIES := ["hair_color", "skin", "eyes"]
+
+
+## Keeps a preview facing front while a face-related category is open (and re-faces her after each pick there);
+## shared with the creation screen. Duck-typed: previews without set_face_mode are left alone.
+static func bind_face_preview(ed: Control, pv: Control) -> void:
+	if ed == null or pv == null or not pv.has_method("set_face_mode"):
+		return
+	var apply := func(cat: String) -> void:
+		if is_instance_valid(pv):
+			pv.call("set_face_mode", FACE_CATEGORIES.has(cat))
+	ed.connect("category_changed", apply)
+	ed.connect("look_changed", func(_l: Dictionary) -> void:
+		if is_instance_valid(pv) and is_instance_valid(ed) and FACE_CATEGORIES.has(String(ed.get("category"))):
+			pv.call("face_front"))
+	apply.call(String(ed.get("category")))
 
 
 ## "< Turn  Turn >" buttons under a preview (shared with the creation screen).
@@ -153,6 +186,7 @@ func refresh() -> void:
 
 
 func reopen(p_args: Dictionary) -> void:
+	mark_notice_seen()
 	var cat := String(p_args.get("category", ""))
 	refresh()
 	if cat != "" and editor != null:
@@ -231,13 +265,13 @@ func _make_preset_row(i: int) -> Control:
 	var name_l := Kit.label("", "CardTitle")
 	name_l.clip_text = true
 	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	name_l.custom_minimum_size = Vector2(340, 0)
+	name_l.custom_minimum_size = Vector2(SIDE_W - 60.0, 0)
 	v.add_child(name_l)
 	var edit := LineEdit.new()
 	edit.max_length = PRESET_NAME_MAX
 	edit.placeholder_text = "Name this look"
 	edit.visible = false
-	edit.custom_minimum_size = Vector2(340, 0)
+	edit.custom_minimum_size = Vector2(SIDE_W - 60.0, 0)
 	edit.text_submitted.connect(_on_rename_submitted.bind(i))
 	edit.focus_exited.connect(_finish_rename.bind(i, true, false))   # clicking elsewhere keeps that focus
 	edit.gui_input.connect(_on_rename_input.bind(i))
@@ -692,11 +726,12 @@ class Looks:
 ##   ed.look_changed.connect(func(l): ...)
 class LookEditor extends VBoxContainer:
 	signal look_changed(look: Dictionary)
+	signal category_changed(category: String)
 
 	const CATEGORIES := [["hair", "Hair"], ["hair_color", "Hair Colour"], ["skin", "Skin"], ["eyes", "Eyes"],
 		["outfit", "Outfits"], ["pieces", "Pieces"], ["colours", "Colours"]]
 	const PIECE_SLOTS := [["upper", "Tops"], ["lower", "Skirts & Trousers"], ["shoes", "Shoes"], ["hat", "Hats"],
-		["hair_acc", "Hair Accessory"], ["back", "Back"]]
+		["hair_acc", "Hair Accessory"], ["back", "Bags & Capes"]]   # (not "Back": it read like the Back button, UI-18)
 	const CHANNELS := [["primary", "Main colour"], ["secondary", "Second colour"], ["accent", "Accent"]]
 	const SLOT_NAMES := {"upper": "Top", "lower": "Skirt, trousers or dress", "shoes": "Shoes", "hat": "Hat",
 		"hair_acc": "Hair accessory", "back": "Back accessory"}
@@ -807,6 +842,7 @@ class LookEditor extends VBoxContainer:
 			(_tab_buttons[id] as Button).set_pressed_no_signal(String(id) == category)
 		_build_sub_row()
 		_build_grid()
+		category_changed.emit(category)
 
 	func cycle_category(step: int) -> void:
 		var ids := categories()
@@ -941,7 +977,8 @@ class LookEditor extends VBoxContainer:
 		b.toggle_mode = true
 		b.text = String(opt["name"])
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.clip_text = true
+		# a long name wraps onto a second line instead of ending in "..." (visual QA UI-05)
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		b.custom_minimum_size = Vector2(tile_w, 58)
 		b.add_theme_font_size_override("font_size", 21)

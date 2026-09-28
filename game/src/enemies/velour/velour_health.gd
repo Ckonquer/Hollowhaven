@@ -6,11 +6,18 @@ extends "res://src/combat/health.gd"
 ## interaction with the candle rule, however strong her gear). A hit that finds no room above the floor deals 0,
 ## so Combat.melee / projectiles / companions treat it exactly like a blocked hit (spark, no knockback, no XP).
 ##   health.floor_hp = 126.0     # hp stays >= 126 until the boss lowers the floor
+## A second, optional limit, `window_room`: a Callable returning how much more damage the boss's current attack
+## window may take (his WINDOW_CAP; < 0 = no limit). It is checked BEFORE the hit lands, so the last blow of a window
+## is trimmed to fit instead of overshooting the cap (QA CH2-013) - except a blow that defeats him outright (only
+## possible with no floor left: phase C once the candle rule was used), so no sliver of health is left to chase.
+##   health.window_room = _window_room
 
 var floor_hp: float = 0.0
+var window_room: Callable = Callable()
 
 
-## Applies damage down to (never below) `floor_hp`; returns the amount actually dealt (0 = ignored).
+## Applies damage down to (never below) `floor_hp` and within `window_room`; returns the amount actually dealt
+## (0 = ignored).
 func apply_damage(amount: float, source: Node = null, dir: Vector3 = Vector3.ZERO) -> float:
 	if dead or invulnerable or amount <= 0.0:
 		return 0.0
@@ -20,6 +27,12 @@ func apply_damage(amount: float, source: Node = null, dir: Vector3 = Vector3.ZER
 	if room <= 0.0001:
 		return 0.0
 	var dealt: float = minf(amount * damage_taken_mult, room)
+	if dealt < hp and window_room.is_valid():
+		var w := float(window_room.call())
+		if w >= 0.0:
+			dealt = minf(dealt, w)
+	if dealt <= 0.0001:
+		return 0.0
 	hp -= dealt
 	damaged.emit(dealt, source, dir)
 	changed.emit(hp, max_hp)

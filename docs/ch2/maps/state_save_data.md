@@ -552,6 +552,26 @@ exact shape) but `step_done()` - and so `has_pending_completion()` / `evaluate()
 objective. `ChapterLog.is_display_objective(o)`. Used by `ch2_quarry` ("Calm the Quarry Warden" `hr_warden_defeated`, "Mend the mineral
 winch" `ch2_winch_repaired`, then the lamp that completes it). Telemetry `current_objective().status` rows may carry the key.
 
+**Quest layer since bug-fix round 1 (pass 3; CH2-001 / 012 / 015 / 016).** Step ids and the saved shape are unchanged.
+* Step group `"lamps"`: the lamp search `ch2_outer_lamps` ("Find the Three Lamps") now shares the group with `ch2_orchard`, `ch2_quarry`
+  and `ch2_manor`, so all four are current together from the moment the Commons is done and each lit lamp completes its own road at
+  once (seal, `ch2_*_restored` flag, "Goal complete", message). The group title "Three Roads, Three Lamps" is announced once.
+* Step key `"hint_when"` (optional, an objective of the same types): the step's hint waits until it holds while the step is current
+  (each lamp road's hint waits for its `ch2_found_*_lamp`), then goes out once per session (`ChapterLog._hinted`, not saved) and never
+  when the HUD card's `hint_quest_<id>` flag is already set. Steps without it hint once, when they start.
+* `ChapterLog.from_dict()` narrowing: silent baselines are added only when NO current step has one (a save from before its current
+  steps started). If one already has a baseline, the others start in the next `evaluate()` like any new step (start event, hint; the
+  group is not announced twice), so an old save stuck in the lamp search pays any lamp already lit on its first evaluation.
+* Legacy landmarks (CH2-010; decision R3-17, kept as implemented), next to the mastery legacy credit (`GameState.mastery.legacy_credit`,
+  `Mastery.apply_legacy_credit()`, once per save, capped by `LEGACY_CAP_XP` below rank 2): when the credit is applied,
+  `Mastery.mark_legacy_landmarks()` records every Chapter One landmark the save proves visited (`data/mastery.gd` `LEGACY_LANDMARKS`: any
+  listed flag; `chapter_one_complete` proves the whole woods, `read_ward_intro` / `ruin_cleared` / `mine_opened`... prove the Haven, Ruin,
+  Mine) as an already-seen wayfinding kind `landmark:<area>/<id>` - no XP, no toast - so a Continued save is not paid again for places the
+  credit already stands for. A new journey has none of those flags and earns every first discovery; Chapter Two landmarks always pay; the
+  Woods waygate circle is a helper zone (`Game.is_landmark_zone`, world_areas.md §8), never a discovery. Verify's S1 run (the real v1
+  Chapter-One-complete save): Wayfinding ends at 105 XP, below rank 2 (110); `discovered.surface` is haven + ruin, no `ch2_waygate`.
+  `tests/unit/test_mastery_landmark_discovery.gd`.
+
 **Rewards (unchanged rule, WAVE_A_REPORT).** Content modules grant only their `"by": "content"` bundles with `grant_once`; the
 integration pass added the missing bundles to `data/sources.gd` REWARDS: `rw_hr_chime_trail` (Pools pouch, R30),
 `rw_hw_throat_supplies` (Bell Throat supplies, R31), `rw_hw_lightwell_alcove` (Light Well keepsake: decor `bat_bunting` ×2 +

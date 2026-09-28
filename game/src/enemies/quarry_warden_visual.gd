@@ -1,8 +1,9 @@
 extends Node3D
 ## Quarry Warden look: a broad, low stone guardian (~2.6 m wide, ~2.4 m tall) of copper-red quarry rock - two
-## stumpy pillar legs, two massive arms with boulder fists, a small heavy-browed head sunk between the shoulders
-## with amber eyes, and a humped SHELL of overlapping rock plates on its back with a cracked bronze BELL set into its
-## front. Three pips on the bell rim count the pulses. Faces -Z, feet at y = 0: a wide, heavy, hunched silhouette.
+## stumpy pillar legs, two massive arms with boulder fists, a heavy-browed head sunk between the shoulders with big
+## amber eyes, and a humped SHELL of overlapping rock plates on its back with a cracked bronze BELL set into its
+## front, riding high between the shoulders BEHIND the head (the face stays in view). Three pips on the bell rim
+## count the pulses. Faces -Z, feet at y = 0: a wide, heavy, hunched silhouette.
 ## States (set_state): idle / wander / chase / return (a heavy knuckle-walk), telegraph + "slam" (rears up, both
 ## fists overhead, the bell glows, amber tint), slam, telegraph + "pulses" (fists planted, the bell hums and the three
 ## pips light one after another, pale tint), pulses (the bell swells with every pulse, one pip goes out each time),
@@ -15,6 +16,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const HIP_Y := 0.75
 const ROCK := Color("b8674a")
@@ -30,6 +32,8 @@ const SLAM_TINT := Color(1.0, 0.66, 0.24)
 const PULSE_TINT := Color(0.98, 0.9, 0.62)
 const CHARGE_TINT := Color(0.98, 0.34, 0.2)
 const PLATES := 6
+const BELL_POS := Vector3(0, 1.52, -0.22)     # torso space
+const HEAD_POS := Vector3(0, 1.0, -0.86)
 
 var state: String = "idle"
 var state_len: float = 0.0
@@ -66,6 +70,7 @@ var _stars: Node3D
 var _tint_mat: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
+var _tint_level_now: float = 0.0
 
 
 func _ready() -> void:
@@ -77,7 +82,7 @@ func body_height() -> float:
 
 
 func _build() -> void:
-	_tint_mat = HitFx.new_tint()
+	_tint_mat = CreatureFx.new_tint()
 	_root = Node3D.new()
 	_root.name = "Root"
 	add_child(_root)
@@ -115,7 +120,9 @@ func _build() -> void:
 	# The cracked bronze bell set into the front of the shell, its glowing core, the crack and the three pips
 	_bell = Node3D.new()
 	_bell.name = "Bell"
-	Kit.add(_torso, _bell, Vector3(0, 1.35, -0.45), Vector3(-15, 0, 0))
+	# CR-13: the bell sat in front of / over the small head and hid the face. It now rides higher and further back
+	# in the shell (between the shoulders, still in the shell's front), and the head comes forward below it.
+	Kit.add(_torso, _bell, BELL_POS, Vector3(-6, 0, 0))
 	var bronze := Mat.outlined(Mat.toon(BRONZE, {"rim": 0.5, "specular": 0.5}), 0.012)
 	var bell_body := Kit.cylinder(0.2, 0.42, 0.55, bronze, 18)
 	_bell.add_child(bell_body)
@@ -138,18 +145,19 @@ func _build() -> void:
 		pip.set_meta("no_flash", true)
 		Kit.add(_bell, pip, Vector3(-0.2 + 0.2 * float(i), -0.26, -0.36))
 		_pips.append(pip)
-	# Head sunk between the shoulders
+	# Head sunk between the shoulders, pushed forward of the bell, with a heavy rounded brow over big amber eyes
 	_head = Node3D.new()
 	_head.name = "Head"
-	Kit.add(_torso, _head, Vector3(0, 0.95, -0.72))
-	var head := Kit.blob(0.26, rock, 65, 0.1, 0.85, 2)
+	Kit.add(_torso, _head, HEAD_POS)
+	var head := Kit.blob(0.3, rock, 65, 0.1, 0.85, 2)
 	_head.add_child(head)
 	_tint_meshes.append(head)
-	Kit.add(_head, Kit.box(Vector3(0.5, 0.12, 0.2), rock_dark), Vector3(0, 0.12, -0.12), Vector3(-12, 0, 0))
+	Kit.add(_head, Kit.capsule(0.08, 0.56, rock_dark), Vector3(0, 0.13, -0.17), Vector3(-12, 0, 90), Vector3(1.0, 1.0, 1.1))
 	for sx in [-1.0, 1.0]:
-		var eye := Kit.sphere(0.05, Mat.glow(EYE, 1.8), 8, 10)
+		Kit.add(_head, Kit.sphere(0.075, Mat.toon(Color("2e1c14"), {"rim": 0.0, "noise": 0.0}), 8, 10), Vector3(sx * 0.12, 0.03, -0.25), Vector3.ZERO, Vector3(1.0, 0.9, 0.5))
+		var eye := Kit.sphere(0.06, Mat.glow(EYE, 2.0), 8, 10)
 		eye.set_meta("no_flash", true)
-		Kit.add(_head, eye, Vector3(sx * 0.1, 0.03, -0.22))
+		Kit.add(_head, eye, Vector3(sx * 0.12, 0.03, -0.27), Vector3.ZERO, Vector3(1.0, 0.85, 0.7))
 	# Arms with boulder fists
 	_arm_l = _arm(rock, rock_dark, -1.0)
 	_arm_r = _arm(rock, rock_dark, 1.0)
@@ -353,19 +361,22 @@ func _set_glow(on: bool) -> void:
 
 
 func _apply_tint(tint: float, col: Color) -> void:
-	var c := Color(0, 0, 0, 0)
+	# CR-09: a capped wash + a fresnel rim in the tell colour (CreatureFx), so the shading and outlines stay.
+	var on := false
 	if _flash_t > 0.0:
-		c = Color(HitFx.FLASH_COLOR, HitFx.flash_strength(0.75))
-	elif tint > 0.0:
-		c = Color(col, clampf(tint, 0.0, 1.0))
-	var on := c.a > 0.01
-	if on:
-		_tint_mat.albedo_color = c
+		_tint_level_now = HitFx.flash_strength(0.75)
+		CreatureFx.apply_flash(_tint_mat, HitFx.FLASH_COLOR, _tint_level_now)
+		on = true
+	elif tint > 0.01:
+		_tint_level_now = clampf(tint, 0.0, 1.0)
+		CreatureFx.apply_tint(_tint_mat, col, _tint_level_now)
+		on = true
 	if on != _tint_on:
 		_tint_on = on
 		for m in _tint_meshes:
 			(m as MeshInstance3D).material_overlay = _tint_mat if on else null
 
 
+## The tell strength (the old flat overlay alpha; the drawn wash is capped, the rim carries the colour).
 func tint_alpha() -> float:
-	return _tint_mat.albedo_color.a if _tint_on else 0.0
+	return _tint_level_now if _tint_on else 0.0

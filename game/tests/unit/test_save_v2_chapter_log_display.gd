@@ -55,11 +55,12 @@ func test_tracker_view_lists_the_quarry_display_rows_with_their_state() -> void:
 	part = _quarry_part(vw)
 	assert_eq(_rows_of(part), [[QUARRY_ROWS[0], true], [QUARRY_ROWS[1], false], [QUARRY_ROWS[2], false]])
 	assert_false(bool(part["done"]))
-	# The flat row list keeps the step order: garden, the quarry's three rows, manor.
+	# The flat row list keeps the step order: the lamp search (shown with the lamps since CH2-001), garden,
+	# the quarry's three rows, manor.
 	var labels: Array = []
 	for r in vw["rows"]:
 		labels.append(String(r["label"]))
-	assert_eq(labels, ["Light the garden lamp"] + QUARRY_ROWS + ["Light the manor lamp"])
+	assert_eq(labels, ["Find the orchard lamp", "Find the quarry lamp", "Find the manor lamp", "Light the garden lamp"] + QUARRY_ROWS + ["Light the manor lamp"])
 
 
 func test_the_lamp_alone_completes_the_step_and_its_rows_read_done() -> void:

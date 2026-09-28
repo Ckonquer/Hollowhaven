@@ -167,6 +167,107 @@ func test_melee_blocked_by_wall() -> void:
 	assert_eq(hits.size(), 1, "hit once the wall is gone")
 
 
+func _wall(pos: Vector3) -> StaticBody3D:
+	var wall := StaticBody3D.new()
+	wall.collision_layer = 1
+	var cs := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4, 4, 0.3)
+	cs.shape = box
+	wall.add_child(cs)
+	_add(wall, pos)
+	return wall
+
+
+func test_line_of_sight_block_returns_the_obstacle_point() -> void:
+	var a := _attacker()
+	_wall(Vector3(0, 1, -1.0))
+	await wait_physics(3)
+	var space := a.get_world_3d().direct_space_state
+	var p: Variant = Combat.line_of_sight_block(space, Vector3(0, 1, 0), Vector3(0, 1, -2.0))
+	assert_true(p is Vector3, "blocked ray returns where it hit")
+	assert_almost(float((p as Vector3).z), -0.85, 0.02, "the wall's near face (wall at z=-1, 0.3 m thick)")
+	assert_false(Combat.has_line_of_sight(space, Vector3(0, 1, 0), Vector3(0, 1, -2.0)), "same ray, same verdict")
+	assert_null(Combat.line_of_sight_block(space, Vector3(0, 1, 0), Vector3(3, 1, 0)), "clear line -> null")
+	assert_true(Combat.has_line_of_sight(space, Vector3(0, 1, 0), Vector3(3, 1, 0)))
+	assert_null(Combat.line_of_sight_block(null, Vector3.ZERO, Vector3.ONE), "no space -> clear")
+
+
+## QA CH2-005 / R3-08: Krystal's blow at an enemy behind a wall used to vanish silently. It now shows ONE glance
+## spark where the wall stopped it - and still deals no damage.
+func test_player_swing_at_enemy_behind_wall_shows_one_glance_spark() -> void:
+	var a := _attacker()
+	a.add_to_group("player")
+	var t: Node3D = _add(Target.new(), Vector3(0, 0, -2.0), "enemy")
+	var t2: Node3D = _add(Target.new(), Vector3(0.6, 0, -2.2), "enemy")
+	_wall(Vector3(0, 1, -1.0))
+	await wait_physics(3)
+	var before := Combat.los_glances
+	var hits: Array = Combat.melee(a, Vector3(0, 1.0, 0), Vector3.FORWARD, 2.5, 90.0, 10.0, ["enemy"], 4.0)
+	assert_eq(hits.size(), 0, "no hits through walls")
+	assert_almost(t.health.hp, 100.0, 0.001, "no damage through the wall")
+	assert_almost(t2.health.hp, 100.0, 0.001)
+	assert_eq(t.knocks.size() + t2.knocks.size(), 0, "no knockback")
+	assert_eq(t.blocked + t2.blocked, 0, "not an armour glance (on_hit_blocked not called)")
+	assert_eq(Combat.los_glances - before, 1, "exactly ONE spark for the swing, even with two enemies behind the wall")
+	var at: Variant = Combat.last_los_glance
+	assert_true(at is Vector3, "spark position recorded")
+	assert_almost(float((at as Vector3).z), -0.85 + Combat.GLANCE_NUDGE, 0.03, "on the wall's near face, nudged toward the swing")
+	Combat.melee(a, Vector3(0, 1.0, 0), Vector3.FORWARD, 2.5, 90.0, 10.0, ["enemy"], 4.0)
+	assert_eq(Combat.los_glances - before, 2, "one more swing, one more spark")
+
+
+func test_enemy_swing_behind_wall_makes_no_spark() -> void:
+	var e: Node3D = _add(Target.new(), Vector3.ZERO, "enemy")
+	var p: Node3D = _add(Target.new(), Vector3(0, 0, -2.0), "player")
+	_wall(Vector3(0, 1, -1.0))
+	await wait_physics(3)
+	var before := Combat.los_glances
+	var hits: Array = Combat.melee(e, Vector3(0, 1.0, 0), Vector3.FORWARD, 2.5, 90.0, 10.0, ["player"], 4.0)
+	assert_eq(hits.size(), 0, "the wall still blocks the enemy's blow")
+	assert_almost(p.health.hp, 100.0)
+	assert_eq(Combat.los_glances, before, "an enemy's blocked swing shows no spark")
+	# A player swing at something that is not an enemy (e.g. a test dummy group) behind the wall: no spark either.
+	var a := _attacker()
+	a.add_to_group("player")
+	_add(Target.new(), Vector3(0.3, 0, -2.0), "combat_test_target")
+	await wait_physics(2)
+	Combat.melee(a, Vector3(0, 1.0, 0), Vector3.FORWARD, 2.5, 90.0, 10.0, ["combat_test_target"], 4.0)
+	assert_eq(Combat.los_glances, before, "only enemies behind a wall make the player's blow glance")
+
+
+func test_unblocked_player_swing_is_unchanged() -> void:
+	var a := _attacker()
+	a.add_to_group("player")
+	var t: Node3D = _add(Target.new(), Vector3(0, 0, -1.6), "enemy")
+	await wait_physics(2)
+	var before := Combat.los_glances
+	var hits: Array = Combat.melee(a, Vector3(0, 1.0, 0), Vector3.FORWARD, 2.0, 100.0, 12.0, ["enemy"], 4.0)
+	assert_eq(hits.size(), 1, "clear line: the blow lands")
+	assert_almost(t.health.hp, 88.0, 0.01, "full damage")
+	assert_eq(t.knocks.size(), 1, "knockback as before")
+	assert_eq(Combat.los_glances, before, "no glance spark on a clean hit")
+	# One enemy in the open, one behind a wall: the open one is hit, the blocked one adds no spark.
+	var hidden: Node3D = _add(Target.new(), Vector3(1.8, 0, -1.2), "enemy")
+	var w := _wall(Vector3(1.2, 1, -0.8))
+	w.rotation_degrees.y = 55.0
+	await wait_physics(3)
+	var space := a.get_world_3d().direct_space_state
+	assert_false(Combat.has_line_of_sight(space, Vector3(0, 1.0, 0), Combat.aim_point(hidden), [a, hidden]), "precondition: side enemy is walled off")
+	assert_true(Combat.has_line_of_sight(space, Vector3(0, 1.0, 0), Combat.aim_point(t), [a, t]), "precondition: front enemy is clear")
+	hits = Combat.melee(a, Vector3(0, 1.0, 0), Vector3.FORWARD, 2.5, 140.0, 12.0, ["enemy"], 4.0)
+	assert_eq(hits.size(), 1, "only the front enemy is hit")
+	assert_true(hits.has(t))
+	assert_almost(hidden.health.hp, 100.0, 0.001)
+	assert_eq(Combat.los_glances, before, "a swing that landed shows no extra glance spark")
+	# An armoured enemy in the open answers with its own glance (on_hit_blocked); the walled one adds nothing.
+	t.health.invulnerable = true
+	hits = Combat.melee(a, Vector3(0, 1.0, 0), Vector3.FORWARD, 2.5, 140.0, 12.0, ["enemy"], 4.0)
+	assert_eq(hits.size(), 0)
+	assert_eq(t.blocked, 1, "the armoured target gives its own feedback")
+	assert_eq(Combat.los_glances, before, "never two glances for one swing")
+
+
 func test_melee_on_invulnerable_calls_blocked() -> void:
 	var a := _attacker()
 	var t: Node3D = _add(Target.new(), Vector3(0, 0, -1.5), "combat_test_target")

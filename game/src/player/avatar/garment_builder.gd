@@ -6,6 +6,8 @@ extends RefCounted
 ##   build_lower(ctx) -> {"skirt": {pivots, theta, radius, y0, length, base, max} | {}}
 ##   build_shoes(ctx) -> {}
 ## Cosmetic only: nothing here touches collision, speed or reach.
+## Under show-armor body pieces (ctx["armor_body"]) the jacket's front details (buttons, pocket flaps) are left out so
+## they never float on top of the vest / mail.
 
 const AKit := preload("res://src/player/avatar/avatar_kit.gd")
 const LookColors := preload("res://src/player/avatar/look_colors.gd")
@@ -47,6 +49,7 @@ static func build_upper(ctx: Dictionary) -> Dictionary:
 	var spine: Node3D = box.call("spine")
 	var chest: Node3D = box.call("chest")
 	var skin := AKit.m(col["skin"])
+	var armored := bool(ctx.get("armor_body", false))
 	var res := {"chains": [], "patch": null}
 	match id:
 		"puff_blouse":
@@ -57,7 +60,7 @@ static func build_upper(ctx: Dictionary) -> Dictionary:
 			for side in 2:
 				var s := 1.0 if side == 0 else -1.0
 				AKit.part(chest, Kit.sphere(0.042, AKit.m(collar_c, false), 10, 14), Vector3(0.045 * s, 0.015, 0.11), Vector3(20, 25 * s, 0), Vector3(1.3, 0.6, 0.35), false)
-			for i in 3:
+			for i in 3 if not armored else 0:
 				AKit.part(spine, Kit.sphere(0.012, AKit.flat(collar_c), 8, 10), Vector3(0, 0.3 - 0.08 * float(i), 0.143), Vector3.ZERO, Vector3.ONE, false)
 			_sleeves(box, "puff", blouse, AKit.m(collar_c), skin)
 		"ribbon_blouse":
@@ -79,10 +82,11 @@ static func build_upper(ctx: Dictionary) -> Dictionary:
 			var cardi_c := LookColors.channel(id, "cardigan", col)
 			var cardi := AKit.m(cardi_c)
 			var buttons := LookColors.fixed(id, "buttons", Color("fbf8f2"))
+			var top_c := LookColors.channel(id, "top", col)
 			_torso(spine, cardi, "cardigan")
-			AKit.part(spine, Kit.prism(Vector3(0.13, 0.2, 0.03), AKit.m(LookColors.channel(id, "top", col), false)), Vector3(0, 0.31, 0.132), Vector3(-14, 0, 180), Vector3.ONE, false)
-			for i in 3:
-				AKit.part(spine, Kit.sphere(0.015, AKit.flat(buttons), 8, 10), Vector3(0.055, 0.26 - 0.075 * float(i), 0.15), Vector3.ZERO, Vector3.ONE, false)
+			AKit.part(spine, Kit.prism(Vector3(0.13, 0.2, 0.03), AKit.m(top_c, false)), Vector3(0, 0.31, 0.132), Vector3(-14, 0, 180), Vector3.ONE, false)
+			for i in 3 if not armored else 0:
+				AKit.part(spine, Kit.sphere(0.015 if id == "cloud_cardigan" else 0.019, AKit.flat(buttons), 8, 10), Vector3(0.055, 0.26 - 0.075 * float(i), 0.15), Vector3.ZERO, Vector3.ONE, false)
 			if id == "cloud_cardigan":
 				# fluffy cloud hem
 				for i in 10:
@@ -90,16 +94,41 @@ static func build_upper(ctx: Dictionary) -> Dictionary:
 					AKit.part(spine, Kit.sphere(0.05, cardi, 10, 14), Vector3(sin(a) * 0.205, -0.07, cos(a) * 0.19), Vector3(0, rad_to_deg(a), 0), Vector3(1.2, 0.8, 1.0))
 				_sleeves(box, "chunky", cardi, AKit.m(AKit.lighten(cardi_c, 0.2)), skin)
 			else:
-				AKit.part(spine, Kit.torus(0.185, 0.222, AKit.m(AKit.shade(cardi_c, 0.15))), Vector3(0, -0.075, 0), Vector3.ZERO, Vector3(1, 1.4, 0.9))
-				# a little pumpkin pocket with a leaf-green stem
-				AKit.part(spine, Kit.sphere(0.042, AKit.m(AKit.shade(cardi_c, 0.1), false), 10, 14), Vector3(-0.1, 0.05, 0.165), Vector3(0, -20, 0), Vector3(1.25, 1.0, 0.45), false)
-				AKit.part(spine, Kit.capsule(0.008, 0.03, AKit.flat(buttons)), Vector3(-0.1, 0.095, 0.17), Vector3(0, 0, 15), Vector3.ONE, false)
-				_sleeves(box, "chunky", cardi, AKit.m(AKit.shade(cardi_c, 0.15)), skin)
+				# Pumpkin Patch: cream ribbing (the "top" channel) at the hem and cuffs for contrast, a knitted pumpkin
+				# (fixed pumpkin orange, leaf-green stem and leaf) on the back where the camera sees it, and a little
+				# pumpkin pocket in front
+				var rib := AKit.m(top_c)
+				var pumpkin_c := LookColors.fixed(id, "pumpkin", Color("e8812f"))
+				var leaf := AKit.m(buttons, false)
+				AKit.part(spine, Kit.torus(0.185, 0.222, rib), Vector3(0, -0.075, 0), Vector3.ZERO, Vector3(1, 1.4, 0.9))
+				if not armored:
+					AKit.part(spine, Kit.sphere(0.045, AKit.m(pumpkin_c, false), 10, 14), Vector3(-0.1, 0.05, 0.166), Vector3(0, -20, 0), Vector3(1.3, 1.0, 0.45), false)
+					AKit.part(spine, Kit.capsule(0.009, 0.034, AKit.flat(AKit.shade(buttons, 0.2))), Vector3(-0.1, 0.098, 0.172), Vector3(0, 0, 15), Vector3.ONE, false)
+					AKit.part(spine, Kit.sphere(0.016, leaf, 8, 10), Vector3(-0.08, 0.1, 0.176), Vector3(0, -20, -30), Vector3(1.5, 0.7, 0.4), false)
+				var knit := AKit.node(spine, Vector3(0, 0.2, -0.155), "KnitPumpkin")
+				knit.rotation_degrees = Vector3(-6, 180, 0)
+				var pk := AKit.m(pumpkin_c, true, 0.005)
+				for k in 3:
+					var x := (float(k) - 1.0) * 0.042
+					AKit.part(knit, Kit.sphere(0.05 - 0.008 * absf(float(k) - 1.0), pk, 10, 14), Vector3(x, 0, 0.004 * (1.0 - absf(float(k) - 1.0))), Vector3.ZERO, Vector3(0.9, 0.95, 0.35), false)
+				AKit.part(knit, Kit.capsule(0.01, 0.04, AKit.flat(AKit.shade(buttons, 0.25))), Vector3(0.004, 0.056, 0.012), Vector3(0, 0, -12), Vector3.ONE, false)
+				AKit.part(knit, Kit.sphere(0.022, leaf, 8, 10), Vector3(0.03, 0.062, 0.012), Vector3(0, 0, -30), Vector3(1.5, 0.65, 0.35), false)
+				_sleeves(box, "chunky", cardi, rib, skin)
+				# knitted pumpkin elbow patches: they read from behind even under long hair
+				for side in 2:
+					var el: Node3D = box.call("el%d" % side)
+					AKit.part(el, Kit.sphere(0.04, AKit.m(pumpkin_c, false), 10, 12), Vector3(0, -0.02, -0.052), Vector3(10, 0, 0), Vector3(1.0, 1.1, 0.4), false)
+					AKit.part(el, Kit.capsule(0.006, 0.02, AKit.flat(AKit.shade(buttons, 0.25))), Vector3(0, 0.024, -0.062), Vector3.ZERO, Vector3.ONE, false)
 		"moonflower_bodice":
 			var bodice_c := LookColors.channel(id, "bodice", col)
 			var bodice := AKit.m(bodice_c)
-			var sash := AKit.m(LookColors.channel(id, "sash", col))
+			var sash_c := LookColors.channel(id, "sash", col)
+			var sash := AKit.m(sash_c)
 			_torso(spine, bodice, "fitted")
+			# three little moonflower appliques on the bodice (sash-coloured petals, cream centres)
+			if not armored:
+				for f in [[Vector3(-0.07, 0.25, 0.132), 0.75], [Vector3(0.075, 0.2, 0.138), 0.62], [Vector3(-0.03, 0.14, 0.146), 0.55]]:
+					_applique(spine, f[0], float(f[1]), sash_c, Color("fff4e0"))
 			AKit.part(spine, Kit.torus(0.148, 0.185, sash), Vector3(0, 0.05, 0), Vector3.ZERO, Vector3(1, 1.15, 0.9))
 			for side in 2:
 				var s := 1.0 if side == 0 else -1.0
@@ -182,6 +211,7 @@ static func build_upper(ctx: Dictionary) -> Dictionary:
 ## flaps, the embroidered back patch, the scarf (with its two fluttering ends) and full sleeves with cuffs.
 static func _explorer_jacket(ctx: Dictionary, spine: Node3D, chest: Node3D, skin: Material) -> Dictionary:
 	var id := String(ctx["id"])
+	var armored := bool(ctx.get("armor_body", false))
 	var col: Dictionary = ctx["col"]
 	var jacket_c := LookColors.channel(id, "jacket", col)
 	var scarf_c := LookColors.channel(id, "scarf", col)
@@ -191,7 +221,7 @@ static func _explorer_jacket(ctx: Dictionary, spine: Node3D, chest: Node3D, skin
 	var jacket_dark := AKit.shade(jacket_c)
 	_torso(spine, jacket, "jacket")
 	AKit.part(spine, Kit.prism(Vector3(0.13, 0.15, 0.03), AKit.m(shirt_c, false)), Vector3(0, 0.335, 0.122), Vector3(-14, 0, 180), Vector3.ONE, false)
-	for side in 2:
+	for side in 2 if not armored else 0:
 		var s := 1.0 if side == 0 else -1.0
 		AKit.part(spine, Kit.sphere(0.013, AKit.flat(brass), 8, 12), Vector3(0.062 * s, 0.24, 0.139), Vector3.ZERO, Vector3.ONE, false)
 		AKit.part(spine, Kit.sphere(0.013, AKit.flat(brass), 8, 12), Vector3(0.062 * s, 0.15, 0.144), Vector3.ZERO, Vector3.ONE, false)
@@ -242,6 +272,17 @@ static func _torso(spine: Node3D, mat: Material, style: String) -> void:
 
 static func _collar(chest: Node3D, mat: Material, inner: float, outer: float, sy: float) -> void:
 	AKit.part(chest, Kit.torus(inner, outer, mat), Vector3(0, 0.035, 0), Vector3(4, 0, 0), Vector3(1.0, sy, 0.94))
+
+
+## A flat five-petal flower sewn onto cloth (faces +Z of `parent`), `sc` ~ 1 = 7 cm across.
+static func _applique(parent: Node3D, pos: Vector3, sc: float, petal: Color, centre: Color) -> void:
+	var f := AKit.node(parent, pos, "Applique")
+	f.scale = Vector3.ONE * sc
+	var pm := AKit.m(petal, true, 0.004)
+	for k in 5:
+		var a := TAU * float(k) / 5.0 + 0.3
+		AKit.part(f, Kit.sphere(0.02, pm, 8, 10), Vector3(cos(a) * 0.021, sin(a) * 0.021, 0), Vector3(0, 0, rad_to_deg(a)), Vector3(1.25, 0.85, 0.3), false)
+	AKit.part(f, Kit.sphere(0.012, AKit.flat(centre), 8, 10), Vector3(0, 0, 0.005), Vector3.ZERO, Vector3(1, 1, 0.5), false)
 
 
 ## Criss-cross lacing down the front of a bodice.
@@ -379,11 +420,22 @@ static func _skirt(ctx: Dictionary, id: String, spec: Dictionary, cloth: Materia
 	var mesh := AKit.panel_mesh(w_top, w_bot, length, r0, r0 + length * sin(base), 0.01, pleats, 0.008 if pleats > 0 else 0.0)
 	var hem_mesh: Mesh = null
 	var hem_mat: Material = null
-	if spec.has("hem"):
+	var lace_mesh: Mesh = null
+	var r_bot := r0 + length * sin(base)
+	if String(spec.get("hem", "")) == "ruffles":
+		# lace: one frilled strip per panel, tucked just behind the panel's hem and hanging below it at the same height
+		# all the way round (a flat strip over the pleated hem let the panel tips poke through: "broken teeth")
+		hem_mat = AKit.m(LookColors.channel(id, "ruffles", col))
+		lace_mesh = AKit.panel_mesh(w_bot * 1.0, w_bot * 1.1, 0.06, r_bot, r_bot + 0.02, 0.008, 3, 0.006)
+	elif spec.has("hem"):
 		hem_mat = AKit.m(LookColors.channel(id, String(spec["hem"]), col))
 		hem_mesh = AKit.panel_mesh(w_bot * 0.97, w_bot * 1.01, 0.05, r0 + length * sin(base) * 0.85, r0 + length * sin(base), 0.012)
 	var dot_mat: Material = null
-	if spec.has("dots"):
+	var flower_c := Color(-1, -1, -1)
+	if String(spec.get("dots", "")) == "flowers":
+		# moonflower appliques: petals in the hem colour (a cream dot vanished on a white dress), warm centres
+		flower_c = LookColors.channel(id, String(spec.get("hem", "hem")), col)
+	elif spec.has("dots"):
 		dot_mat = AKit.flat(LookColors.fixed(id, String(spec["dots"]), Color("fff4e0")))
 	var bow_mat: Material = null
 	if spec.has("bows"):
@@ -398,8 +450,17 @@ static func _skirt(ctx: Dictionary, id: String, spec: Dictionary, cloth: Materia
 		AKit.mesh_part(pv, mesh, cloth, Vector3.ZERO)
 		if hem_mesh != null:
 			AKit.mesh_part(pv, hem_mesh, hem_mat, Vector3(0, -length + 0.05, 0.004))
+		if lace_mesh != null:
+			AKit.mesh_part(pv, lace_mesh, hem_mat, Vector3(0, -length + 0.022, -0.02))
+			for k in 4:
+				var x := lerpf(-w_bot * 0.42, w_bot * 0.42, float(k) / 3.0)
+				AKit.part(pv, Kit.sphere(0.017, hem_mat, 6, 8), Vector3(x, -length - 0.036, -0.02 - x * x / (2.0 * r_bot)), Vector3.ZERO, Vector3(1.4, 0.8, 0.45), false)
 		if bool(spec.get("points", false)):
 			AKit.part(pv, Kit.prism(Vector3(w_bot * 0.55, 0.05, 0.01), cloth), Vector3(0, -length - 0.02, -0.004), Vector3(0, 0, 180))
+		if flower_c.r >= 0.0:
+			var fx := -w_bot * 0.18 if i % 2 == 0 else w_bot * 0.16
+			var fy := -length * (0.62 if i % 2 == 0 else 0.42)
+			_applique(pv, Vector3(fx, fy, 0.004 - fx * fx / (2.0 * r_bot)), 0.8 if i % 2 == 0 else 0.62, flower_c, Palette.FLOWER_YELLOW)
 		if dot_mat != null and i % 4 == 0:
 			AKit.part(pv, Kit.sphere(0.016, dot_mat, 8, 10), Vector3(-w_bot * 0.15, -length * 0.55, 0.008), Vector3.ZERO, Vector3(1.0, 1.0, 0.5), false)
 			AKit.part(pv, Kit.sphere(0.012, dot_mat, 8, 10), Vector3(w_bot * 0.18, -length * 0.78, 0.008), Vector3.ZERO, Vector3(1.0, 1.0, 0.5), false)

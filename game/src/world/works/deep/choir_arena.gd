@@ -447,4 +447,18 @@ func _on_exit_lift(_lift: Node) -> void:
 		return
 	var target: Dictionary = Layout.VAULT_EXIT_TARGET
 	if controller != null and is_instance_valid(controller) and controller.has_method("travel_area"):
-		controller.call("travel_area", String(target["area"]), String(target["spawn"]), "[the bell-lift climbs toward the night air]")
+		controller.call("travel_area", String(target["area"]), String(target["spawn"]), exit_caption())
+
+
+## The bell-lift's caption follows the hour Krystal rides up into (the game clock, GameState.is_night() / hour()):
+## the night air after dark, the morning air, the daylight or the evening air by day (CH2-017: it used to say
+## "night air" at 10 am).
+static func exit_caption() -> String:
+	if GameState.is_night():
+		return "[the bell-lift climbs toward the night air]"
+	var h := GameState.hour()
+	if h < 11.0:
+		return "[the bell-lift climbs toward the morning air]"
+	if h < 17.0:
+		return "[the bell-lift climbs toward the daylight]"
+	return "[the bell-lift climbs toward the evening air]"

@@ -6,8 +6,12 @@ extends RefCounted
 ##   1. The Lanternwake waygate (waygate.gd) at Layout.CH2_POINTS["waygate"]: north of the Moonlit Ruin
 ##      on its outer side, 21 m from the ruin centre (which stays unsafe), 25 m from the ruin_bramblings
 ##      spawner, 86 m from the Haven, and clear of every legacy vegetation node by its footprint + 2 m
-##      (tests/unit/test_flow_ch2_areas.gd checks all of this). Spawn "waygate" stands 3 m south of it,
-##      facing home; a small safe zone "ch2_waygate" (never containing a landmark centre) covers both.
+##      (tests/unit/test_flow_ch2_areas.gd checks all of this). Spawn "waygate" stands WAYGATE_SPAWN_OFFSET
+##      (5.8 m) south of it, facing home, far enough out that the arrival camera frames her in front of the arch
+##      instead of sitting under its lintel (tests/unit/test_camera_spawn_clearance.gd); a small safe zone
+##      "ch2_waygate" centred halfway between them (never containing a landmark centre) covers both, and the grass
+##      is thinned around the gate and around that centre. It is a helper zone, not a map landmark
+##      (mark_helper_zone): entering it is no discovery (CH2-010).
 ##   2. Optional annex scripts (ANNEX_SCRIPTS): each, if the file exists, is a script with
 ##      `static func build(area: Node3D) -> void` (Chapter One extras owned by other modules).
 ##   3. Chapter Two story dressings (STORY_SCRIPTS, same contract and the same safe loader, run after the eight
@@ -37,8 +41,10 @@ const STORY_SCRIPTS := [
 
 const WAYGATE_SPAWN := "waygate"
 const WAYGATE_ZONE := "ch2_waygate"
-const WAYGATE_SPAWN_OFFSET := 3.0      # metres south of the gate
+const WAYGATE_SPAWN_OFFSET := 5.8      # metres south of the gate (the zone centre sits at half of it)
 const WAYGATE_SAFE_RADIUS := 4.5
+## Zone-entry key read by Game.is_landmark_zone (Game.ZONE_LANDMARK_KEY): false = a helper zone, never a discovery.
+const HELPER_ZONE_KEY := "landmark"
 ## Spawn id -> legacy spawn whose transform is used when no annex script registered it.
 const FALLBACK_SPAWNS := {"annex_door": "mine_exit", "annex_hatch": "mine_threshold"}
 
@@ -67,6 +73,8 @@ static func clear_grass(terrain: RefCounted) -> void:
 		return
 	var wp := waygate_site()
 	terrain.clear_grass(wp.x, wp.y, WAYGATE_SAFE_RADIUS)
+	var zc := waygate_zone_centre()
+	terrain.clear_grass(zc.x, zc.y, WAYGATE_SAFE_RADIUS)      # the arrival spot and the walk up to the arch
 	for path in all_scripts():
 		if not ResourceLoader.exists(String(path)):
 			continue
@@ -89,6 +97,16 @@ static func waygate_site() -> Vector2:
 	return Layout.CH2_POINTS["waygate"]
 
 
+## Where the "waygate" spawn stands (XZ): WAYGATE_SPAWN_OFFSET south of the gate.
+static func waygate_spawn_site() -> Vector2:
+	return waygate_site() + Vector2(0.0, WAYGATE_SPAWN_OFFSET)
+
+
+## Centre of the "ch2_waygate" safe zone (XZ): halfway between the gate and its spawn, so both stand inside it.
+static func waygate_zone_centre() -> Vector2:
+	return waygate_site() + Vector2(0.0, WAYGATE_SPAWN_OFFSET * 0.5)
+
+
 static func _height(area: Node, p: Vector2) -> float:
 	if area.has_method("height_at"):
 		return float(area.height_at(p.x, p.y))
@@ -103,12 +121,25 @@ static func build_waygate(area: Node3D) -> Node3D:
 	# The stones stand east-west; the arch opens toward the ruin and the Haven (south).
 	gate.position = Vector3(p.x, _height(area, p) - 0.05, p.y)
 	gate.rotation.y = 0.0
-	var sp := p + Vector2(0.0, WAYGATE_SPAWN_OFFSET)
+	var sp := waygate_spawn_site()
 	var xf := Transform3D(Basis(Vector3.UP, PI), Vector3(sp.x, _height(area, sp) + 0.08, sp.y))   # facing south, toward home
 	_register(area, WAYGATE_SPAWN, xf)
-	var zc := p + Vector2(0.0, WAYGATE_SPAWN_OFFSET * 0.5)
+	var zc := waygate_zone_centre()
 	area.add_zone(WAYGATE_ZONE, Vector3(zc.x, _height(area, zc), zc.y), WAYGATE_SAFE_RADIUS, true)
+	mark_helper_zone(area, WAYGATE_ZONE)
 	return gate
+
+
+## Marks zone `zone_id` of `area` as a helper zone (CH2-010): it still answers get_zone_at / is_safe_zone, but it is
+## no map landmark, so entering it is never a discovery (Game.is_landmark_zone reads HELPER_ZONE_KEY = false on its
+## `zones` entry). The waygate's 4.5 m safe circle is one: the landmarks are data/world_layout.gd LANDMARKS.
+static func mark_helper_zone(area: Node, zone_id: String) -> void:
+	var zs: Variant = area.get("zones") if area != null else null
+	if not (zs is Array):
+		return
+	for e in zs:
+		if e is Dictionary and String((e as Dictionary).get("id", "")) == zone_id:
+			(e as Dictionary)[HELPER_ZONE_KEY] = false
 
 
 static func _register(area: Node3D, spawn_id: String, xf: Transform3D) -> void:

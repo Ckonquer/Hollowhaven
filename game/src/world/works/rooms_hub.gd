@@ -74,6 +74,7 @@ static func _refuge(b: Builder, area: Node3D) -> void:
 	area.add_child(sun)          # a direct child of the area: the Works' "sun" (flow tools look for one there)
 	sun.position = Vector3(SHAFT.x, TOP_Y - 0.4, SHAFT.z)
 	sun.rotation_degrees = Vector3(-90, 0, 0)
+	_daylight_beam(n, cy, y + 0.6)
 	# vines trailing down the shaft rim
 	for i in 14:
 		var a := TAU * float(i) / 14.0
@@ -133,6 +134,83 @@ static func _refuge(b: Builder, area: Node3D) -> void:
 		Props.lamp(n, p, {"style": "hanging", "hang": 0.1, "energy": 1.3, "range": 8.5, "color": WP.WARM_LAMP, "idle": 0.03})
 		WP.glow_pool(b, Vector3(p.x, y, p.z), 2.2)
 	Props.glow_light(n, Vector3(29.0, y + 2.5, 0.0), Color("fff0c8"), 0.8, 9.0)
+
+
+static var _beam_mat: ShaderMaterial = null
+static var _beam_mesh: CylinderMesh = null
+static var _mote_mesh: SphereMesh = null
+
+
+## The narrated "shaft of real daylight" (VISUAL_BUGS IN-16): the spot light alone only lit the planter, so
+## the beam itself is drawn - three nested open cones of soft additive light from the ceiling slot down onto
+## the tree (edges and the floor end fade out, and it fades away when the camera is inside it), plus a few
+## slow motes of dust drifting in it. No shadow, no collision, one shared material.
+static func _daylight_beam(parent: Node3D, top_y: float, bottom_y: float) -> void:
+	if _beam_mat == null:
+		var sh := Shader.new()
+		sh.code = """shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+uniform vec4 beam_color : source_color = vec4(1.0, 0.9, 0.68, 1.0);
+uniform float strength = 0.11;
+varying float t;
+void vertex() {
+	t = 0.5 - VERTEX.y;
+}
+void fragment() {
+	float facing = abs(dot(normalize(NORMAL), normalize(VIEW)));
+	float a = strength * pow(facing, 2.2);
+	a *= mix(1.0, 0.45, t) * smoothstep(0.0, 0.06, t) * (1.0 - smoothstep(0.78, 1.0, t));
+	a *= smoothstep(0.8, 3.5, length(VERTEX));
+	ALBEDO = beam_color.rgb;
+	ALPHA = a;
+}
+"""
+		_beam_mat = ShaderMaterial.new()
+		_beam_mat.shader = sh
+		_beam_mesh = CylinderMesh.new()
+		_beam_mesh.top_radius = 0.5
+		_beam_mesh.bottom_radius = 0.62
+		_beam_mesh.height = 1.0
+		_beam_mesh.radial_segments = 24
+		_beam_mesh.rings = 1
+		_beam_mesh.cap_top = false
+		_beam_mesh.cap_bottom = false
+		_mote_mesh = SphereMesh.new()
+		_mote_mesh.radius = 0.022
+		_mote_mesh.height = 0.044
+		_mote_mesh.radial_segments = 6
+		_mote_mesh.rings = 3
+	var holder := Node3D.new()
+	holder.name = "DaylightBeam"
+	parent.add_child(holder)
+	var h := top_y - bottom_y
+	holder.position = Vector3(SHAFT.x, bottom_y + h * 0.5, SHAFT.z)
+	for s in [4.6, 3.4, 2.1]:
+		var mi := MeshInstance3D.new()
+		mi.mesh = _beam_mesh
+		mi.material_override = _beam_mat
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.scale = Vector3(float(s), h, float(s))
+		holder.add_child(mi)
+	var motes := CPUParticles3D.new()
+	motes.name = "Motes"
+	motes.amount = 28
+	motes.lifetime = 9.0
+	motes.preprocess = 9.0
+	motes.mesh = _mote_mesh
+	motes.material_override = Mat.glow(Color("fff2d2"), 1.1)
+	motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	motes.emission_box_extents = Vector3(1.6, h * 0.35, 1.6)
+	motes.direction = Vector3.DOWN
+	motes.spread = 60.0
+	motes.gravity = Vector3(0.0, -0.02, 0.0)
+	motes.initial_velocity_min = 0.03
+	motes.initial_velocity_max = 0.12
+	motes.scale_amount_min = 0.6
+	motes.scale_amount_max = 1.3
+	motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	holder.add_child(motes)
+	motes.position = Vector3(0.0, h * 0.1, 0.0)
 
 
 ## Ferns (cones), flowers (small tinted spheres) and a few glowing moonflowers on a round / square patch.

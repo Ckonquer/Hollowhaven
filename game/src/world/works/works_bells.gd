@@ -100,7 +100,6 @@ func _build_bell(symbol: String, pos: Vector3) -> void:
 	var bronze := Mat.outlined(Mat.toon(Color("a8743e"), {"rim": 0.5, "specular": 0.45}), 0.02)
 	var iron := Mat.outlined(Mat.toon(Color("333a46"), {"rim": 0.35}), 0.014)
 	var ink := Mat.outlined(Mat.toon(Color("f3e6c8"), {"emission": Color("f3e6c8"), "emission_energy": 0.4}), 0.02)
-	var plate := Mat.outlined(Mat.toon(Color("46505e")), 0.016)
 	# the bell (swings on its pivot under the beam)
 	var pivot := Node3D.new()
 	pivot.name = "Bell_" + symbol
@@ -125,10 +124,20 @@ func _build_bell(symbol: String, pos: Vector3) -> void:
 	var to := centre - pos
 	root.rotation.y = atan2(to.x, to.z)          # local +Z faces the room centre
 	Kit.add(root, Kit.box(Vector3(0.3, 1.3, 0.3), iron), Vector3(0, 0.65, 0))
-	Kit.add(root, Kit.cylinder(0.62, 0.62, 0.08, plate, 20), Vector3(0, 1.75, 0.18), Vector3(90, 0, 0))
+	# A lighter painted plate in a brass rim, the symbol on BOTH faces: from behind, the bare dark disc read as
+	# a hole in the room (VISUAL_BUGS IN-12).
+	var face_plate := Mat.outlined(Mat.toon(Color("5d6b7c"), {"rim": 0.45, "emission": Color("5d6b7c"), "emission_energy": 0.22}), 0.016)
+	var brass := Mat.outlined(Mat.toon(Color("c9a25a"), {"rim": 0.5, "specular": 0.4}), 0.014)
+	Kit.add(root, Kit.cylinder(0.62, 0.62, 0.08, face_plate, 20), Vector3(0, 1.75, 0.18), Vector3(90, 0, 0))
+	Kit.add(root, Kit.torus(0.58, 0.68, brass), Vector3(0, 1.75, 0.18), Vector3(90, 0, 0))
 	var g := Glyphs.build(symbol, ink, 1.0)
 	root.add_child(g)
 	g.position = Vector3(0, 1.75, 0.26)
+	var back := Glyphs.build(symbol, ink, 0.85)
+	back.name = "GlyphBack_" + symbol
+	root.add_child(back)
+	back.position = Vector3(0, 1.75, 0.1)
+	back.rotation.y = PI
 	# lever
 	Kit.add(root, Kit.box(Vector3(0.08, 0.7, 0.08), iron), Vector3(0.28, 1.05, 0.12), Vector3(0, 0, -20))
 	Kit.add(root, Kit.sphere(0.08, Mat.toon(Color("c9a25a")), 6, 8), Vector3(0.4, 1.38, 0.12))

@@ -48,9 +48,12 @@ const HATCH_HOLE := {"x0": 4.3, "x1": 5.7, "z0": -42.0, "z1": -40.6}
 const SHAFT_HEIGHT := 2.6            # visual shaft above the hole, capped by the hatch lid
 
 ## Spawn points: position (floor) + facing yaw in degrees (0 = facing north/-z, 90 = west, -90 = east, 180 = south).
+## Camera rule (visual QA T1): the follow camera hangs ~4.8 m behind her. annex_lantern (the checkpoint respawn)
+## stands at the niche mouth FACING the lantern: the niche is only 2.5 m deep, so the camera hangs out in the locker
+## hall looking in at her and the lantern, instead of being squeezed into the lantern glass (IN-03).
 const SPAWNS := {
 	"annex_entry": {"pos": Vector3(0.0, 0.0, -2.8), "yaw": 0.0},
-	"annex_lantern": {"pos": Vector3(-5.9, 0.0, -18.75), "yaw": -90.0},
+	"annex_lantern": {"pos": Vector3(-5.6, 0.0, -18.75), "yaw": 90.0},
 	"annex_hatch_below": {"pos": Vector3(4.2, -2.0, -39.4), "yaw": 180.0},
 }
 const SPAWN_LIFT := 0.08

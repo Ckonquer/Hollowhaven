@@ -15,6 +15,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const BODY_Y := 0.42
 const RIB_COUNT := 7
@@ -24,12 +25,24 @@ const STEM := Color("5f7a38")
 const LEAF := Color("7fae57")
 const VINE := Color("6c9a45")
 const GLOW := Color("ffb347")
+const FACE_GLOW := Color("ffd873")       # the candle inside: yellower than the skin so the cut face pops
 const INSIDE := Color("5a2a18")
 const LID := Color("6e3a1c")
 const BITE_TINT := Color(1.0, 0.62, 0.2)
 const ROLL_TINT := Color(0.98, 0.34, 0.2)
 const TWITCH_TIME := 0.28
 const ROLL_RADIUS := 0.42
+const RIB_RING := 0.19                  # ribs: spheres of RIB_R on a ring of RIB_RING, scaled RIB_SCALE
+const RIB_R := 0.3
+const RIB_SCALE := Vector3(0.62, 0.95, 1.0)
+const CORE_R := 0.34
+const CORE_SCALE := Vector3(1.0, 0.85, 1.0)
+const EYE_X := 0.14                     # carved face, shell space (on the surface, see shell_front_z)
+const EYE_Y := 0.09
+const MOUTH_Y := -0.1
+const MOUTH_HALF := 0.19
+const MOUTH_COLS := 8
+const SMILE := 0.035                     # the grin's corners curl up by this much
 
 var state: String = "idle"
 var state_len: float = 0.0
@@ -51,11 +64,15 @@ var _stem: Node3D
 var _mouth: Node3D
 var _eyes: Array = []
 var _lids: Array = []
+var _mouth_glow: Array = []
+var _mouth_cols: Array = []
+var _face_parts: Array = []           # every carved-face mesh (tests: all sit in front of the shell)
 var _feet: Array = []
 var _stars: Node3D
 var _tint_mat: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
+var _tint_level_now: float = 0.0
 
 
 func _ready() -> void:
@@ -67,7 +84,7 @@ func body_height() -> float:
 
 
 func _build() -> void:
-	_tint_mat = HitFx.new_tint()
+	_tint_mat = CreatureFx.new_tint()
 	_root = Node3D.new()
 	_root.name = "Root"
 	add_child(_root)
@@ -92,11 +109,11 @@ func _build() -> void:
 	var skin_deep := Mat.outlined(Mat.toon(SKIN_DEEP, {"rim": 0.4, "noise": 0.12}), 0.016)
 	for i in RIB_COUNT:
 		var a := TAU * float(i) / float(RIB_COUNT)
-		var rib := Kit.sphere(0.3, skin if i % 2 == 0 else skin_deep, 10, 14)
-		Kit.add(_shell, rib, Vector3(sin(a) * 0.19, 0.0, cos(a) * 0.19), Vector3(0.0, rad_to_deg(a), 0.0), Vector3(0.62, 0.95, 1.0))
+		var rib := Kit.sphere(RIB_R, skin if i % 2 == 0 else skin_deep, 10, 14)
+		Kit.add(_shell, rib, Vector3(sin(a) * RIB_RING, 0.0, cos(a) * RIB_RING), Vector3(0.0, rad_to_deg(a), 0.0), RIB_SCALE)
 		_tint_meshes.append(rib)
-	var core := Kit.sphere(0.34, skin, 12, 16)
-	Kit.add(_shell, core, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.85, 1.0))
+	var core := Kit.sphere(CORE_R, skin, 12, 16)
+	Kit.add(_shell, core, Vector3.ZERO, Vector3.ZERO, CORE_SCALE)
 	_tint_meshes.append(core)
 	# Curly stem + one leaf on its own pivot (the twitch)
 	_stem = Node3D.new()
@@ -106,30 +123,59 @@ func _build() -> void:
 	Kit.add(_stem, Kit.cylinder(0.035, 0.06, 0.2, stem_mat, 8), Vector3(0, 0.09, 0), Vector3(0, 0, -12))
 	Kit.add(_stem, Kit.torus(0.035, 0.06, stem_mat), Vector3(-0.05, 0.2, 0), Vector3(90, 0, 20), Vector3(1, 1, 1))
 	Kit.add(_stem, Kit.prism(Vector3(0.18, 0.12, 0.02), Mat.outlined(Mat.toon(LEAF), 0.008)), Vector3(0.1, 0.12, 0.02), Vector3(0, 30, -70))
-	# Carved eyes (glow) + dark lids (dormant)
-	var glow := Mat.glow(GLOW, 1.7)
+	# The carved face is laid ON the shell (CR-00: it used to sit inside the front ribs): every piece is placed
+	# at shell_front_z() (the analytic front of the ribs + core) and turned to the surface normal there.
+	var glow := Mat.glow(FACE_GLOW, 2.2)
+	var cut := Mat.toon(INSIDE, {"rim": 0.0, "noise": 0.0})
 	var lid := Mat.toon(LID, {"rim": 0.1, "noise": 0.0})
 	for sx in [-1.0, 1.0]:
-		var eye := Kit.prism(Vector3(0.13, 0.11, 0.05), glow)
+		var ex: float = sx * EYE_X
+		var socket := Kit.prism(Vector3(0.2, 0.17, 0.03), cut)
+		_on_shell(socket, ex, EYE_Y - 0.006, 0.004, sx * 8.0)
+		_eyes.append(socket)                     # the cut shows only while the eyes are open
+		_face_parts.append(socket)
+		var eye := Kit.prism(Vector3(0.15, 0.125, 0.03), glow)
 		eye.set_meta("no_flash", true)
-		Kit.add(_shell, eye, Vector3(sx * 0.12, 0.1, -0.31), Vector3(-18, 0, sx * 8.0))
+		_on_shell(eye, ex, EYE_Y, 0.011, sx * 8.0)
 		_eyes.append(eye)
-		var slit := Kit.box(Vector3(0.12, 0.018, 0.03), lid)
-		Kit.add(_shell, slit, Vector3(sx * 0.12, 0.08, -0.325), Vector3(-18, 0, sx * -10.0))
+		_face_parts.append(eye)
+		var slit := Kit.box(Vector3(0.15, 0.028, 0.03), lid)
+		_on_shell(slit, ex, EYE_Y - 0.02, 0.009, sx * -12.0)
 		_lids.append(slit)
-	# Jagged mouth: a dark inside with a candle glow and a row of teeth (scaled open / shut)
+		_face_parts.append(slit)
+	# Jagged mouth: MOUTH_COLS narrow columns, each on the shell at its own x (the grin follows the ribs and the
+	# groove between them), under one pivot tilted to the surface: a dark cut with a candle glow and teeth.
 	_mouth = Node3D.new()
 	_mouth.name = "Mouth"
-	Kit.add(_shell, _mouth, Vector3(0, -0.08, -0.3), Vector3(-10, 0, 0))
-	Kit.add(_mouth, Kit.box(Vector3(0.36, 0.14, 0.05), Mat.toon(INSIDE, {"rim": 0.0, "noise": 0.0})), Vector3(0, 0, 0.01))
-	var inner := Kit.box(Vector3(0.26, 0.07, 0.03), Mat.glow(GLOW, 1.2))
-	inner.set_meta("no_flash", true)
-	Kit.add(_mouth, inner, Vector3(0, -0.01, 0.025))
+	var mz := shell_front_z(0.0, MOUTH_Y)
+	var pitch := _surface_pitch(0.0, MOUTH_Y)
+	Kit.add(_shell, _mouth, Vector3(0.0, MOUTH_Y, mz), Vector3(rad_to_deg(pitch), 0.0, 0.0))
 	var tooth_mat := Mat.toon(SKIN, {"rim": 0.3})
-	for i in 4:
-		var x := -0.12 + 0.08 * float(i)
-		Kit.add(_mouth, Kit.prism(Vector3(0.05, 0.06, 0.04), tooth_mat), Vector3(x, 0.05, -0.01), Vector3(0, 0, 180))
-		Kit.add(_mouth, Kit.prism(Vector3(0.05, 0.06, 0.04), tooth_mat), Vector3(x + 0.04, -0.05, -0.01))
+	var inner_mat := Mat.glow(FACE_GLOW, 1.6)
+	for i in MOUTH_COLS:
+		var x := -MOUTH_HALF + 2.0 * MOUTH_HALF * (float(i) + 0.5) / float(MOUTH_COLS)
+		var cy := SMILE * (x / MOUTH_HALF) * (x / MOUTH_HALF)
+		# the spot on the shell and its normal, expressed in the tilted mouth frame
+		var inv := _mouth.basis.inverse()
+		var at := inv * (Vector3(x, MOUTH_Y + cy, shell_front_z(x, MOUTH_Y + cy)) - _mouth.position)
+		var n := inv * surface_normal(x, MOUTH_Y + cy)
+		var col := Node3D.new()
+		Kit.add(_mouth, col, at, Vector3(0.0, rad_to_deg(atan2(-n.x, -n.z)), 0.0))
+		_mouth_cols.append(col)
+		var w := 2.0 * MOUTH_HALF / float(MOUTH_COLS)
+		var dark := Kit.box(Vector3(w + 0.008, 0.16, 0.04), cut)
+		Kit.add(col, dark, Vector3(0.0, 0.0, 0.012))
+		_face_parts.append(dark)
+		var inner := Kit.box(Vector3(w + 0.006, 0.11, 0.04), inner_mat)
+		inner.set_meta("no_flash", true)
+		Kit.add(col, inner, Vector3(0.0, 0.0, 0.006))
+		_mouth_glow.append(inner)
+		_face_parts.append(inner)
+		if i == 2 or i == MOUTH_COLS - 3:
+			var up := i == 2                          # one tooth hangs from the top, one stands at the bottom
+			var tooth := Kit.box(Vector3(w * 1.1, 0.07, 0.04), tooth_mat)
+			Kit.add(col, tooth, Vector3(0.0, 0.045 if up else -0.045, 0.0))
+			_face_parts.append(tooth)
 	# Dizzy stars (stuck / recover)
 	_stars = Node3D.new()
 	_stars.name = "Stars"
@@ -139,6 +185,80 @@ func _build() -> void:
 		var a := TAU * float(i) / 3.0
 		Kit.add(_stars, Kit.sphere(0.045, star_mat, 6, 8), Vector3(cos(a) * 0.26, 0.0, sin(a) * 0.26))
 	_stars.visible = false
+
+
+## Places a face piece on the shell at (x, y): centred `proud` m in front of the surface (its back stays sunk in the
+## shell), facing along the surface normal there, rolled `roll_deg`.
+func _on_shell(mi: Node3D, x: float, y: float, proud: float, roll_deg: float) -> void:
+	var n := surface_normal(x, y)
+	var p := Vector3(x, y, shell_front_z(x, y)) + n * proud
+	_shell.add_child(mi)
+	mi.transform = Transform3D(Basis.looking_at(n, Vector3.UP) * Basis(Vector3.BACK, deg_to_rad(roll_deg)), p)
+
+
+## The front of the shell (shell space, the mimic faces -Z): the most forward z of the seven ribs and the core on the
+## line (x, y, *). 0.0 when the line misses the shell. Pure maths on the same numbers the meshes are built from.
+static func shell_front_z(x: float, y: float) -> float:
+	var best := INF
+	for i in RIB_COUNT:
+		var a := TAU * float(i) / float(RIB_COUNT)
+		var c := Vector3(sin(a) * RIB_RING, 0.0, cos(a) * RIB_RING)
+		var axes := [Vector3(cos(a), 0.0, -sin(a)), Vector3.UP, Vector3(sin(a), 0.0, cos(a))]
+		best = minf(best, _ellipsoid_front(x, y, c, axes, RIB_SCALE * RIB_R))
+	best = minf(best, _ellipsoid_front(x, y, Vector3.ZERO, [Vector3.RIGHT, Vector3.UP, Vector3.BACK], CORE_SCALE * CORE_R))
+	return best if best < INF else 0.0
+
+
+static func _ellipsoid_front(x: float, y: float, c: Vector3, axes: Array, semi: Vector3) -> float:
+	var qa := 0.0
+	var qb := 0.0
+	var qc := -1.0
+	for k in 3:
+		var e: Vector3 = axes[k]
+		var sk: float = semi[k]
+		var a0 := ((x - c.x) * e.x + (y - c.y) * e.y - c.z * e.z) / sk
+		var b0 := e.z / sk
+		qa += b0 * b0
+		qb += 2.0 * a0 * b0
+		qc += a0 * a0
+	var disc := qb * qb - 4.0 * qa * qc
+	if disc < 0.0 or qa < 0.000001:
+		return INF
+	return (-qb - sqrt(disc)) / (2.0 * qa)
+
+
+## Outward (-Z-ish) unit normal of the shell front at (x, y), from the slope of shell_front_z.
+static func surface_normal(x: float, y: float) -> Vector3:
+	var h := 0.01
+	var fx := (shell_front_z(x + h, y) - shell_front_z(x - h, y)) / (2.0 * h)
+	var fy := (shell_front_z(x, y + h) - shell_front_z(x, y - h)) / (2.0 * h)
+	return Vector3(fx, fy, -1.0).normalized()
+
+
+static func _surface_pitch(x: float, y: float) -> float:
+	var n := surface_normal(x, y)
+	return atan2(n.y, -n.z)
+
+
+## Smallest clearance (m) between the front face of any visible carved-face piece and the shell surface behind it
+## (tests: > 0 means nothing of the face is buried). Measured in shell space, so any pose / tip is fine.
+func face_clearance() -> float:
+	var worst := INF
+	var inv := _shell.global_transform.affine_inverse()
+	for p in _face_parts:
+		var mi := p as MeshInstance3D
+		if not mi.is_visible_in_tree():
+			continue
+		var t: Transform3D = inv * mi.global_transform
+		var ab := mi.get_aabb()
+		var c := ab.get_center()
+		var front := t * Vector3(c.x, c.y, ab.position.z)
+		worst = minf(worst, shell_front_z(front.x, front.y) - front.z)
+	return worst
+
+
+func mouth_glowing() -> bool:
+	return not _mouth_glow.is_empty() and (_mouth_glow[0] as Node3D).visible
 
 
 func set_state(new_state: String, length: float = 0.0) -> void:
@@ -203,7 +323,7 @@ func _process(delta: float) -> void:
 	var body_y := BODY_Y
 	var lean := Vector3.ZERO
 	var shell_tip := 0.0
-	var want_mouth := 0.12
+	var want_mouth := 0.22
 	var want_feet := 1.0
 	var tint := 0.0
 	var tint_col := BITE_TINT
@@ -230,17 +350,17 @@ func _process(delta: float) -> void:
 			if attack_kind == "roll":
 				tint_col = ROLL_TINT
 				want_feet = 0.0
-				lean.x = 0.25 * k2
+				lean.x = -0.25 * k2           # leans forward into the lane
 				body_y = BODY_Y - 0.08 * k2
 				want_mouth = 0.1
 			else:
 				want_mouth = 1.0
-				shell_tip = -0.32 * k2
-				lean.x = -0.12 * k2
+				shell_tip = 0.3 * k2          # the top tips BACK: the gaping mouth turns up toward Krystal
+				lean.x = 0.1 * k2
 		"bite":
 			want_mouth = 0.35
-			shell_tip = 0.12
-			lean.x = 0.2
+			shell_tip = -0.12             # the snap: tips forward
+			lean.x = -0.2
 		"roll":
 			want_feet = 0.0
 			spinning = true
@@ -255,7 +375,7 @@ func _process(delta: float) -> void:
 		"flinch":
 			var f := 1.0 - clampf(_st / 0.3, 0.0, 1.0)
 			body_y -= 0.06 * f
-			lean.x = -0.18 * f
+			lean.x = 0.18 * f             # rocks back
 		"dead":
 			want_mouth = 1.0
 			eyes = false
@@ -275,7 +395,13 @@ func _process(delta: float) -> void:
 		var wob := Vector3(0.0, 0.0, sin(_t * 7.0) * 0.1 * waddle)
 		_body.rotation = _body.rotation.lerp(lean + wob, k_s)
 	_shell.rotation.x = lerpf(_shell.rotation.x, shell_tip, k_s)
-	_mouth.scale = Vector3(1.0, maxf(0.12 + mouth_open * 1.6, 0.05), 1.0)
+	var gape := maxf(0.14 + mouth_open * 1.35, 0.05)
+	for c in _mouth_cols:
+		(c as Node3D).scale = Vector3(1.0, gape, 1.0)
+	var glow_on := mouth_open > 0.06
+	if glow_on != mouth_glowing():
+		for g in _mouth_glow:
+			(g as Node3D).visible = glow_on
 	_show_eyes(eyes)
 	for i in _feet.size():
 		var f2 := _feet[i] as Node3D
@@ -309,19 +435,22 @@ func _tint_level(k: float) -> float:
 
 
 func _apply_tint(tint: float, col: Color) -> void:
-	var c := Color(0, 0, 0, 0)
+	# CR-09: a capped wash + a fresnel rim in the tell colour (CreatureFx), so the shading and outlines stay.
+	var on := false
 	if _flash_t > 0.0:
-		c = Color(HitFx.FLASH_COLOR, HitFx.flash_strength(0.75))
-	elif tint > 0.0:
-		c = Color(col, clampf(tint, 0.0, 1.0))
-	var on := c.a > 0.01
-	if on:
-		_tint_mat.albedo_color = c
+		_tint_level_now = HitFx.flash_strength(0.75)
+		CreatureFx.apply_flash(_tint_mat, HitFx.FLASH_COLOR, _tint_level_now)
+		on = true
+	elif tint > 0.01:
+		_tint_level_now = clampf(tint, 0.0, 1.0)
+		CreatureFx.apply_tint(_tint_mat, col, _tint_level_now)
+		on = true
 	if on != _tint_on:
 		_tint_on = on
 		for m in _tint_meshes:
 			(m as MeshInstance3D).material_overlay = _tint_mat if on else null
 
 
+## The tell strength (the old flat overlay alpha; the drawn wash is capped, the rim carries the colour).
 func tint_alpha() -> float:
-	return _tint_mat.albedo_color.a if _tint_on else 0.0
+	return _tint_level_now if _tint_on else 0.0

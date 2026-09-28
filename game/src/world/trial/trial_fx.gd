@@ -51,7 +51,7 @@ static func motes(parent: Node3D, pos: Vector3, extents: Vector3, amount: int = 
 
 ## The echo stone's body (a rounded pale stone with a steady violet band) under `parent`, standing on y = 0.
 static func stone(parent: Node3D, radius: float = 0.4) -> void:
-	var sm := Mat.outlined(Mat.toon(STONE, {"rim": 0.35, "noise": 0.18}), 0.014)
+	var sm := Mat.outlined(Mat.toon(STONE, {"rim": 0.6, "noise": 0.18, "emission": Color("b9a6e0"), "emission_energy": 0.2}), 0.014)
 	Kit.add(parent, Kit.blob(radius, sm, 17, 0.16, 1.9, 2), Vector3(0, radius * 1.5, 0))
 	var band := Kit.torus(radius * 1.02, radius * 1.12, Mat.glow(BAND, 1.2))
 	Kit.add(parent, band, Vector3(0, radius * 1.8, 0), Vector3.ZERO, Vector3(1, 1.8, 1))

@@ -23,6 +23,9 @@ extends CharacterBody3D
 ##   claim_attack_token(id) / release_attack_token(id) (static)   the shared MAX_ATTACKERS table for attackers that are
 ##                             not enemy_base nodes (the Borrowed Choir); same cap and stagger rule as a wind-up
 ##   setup key "defeat_flag"   flag set once when this enemy is defeated (content modules)
+##   lose_sight_seconds() / unseen_time()   CH2-006: a hunt without line of sight for LOST_SIGHT_GIVE_UP (5 s; data
+##                             "lose_sight") ends in "return" (no longer threatening, so saving / travel are free
+##                             again); elites / bosses never give up this way
 
 signal defeated
 signal state_changed(new_state: String)
@@ -53,6 +56,11 @@ const TARGET_BODY_RADIUS := 0.35     # Krystal's body radius for lane / landing 
 const SLOW_MIN_MULT := 0.5           # the strongest slow an enemy may apply (spec 9: bounded)
 const SLOW_MAX_SECONDS := 3.0
 const CAPTION_GAP_MS := 6000
+## CH2-006: a hunt that has not seen Krystal (line of sight, _perceive) for this long gives up and goes home, so an
+## enemy on the far side of a wall never keeps threatening (and blocking saves / travel) forever. A grace, not an
+## instant drop: it still follows her round a corner. Data "lose_sight" overrides it per enemy; elites and bosses
+## (data "elite" / "boss") never give up this way (their arena fights have cover on purpose - lose_sight_seconds()).
+const LOST_SIGHT_GIVE_UP := 5.0
 # Chapter Two horror-intensity rules (opt-in helpers below; the C5 enemies use them)
 const INTENSITY_GENTLE_REST := 1.35        # Gentle: every rest (cooldown after an attack) x this
 const INTENSITY_INTENSE_REST := 0.8        # Intense: shorter rests (never faster, never invisible tells)
@@ -95,6 +103,7 @@ var _sidestep := Vector3.ZERO
 var _sidestep_t: float = 0.0
 var _chatter_t: float = 6.0
 var _since_hurt: float = 999.0
+var _unseen_t: float = 0.0            # seconds this hunt has gone without line of sight to her (CH2-006)
 var _separation := Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
 
@@ -312,6 +321,11 @@ func tick(delta: float) -> void:
 	if _perceive_t <= 0.0:
 		_perceive_t = PERCEPTION_INTERVAL
 		_perceive()
+	# Lost-sight clock (CH2-006): runs only while hunting and out of sight; any sighting (or hit) resets it.
+	if _player_visible or not (state in THREAT_STATES or state in committed_states):
+		_unseen_t = 0.0
+	else:
+		_unseen_t += delta
 	_desired_vel = Vector3.ZERO
 	_tick_extra(delta)
 	match state:
@@ -555,7 +569,23 @@ func _chase_valid() -> bool:
 		return false
 	if global_position.distance_to(home) > float(data.get("leash_radius", 22.0)) + 4.0:
 		return false
+	if _unseen_t >= lose_sight_seconds():
+		return false                    # CH2-006: out of sight too long (behind a wall): give up, go home
 	return _player_dist <= aggro_radius() * 2.2
+
+
+## Seconds a hunt survives without line of sight before the chase is dropped (CH2-006): data "lose_sight", default
+## LOST_SIGHT_GIVE_UP. Elites and bosses (data "elite" / "boss") never give up this way: INF (their arena fights use
+## pillars / cover on purpose and keep their own leash rules).
+func lose_sight_seconds() -> float:
+	if bool(data.get("elite", false)) or bool(data.get("boss", false)):
+		return INF
+	return float(data.get("lose_sight", LOST_SIGHT_GIVE_UP))
+
+
+## How long the current hunt has gone without seeing her (0 while she is in sight or it is not hunting).
+func unseen_time() -> float:
+	return _unseen_t
 
 
 func _line_of_sight(p: Node3D) -> bool:
@@ -665,6 +695,7 @@ func _on_damaged(amount: float, source: Node, _dir: Vector3) -> void:
 	if source != null and is_instance_valid(source) and source is Node3D and source.is_in_group("player"):
 		_player = source as Node3D
 		_player_visible = true
+		_unseen_t = 0.0                 # her hit gives her away: the lost-sight clock starts again
 		_alert_boost = maxf(_alert_boost, 6.0)
 	if _is_uninterruptible():
 		return

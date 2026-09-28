@@ -9,6 +9,8 @@ extends Control
 ## Everything is mouse-transparent except the hotbar slots.
 ## Underground areas (UiUtil.is_underground_area: the Below, Tobin's annex, the Hushed Works) tone the
 ## parchment HUD down a little (apply_area_look).
+## set_hush(reason) (the UI root's hush, visual QA T4): any reason holds the tip card; "card" (a chapter card) also
+## hides the gameplay widgets like a cutscene, so the title stands alone with the story line under it.
 
 const Kit := preload("res://src/ui/ui_kit.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
@@ -45,6 +47,8 @@ var gameplay_regions: Array = []
 var _prompt_t := 0.0
 var _fps_t := 0.0
 var _cinematic := false
+var _hush := ""
+var _regions_hidden := false
 var _tw: Dictionary = {}
 
 
@@ -142,14 +146,41 @@ func set_cinematic(on: bool) -> void:
 	if on == _cinematic:
 		return
 	_cinematic = on
-	var tw := Kit.retween(self, _tw, "cine")
-	tw.set_parallel(true)
-	for r in gameplay_regions:
-		tw.tween_property(r, "modulate:a", 0.0 if on else 1.0, 0.5)
+	_apply_regions()
 
 
 func is_cinematic() -> bool:
 	return _cinematic
+
+
+## The UI root's hush reason ("" = none): holds the tip card; a chapter card also steps the gameplay widgets aside.
+func set_hush(reason: String) -> void:
+	if reason == _hush:
+		return
+	_hush = reason
+	if hints != null and hints.has_method("set_held"):
+		hints.set_held(reason != "")
+	_apply_regions()
+
+
+func hush_reason() -> String:
+	return _hush
+
+
+## True while the gameplay widgets are (fading) hidden: a cutscene / ending / death, or a chapter card.
+func gameplay_hidden() -> bool:
+	return _regions_hidden
+
+
+func _apply_regions() -> void:
+	var hidden_now := _cinematic or _hush == "card"
+	if hidden_now == _regions_hidden:
+		return
+	_regions_hidden = hidden_now
+	var tw := Kit.retween(self, _tw, "cine")
+	tw.set_parallel(true)
+	for r in gameplay_regions:
+		tw.tween_property(r, "modulate:a", 0.0 if hidden_now else 1.0, 0.5)
 
 
 func _process(delta: float) -> void:
@@ -167,7 +198,7 @@ func _process(delta: float) -> void:
 func _update_prompt() -> void:
 	var p: Dictionary = {}
 	var pl: Node = Game.player
-	if Game.mode == "playing" and not Game.is_ui_open() and not _cinematic and pl != null and is_instance_valid(pl):
+	if Game.mode == "playing" and not Game.is_ui_open() and not _regions_hidden and pl != null and is_instance_valid(pl):
 		var building := false
 		var bm: Variant = pl.get("build_mode_active")
 		if bm is bool:

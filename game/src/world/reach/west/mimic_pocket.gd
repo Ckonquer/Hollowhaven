@@ -71,7 +71,8 @@ func _build() -> void:
 		var p := _center + Vector2(cos(a), sin(a)) * r
 		var g := B.ground(area, p)
 		stake_x.append(Transform3D(Basis(Vector3.UP, a).rotated(Vector3.RIGHT, 0.06 * sin(a * 3.0)), g))
-		ribbon_x.append(Transform3D(Basis(Vector3.UP, a + 1.2), g + Vector3(0, 1.08, 0)))
+		# the ribbons hang from the stake tops and flutter (the strip is flipped)
+		ribbon_x.append(Transform3D(Basis(Vector3.UP, a + 1.2) * Basis(Vector3.BACK, PI - 0.4), g + Vector3(0, 1.1, 0)))
 		B.cylinder(solids, g, 0.06, 1.1)
 	B.multi(self, Art.stake(), prop, stake_x, "Stakes")
 	B.multi(self, Art.ribbon_strip(0.55), Art.ribbon_material(Art.RIBBON_RED), ribbon_x, "StakeRibbons", 70.0, false)
@@ -115,10 +116,12 @@ func _dormant_mimic(p: Vector2, index: int) -> Dictionary:
 	body.scale = Vector3(MIMIC_RADIUS * 1.08, MIMIC_RADIUS * 0.92, MIMIC_RADIUS)
 	body.rotation.z = 0.12
 	root.add_child(body)
+	# the tells sit on the rind of the same body variant, under the body's own (squashed, tilted) transform
 	var det := MeshInstance3D.new()
-	det.mesh = Art.mimic_details()
+	det.mesh = Art.mimic_details(2)
 	det.material_override = prop
-	det.scale = Vector3.ONE * MIMIC_RADIUS
+	det.scale = body.scale
+	det.rotation = body.rotation
 	root.add_child(det)
 	var stem := Node3D.new()
 	stem.name = "Stem"

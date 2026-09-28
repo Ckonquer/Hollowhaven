@@ -15,9 +15,13 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const FALSE_GLOW := Color("ffb45e")
-const HALO := Color(1.0, 0.78, 0.45, 0.22)
+const FALSE_CORE := Color("ffe2a6")      # the hot centre of the false light (CR-07: the orb had no volume)
+const HALO := Color(1.0, 0.78, 0.45, 0.5)
+const RIBBON_W := 0.085
+const RIBBON_L := 0.62
 const TRUE_FLAME := Color("bfe0ff")
 const HOOD := Color("3b3346")
 const MASK := Color("d8b88a")
@@ -45,6 +49,7 @@ var _ribbons: Array = []
 var _tint_mat: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
+var _tint_level_now: float = 0.0
 
 
 func _ready() -> void:
@@ -56,16 +61,18 @@ func body_height() -> float:
 
 
 func _build() -> void:
-	_tint_mat = HitFx.new_tint()
+	_tint_mat = CreatureFx.new_tint()
 	_float = Node3D.new()
 	_float.name = "Float"
 	add_child(_float)
-	# The false light (veiled)
-	_orb = Kit.sphere(0.32, Mat.glow(FALSE_GLOW, 2.2), 12, 16)
+	# The false light (veiled): a self-lit orb with a hot cream core fading to a warm orange limb, in a soft halo that
+	# fades to nothing at its edge and only glows BEHIND it (CR-07: was a flat unshaded disc in a flat disc).
+	_orb = Kit.sphere(0.32, CreatureFx.orb(FALSE_CORE, FALSE_GLOW, 1.25), 14, 18)
 	_orb.name = "FalseLight"
 	_orb.set_meta("no_flash", true)
+	_orb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_float.add_child(_orb)
-	_halo = Kit.sphere(0.55, Mat.transparent(HALO, true), 10, 14)
+	_halo = Kit.sphere(0.58, CreatureFx.soft_glow(HALO, 1.25, 1.3, true), 12, 16)
 	_halo.name = "Halo"
 	_halo.set_meta("no_flash", true)
 	_halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -74,14 +81,18 @@ func _build() -> void:
 	_true = Node3D.new()
 	_true.name = "TrueForm"
 	_float.add_child(_true)
-	var hood := Mat.outlined(Mat.toon(HOOD, {"rim": 0.6, "noise": 0.2}), 0.012)
-	var head := Kit.sphere(0.26, hood, 10, 14)
-	Kit.add(_true, head, Vector3(0, 0.08, 0.02), Vector3.ZERO, Vector3(1.0, 1.1, 1.0))
+	# CR-08: a soft lumpy hood with a drooping point and a wispy tail that curls away in three tapering puffs (was a
+	# sphere on a hard cone), with a heavier ink line.
+	var hood := Mat.outlined(Mat.toon(HOOD, {"rim": 0.6, "noise": 0.2}), 0.016)
+	var head := Kit.blob(0.27, hood, 51, 0.08, 1.1, 3)
+	Kit.add(_true, head, Vector3(0, 0.08, 0.02))
 	_tint_meshes.append(head)
-	var tail := Kit.cone(0.24, 0.7, hood, 10)
-	Kit.add(_true, tail, Vector3(0, -0.42, 0.06), Vector3(180 - 12, 0, 0))
-	_tint_meshes.append(tail)
-	Kit.add(_true, Kit.cone(0.1, 0.22, hood, 8), Vector3(0, 0.36, 0.08), Vector3(-25, 0, 0))
+	for i in 3:
+		var puff := Kit.blob(0.2 - 0.05 * float(i), hood, 52 + i, 0.1, 1.25, 2)
+		Kit.add(_true, puff, Vector3(0.04 * float(i), -0.26 - 0.2 * float(i), 0.08 + 0.07 * float(i)))
+		_tint_meshes.append(puff)
+	Kit.add(_true, Kit.cone(0.05, 0.16, hood, 8), Vector3(0.1, -0.86, 0.3), Vector3(150, 0, -25))
+	Kit.add(_true, Kit.cone(0.1, 0.24, hood, 8), Vector3(0, 0.37, 0.1), Vector3(-35, 0, 0))
 	_flame = Kit.sphere(0.09, Mat.glow(TRUE_FLAME, 1.6), 8, 10)
 	_flame.set_meta("no_flash", true)
 	Kit.add(_true, _flame, Vector3(0, 0.05, -0.12))
@@ -89,22 +100,25 @@ func _build() -> void:
 	_mask = Node3D.new()
 	_mask.name = "Mask"
 	Kit.add(_float, _mask, Vector3(0, 0.02, -0.36))
+	# a gently domed carved mask (was a flat disc): the eye holes and the mouth slit sit on its curve
 	var mask := Mat.outlined(Mat.toon(MASK, {"rim": 0.35, "noise": 0.2}), 0.01)
-	var face := Kit.cylinder(0.16, 0.16, 0.04, mask, 16)
-	Kit.add(_mask, face, Vector3.ZERO, Vector3(90, 0, 0), Vector3(1.0, 1.0, 1.2))
+	var face := Kit.sphere(0.16, mask, 12, 16)
+	Kit.add(_mask, face, Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 1.15, 0.4))
 	_tint_meshes.append(face)
 	var dark := Mat.toon(MASK_DARK, {"rim": 0.0, "noise": 0.0})
 	for sx in [-1.0, 1.0]:
-		Kit.add(_mask, Kit.sphere(0.035, dark, 6, 8), Vector3(sx * 0.06, 0.04, -0.02), Vector3.ZERO, Vector3(1.0, 1.3, 0.5))
-	Kit.add(_mask, Kit.box(Vector3(0.1, 0.018, 0.02), dark), Vector3(0, -0.06, -0.02))
+		Kit.add(_mask, Kit.sphere(0.036, dark, 6, 8), Vector3(sx * 0.06, 0.04, -0.058), Vector3.ZERO, Vector3(1.0, 1.35, 0.4))
+	Kit.add(_mask, Kit.box(Vector3(0.1, 0.02, 0.02), dark), Vector3(0, -0.06, -0.062))
 	# Harvest ribbons trailing below
 	for i in RIBBONS.size():
 		var piv := Node3D.new()
 		piv.name = "Ribbon"
 		Kit.add(_float, piv, Vector3((float(i) - 1.0) * 0.12, -0.2, 0.05))
 		var col: Color = RIBBONS[i]
-		var strip := Kit.box(Vector3(0.05, 0.5, 0.012), Mat.outlined(Mat.toon(col, {"rim": 0.3}), 0.006))
-		Kit.add(piv, strip, Vector3(0, -0.25, 0))
+		var strip := Kit.box(Vector3(RIBBON_W, RIBBON_L, 0.014), Mat.outlined(Mat.toon(col, {"rim": 0.3}), 0.008))
+		Kit.add(piv, strip, Vector3(0, -RIBBON_L * 0.5, 0))
+		var tip := Kit.prism(Vector3(RIBBON_W, 0.08, 0.014), Mat.toon(col, {"rim": 0.3}))
+		Kit.add(piv, tip, Vector3(0, -RIBBON_L - 0.04, 0), Vector3(0, 0, 180))
 		_ribbons.append(piv)
 	_apply_form(0.0)
 
@@ -158,21 +172,25 @@ func _process(delta: float) -> void:
 	var bob := sin(_t * 1.6) * 0.06
 	var lean := Vector3.ZERO
 	var ribbon := sin(_t * 2.0) * 0.25
+	var stretch := 1.0                 # ribbons lengthen in the sweep wind-up (CR-07: the tell was a few thin strips)
 	var tint := 0.0
 	match state:
 		"telegraph":
 			var k := clampf(_st / 0.3, 0.0, 1.0)
 			ribbon = lerpf(ribbon, -1.6, k)
-			lean = Vector3(0.0, 0.5 * k, 0.15 * k)
+			lean = Vector3(0.0, 0.5 * k, 0.35 * k)
+			stretch = 1.0 + 0.45 * k
 			tint = (0.3 * k) if HitFx.reduce_flashing() else (0.2 + 0.2 * (0.5 + 0.5 * sin(_st * 16.0)))
 		"sweep_wait":
 			ribbon = -1.7
-			lean = Vector3(0.0, 0.6, 0.18)
+			lean = Vector3(0.0, 0.6, 0.38)
+			stretch = 1.45
 			tint = 0.45
 		"sweep":
 			var s := clampf(_st / 0.2, 0.0, 1.0)
 			ribbon = lerpf(-1.7, 1.6, s)
-			lean = Vector3(0.0, lerpf(0.6, -0.6, s), 0.0)
+			lean = Vector3(0.0, lerpf(0.6, -0.6, s), lerpf(0.38, -0.2, s))
+			stretch = 1.45
 			tint = 0.3
 		"recover":
 			bob -= 0.1
@@ -190,25 +208,29 @@ func _process(delta: float) -> void:
 	for i in _ribbons.size():
 		var r := _ribbons[i] as Node3D
 		r.rotation.z = lerpf(r.rotation.z, ribbon + sin(_t * 3.0 + float(i)) * 0.15, k_s)
+		r.scale.y = lerpf(r.scale.y, stretch, k_s)
 	if not HitFx.reduce_flashing():
 		_flame.scale = Vector3.ONE * (1.0 + 0.15 * sin(_t * 11.0))
 	_apply_tint(tint)
 
 
 func _apply_tint(tint: float) -> void:
-	var c := Color(0, 0, 0, 0)
+	# CR-09: a capped wash + a fresnel rim in the tell colour (CreatureFx), so the shading and outlines stay.
+	var on := false
 	if _flash_t > 0.0:
-		c = Color(HitFx.FLASH_COLOR, HitFx.flash_strength(0.75))
-	elif tint > 0.0:
-		c = Color(SWEEP_TINT, clampf(tint, 0.0, 1.0))
-	var on := c.a > 0.01
-	if on:
-		_tint_mat.albedo_color = c
+		_tint_level_now = HitFx.flash_strength(0.75)
+		CreatureFx.apply_flash(_tint_mat, HitFx.FLASH_COLOR, _tint_level_now)
+		on = true
+	elif tint > 0.01:
+		_tint_level_now = clampf(tint, 0.0, 1.0)
+		CreatureFx.apply_tint(_tint_mat, SWEEP_TINT, _tint_level_now)
+		on = true
 	if on != _tint_on:
 		_tint_on = on
 		for m in _tint_meshes:
 			(m as MeshInstance3D).material_overlay = _tint_mat if on else null
 
 
+## The tell strength (the old flat overlay alpha; the drawn wash is capped, the rim carries the colour).
 func tint_alpha() -> float:
-	return _tint_mat.albedo_color.a if _tint_on else 0.0
+	return _tint_level_now if _tint_on else 0.0

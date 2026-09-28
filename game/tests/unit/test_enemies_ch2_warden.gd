@@ -9,6 +9,8 @@ extends "res://tests/test_case.gd"
 ## BEFORE any presentation, and a retry after Krystal's defeat starts fresh.
 ## Integration pass 2 (D06): the charge lane ends within arena_radius - 1 m of the arena centre (the mark shows the
 ## clipped length) and a ledge ahead (no floor within 1 m below) bonks it like a wall - it never falls to L1.
+## QA CH2-004 (balance): one exposure takes at most EXPOSE_CAP of its health (then the shell closes), phase 2 opens
+## with its pulses and holds a floor until they played, so early gear needs 2-3 exposures and always meets the pulses.
 
 const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Base := preload("res://src/enemies/enemy_base.gd")
@@ -406,6 +408,173 @@ func test_three_spaced_pulses_in_phase_two() -> void:
 	assert_almost(float(e.armor_mult()), Warden.OPEN_MULT, 0.001, "open after the pulses")
 
 
+# --- Balance: capped exposures, phase 2 always plays its pulses (QA CH2-004) ----------------------------------------
+# The QA bot's Chapter-One gear: the starting copper sword, 18 damage every ~0.45 s. Before the fix one pillar
+# exposure (6 s, x1.6, no cap) took ~250 of 300 and phase 2 (the three pulses) began and ended inside it.
+
+const COPPER := 18.0
+const COPPER_EVERY := 0.45
+
+
+## A constant of quarry_warden.gd by name (a default when it is missing, so these checks fail by assertion - not by
+## a parse error of this file - against a Warden without them).
+func _k(name: String, fallback: float) -> float:
+	var script: Script = Warden
+	return float(script.get_script_constant_map().get(name, fallback))
+
+
+## Strikes with the copper sword while the Warden stays in state `s` (at most max_t s); returns the health it lost.
+func _strike_while(e: Node, d: Dummy, s: String, max_t: float) -> float:
+	var hp0 := float(e.health.hp)
+	var t := 0.0
+	var next := 0.0
+	while e.state == s and t < max_t and not bool(e.health.dead):
+		if t >= next - 0.0001:
+			next += COPPER_EVERY
+			e.health.apply_damage(COPPER, d, Vector3.FORWARD)
+			if e.state != s or bool(e.health.dead):
+				break
+		_step(e, false)
+		t += DT
+	return hp0 - float(e.health.hp)
+
+
+func test_one_exposure_takes_at_most_its_cap_then_the_shell_closes() -> void:
+	_floor()
+	var pl := _pillar(Vector3(0, 0, -9.0))
+	var d := _dummy(Vector3(0, 0, -6.5))
+	var e := _warden(d, Vector3.ZERO, [pl])
+	await wait_physics(3)
+	_baited_charge(e, d)
+	assert_eq(e.state, "exposed", "baited into the pillar")
+	var captions: Array = []
+	var cb := func(text: String) -> void: captions.append(text)
+	Events.caption.connect(cb)
+	var t := 0.0
+	var lost := 0.0
+	var hp0 := float(e.health.hp)
+	var next := 0.0
+	while e.state == "exposed" and t < Warden.EXPOSE_TIME + 1.0 and not bool(e.health.dead):
+		if t >= next - 0.0001:
+			next += COPPER_EVERY
+			e.health.apply_damage(COPPER, d, Vector3.FORWARD)
+			if e.state != "exposed" or bool(e.health.dead):
+				break
+		_step(e, true)
+		t += DT
+	lost = hp0 - float(e.health.hp)
+	Events.caption.disconnect(cb)
+	var cap := 300.0 * _k("EXPOSE_CAP", 0.35)
+	assert_false(bool(e.health.dead), "one exposure never finishes it (it lost %.1f of 300)" % lost)
+	assert_true(lost <= cap + 0.01, "one exposure takes at most %.0f of 300 (it lost %.1f)" % [cap, lost])
+	assert_almost(lost, cap, 0.01, "the copper sword reaches the cap: the blow that gets there is trimmed to it")
+	assert_ne(e.state, "exposed", "at the cap the shell closes at once")
+	assert_true(t < Warden.EXPOSE_TIME - 1.0, "well before the window's time ran out (%.2f s)" % t)
+	assert_true(captions.has("[the Warden's shell grinds shut over its bell]"), "a caption says why the window ended")
+	assert_eq(int(e.get("exposures_capped")), 1, "counted as a capped exposure")
+	assert_almost(float(e.armor_mult()), Warden.SHELL_MULT, 0.001, "shelled again")
+	assert_eq(int(e.phase), 2, "from full health one capped exposure reaches phase 2 ...")
+	assert_eq(int(e.pulses_fired), 0, "... with its pulses still ahead")
+	e.health.apply_damage(COPPER, d, Vector3.FORWARD)
+	assert_almost(float(e.health.hp), 300.0 - cap - COPPER * Warden.SHELL_MULT, 0.01, "the cap is per exposure: the shell still takes its share")
+
+
+func test_phase_two_opens_with_the_pulses_even_from_charge_range() -> void:
+	_floor()
+	var d := _dummy(Vector3(0, 0, -7.0))
+	var e := _warden(d)
+	await wait_physics(2)
+	e.slams_done = 1
+	e.health.set_hp(190.0)
+	assert_eq(int(e.phase), 2, "phase 2")
+	_until(e, "telegraph", 8.0, true)
+	assert_eq(String(e.attack_kind), "pulses", "phase 2 opens with its three pulses (Krystal stood at charge range)")
+	var p: Vector3 = (e as Node3D).global_position
+	var gap := Vector2(p.x - d.global_position.x, p.z - d.global_position.z).length()
+	assert_true(gap <= float(e.pulse_radius()), "it walked into pulse reach first (%.2f m): the ring is a real threat" % gap)
+	_until(e, "recover", 6.0, true)
+	assert_eq(int(e.pulses_fired), 3, "three spaced pulses played")
+	assert_false(bool(e.pulses_owed()), "the debt is paid")
+	d.global_position = (e as Node3D).global_position + Vector3(0, 0, -7.0)
+	Base.clock_override_ms += 5000
+	_until(e, "telegraph", 8.0, true)
+	assert_eq(String(e.attack_kind), "charge", "afterwards phase 2 picks its attacks as before (a charge from range)")
+
+
+func test_owed_pulses_hold_a_floor_until_the_cycle_played() -> void:
+	var hints: Array = []
+	var hcb := func(id: String, _text: String) -> void: hints.append(id)
+	Events.hint.connect(hcb)
+	var d := _dummy(Vector3(0, 0, -3.0))
+	var e := _warden(d)
+	e.health.set_hp(190.0)
+	e._enter("recover", 2.0)                         # shell open: full damage
+	for i in 20:
+		e.health.apply_damage(COPPER, d, Vector3.FORWARD)
+	var fl := 300.0 * _k("PULSE_FLOOR_RATIO", 0.3)
+	assert_false(bool(e.health.dead), "a burst can't finish it before its phase-2 pulses played")
+	assert_almost(float(e.health.hp), fl, 0.01, "blows stop at the floor (%.1f)" % float(e.health.hp))
+	assert_true(hints.has("hint_quarry_warden_pulses"), "a hint says what the fight is waiting for")
+	Events.hint.disconnect(hcb)
+	_until(e, "pulses", 10.0)
+	_until(e, "recover", 4.0)
+	assert_eq(int(e.pulses_fired), 3, "the pulses played")
+	for i in 10:
+		e.health.apply_damage(COPPER, d, Vector3.FORWARD)
+	assert_true(bool(e.health.dead), "after its pulses it can be finished")
+
+
+func test_a_retry_forgets_the_owed_pulses() -> void:
+	var d := _dummy(Vector3(0, 0, -3.0))
+	var e := _warden(d)
+	_until(e, "chase", 3.0)
+	e.health.set_hp(150.0)
+	assert_true(bool(e.pulses_owed()), "phase 2 owes its pulses")
+	Events.player_died.emit()
+	assert_false(bool(e.pulses_owed()), "a fresh attempt starts at the lesson again")
+	assert_almost(float(e.pulse_floor()), 0.0, 0.001, "no floor in phase 1")
+	e.health.apply_damage(1.0e6, d, Vector3.FORWARD)
+	assert_true(bool(e.health.dead), "outside the owed pulses nothing holds a blow back")
+
+
+## A whole fight with the copper sword, striking only in the exposure windows (the pillar bait itself is covered
+## above: the exposure is started directly here), with and without punishing the pulse recovery: two or three
+## exposures, and the three pulses always play before it falls.
+func test_early_gear_needs_two_or_three_exposures_and_meets_the_pulses() -> void:
+	for punish in [false, true]:
+		Base.reset_attack_tokens()
+		var d := _dummy(Vector3(0, 0, -3.0))
+		var e := _warden(d)
+		e.slams_done = 1
+		_until(e, "chase", 3.0)
+		var pulses_at_defeat := -1
+		var worst := 0.0
+		var guard := 0
+		while not bool(e.health.dead) and guard < 6:
+			guard += 1
+			e._expose()
+			var hp0 := float(e.health.hp)
+			_strike_while(e, d, "exposed", 9.0)
+			worst = maxf(worst, hp0 - float(e.health.hp))
+			if bool(e.health.dead):
+				pulses_at_defeat = int(e.pulses_fired)
+				break
+			if e.has_method("pulses_owed") and bool(e.pulses_owed()):
+				_until(e, "pulses", 10.0)
+				_until(e, "recover", 4.0)
+				if punish:
+					_strike_while(e, d, "recover", 3.0)
+				if bool(e.health.dead):
+					pulses_at_defeat = int(e.pulses_fired)
+					break
+			_until(e, "chase", 6.0)
+		var n := int(e.exposures)
+		assert_true(bool(e.health.dead), "defeated (punish %s)" % punish)
+		assert_true(n >= 2 and n <= 3, "early gear needs 2-3 exposures (punish %s: %d)" % [punish, n])
+		assert_true(worst <= 300.0 * _k("EXPOSE_CAP", 0.35) + 0.01, "no exposure took more than the cap (%.1f)" % worst)
+		assert_true(pulses_at_defeat >= 3, "the three pulses played before it fell (punish %s: %d)" % [punish, pulses_at_defeat])
+
+
 func test_gentle_spaces_the_pulses_further() -> void:
 	Settings.set_value("horror_intensity", 0)
 	var d := _dummy(Vector3(0, 0, -20))
@@ -506,7 +675,11 @@ func test_leaving_while_exposed_near_home_is_the_same_clean_reset() -> void:
 	_baited_charge(e, d)
 	assert_eq(e.state, "exposed", "baited into the near pillar (%s)" % e.last_charge_result)
 	assert_true((e as Node3D).global_position.length() < float(e.wander_radius) + 2.0, "it stopped near home")
-	e.health.apply_damage(100.0, d, Vector3.FORWARD)
+	# Hurt into phase 2 while it stays exposed (CH2-004: a blow that reaches the exposure cap would close the shell
+	# at once and send it back to chase, and this case is about leaving while it is still exposed).
+	e.health.set_hp(230.0)
+	e.health.apply_damage(40.0, d, Vector3.FORWARD)
+	assert_eq(e.state, "exposed", "still exposed under the cap")
 	assert_eq(int(e.phase), 2, "hurt into phase 2")
 	d.global_position = Vector3(0, 0, -60.0)
 	var t := 0.0

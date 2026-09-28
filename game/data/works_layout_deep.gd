@@ -83,12 +83,15 @@ const DESIGN_ROOMS := {9: "hw_winch", 10: "hw_crossing", 11: "hw_wrong_landing",
 
 ## Spawn points (position on the floor + facing yaw in degrees: 0 = north/-z, -90 = east, 180 = south).
 ## crossing_gate / bell_throat / vault_exit are contract spawns (spec §1); the others belong to this module.
+## Camera rule (visual QA T1): the follow camera hangs ~4.8 m behind her, so a spawn keeps that much open room
+## behind it. vault_exit faces the exit lift (she wakes beside it after the Choir; the camera stays out in the
+## vault, not inside the lift's bars); hw_lift_landing stands out on the landing, 6.9 m from the real lift's cage.
 const SPAWNS := {
 	"crossing_gate": {"pos": Vector3(64.2, -18.0, 0.9), "yaw": -90.0},
 	"bell_throat": {"pos": Vector3(154.9, -28.0, 33.5), "yaw": -90.0},
-	"vault_exit": {"pos": Vector3(157.0, -32.0, 80.0), "yaw": 0.0},
+	"vault_exit": {"pos": Vector3(157.0, -32.0, 80.0), "yaw": 180.0},
 	"hw_wrong_siding": {"pos": Vector3(146.0, -22.0, -7.5), "yaw": 180.0},
-	"hw_lift_landing": {"pos": Vector3(123.0, -22.0, -7.6), "yaw": 180.0},
+	"hw_lift_landing": {"pos": Vector3(123.0, -22.0, -5.4), "yaw": 180.0},
 }
 
 ## Checkpoint lanterns (checkpoint_lantern.gd, area "hushed_works"): id -> lantern position, spawn, zone,

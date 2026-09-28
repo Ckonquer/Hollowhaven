@@ -11,7 +11,7 @@ extends RefCounted
 
 # --- Encounter shape ------------------------------------------------------------------------------------
 const START_SIDE := -1                     # phase 1 holds the north lane
-const EXPOSURES_TARGET := 3                # data "exposures": two or three exposures + damage end it
+const EXPOSURES_TARGET := 3                # data "exposures": one exposure per phase + damage end it
 const SCORCH_FRAC := 0.1                   # the flare that burns her off the ceiling (of max hp) ...
 const SCORCH_FRAC_LATE := 0.25             # ... and after EXPOSURES_TARGET exposures: never a health sponge
 const EXPOSED_MULT := 1.25                 # damage taken while exposed
@@ -19,9 +19,19 @@ const WINDOW_CAP_EXPOSED := 0.4            # one exposure window takes at most t
 const WINDOW_CAP_STRANDED := 0.2           # a missed pounce's window, at most this much
 ## The core rule can't be skipped with a strong weapon (MP 13.1/13.3 "strong equipment helps but never
 ## bypasses the learned interaction"; 13.2 "two or three exposures"): blows alone never take her below
-## HP_FLOOR[n] of her max hp while she has been exposed only n times (the flare's scorch still can). With
-## [0.6, 0.25] every win needs at least two exposures; from exposure 2 on nothing holds her up.
-const HP_FLOOR := [0.6, 0.25]
+## HP_FLOOR[n] of her max hp while she has been exposed only n times, and the flare's scorch never takes her
+## below the floor of the exposure it makes (scorch_damage). QA CH2-007: ONE EXPOSURE CROSSES AT MOST ONE
+## PHASE BOUNDARY - the exposure that opens phase 3 can't also end the fight, so every win (with the Lantern)
+## goes through all three phases: exposure 1 -> phase 2, exposure 2 -> phase 3, exposure 3 ends it. The
+## bands leave every exposure window room for Krystal's blows even at the floor before it (window_room()):
+## 60% -(scorch 10%)-> 50% .. 35% | 35% -> 25% .. 20% | 20% -> 10% .. 0. From exposure 3 on nothing holds her.
+const HP_FLOOR := [0.6, 0.35, 0.2]
+## THE ENGAGEMENT RULE (QA CH2-007: "every committed attack readable", "the next phase introduces its
+## mechanic before it can be skipped"): she lets go of her anchor only once she has COMMITTED in this round
+## (since the last exposure / reset) - a pounce or delayed pounce that dropped, or (phase 3) her brood release
+## once its sacs have opened. A flare under her anchor before that CATCHES it (crossing_matron "primed": the
+## anchor glows, a caption says so): she is burned off it the moment her next pounce lands, hit or miss. Every
+## phase's rotation shows its new action first (1: threads + the pounce, 2: the delayed pounce, 3: the release).
 ## Action rotation per phase ("release" happens once, only in phase 3, INSTEAD of a delayed pounce).
 const ROTATION := {
 	1: ["threads", "pounce", "pounce"],
@@ -162,6 +172,23 @@ static func hp_floor(max_hp: float, exposures: int) -> float:
 	if exposures < 0 or exposures >= HP_FLOOR.size():
 		return 0.0
 	return max_hp * float(HP_FLOOR[exposures])
+
+
+## The scorch of exposure number `n` (1-based) for her at `hp`: its share of max hp, but never below
+## `floor_hp` (the floor for n exposures; 0 = none) - a flare can't skip a phase either. >= 0.
+static func scorch_damage(max_hp: float, hp: float, n: int, floor_hp: float) -> float:
+	var s := max_hp * scorch_fraction(n)
+	if floor_hp > 0.0:
+		s = minf(s, maxf(hp - floor_hp, 0.0))
+	return maxf(s, 0.0)
+
+
+## Hp Krystal's blows can still take in exposure window `n` (1-based) when she starts it at the floor held
+## before it (the worst case: a strong weapon has maxed every earlier window): > 0 for every n <= the floors.
+static func window_room(max_hp: float, n: int) -> float:
+	var start := hp_floor(max_hp, n - 1) if n >= 1 else max_hp
+	var after := start - scorch_damage(max_hp, start, n, hp_floor(max_hp, n))
+	return maxf(after - hp_floor(max_hp, n), 0.0)
 
 
 # --- Geometry helpers -----------------------------------------------------------------------------------------

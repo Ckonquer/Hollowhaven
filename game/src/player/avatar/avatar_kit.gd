@@ -6,7 +6,9 @@ extends RefCounted
 ## Builders receive a context Dictionary from krystal_avatar.gd:
 ##   ctx["box"]: Callable(host_key: String) -> Node3D   the builder's slot container on that rig host
 ##   ctx["col"]: resolved colours (look_colors.gd resolve()), ctx["look"]: the sanitized look,
-##   ctx["id"]: the part id being built, plus a few flags (hides_hair, hat, hair, armor ids).
+##   ctx["id"]: the part id being built, plus a few flags: hides_hair, hat (hat or head armor id), head_armor ("helm" /
+##   "hood" / ""), hair_acc, back_pack (a bulky pack the hair drapes over), armor_body (body armor shown), upper (the top
+##   a cape is worn over) and hair_prims (the static hair parts for hair_builder.gd reach(): pieces sit ON the hair).
 ## Host keys: hips, leg0, leg1, knee0, knee1, spine, chest, sh0, sh1, el0, el1, hand0, hand1, head_c, eye0, eye1,
 ## brow0, brow1 (0 = +X = Krystal's left, 1 = -X = right / tool hand). Containers sit at the host origin with an
 ## identity transform, so a part's position is in the host joint's space (the model faces +Z).

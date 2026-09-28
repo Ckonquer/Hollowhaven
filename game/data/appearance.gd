@@ -205,8 +205,9 @@ const PARTS := {
 	# hats (non-obstructive: small brims, the camera always sees her face)
 	"sun_hat": {"name": "Straw Sun Hat", "slot": "hat", "mesh": "hat_sun_hat", "starter": true, "pattern": "", "skirt": false, "hides_hair": true,
 		"channels": {"band": "accent"}, "fixed": {"straw": Color("e6cf8a")}},
+	# accent: a toadstool cap (berry red in the Mushroom Dungarees preset), not a plain beret in the dungaree colour
 	"mushroom_beret": {"name": "Mushroom Beret", "slot": "hat", "mesh": "hat_mushroom_beret", "starter": true, "pattern": "", "skirt": false, "hides_hair": true,
-		"channels": {"beret": "primary"}, "fixed": {"spots": Color("fff4e0")}},
+		"channels": {"beret": "accent"}, "fixed": {"spots": Color("fff4e0")}},
 	"witch_hat": {"name": "Ribbon Witch Hat", "slot": "hat", "mesh": "hat_witch_hat", "starter": false, "pattern": "pat_witch_hat", "skirt": false, "hides_hair": true,
 		"channels": {"hat": "primary", "ribbon": "accent"}, "fixed": {}},
 	"flower_crown": {"name": "Lantern Flower Crown", "slot": "hat", "mesh": "hat_flower_crown", "starter": false, "pattern": "pat_lanternwake", "skirt": false, "hides_hair": false,
@@ -262,8 +263,10 @@ const PARTS := {
 		"channels": {"paper": "secondary"}, "fixed": {"glow": Color("ffc978")}},
 	"opera_cloak": {"name": "Moonlit Opera Cloak", "slot": "back", "mesh": "back_opera_cloak", "starter": false, "pattern": "pat_echo_masquerade", "skirt": false, "hides_hair": false,
 		"channels": {"cloak": "accent", "lining": "primary"}, "fixed": {"clasp": Color("e0b85a")}, "cape": true},
+	# secondary / accent: most tops are primary, so the capelet stands out as coloured (and the wardrobe tile, which
+	# shows the first channel, matches the render); the builder's contrast guard still swaps over a secondary top
 	"chorister_capelet": {"name": "Chorister Capelet", "slot": "back", "mesh": "back_chorister_capelet", "starter": false, "pattern": "pat_echo_chime", "skirt": false, "hides_hair": false,
-		"channels": {"capelet": "primary", "collar": "secondary"}, "fixed": {"chime": Color("e8c66a")}, "cape": true},
+		"channels": {"capelet": "secondary", "collar": "accent"}, "fixed": {"chime": Color("e8c66a")}, "cape": true},
 }
 
 ## Ownership patterns: which parts each grants and how it is earned. `recipe` = the Loom pattern recipe
@@ -324,9 +327,9 @@ const OUTFITS := {
 		"parts": {"upper": "striped_tee", "lower": "dungarees", "shoes": "wellies", "hat": "mushroom_beret", "hair_acc": "", "back": "acorn_pack"},
 		"palette": {"primary": "moss", "secondary": "cream", "accent": "berry"}, "unlock": {"kind": "starter"},
 		"desc": "Sturdy dungarees, a striped tee, wellies and a spotted mushroom beret."},
-	"pumpkin_patch": {"name": "Pumpkin Patch", "starter": false, "hair": "half_up_ribbon", "hair_color": "strawberry",
+	"pumpkin_patch": {"name": "Pumpkin Patch", "starter": false, "hair": "half_up_ribbon", "hair_color": "espresso",
 		"parts": {"upper": "pumpkin_cardigan", "lower": "harvest_skirt", "shoes": "lace_up_boots", "hat": "", "hair_acc": "leaf_clip", "back": "picnic_basket"},
-		"palette": {"primary": "caramel", "secondary": "cream", "accent": "cocoa"}, "unlock": {"kind": "pattern", "patterns": ["pat_pumpkin_patch"]},
+		"palette": {"primary": "caramel", "secondary": "cream", "accent": "moss"}, "unlock": {"kind": "pattern", "patterns": ["pat_pumpkin_patch"]},
 		"desc": "A chunky pumpkin cardigan over a swishy harvest skirt."},
 	"ribbon_witch": {"name": "Ribbon Witch", "starter": false, "hair": "long_waves", "hair_color": "raven",
 		"parts": {"upper": "witch_blouse", "lower": "witch_dress", "shoes": "buckle_boots", "hat": "witch_hat", "hair_acc": "ribbon_ties", "back": ""},
@@ -336,9 +339,9 @@ const OUTFITS := {
 		"parts": {"upper": "ruffle_bodice", "lower": "velvet_dress", "shoes": "velvet_slippers", "hat": "", "hair_acc": "bat_bow", "back": "little_cape"},
 		"palette": {"primary": "berry", "secondary": "snow", "accent": "plum"}, "unlock": {"kind": "pattern", "patterns": ["pat_velvet_vampire", "pat_velvet_cape"]},
 		"desc": "A ruffled velvet dress with a little cape and a bat-shaped bow."},
-	"ghostlight_party": {"name": "Ghostlight Party", "starter": false, "hair": "space_buns", "hair_color": "platinum",
+	"ghostlight_party": {"name": "Ghostlight Party", "starter": false, "hair": "space_buns", "hair_color": "lavender",
 		"parts": {"upper": "ghost_bodice", "lower": "tulle_party_dress", "shoes": "mary_janes", "hat": "", "hair_acc": "glow_pins", "back": "ghostlight_wings"},
-		"palette": {"primary": "snow", "secondary": "sky", "accent": "lavender"}, "unlock": {"kind": "pattern", "patterns": ["pat_ghostlight_party"]},
+		"palette": {"primary": "sky", "secondary": "snow", "accent": "lavender"}, "unlock": {"kind": "pattern", "patterns": ["pat_ghostlight_party"]},
 		"desc": "A floaty tulle party dress with gentle ghost-light wings."},
 	"moon_moth_shawl": {"name": "Moon Moth Shawl", "starter": false, "hair": "half_up_ribbon", "hair_color": "silver",
 		"parts": {"upper": "moth_blouse", "lower": "moth_long_skirt", "shoes": "ballet_flats", "hat": "", "hair_acc": "moth_antennae_band", "back": "moth_shawl"},

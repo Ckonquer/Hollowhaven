@@ -648,6 +648,74 @@ func test_boss_phase_layers() -> void:
 	assert_eq(String(back[0][1]["cue"]) if back.size() > 0 else "", "m23", "then Under the Bellhouse")
 
 
+## CH2-008: the boss is itself an enemy near Krystal, so the raw threat is up for the whole fight. That must not
+## latch the ordinary combat state underneath the boss: when the boss context ends (reported boss or the legacy
+## Weaver's own request) and nobody is left threatening, the boss piece settles and the area's mood (or silence)
+## returns with no combat cue (m10 / m22) in between.
+func test_boss_end_with_no_enemy_left_plays_no_combat_cue() -> void:
+	var cases := [["moonveil_manor", "", "count_velour", "", "m21"], ["hushed_works", "hw_vault", "borrowed_choir", "", "m26"],
+		["hushed_works", "hw_crossing", "crossing_matron", "", "m25"], ["below", "boss", "weaver_matron", "boss_matron", "m13"]]
+	for cs in cases:
+		var s := _sel(8)
+		var c := _ctx(String(cs[0]), String(cs[1]))
+		s.update(c, 0.2)
+		c["threat"] = true
+		c["boss"] = String(cs[2])
+		if String(cs[3]) != "":
+			s.request(String(cs[3]), 1.5, String(cs[0]))
+		var fight := _run(s, c, 12.0, 0.2)
+		assert_true(fight.size() >= 1, "%s: the boss piece plays" % cs[2])
+		if fight.size() >= 1:
+			assert_eq(String(fight[0][1]["cue"]), String(cs[4]), "%s: its own piece" % cs[2])
+		for e in fight:
+			assert_ne(_kind_of(e[1]), "combat", "%s: no ordinary combat cue during the fight" % cs[2])
+		assert_false(bool(s.combat), "%s: no ordinary combat latched under the boss" % cs[2])
+		# the boss is defeated / flees: its context ends and nothing threatens Krystal any more
+		c["boss"] = ""
+		c["threat"] = false
+		if String(cs[3]) != "":
+			s.release(String(cs[3]), 4.0)
+		var after := _run(s, c, 30.0, 0.2)
+		assert_true(after.size() >= 1, "%s: the boss piece settles" % cs[2])
+		for e in after:
+			assert_ne(_kind_of(e[1]), "combat", "%s: no combat cue after the boss (%s at %.1f s)" % [cs[2], str(e[1].get("cue", "")), float(e[0])])
+		assert_false(bool(s.combat), "%s: combat never latched" % cs[2])
+
+
+## CH2-008 (other side): an ordinary enemy that is still threatening after the boss earns the combat music the usual
+## way, after ~1 s of sustained threat counted from the end of the boss context (not straight away).
+func test_combat_after_a_boss_needs_its_own_sustained_threat() -> void:
+	var s := _sel(9)
+	var c := _ctx("moonveil_manor", "")
+	s.update(c, 0.2)
+	c["threat"] = true
+	c["boss"] = "count_velour"
+	_run(s, c, 8.0, 0.2)
+	c["boss"] = ""
+	var early := _run(s, c, 0.8, 0.2)
+	for e in early:
+		assert_ne(_kind_of(e[1]), "combat", "no combat cue before the threat was held on its own for 1 s")
+	assert_false(bool(s.combat), "the latch restarted when the boss ended")
+	var later := _run(s, c, 6.0, 0.2, 0.8)
+	var entered := false
+	for e in later:
+		if _kind_of(e[1]) == "combat":
+			entered = true
+			assert_true(float(e[0]) >= 1.0 - 0.001, "combat after >= 1 s of its own threat (%.1f s)" % float(e[0]))
+			break
+	assert_true(entered and bool(s.combat), "a threat still there enters ordinary combat")
+
+
+func _kind_of(d: Dictionary) -> String:
+	var cx := String(d.get("context", ""))
+	var cue := String(d.get("cue", ""))
+	if MusicData.CONTEXTS.has(cx):
+		return String((MusicData.CONTEXTS[cx] as Dictionary).get("kind", ""))
+	if MusicData.CUES.has(cue):
+		return String((MusicData.CUES[cue] as Dictionary).get("kind", ""))
+	return ""
+
+
 # --- missing files ------------------------------------------------------------------------------------------
 
 func test_missing_cues_fall_back_gracefully() -> void:

@@ -423,6 +423,11 @@ static func any_trial_cleared() -> bool:
 
 
 ## Made redundant by play: dropped without being marked.
+## Public: the hint card asks before showing / while showing a tip (UI-02).
+func is_obsolete(id: String) -> bool:
+	return _obsolete(id)
+
+
 func _obsolete(id: String) -> bool:
 	match id:
 		"ob_ch2_invitation":

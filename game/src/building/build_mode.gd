@@ -23,6 +23,9 @@ extends Node
 ##            (saved as data.face; the ghost shows it); pointing at a placed pumpkin re-carves it. Only faces
 ##            available now are offered (pumpkin_faces.gd: the six faces, then the Lanternwake festival faces
 ##            once ch2_feast is set).
+##   wall decor  pieces with data mount "wall" snap onto the nearest wall (placement.gd mount_snap) with their
+##            back against it (the ghost turns to face away from the wall; R only matters away from walls), and
+##            the ghost shows the window variant (curtain pair / centred flower box) and upstairs wall variant
 ##   The fallback keys (FALLBACK_KEYS) avoid every default binding (T is the companion skill, F the lantern),
 ##   so build mode never shadows another action.
 
@@ -88,6 +91,9 @@ var _undo_armed := ""
 var _undo_armed_until_ms := 0
 var _face_index := 0
 var _height_fn: Callable
+var _place_rot := 0                   # rotation the target was validated with (wall decor turns to its wall)
+var _ghost_opts_key := ""             # model options the ghost was built with (mount dir / storey)
+var _snap_ctx: Dictionary = {}        # wall-decor snapping context (placement.gd mount_snap)
 
 
 ## Contract helper: spawn a saved structure (used when loading).
@@ -316,6 +322,8 @@ func _select(item_id: String, force: bool = false) -> void:
 		_face_index = 0
 	_last_key = ""
 	_dirty = true
+	if changed:
+		_result = {}
 	_rebuild_ghost()
 	if changed or force:
 		Events.build_selection_changed.emit(item_id)
@@ -394,14 +402,26 @@ func _update(delta: float) -> void:
 			_set_state(false, MSG_NOTHING)
 		return
 	var def := Placement.def_of(_sid)
+	var rot := rot_deg
 	var snapped := Placement.snap_position(def, point, float(rot_deg))
-	var key := "%s|%d|%.2f|%.2f|%d" % [_sid, rot_deg, snapped.x, snapped.z, _cursor_level]
+	if Placement.is_wall_mount(def):
+		_snap_ctx["structures"] = GameState.structures      # reused every frame (no per-frame allocation)
+		_snap_ctx["area_id"] = Ops.area_id_of(area())
+		_snap_ctx["occupancy"] = _occ
+		_snap_ctx["level"] = _cursor_level
+		var ms := Placement.mount_snap(point, _snap_ctx)
+		if not ms.is_empty():
+			rot = int(ms["rot"])
+			snapped = ms["pos"]
+	var key := "%s|%d|%.2f|%.2f|%d" % [_sid, rot, snapped.x, snapped.z, _cursor_level]
 	_revalidate_t -= delta
 	if key != _last_key or _dirty or _revalidate_t <= 0.0:
 		_last_key = key
 		_dirty = false
 		_revalidate_t = REVALIDATE_SECONDS
-		_result = Placement.validate(_sid, snapped, float(rot_deg), _make_ctx())
+		_result = Placement.validate(_sid, snapped, float(rot), _make_ctx())
+		_sync_ghost_opts(def)
+	_place_rot = rot
 	_target = Vector3(snapped.x, float(_result.get("y", snapped.y)), snapped.z)
 	_has_target = true
 	var ok := bool(_result.get("ok", false))
@@ -632,7 +652,7 @@ func try_place() -> String:
 	if not active or _sid == "" or not _has_target:
 		_fail_feedback()
 		return ""
-	var res := Placement.validate(_sid, _target, float(rot_deg), _make_ctx())
+	var res := Placement.validate(_sid, _target, float(_place_rot), _make_ctx())
 	if not bool(res.get("ok", false)):
 		_result = res
 		_set_state(false, String(res.get("reason", "")))
@@ -645,7 +665,7 @@ func try_place() -> String:
 	# Remember the item first: placing the LAST one empties the stack, and the inventory listener switches the
 	# selection before place_structure returns (the undo entry must still name what was placed).
 	var item := selected_item
-	var uid := Ops.place_structure(area(), item, pos, float(rot_deg), int(res.get("level", 0)), data)
+	var uid := Ops.place_structure(area(), item, pos, float(_place_rot), int(res.get("level", 0)), data)
 	if uid == "":
 		_fail_feedback()
 		return ""
@@ -837,7 +857,9 @@ func _rebuild_ghost() -> void:
 	_ghost_model = Node3D.new()
 	_ghost_model.name = "Model"
 	_ghost.add_child(_ghost_model)
-	Models.build(_sid, _ghost_model, {"face": selected_face()} if selected_face() != "" else {})
+	var opts := _ghost_opts()
+	_ghost_opts_key = "%d|%d" % [int(opts.get("mount_dir", 0)), int(opts.get("level", 0))]
+	Models.build(_sid, _ghost_model, opts)
 	var def := Placement.def_of(_sid)
 	var snap := Placement.snap_kind(def)
 	if snap != "roof2":
@@ -862,6 +884,40 @@ func _rebuild_ghost() -> void:
 	_ghost_shown = false
 
 
+## Model options for the ghost: the pumpkin face, and what the validation says about the spot (the window
+## variant of wall decor, the upstairs variant of wall panels), so the ghost looks like the piece will.
+func _ghost_opts() -> Dictionary:
+	var o := {}
+	if selected_face() != "":
+		o["face"] = selected_face()
+	var md := int(_result.get("mount_dir", 0))
+	if md != 0:
+		o["mount_dir"] = md
+	var lv := int(_result.get("level", 0))
+	if lv >= 1:
+		o["level"] = lv
+	return o
+
+
+## Rebuilds the ghost when the model options it depends on change (rare: moving onto a window / upstairs).
+func _sync_ghost_opts(def: Dictionary) -> void:
+	if not Placement.is_wall_mount(def) and Placement.snap_kind(def) != "edge2":
+		return
+	var k := "%d|%d" % [int(_result.get("mount_dir", 0)), int(_result.get("level", 0))]
+	if k == _ghost_opts_key:
+		return
+	if _ghost != null:
+		var shown := _ghost_shown
+		var at := _ghost.position
+		var rot_y := _ghost.rotation.y
+		_rebuild_ghost()
+		if shown and _ghost != null:
+			_ghost.position = at
+			_ghost.rotation.y = rot_y
+			_ghost.visible = true
+			_ghost_shown = true
+
+
 static func _plate_mesh(size: Vector2) -> Mesh:
 	var b := BoxMesh.new()
 	b.size = Vector3(size.x, 0.03, size.y)
@@ -884,7 +940,7 @@ func _apply_ghost_look(n: Node, valid: bool) -> void:
 func _show_ghost(delta: float) -> void:
 	if _ghost == null:
 		return
-	var want_rot := deg_to_rad(float(rot_deg))
+	var want_rot := deg_to_rad(float(_place_rot))
 	if not _ghost_shown or _ghost.position.distance_to(_target) > 3.0:
 		_ghost.position = _target
 		_ghost.rotation.y = want_rot

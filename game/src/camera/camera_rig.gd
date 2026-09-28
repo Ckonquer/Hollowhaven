@@ -3,8 +3,10 @@ extends Node3D
 ##   yaw -> pitch -> (SpringArm3D probe) ; Camera3D placed at the smoothed arm length.
 ## Mouse orbit only while the mouse is captured (Game manages capture). Pitch is clamped, zoom is
 ## 2.5..8 m (wheel), FOV/sensitivity/invert/distance come from Settings and update live.
-## Walls: a SpringArm3D (world|structure) finds obstructions; the camera pulls in quickly and eases
-## back out. Shake comes only from Events.camera_shake, scaled to zero by "reduce_shake".
+## Walls: a SpringArm3D (world|structure|camera blockers) finds obstructions; the camera pulls in quickly and
+## eases back out. Camera blockers (camera_block.gd, layer 10 = bit 512) are camera-only boxes on visual props
+## (lintels, arch tops, lift roofs, pale doors) so arrival / respawn views never start inside them.
+## Shake comes only from Events.camera_shake, scaled to zero by "reduce_shake".
 ## The rig never moves the camera by itself (no auto-recentering); only teleports snap it.
 
 const PITCH_MIN := -1.1345          # -65 deg (looking down)
@@ -19,7 +21,8 @@ const BASE_SENS := 0.0045           # radians per pixel at sensitivity 1.0
 const MAX_SHAKE := 0.6
 const HIDE_DIST := 1.0              # camera closer than this to the head hides the avatar (her head would fill the view)
 const SHOW_DIST := 1.15             # ...and she reappears beyond this (hysteresis: no flicker at the threshold)
-const COLLISION_MASK := 1 | 32
+const CameraBlock := preload("res://src/camera/camera_block.gd")
+const COLLISION_MASK := 1 | 32 | CameraBlock.LAYER
 const SIDE_PAD := 0.12              # extra clearance (on top of the 0.16 m probe sphere) between the shifted arm and a wall
 
 var target: Node3D = null

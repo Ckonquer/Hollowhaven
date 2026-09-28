@@ -142,3 +142,22 @@ const LEGACY_CREDIT := {
 		{"source": "flag", "key": "chapter_one_complete", "xp": 30},
 	],
 }
+## Chapter One landmarks a legacy save has already been credited for (its wayfinding LEGACY_CREDIT stands in for that
+## exploration; v1 saves carry no "discovered" list). When the one-time credit is applied, each landmark the save
+## proves visited is recorded as an already-seen wayfinding kind ("landmark:<area>/<id>", rule "landmark") - NO xp,
+## no toast - so walking past it after the update never pays a first discovery on top of the credit (CH2-010: a
+## Continued v1 Chapter-One-complete save reached Wayfinding rank 2 within a minute, although LEGACY_CAP_XP keeps the
+## credit below rank 2). "flags": any one of these saved flags proves the visit; chapter_one_complete proves the whole
+## Chapter One woods (every data/world_layout.gd LANDMARKS id). A brand-new journey has none of them, so its first
+## discoveries still pay. Chapter One 1.x extras (Bramblewatch) are not v1 landmarks and stay discoverable.
+const LEGACY_LANDMARKS := [
+	{"landmark": "surface/haven", "flags": ["read_ward_intro", "chapter_one_complete"]},
+	{"landmark": "surface/ruin", "flags": ["ruin_cleared", "spawner_cleared_ruin_bramblings", "chapter_one_complete"]},
+	{"landmark": "surface/mine_mouth", "flags": ["mine_opened", "entered_below", "chapter_one_complete"]},
+	{"landmark": "surface/glade", "flags": ["chapter_one_complete"]},
+	{"landmark": "surface/quarry", "flags": ["chapter_one_complete"]},
+	{"landmark": "surface/pond", "flags": ["chapter_one_complete"]},
+	{"landmark": "surface/meadow", "flags": ["chapter_one_complete"]},
+	{"landmark": "surface/old_oak", "flags": ["chapter_one_complete"]},
+	{"landmark": "surface/thicket", "flags": ["chapter_one_complete"]},
+]

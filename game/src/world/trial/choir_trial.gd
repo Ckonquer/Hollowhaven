@@ -15,7 +15,7 @@ extends RefCounted
 ## flag. The anchors and resonators persist nothing. Arachnophobia: nothing here is spider-like. Comfort: the
 ## boss's own warnings honour timing_assist / high_visibility_cues; nothing here flashes.
 ##   static func build(area: Node3D) -> Dictionary   (called by src/world/areas_ch2/echo_trial.gd _ready)
-## Returns {pad, exit, exit_yaw, bounds, zone_center, zone_radius, plate, boss, anchors, resonators, symbols,
+## Returns {pad, exit, exit_yaw, bounds, zone_center, zone_radius, plate, plate_width, boss, anchors, resonators, symbols,
 ## arena_center, arena_radius, perimeter_radius, order_board}.
 
 const VaultLayout := preload("res://data/works_layout_deep.gd")
@@ -35,11 +35,11 @@ const HEIGHT := 12.0
 const SEGMENTS := 48
 const CORRIDOR_HALF := 2.0
 const CORRIDOR_START := 12.2
-const CORRIDOR_END := 25.0
+const CORRIDOR_END := 28.0             # 6.2 m behind the pad: the follow camera's full arm fits on arrival (visual QA IN-00)
 const CORRIDOR_H := 4.5
 const DOOR_H := 3.6
 const PAD_Z := 21.8
-const EXIT_Z := CORRIDOR_END - 0.6
+const EXIT_Z := CORRIDOR_END - 0.14     # the pale door flush against the end wall (echo_trial.gd EXIT_INSET)
 
 
 static func radius() -> float:
@@ -85,7 +85,7 @@ static func build(area: Node3D) -> Dictionary:
 		points.append((a as Node3D).position)
 	var out := {"pad": Vector3(0, 0, PAD_Z), "exit": Vector3(0, 0, EXIT_Z), "exit_yaw": PI,
 		"bounds": Rect2(-radius() - 1.5, -radius() - 1.5, (radius() + 1.5) * 2.0, CORRIDOR_END + radius() + 2.5),
-		"zone_center": Vector3(0, 0, 5.0), "zone_radius": 26.0, "plate": Vector3(0, 3.4, PAD_Z - 1.4),
+		"zone_center": Vector3(0, 0, 5.0), "zone_radius": 26.0, "plate": Vector3(0, 3.4, PAD_Z - 1.4), "plate_width": CORRIDOR_HALF * 2.0 - 0.6,
 		"anchors": anchors, "anchor_points": points, "resonators": resonators, "symbols": symbols, "order_board": board,
 		"arena_center": Vector3.ZERO, "arena_radius": radius(), "perimeter_radius": perimeter(), "boss": null}
 	out["boss"] = _spawn_boss(area, out)
@@ -213,7 +213,8 @@ static func _order_board(area: Node3D, symbols: Array) -> Node3D:
 	n.position = Vector3(-CORRIDOR_HALF + 0.02, 0.0, 16.0)
 	n.rotation.y = PI * 0.5                  # faces +x, into the corridor
 	var wood := Mat.outlined(Mat.toon(Color("5a3b27")), 0.016)
-	var sheet := Mat.toon(Color("efe0bd"), {"emission": Color("efe0bd"), "emission_energy": 0.12})
+	var sheet_c := Color("efe0bd")
+	var sheet := Mat.toon(sheet_c, {"emission": sheet_c, "emission_energy": 0.12})
 	Kit.add(n, Kit.box(Vector3(2.7, 1.35, 0.08), wood), Vector3(0, 1.9, 0.04))
 	Kit.add(n, Kit.box(Vector3(2.5, 1.15, 0.02), sheet), Vector3(0, 1.9, 0.09))
 	var title := Art.label(n, "THE BELLMAKERS' ORDER", Vector3(0, 2.36, 0.11), 24, Color("3a2a22"))
@@ -227,7 +228,9 @@ static func _order_board(area: Node3D, symbols: Array) -> Node3D:
 		var x := (float(i) - float(k - 1) * 0.5) * 0.6
 		var num := Art.label(n, str(i + 1), Vector3(x, 2.14, 0.11), 26, Color("3a2a22"))
 		num.outline_size = 0
-		var sym := Art.symbol(n, String(s["id"]), 0.36, Color("b0703a"), nm)
+		# painted on the pale sheet: the Moon's "bite" takes the sheet colour so it reads as a crescent, not a black
+		# hole (like the real board in the Bell Throat, throat.gd; VISUAL_BUGS IN-11)
+		var sym := Art.symbol(n, String(s["id"]), 0.36, Color("b0703a"), nm, sheet_c)
 		sym.position = Vector3(x, 1.86, 0.12)
 		var tag: Variant = sym.get_node_or_null("Name")
 		if tag is Label3D:

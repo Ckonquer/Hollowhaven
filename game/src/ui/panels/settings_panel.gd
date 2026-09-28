@@ -9,6 +9,8 @@ const Rows := preload("res://src/ui/widgets/setting_rows.gd")
 const Schema := preload("res://src/ui/settings_schema.gd")
 
 const ROW_W := 1200.0
+## Tab page height: most of the screen (visual QA UI-20: at 660 every tab scrolled with half the screen unused).
+const TABS_H := 800.0
 ## Settings "Reset to defaults" leaves alone: the key bindings (they have their own reset) and every
 ## comfort choice, which a player may depend on (e.g. arachnophobia mode, timing assist).
 const RESET_KEEPS := ["bindings", "comfort_confirmed", "arachnophobia", "reduce_shake", "reduce_flashing", "captions", "horror_intensity",
@@ -29,7 +31,7 @@ func setup(p_args: Dictionary) -> void:
 
 func _build() -> void:
 	tabs = TabContainer.new()
-	tabs.custom_minimum_size = Vector2(1320, 660)
+	tabs.custom_minimum_size = Vector2(1320, TABS_H)
 	body.add_child(tabs)
 	for t in Schema.TABS:
 		var id := String(t[0])

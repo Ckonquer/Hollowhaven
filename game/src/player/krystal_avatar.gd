@@ -137,6 +137,8 @@ const HELD_HIDDEN_ACTIONS := ["eat", "sleep", "death"]
 ## Roll: points on the head + hair silhouette (HeadCenter space) that must stay above the floor.
 ## Hats, buns, helms and ponytails add their own silhouette points on top of these (see _head_hull).
 const ROLL_CLEARANCE := 0.02
+## A tall hat (witch hat) folds down to this height while she rolls, so its tip never props the ball up.
+const ROLL_HAT_SQUASH := 0.45
 const _HEAD_HULL := [Vector3(0, 0.33, -0.05), Vector3(0, -0.27, 0.0), Vector3(0, -0.3, -0.2), Vector3(0.28, 0.03, -0.03),
 	Vector3(-0.28, 0.03, -0.03), Vector3(0, 0.03, 0.26), Vector3(0, 0.0, -0.33), Vector3(0, 0.24, 0.17), Vector3(0, 0.25, -0.26),
 	Vector3(0, -0.2, 0.17), Vector3(0.2, 0.24, -0.05), Vector3(-0.2, 0.24, -0.05), Vector3(0.2, -0.2, -0.1), Vector3(-0.2, -0.2, -0.1)]
@@ -214,6 +216,8 @@ var _chains: Array = []               # spring chain records of every unit (avat
 var _skirt: SkirtRig = null
 var _skirt_pivots: Array = []
 var _head_hull: Array = []
+var _hair_prims: Array = []          # static hair parts for the hair surface probe (hair_builder.gd primitives())
+var _hat_node: Node3D = null          # a tall hat squashed while rolling (witch hat), else null
 var _patch: Node3D
 var _connected: bool = false
 
@@ -778,6 +782,25 @@ func _hides_hair() -> bool:
 	return hat != "" and bool(ItemDB.appearance_part(hat).get("hides_hair", false))
 
 
+## "helm" (metal) / "hood" (cloth) while a show-armor head piece is drawn, else "" (the hair compresses under it).
+func _head_armor_kind() -> String:
+	var id := _armor_id("head")
+	if id == "":
+		return ""
+	return "helm" if bool(ArmorBuilder.style(id)["metal"]) else "hood"
+
+
+## The bulky back pack the long hair drapes over (hair_builder.gd BACK_PACKS), or "".
+func _back_pack() -> String:
+	var b := String(_look.get("back", ""))
+	return b if HairBuilder.BACK_PACKS.has(b) else ""
+
+
+## Everything the hair SHAPE depends on (not its colour): hats / hair accessories that sit on the hair rebuild with it.
+func _hair_shape_sig() -> String:
+	return "%s|%s|%s|%s|%s" % [_look.get("hair", ""), _hides_hair(), _head_armor_kind(), String(_look.get("hair_acc", "")) == "big_bow", _back_pack()]
+
+
 ## What each unit is built from: a unit is rebuilt only when its signature changes.
 func _signatures(col: Dictionary) -> Dictionary:
 	var pal := String(col["palette_key"])
@@ -786,13 +809,13 @@ func _signatures(col: Dictionary) -> Dictionary:
 	return {
 		"skin": String(_look.get("skin", "")),
 		"eyes": String(_look.get("eyes", "")),
-		"hair": "%s|%s|%s|%s" % [_look.get("hair", ""), _look.get("hair_color", ""), _hides_hair(), pal],
-		"hat": "%s|%s|%s" % [hat, head_armor, pal],
-		"hair_acc": "%s|%s|%s|%s" % [_look.get("hair_acc", ""), pal, _look.get("hair", ""), head_armor if head_armor != "" else hat],
-		"upper": "%s|%s|%s" % [_look.get("upper", ""), pal, _look.get("skin", "")],
+		"hair": "%s|%s|%s" % [_hair_shape_sig(), _look.get("hair_color", ""), pal],
+		"hat": "%s|%s|%s|%s" % [hat, head_armor, pal, _hair_shape_sig() if hat != "" else ""],
+		"hair_acc": "%s|%s|%s|%s" % [_look.get("hair_acc", ""), pal, _hair_shape_sig(), head_armor if head_armor != "" else hat],
+		"upper": "%s|%s|%s|%s" % [_look.get("upper", ""), pal, _look.get("skin", ""), _armor_id("body") != ""],
 		"lower": "%s|%s|%s" % [_look.get("lower", ""), pal, _look.get("skin", "")],
 		"shoes": "%s|%s|%s|%s" % [_look.get("shoes", ""), pal, _armor_id("boots"), (col["leg"] as Color).to_html(false)],
-		"back": "%s|%s" % [_look.get("back", ""), pal],
+		"back": "%s|%s|%s|%s" % [_look.get("back", ""), pal, _armor_id("body") != "", _look.get("upper", "")],
 		"armor": _armor_id("body"),
 	}
 
@@ -839,14 +862,21 @@ func _rebuild_units(force: bool) -> Array:
 func _build_unit(u: String, col: Dictionary) -> Dictionary:
 	var head_armor := _armor_id("head")
 	var ctx := {"box": Callable(self, "_box").bind(u), "col": col, "look": _look, "id": "",
-		"hides_hair": _hides_hair(), "hat": head_armor if head_armor != "" else String(_look.get("hat", ""))}
+		"hides_hair": _hides_hair(), "hat": head_armor if head_armor != "" else String(_look.get("hat", "")),
+		"head_armor": _head_armor_kind(), "hair_acc": String(_look.get("hair_acc", "")), "back_pack": _back_pack(),
+		"hair_prims": _hair_prims, "armor_body": _armor_id("body") != "", "upper": String(_look.get("upper", ""))}
 	match u:
 		"skin":
 			_build_skin(col)
 		"eyes":
 			_build_eyes(col)
 		"hair":
-			return HairBuilder.build(ctx)
+			var hres := HairBuilder.build(ctx)
+			_hair_prims = []
+			for b in _unit_boxes["hair"]:
+				if (b as Node).get_parent() == _head_c:
+					_hair_prims.append_array(HairBuilder.primitives((b as Node).get_children()))
+			return hres
 		"hat":
 			if head_armor != "":
 				ctx["id"] = head_armor
@@ -855,8 +885,9 @@ func _build_unit(u: String, col: Dictionary) -> Dictionary:
 			if ctx["id"] != "":
 				return AccessoryBuilder.build_hat(ctx)
 		"hair_acc":
+			# a show-armor helm / hood covers the hair and whatever is pinned in it
 			ctx["id"] = String(_look.get("hair_acc", ""))
-			if ctx["id"] != "":
+			if ctx["id"] != "" and head_armor == "":
 				return AccessoryBuilder.build_hair_acc(ctx)
 		"upper":
 			ctx["id"] = String(_look.get("upper", ""))
@@ -942,6 +973,8 @@ func _after_rebuild(changed: Array) -> void:
 	_head_hull = _HEAD_HULL.duplicate()
 	for u in ["hair", "hat", "hair_acc"]:
 		_head_hull.append_array((_unit_res.get(u, {}) as Dictionary).get("hull_pts", []))
+	var squash: Variant = (_unit_res.get("hat", {}) as Dictionary).get("roll_squash")
+	_hat_node = squash if squash is Node3D and is_instance_valid(squash) else null
 	if changed.has("upper"):
 		_patch = (_unit_res["upper"] as Dictionary).get("patch")
 	# A cape / shawl covers the jacket's back patch and the scarf ends (they would lie over / cut through the
@@ -996,15 +1029,22 @@ func _hull_points(u: String) -> Array:
 							if d > best_d[di]:
 								best_d[di] = d
 								best[di] = p
+		var sq: Variant = res.get("roll_squash")
 		for p in best:
 			if p is Vector3 and ((p as Vector3) - HULL_CENTRE).length() > HULL_MIN_DIST and not out.has(p):
-				out.append(p)
+				out.append(_roll_squashed(p, sq) if sq is Node3D else p)
 	for nr in res.get("hull_nodes", []):
 		var nd: Node3D = nr[0]
 		var p2 := _xf_to(nd, _head_c).origin
 		var away := (p2 - HULL_CENTRE).normalized()
 		out.append(p2 + away * float(nr[1]))
 	return out
+
+
+## A tall hat's hull point as it sits while rolling (the hat is squashed toward the head by ROLL_HAT_SQUASH).
+func _roll_squashed(p: Vector3, hat: Node3D) -> Vector3:
+	var local := hat.transform.affine_inverse() * p
+	return hat.transform * (local * Vector3(1.0, ROLL_HAT_SQUASH, 1.0))
 
 
 ## Transform of `n` relative to an ancestor (walks the local transforms; works outside the tree too).
@@ -1514,6 +1554,8 @@ func _blend(j: int, target: Vector3, w: float) -> void:
 func _pose_roll(dt: float) -> void:
 	var active := roll_t >= 0.0
 	_roll_blend = move_toward(_roll_blend, 1.0 if active else 0.0, dt * 14.0)
+	if _hat_node != null:
+		_hat_node.scale = Vector3(1.0, lerpf(1.0, ROLL_HAT_SQUASH, _roll_blend), 1.0)
 	if not active:
 		_roll.rotation.x = 0.0
 		_roll.scale = Vector3.ONE
@@ -1662,6 +1704,11 @@ func _chain_braid(ch: Dictionary, dt: float, bt: Vector2) -> void:
 	var sd := float(ch["side"])
 	var segs: Array = ch["segs"]
 	var rest: Array = ch["rest"]
+	var anchor: Variant = ch.get("anchor")
+	if anchor != null:
+		# twin braids hang from the body: cancel the head's yaw at their roots
+		var ar: Vector3 = ch["anchor_rest"]
+		(anchor as Node3D).rotation = Vector3(ar.x, ar.y - _pose[J_HEAD].y, ar.z)
 	for i in segs.size():
 		var f := 0.5 if i == 0 else (0.22 + 0.06 * i) * 0.5
 		var wave := sin(_t * 5.5 - float(i) * 0.8) * 0.04 * _move_w
@@ -1707,9 +1754,17 @@ func _update_skirt(dt: float) -> void:
 	# that frame spins, so a "trailing" hem would swing into the ground (the back panels point down at 3/4 turn).
 	# Fade the motion drive out while rolling: the panels keep their base flare and the leg push.
 	var drive := 1.0 - _roll_blend
-	_skirt.update(dt, _lv * drive, _acc * drive, _pose[J_LEG_L], _pose[J_LEG_R], _pose[J_KNEE_L], _pose[J_KNEE_R], _t, _run_w * drive, turn_rate * drive)
+	# Tucked into a roll the skirt bunches up around the folded legs (shorter panels hugging the thighs) instead of
+	# flaring its full length into a stiff cone.
+	var tuck := 0.0
+	if roll_t >= 0.0:
+		tuck = clampf(sin(PI * clampf(roll_t, 0.0, 1.0)) * 1.5, 0.0, 1.0) * _roll_blend
+	var len_scale := 1.0 - SkirtRig.ROLL_BUNCH * tuck
+	_skirt.update(dt, _lv * drive, _acc * drive, _pose[J_LEG_L], _pose[J_LEG_R], _pose[J_KNEE_L], _pose[J_KNEE_R], _t, _run_w * drive, turn_rate * drive, len_scale)
 	for i in _skirt_pivots.size():
-		(_skirt_pivots[i] as Node3D).rotation = Vector3(-_skirt.flare[i], _skirt.theta[i], _skirt.side[i])
+		var pv := _skirt_pivots[i] as Node3D
+		pv.rotation = Vector3(-_skirt.flare[i], _skirt.theta[i], _skirt.side[i])
+		pv.scale = Vector3(1.0, len_scale, 1.0)
 
 
 func _update_props(dt: float) -> void:

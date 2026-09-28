@@ -20,10 +20,29 @@ extends Node
 ## "kind" (boss hazards: trip / thread / sac) and "vuln" (is_vulnerable()); "boss" is the nearest visible boss
 ## (id, name, pos, state, hp, max_hp, phase, vuln, threat, dist) read fresh for every line, and player "facing_yaw"
 ## is Krystal's body facing (cam_yaw convention). All read-only.
+## Performance QA additions (tools/qa/perf_profile.py, MP §20.5; read-only - Performance monitors and clocks only):
+## every line carries "perf" (see _perf_block()): tick_ms (Time.get_ticks_msec), area / zone / mode, fps, process_ms /
+## physics_ms (Performance TIME_*), static_mb / static_max_mb (0 in release builds: the engine tracks it in debug builds
+## only), video_mb / texture_mb / buffer_mb, draw_calls / objects_drawn / primitives, objects / resources / nodes /
+## orphans, phys_active / phys_pairs and "load" (the last area load: Game.mode "loading" -> "playing" in ms, its worst
+## frame and frames over 50 ms, then the worst frame in the first POST_LOAD_S s of play). The user arg --qa-perf adds
+## per-frame data since the previous line: "frames" (frame-to-frame interval, ms), "self_ms" (this node's own cost in
+## the frame that started each interval, so a profile can tell telemetry overhead from game stalls), "gpu_ms" /
+## "cpu_render_ms" (the main viewport's measured render times), plus "audio" (AudioStreamPlayer* nodes in the tree /
+## playing), "enemies" (group "enemy": total / alive / still processing, processing far away or off-screen) and "env"
+## (adapter, CPU, window, refresh rate, render scale, quality, vsync). With --qa-perf the button scan skips the 3D world
+## while playing (it has no buttons; the UI root is still scanned) and the nearby / button scans run less often, so the
+## telemetry itself does not add a periodic stall to the frames it measures.
 
 const Tracker := preload("res://src/ui/hud/tracker.gd")
 const MapView := preload("res://src/ui/widgets/map_view.gd")
 const PROGRESS_INTERVAL := 0.5
+const POST_LOAD_S := 3.0            # "load".post_worst_ms: worst frame this long after a load ends
+const LONG_FRAME_MS := 50.0         # "load".long_frames / post_long_frames threshold
+const FAR_AI_M := 60.0              # "enemies".active_far: still processing this far from Krystal
+const PERF_MAX_FRAMES := 4000       # per-frame lists are capped if no line is written for a long time
+const PERF_NEARBY_INTERVAL := 1.0   # --qa-perf cadences (defaults 0.4 / 0.2 s)
+const PERF_BUTTONS_INTERVAL := 0.5
 
 var _file: FileAccess
 var _interval := 0.1
@@ -39,6 +58,25 @@ var _progress_t := PROGRESS_INTERVAL
 var _progress: Dictionary = {}
 var _music_cue := ""
 var _boss: WeakRef = null          # nearest boss node (has "boss_id") seen by _collect_nearby; read every snapshot
+# Performance QA ("perf", see the header). Measurement only: nothing here changes game state.
+var _perf_mode := false            # --qa-perf
+var _last_frame_us := 0
+var _prev_self_ms := 0.0
+var _pf_frames: Array = []
+var _pf_self: Array = []
+var _pf_gpu: Array = []
+var _pf_cpu: Array = []
+var _vp_rid := RID()
+var _prev_mode := ""
+var _load: Dictionary = {}
+var _load_n := 0
+var _load_from := ""
+var _load_start_us := 0
+var _load_worst := 0.0
+var _load_long := 0
+var _load_frames := 0
+var _post_until_us := 0
+var _audio: Dictionary = {}        # instance id -> true: AudioStreamPlayer / 2D / 3D nodes in the tree (--qa-perf)
 
 
 func setup(path: String, interval: float) -> void:
@@ -48,6 +86,9 @@ func setup(path: String, interval: float) -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_perf_mode = Debug.has_arg("qa-perf")
+	if _perf_mode:
+		_perf_setup()
 	Events.notify.connect(func(text: String, kind: String): _push_msg("notify", kind + ": " + text))
 	Events.say.connect(func(speaker: String, text: String, _d: float): _push_msg("say", speaker + ": " + text))
 	Events.hint.connect(func(id: String, text: String): _push_msg("hint", id + ": " + text))
@@ -80,13 +121,20 @@ func _push_msg(kind: String, text: String) -> void:
 func _process(delta: float) -> void:
 	if _file == null:
 		return
+	var t0 := Time.get_ticks_usec()
+	_perf_frame(t0)
+	_tick(delta)
+	_prev_self_ms = float(Time.get_ticks_usec() - t0) / 1000.0
+
+
+func _tick(delta: float) -> void:
 	_t += delta
 	_nearby_t += delta
 	_buttons_t += delta
-	if _nearby_t >= 0.4:
+	if _nearby_t >= (PERF_NEARBY_INTERVAL if _perf_mode else 0.4):
 		_nearby_t = 0.0
 		_nearby = _collect_nearby()
-	if _buttons_t >= 0.2:
+	if _buttons_t >= (PERF_BUTTONS_INTERVAL if _perf_mode else 0.2):
 		_buttons_t = 0.0
 		_buttons = _collect_buttons()
 	_progress_t += delta
@@ -175,7 +223,197 @@ func _snapshot() -> Dictionary:
 	d["companion_nodes"] = comps
 	for k in _progress:
 		d[k] = _progress[k]
+	d["perf"] = _perf_block()
 	return d
+
+
+# --- Performance QA (read-only; see the header) -----------------------------------------------------------------
+
+## --qa-perf only: track audio players entering / leaving the tree and turn on the main viewport's render-time
+## measurement (a measurement switch, nothing rendered changes).
+func _perf_setup() -> void:
+	get_tree().node_added.connect(_on_perf_node_added)
+	get_tree().node_removed.connect(_on_perf_node_removed)
+	for type in ["AudioStreamPlayer", "AudioStreamPlayer2D", "AudioStreamPlayer3D"]:
+		for n in get_tree().root.find_children("*", type, true, false):
+			_audio[n.get_instance_id()] = true
+	var vp := get_viewport()
+	if vp != null and DisplayServer.get_name() != "headless":
+		_vp_rid = vp.get_viewport_rid()
+		RenderingServer.viewport_set_measure_render_time(_vp_rid, true)
+
+
+func _on_perf_node_added(n: Node) -> void:
+	if n is AudioStreamPlayer or n is AudioStreamPlayer2D or n is AudioStreamPlayer3D:
+		_audio[n.get_instance_id()] = true
+
+
+func _on_perf_node_removed(n: Node) -> void:
+	_audio.erase(n.get_instance_id())
+
+
+## Called once per frame before anything else here: the frame-to-frame interval, the area-load timer (Game.mode
+## "loading" -> anything else) and, with --qa-perf, the per-frame lists.
+func _perf_frame(now_us: int) -> void:
+	var dt_ms := 0.0
+	if _last_frame_us > 0:
+		dt_ms = float(now_us - _last_frame_us) / 1000.0
+	_last_frame_us = now_us
+	var m := String(Game.mode)
+	if m == "loading" and _prev_mode != "loading":
+		_load_start_us = now_us
+		_load_from = String(Game.area_id)
+		_load_worst = dt_ms          # this interval holds the frame that started the load (save parse, prefetch)
+		_load_long = 1 if dt_ms > LONG_FRAME_MS else 0
+		_load_frames = 1
+		_post_until_us = 0
+	elif m == "loading":
+		_load_frames += 1
+		_load_worst = maxf(_load_worst, dt_ms)
+		if dt_ms > LONG_FRAME_MS:
+			_load_long += 1
+	elif _prev_mode == "loading":
+		_load_n += 1
+		_load = {"n": _load_n, "from": _load_from, "area": String(Game.area_id),
+			"ms": snappedf(float(now_us - _load_start_us) / 1000.0, 0.1),
+			"worst_frame_ms": snappedf(maxf(_load_worst, dt_ms), 0.01), "long_frames": _load_long + (1 if dt_ms > LONG_FRAME_MS else 0),
+			"frames": _load_frames + 1, "post_worst_ms": 0.0, "post_long_frames": 0, "post_done": false}
+		_post_until_us = now_us + int(POST_LOAD_S * 1000000.0)
+	elif _post_until_us > 0:
+		if now_us <= _post_until_us:
+			_load["post_worst_ms"] = snappedf(maxf(float(_load["post_worst_ms"]), dt_ms), 0.01)
+			if dt_ms > LONG_FRAME_MS:
+				_load["post_long_frames"] = int(_load["post_long_frames"]) + 1
+		else:
+			_load["post_done"] = true
+			_post_until_us = 0
+	_prev_mode = m
+	if not _perf_mode or dt_ms <= 0.0:
+		return
+	if _pf_frames.size() >= PERF_MAX_FRAMES:
+		_pf_frames.clear()
+		_pf_self.clear()
+		_pf_gpu.clear()
+		_pf_cpu.clear()
+	_pf_frames.append(snappedf(dt_ms, 0.001))
+	_pf_self.append(snappedf(_prev_self_ms, 0.001))
+	if _vp_rid.is_valid():
+		_pf_gpu.append(snappedf(RenderingServer.viewport_get_measured_render_time_gpu(_vp_rid), 0.001))
+		_pf_cpu.append(snappedf(RenderingServer.viewport_get_measured_render_time_cpu(_vp_rid), 0.001))
+
+
+static func _mb(bytes: float) -> float:
+	return snappedf(bytes / 1048576.0, 0.1)
+
+
+## The "perf" entry of a line (cheap monitors always; per-frame lists, audio, enemies and env with --qa-perf).
+func _perf_block() -> Dictionary:
+	var d := {"tick_ms": Time.get_ticks_msec(), "area": String(Game.area_id), "zone": String(Game.zone_id),
+		"mode": String(Game.mode), "fps": Engine.get_frames_per_second(),
+		"process_ms": snappedf(Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, 0.01),
+		"physics_ms": snappedf(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, 0.01),
+		"static_mb": _mb(Performance.get_monitor(Performance.MEMORY_STATIC)),
+		"static_max_mb": _mb(Performance.get_monitor(Performance.MEMORY_STATIC_MAX)),
+		"video_mb": _mb(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)),
+		"texture_mb": _mb(Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED)),
+		"buffer_mb": _mb(Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED)),
+		"draw_calls": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		"objects_drawn": int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
+		"primitives": int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+		"objects": int(Performance.get_monitor(Performance.OBJECT_COUNT)),
+		"resources": int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)),
+		"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"orphans": int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)),
+		"phys_active": int(Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)),
+		"phys_pairs": int(Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS)),
+		"load": _load.duplicate()}
+	if not _perf_mode:
+		return d
+	d["frames"] = _pf_frames
+	d["self_ms"] = _pf_self
+	d["gpu_ms"] = _pf_gpu
+	d["cpu_render_ms"] = _pf_cpu
+	_pf_frames = []
+	_pf_self = []
+	_pf_gpu = []
+	_pf_cpu = []
+	d["audio"] = _audio_counts()
+	d["enemies"] = _enemy_activity()
+	d["env"] = _perf_env()
+	return d
+
+
+func _audio_counts() -> Dictionary:
+	var total := 0
+	var playing := 0
+	var p3d := 0
+	var stale: Array = []
+	for id in _audio:
+		var o: Object = instance_from_id(int(id))
+		if o == null or not is_instance_valid(o) or not (o is Node):
+			stale.append(id)
+			continue
+		total += 1
+		if o is AudioStreamPlayer3D:
+			p3d += 1
+		if bool(o.get("playing")):
+			playing += 1
+	for id in stale:
+		_audio.erase(id)
+	return {"players": total, "playing": playing, "players_3d": p3d}
+
+
+## Enemies (group "enemy") and whether they still run their AI: "active" = can_process() and processing,
+## "active_far" beyond FAR_AI_M from Krystal, "active_offscreen" outside the current camera's frustum.
+func _enemy_activity() -> Dictionary:
+	var p = Game.player
+	var has_p: bool = p != null and is_instance_valid(p) and p is Node3D
+	var cam := get_viewport().get_camera_3d()
+	var total := 0
+	var alive := 0
+	var active := 0
+	var far := 0
+	var off := 0
+	var maxd := 0.0
+	for n in get_tree().get_nodes_in_group("enemy"):
+		if not is_instance_valid(n) or not (n is Node3D):
+			continue
+		total += 1
+		if n.has_method("is_dead") and bool(n.call("is_dead")):
+			continue
+		alive += 1
+		if not (n.can_process() and (n.is_physics_processing() or n.is_processing())):
+			continue
+		active += 1
+		var pos: Vector3 = (n as Node3D).global_position
+		var dist: float = pos.distance_to((p as Node3D).global_position) if has_p else 0.0
+		maxd = maxf(maxd, dist)
+		if dist > FAR_AI_M:
+			far += 1
+		if cam != null and not cam.is_position_in_frustum(pos):
+			off += 1
+	return {"total": total, "alive": alive, "active": active, "active_far": far, "active_offscreen": off,
+		"active_max_dist": snappedf(maxd, 0.1)}
+
+
+func _perf_env() -> Dictionary:
+	var vp := get_viewport()
+	var scr := DisplayServer.window_get_current_screen()
+	var e := {"adapter": RenderingServer.get_video_adapter_name(), "vendor": RenderingServer.get_video_adapter_vendor(),
+		"api": RenderingServer.get_video_adapter_api_version(), "cpu": OS.get_processor_name(),
+		"threads": OS.get_processor_count(), "debug_build": OS.is_debug_build(),
+		"engine": String(Engine.get_version_info().get("string", "")),
+		"window": [DisplayServer.window_get_size().x, DisplayServer.window_get_size().y], "screen": scr,
+		"refresh_hz": snappedf(DisplayServer.screen_get_refresh_rate(scr), 0.01),
+		"render_scale": snappedf(vp.scaling_3d_scale, 0.01) if vp != null else 1.0,
+		"quality": Settings.get_value("quality"), "vsync_mode": int(DisplayServer.window_get_vsync_mode()),
+		"max_fps": Engine.max_fps,
+		"method": String(ProjectSettings.get_setting("rendering/renderer/rendering_method", ""))}
+	if RenderingServer.has_method("get_current_rendering_driver_name"):
+		e["driver"] = String(RenderingServer.call("get_current_rendering_driver_name"))
+	if RenderingServer.has_method("get_current_rendering_method"):
+		e["method"] = String(RenderingServer.call("get_current_rendering_method"))
+	return e
 
 
 ## Chapter Two / progression state as the QA bot sees it (read-only; allocates, so _process refreshes it only
@@ -345,7 +583,9 @@ func _collect_buttons() -> Array:
 	var roots: Array = []
 	if Game.ui != null and is_instance_valid(Game.ui):
 		roots.append(Game.ui)
-	if get_tree().current_scene != null:
+	# --qa-perf: the 3D world has no buttons; walking its whole tree every scan would be a periodic stall of our own.
+	var skip_world: bool = _perf_mode and (Game.mode == "playing" or Game.mode == "loading")
+	if get_tree().current_scene != null and not skip_world:
 		roots.append(get_tree().current_scene)
 	for r in roots:
 		_collect_buttons_rec(r, xf, out)

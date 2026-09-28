@@ -72,6 +72,18 @@ func _counted(rows: Array) -> Array:
 	return rows.filter(func(r: Dictionary) -> bool: return not bool(r.get("display", false)))
 
 
+## The lamp roads' rows (the lamp search's "Find the ... lamp" rows, shown first in the group, left out).
+func _road_rows(rows: Array) -> Array:
+	return rows.filter(func(r: Dictionary) -> bool: return String(r.get("step", "")) != "ch2_outer_lamps")
+
+
+func _part_ids(vw: Dictionary) -> Array:
+	var out: Array = []
+	for p in vw["parts"]:
+		out.append(String(p["id"]))
+	return out
+
+
 ## Every display row is labelled and flagged (they are shown with their real done state, never required).
 func _check_display_rows(rows: Array) -> void:
 	for r in rows:
@@ -163,9 +175,10 @@ func test_three_lamps_shown_together_in_any_order() -> void:
 	assert_eq(String(vw["kind"]), "chapter2")
 	assert_eq(String(vw["group"]), "lamps")
 	assert_eq(String(vw["title"]), String(Ch2.GROUPS["lamps"]["title"]))
-	assert_eq(_labels(_counted(vw["rows"])), ["Light the garden lamp", "Light the quarry lamp", "Light the manor lamp"])
+	assert_eq(_labels(_counted(_road_rows(vw["rows"]))), ["Light the garden lamp", "Light the quarry lamp", "Light the manor lamp"])
 	_check_display_rows(vw["rows"])
-	assert_eq(vw["parts"].size(), 3)
+	assert_eq(_part_ids(vw), ["ch2_outer_lamps", "ch2_orchard", "ch2_quarry", "ch2_manor"])
+	assert_true(bool(vw["parts"][0]["done"]), "every lamp found: the search reads done")
 	assert_eq(Tracker.pending_targets(vw).size(), 3)
 	# light the MANOR lamp first: it stays listed, ticked; the others remain
 	GameState.set_flag("ch2_manor_lamp_lit")
@@ -173,7 +186,7 @@ func test_three_lamps_shown_together_in_any_order() -> void:
 	assert_true(GameState.chapter2.is_done("ch2_manor"))
 	vw = Tracker.objective_view()
 	assert_eq(String(vw["group"]), "lamps")
-	var lamps := _counted(vw["rows"])
+	var lamps := _counted(_road_rows(vw["rows"]))
 	assert_eq(_labels(lamps), ["Light the garden lamp", "Light the quarry lamp", "Light the manor lamp"], "all three stay")
 	assert_eq([bool(lamps[0]["done"]), bool(lamps[1]["done"]), bool(lamps[2]["done"])], [false, false, true])
 	var pend: Array = []
@@ -190,6 +203,49 @@ func test_three_lamps_shown_together_in_any_order() -> void:
 	vw = Tracker.objective_view()
 	assert_eq(String(vw["group"]), "")
 	assert_eq(String(vw["step_id"]), "ch2_prepare")
+
+
+## CH2-001: right after the Commons the card already shows the lamp search AND the three roads under the group
+## title (not 'Find the manor lamp' alone until every lamp is found): a lamp lit while the others are unfound ticks
+## its road at once. The map marks the three roads' places and the Conservatory they start from (the search).
+func test_lamp_search_and_roads_shown_together_from_the_commons() -> void:
+	_accept()
+	for f in ["ch2_waygate_repaired", "ch2_arch_commons", "ch2_read_festival_map"]:
+		GameState.set_flag(f)
+	GameState.chapter2.evaluate()
+	var vw := Tracker.objective_view()
+	assert_eq(String(vw["kind"]), "chapter2")
+	assert_eq(String(vw["group"]), "lamps")
+	assert_eq(String(vw["title"]), String(Ch2.GROUPS["lamps"]["title"]))
+	assert_eq(String(vw["text"]), String(Ch2.GROUPS["lamps"]["text"]))
+	assert_eq(_part_ids(vw), ["ch2_outer_lamps", "ch2_orchard", "ch2_quarry", "ch2_manor"])
+	assert_eq(_labels(_counted(vw["rows"])), ["Find the orchard lamp", "Find the quarry lamp", "Find the manor lamp",
+		"Light the garden lamp", "Light the quarry lamp", "Light the manor lamp"])
+	var pend: Array = []
+	for t in Tracker.pending_targets(vw):
+		pend.append(String(t["id"]))
+	assert_eq(pend, ["hr_conservatory", "hr_orchard", "hr_quarry", "hr_manor_grounds"], "the hub and the three roads")
+	assert_eq(Tracker.where_text(vw, "hallowmere_reach", Vector3.ZERO), "Each is marked on your map   ·   %s Map" % Settings.action_label("map"))
+	# The garden lamp found and lit, the other two never seen: its road is done and ticked now.
+	GameState.set_flag("ch2_found_orchard_lamp")
+	GameState.set_flag("ch2_garden_lamp_lit")
+	GameState.chapter2.evaluate()
+	assert_true(GameState.chapter2.is_done("ch2_orchard"))
+	vw = Tracker.objective_view()
+	assert_eq(String(vw["group"]), "lamps")
+	var done_by_label := {}
+	for r in vw["rows"]:
+		done_by_label[String(r["label"])] = bool(r["done"])
+	assert_true(bool(done_by_label["Light the garden lamp"]))
+	assert_true(bool(done_by_label["Find the orchard lamp"]))
+	assert_false(bool(done_by_label["Find the manor lamp"]))
+	assert_false(bool(done_by_label["Light the quarry lamp"]))
+	assert_true(bool(vw["parts"][1]["done"]), "the orchard road reads done")
+	assert_false(bool(vw["parts"][0]["done"]), "the search is still open")
+	pend = []
+	for t in Tracker.pending_targets(vw):
+		pend.append(String(t["id"]))
+	assert_eq(pend, ["hr_conservatory", "hr_quarry", "hr_manor_grounds"], "the lit road's place is no longer marked")
 
 
 func test_after_chapter_two_a_signpost_never_the_legacy_header() -> void:
@@ -376,7 +432,7 @@ func test_tracker_node_follows_every_stage() -> void:
 	var vrows: Array = Tracker.objective_view()["rows"]
 	assert_eq(rows.size(), vrows.size(), "one row per objective row (pooled rows reused, extras hidden)")
 	assert_eq(_labels(rows), _labels(vrows))
-	var lamps := _counted(vrows)
+	var lamps := _counted(_road_rows(vrows))
 	assert_eq(lamps.size(), 3, "three lamp rows")
 	var done_by_label := {}
 	for r in rows:

@@ -7,6 +7,10 @@ extends Control
 
 signal close_requested
 
+## Room kept on each side of the title ribbon, so a long title never runs into the round close button (visual QA
+## UI-10: "Echo Trial: The Last Waltz (a remembered challenge)" was wider than its card).
+const RIBBON_SIDE_CLEAR := 84.0
+
 const Kit := preload("res://src/ui/ui_kit.gd")
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -19,6 +23,9 @@ var args: Dictionary = {}
 var title: String = ""
 var dim_background: bool = true
 var window_min := Vector2(1100, 700)
+## Screen height (canvas px) kept free at the bottom when centring the window, e.g. the HUD hotbar under a panel
+## that does not dim the world (companion menu, visual QA UI-12). 0 = centre on the whole screen.
+var bottom_reserve: float = 0.0
 var show_close: bool = true
 var window: PanelContainer
 var body: VBoxContainer
@@ -49,6 +56,7 @@ func _ready() -> void:
 	_frame.add_child(window)
 	if title != "":
 		window.set_ribbon(title)
+	_fit_ribbon()
 	body = Kit.vbox(14)
 	window.add_child(body)
 	if show_close:
@@ -105,6 +113,18 @@ func set_title(text: String) -> void:
 	title = text
 	if window != null:
 		window.set_ribbon(text)
+		_fit_ribbon()
+
+
+## Widens the window (never narrows it below window_min) so the ribbon keeps RIBBON_SIDE_CLEAR on both sides.
+func _fit_ribbon() -> void:
+	if window == null:
+		return
+	var rb: Variant = window.get("ribbon")
+	var need := window_min.x
+	if rb is Control and title != "":
+		need = maxf(need, (rb as Control).get_combined_minimum_size().x + RIBBON_SIDE_CLEAR * 2.0)
+	window.custom_minimum_size.x = need
 
 
 ## Plays the closing animation then frees the panel.
@@ -130,6 +150,9 @@ func _layout_window() -> void:
 	sz = sz.max(ms.min(avail))
 	window.size = sz
 	window.position = ((avail - sz) * 0.5).round()
+	if bottom_reserve > 0.0:
+		# centred in the space above the reserve, but never pushed above the ribbon's clearance
+		window.position.y = maxf(minf(window.position.y, round((avail.y - bottom_reserve - sz.y) * 0.5)), 30.0)
 	if window.position.y < 30.0 and avail.y > sz.y + 30.0:
 		window.position.y = 30.0
 	window.pivot_offset = sz * 0.5

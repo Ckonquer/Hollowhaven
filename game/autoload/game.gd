@@ -39,6 +39,8 @@ const AREA_DEFAULT_RESPAWN := {
 	"hushed_works": "service_landing",
 }
 const THREAT_RADIUS := 20.0                 # an enemy hunting her this close blocks saving and travel
+## Key of an area `zones` entry that marks a helper zone (false = never a map landmark / discovery; is_landmark_zone).
+const ZONE_LANDMARK_KEY := "landmark"
 const COMPANION_PRESENT_RADIUS := 25.0      # support/passives only count this close (spec §5)
 ## The Lantern Road's home destination (always offered once any arch is lit).
 const HAVEN_DESTINATION := {"id": "haven", "name": "The Haven (home)", "area": "surface", "spawn": "haven_respawn"}
@@ -196,13 +198,34 @@ func _process(delta: float) -> void:
 		if z != zone_id:
 			zone_id = z
 			Events.zone_entered.emit(z)
-			# Map discovery (spec §10): every landmark zone entered is remembered per area.
-			if z != "" and GameState.has_method("discover"):
+			# Map discovery (spec §10): every landmark zone entered is remembered per area (helper zones such as
+			# the surface waygate's small safe circle are not landmarks: is_landmark_zone, CH2-010).
+			if z != "" and is_landmark_zone(area, z) and GameState.has_method("discover"):
 				GameState.discover(area_id, z)
 		var safe: bool = area.is_safe_zone(player.global_position) if area.has_method("is_safe_zone") else false
 		if safe != in_safe_zone:
 			in_safe_zone = safe
 			Events.safe_zone_changed.emit(safe)
+
+
+## Is `zone` of area node `a` a map landmark (a discovery when entered)? Every zone is, unless its area registered it
+## as a helper zone: an entry of the area's `zones` (area_base add_zone dictionaries) with ZONE_LANDMARK_KEY = false,
+## e.g. the surface waygate's small safe circle (src/world/surface/annexes.gd, CH2-010). Legacy landmarks, rooms and
+## districts never carry the key, so they all keep counting. "" is never a landmark.
+func is_landmark_zone(a: Node, zone: String) -> bool:
+	if zone == "":
+		return false
+	if a == null or not is_instance_valid(a):
+		return true
+	var zs: Variant = a.get("zones")
+	if not (zs is Array):
+		return true
+	for e in zs:
+		if e is Dictionary and String((e as Dictionary).get("id", "")) == zone:
+			var lm: Variant = (e as Dictionary).get(ZONE_LANDMARK_KEY, true)
+			if lm is bool and not lm:
+				return false
+	return true
 
 
 func _notification(what: int) -> void:
@@ -259,6 +282,7 @@ func _on_close_requested() -> void:
 	Settings.save()
 	if Audio.has_method("stop_all"):
 		Audio.stop_all()
+	release_prefetches()
 	get_tree().quit()
 
 
@@ -543,6 +567,24 @@ func prefetch_area(target_area: String, extra: Array = []) -> int:
 ## True while `path` has an outstanding prefetch request (tests / diagnostics).
 func is_prefetching(path: String) -> bool:
 	return _prefetching.has(path)
+
+
+## Takes back EVERY outstanding prefetch request (waiting for one a loader thread is still compiling) and drops the
+## kept warm-up scripts; returns how many requests it collected. Called on quit (quit_game / closing the window):
+## a threaded request that is never collected with load_threaded_get() leaves the loader's bookkeeping objects
+## behind, and the engine reported them as "N ObjectDB instances were leaked at exit" (CH2-011: e.g. the Reach
+## scene + warm-ups the lit waygate prefetched, or an area scene requested from the title, never travelled to).
+## Safe any time: a later prefetch_area() simply requests again.
+func release_prefetches() -> int:
+	var n := 0
+	for key in _prefetching.keys():
+		var path := String(key)
+		_prefetching.erase(path)
+		if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			ResourceLoader.load_threaded_get(path)      # result dropped (freed unless something else holds it)
+			n += 1
+	_warm_refs.clear()
+	return n
 
 
 func _request_prefetch(path: String) -> bool:
@@ -1259,9 +1301,12 @@ func quit_to_title() -> void:
 	goto_title()
 
 
+## Pause menu / title "Quit Game": keeps the settings, silences the audio (Audio.stop_all also takes back its music
+## prefetches), takes back this autoload's own outstanding area prefetches (release_prefetches, CH2-011) and quits.
 func quit_game() -> void:
 	Settings.save()
 	if Audio.has_method("stop_all"):
 		Audio.stop_all()
+	release_prefetches()
 	await get_tree().process_frame
 	get_tree().quit()

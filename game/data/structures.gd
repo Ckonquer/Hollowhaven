@@ -23,8 +23,23 @@ extends RefCounted
 ##   support           true: counts as support for an upper floor above it (legacy walls count by rule)
 ##   level_ok          true: may also be placed on an upper floor (default false = ground storey only)
 ##   mount             "wall": a thin decoration whose model hugs the back edge (-Z) of its cell, so it sits
-##                     flush against the wall panel behind it (curtains, flower boxes, bunting, trim)
-##   tintable          true: can be recoloured in place with an unlocked dye palette (data.tint), uid kept
+##                     flush against the wall panel behind it (curtains, flower boxes, bunting, trim). It can only be
+##                     placed where a wall panel of its storey stands on that back edge (src/building/placement.gd
+##                     mount_reason; build mode snaps it onto the nearest wall and turns its back to it), and that
+##                     wall can't be taken down while something hangs on it
+##   mount_on          wall pieces: the panel kinds it may hang on (default ["wall"]): "wall" (plain wall), "window"
+##                     (round window walls), "arch" (arched window), "door" (doorway), "half" (half wall)
+##   mount_centre      true: on a window panel the model shifts half a metre so it centres on the 2 m window (one per
+##                     window side); on a plain wall it stays on its own cell
+##   mount_pair        true: on a window panel the model is drawn as one half of a pair framing the window (curtains:
+##                     one drape on the side away from the window, the rail running over it)
+##   sill              true: sits under a window's sill, so it can't go on the front of the Chapter One Window Wall
+##                     (that window has its own flower box there)
+##   panel             edge pieces: what wall-mounted decor sees ("wall" | "window" | "arch" | "door" | "half"); the
+##                     Chapter One walls are mapped in placement.gd (their entries never change)
+##   tintable          true: can be recoloured in place with an unlocked dye palette (data.tint), uid kept. Only the
+##                     piece's own colour family is dyed (wood, or its main colour), accents keep theirs (tints.gd)
+##   tint_family       "main": recolouring dyes the piece's main colour even when it has some wood (companion bed)
 ##   interact          new values: "wardrobe" (mirror & wardrobe), "nook" (companion bed/perch), "board"
 ##                     (expedition board), "music" (music box), "face" (pumpkin lantern face picker)
 ##   queue             furnace: max queued jobs (data.queue / data.output live in the structure record)
@@ -57,14 +72,14 @@ const STRUCTURES := {
 	"wood_stairs": {"name": "Wooden Stairs", "item": "wood_stairs", "layer": "stair", "snap": "stair2", "size": Vector2i(2, 4), "height": 3.0, "solid": true, "interact": "", "stairs": true, "tintable": true},
 	"upper_floor": {"name": "Upper Floor", "item": "upper_floor", "layer": "floor", "snap": "floor2", "size": Vector2i(2, 2), "height": 0.2, "solid": true, "interact": "", "upper": true, "level_ok": true, "tintable": true},
 	"wood_railing": {"name": "Railing", "item": "wood_railing", "layer": "edge", "snap": "edge2", "size": Vector2i(2, 1), "height": 1.0, "solid": true, "interact": "", "level_ok": true, "tintable": true},
-	"half_wall": {"name": "Half Wall", "item": "half_wall", "layer": "edge", "snap": "edge2", "size": Vector2i(2, 1), "height": 1.2, "solid": true, "interact": "", "level_ok": true, "tintable": true},
+	"half_wall": {"name": "Half Wall", "item": "half_wall", "layer": "edge", "snap": "edge2", "size": Vector2i(2, 1), "height": 1.2, "solid": true, "interact": "", "level_ok": true, "tintable": true, "panel": "half"},
 	"porch_post": {"name": "Porch Post", "item": "porch_post", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 3.0, "solid": true, "interact": "", "support": true, "level_ok": true, "tintable": true},
-	"arched_window": {"name": "Arched Window", "item": "arched_window", "layer": "edge", "snap": "edge2", "size": Vector2i(2, 1), "height": 3.0, "solid": true, "interact": "", "support": true, "level_ok": true, "tintable": true},
+	"arched_window": {"name": "Arched Window", "item": "arched_window", "layer": "edge", "snap": "edge2", "size": Vector2i(2, 1), "height": 3.0, "solid": true, "interact": "", "support": true, "level_ok": true, "tintable": true, "panel": "arch"},
 	"gable_roof": {"name": "Gable Roof", "item": "gable_roof", "layer": "roof", "snap": "roof2", "size": Vector2i(2, 2), "height": 1.8, "solid": true, "interact": "", "level_ok": true, "tintable": true},
 	"roof_corner": {"name": "Roof Corner", "item": "roof_corner", "layer": "roof", "snap": "roof2", "size": Vector2i(2, 2), "height": 1.2, "solid": true, "interact": "", "level_ok": true, "tintable": true},
 	# --- Cozy furniture -------------------------------------------------------------------------------------
-	"flower_box": {"name": "Window Flower Box", "item": "flower_box", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.5, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true},
-	"curtain": {"name": "Curtains", "item": "curtain", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.4, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true},
+	"flower_box": {"name": "Window Flower Box", "item": "flower_box", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 1.15, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true, "mount_on": ["wall", "window", "arch"], "mount_centre": true, "sill": true},
+	"curtain": {"name": "Curtains", "item": "curtain", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.4, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true, "mount_on": ["wall", "window", "arch"], "mount_pair": true},
 	"bookshelf": {"name": "Bookshelf", "item": "bookshelf", "layer": "object", "snap": "cell", "size": Vector2i(2, 1), "height": 2.0, "solid": true, "interact": "", "level_ok": true, "tintable": true},
 	"wardrobe": {"name": "Wardrobe", "item": "wardrobe", "layer": "object", "snap": "cell", "size": Vector2i(2, 1), "height": 2.2, "solid": true, "interact": "wardrobe", "level_ok": true, "tintable": true},
 	"vanity_mirror": {"name": "Vanity Mirror", "item": "vanity_mirror", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 1.8, "solid": true, "interact": "wardrobe", "level_ok": true, "tintable": true},
@@ -72,7 +87,7 @@ const STRUCTURES := {
 	"furnace": {"name": "Furnace", "item": "furnace", "layer": "object", "snap": "cell", "size": Vector2i(2, 1), "height": 1.8, "solid": true, "interact": "station", "station": "furnace", "queue": 4,
 		"light": {"color": Color("ff9a52"), "energy": 0.9, "range": 4.0}},
 	"loom": {"name": "Loom & Dye Bench", "item": "loom", "layer": "object", "snap": "cell", "size": Vector2i(2, 1), "height": 1.6, "solid": true, "interact": "station", "station": "loom", "level_ok": true, "tintable": true},
-	"companion_bed": {"name": "Companion Bed", "item": "companion_bed", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.4, "solid": false, "interact": "nook", "level_ok": true, "tintable": true},
+	"companion_bed": {"name": "Companion Bed", "item": "companion_bed", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.4, "solid": false, "interact": "nook", "level_ok": true, "tintable": true, "tint_family": "main"},
 	"companion_perch": {"name": "Companion Perch", "item": "companion_perch", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 1.4, "solid": false, "interact": "nook", "level_ok": true, "tintable": true},
 	"sturdy_planter": {"name": "Sturdy Planter", "item": "sturdy_planter", "layer": "object", "snap": "cell", "size": Vector2i(2, 1), "height": 0.6, "solid": false, "interact": "farm", "tintable": true},
 	"cottage_bench": {"name": "Cottage Bench", "item": "cottage_bench", "layer": "object", "snap": "cell", "size": Vector2i(2, 1), "height": 0.9, "solid": true, "interact": "", "level_ok": true, "tintable": true},
@@ -85,19 +100,19 @@ const STRUCTURES := {
 		"light": {"color": Color("ffe2a0"), "energy": 1.5, "range": 7.0}},
 	"miner_lamp": {"name": "Miner's Lamp", "item": "miner_lamp", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 1.6, "solid": false, "interact": "", "level_ok": true,
 		"light": {"color": Color("ffc978"), "energy": 1.3, "range": 6.0}},
-	"thread_veil": {"name": "Thread Veil", "alt_name": "Pale Veil Drape", "item": "thread_veil", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.4, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true},
+	"thread_veil": {"name": "Thread Veil", "alt_name": "Pale Veil Drape", "item": "thread_veil", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.4, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true, "mount_on": ["wall"]},
 	# --- Halloween decor (optional; nothing here ever becomes hostile) ----------------------------------------
 	"pumpkin_lantern": {"name": "Carved Pumpkin", "item": "pumpkin_lantern", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.6, "solid": false, "interact": "face", "level_ok": true,
 		"faces": ["friendly", "sleepy", "toothy", "cat", "moon", "ghost"], "light": {"color": Color("ffae4a"), "energy": 1.1, "range": 5.0}},
-	"pumpkin_lights": {"name": "Pumpkin String Lights", "item": "pumpkin_lights", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.4, "solid": false, "interact": "", "mount": "wall", "level_ok": true,
+	"pumpkin_lights": {"name": "Pumpkin String Lights", "item": "pumpkin_lights", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.4, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "mount_on": ["wall", "window"],
 		"light": {"color": Color("ffb862"), "energy": 0.7, "range": 4.0}},
-	"bat_bunting": {"name": "Bat Bunting", "item": "bat_bunting", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.6, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true},
+	"bat_bunting": {"name": "Bat Bunting", "item": "bat_bunting", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.6, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true, "mount_on": ["wall", "window"]},
 	"ghost_lantern": {"name": "Ghost Lantern", "item": "ghost_lantern", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 1.8, "solid": false, "interact": "", "level_ok": true,
-		"light": {"color": Color("bcd6ff"), "energy": 1.0, "range": 5.0}},
-	"crescent_window": {"name": "Crescent Window", "item": "crescent_window", "layer": "edge", "snap": "edge2", "size": Vector2i(2, 1), "height": 3.0, "solid": true, "interact": "", "support": true, "level_ok": true, "tintable": true},
+		"light": {"color": Color("bcd6ff"), "energy": 1.4, "range": 5.5}},
+	"crescent_window": {"name": "Crescent Window", "item": "crescent_window", "layer": "edge", "snap": "edge2", "size": Vector2i(2, 1), "height": 3.0, "solid": true, "interact": "", "support": true, "level_ok": true, "tintable": true, "panel": "window"},
 	"candy_bowl": {"name": "Candy Bowl", "item": "candy_bowl", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 0.5, "solid": false, "interact": "", "level_ok": true, "tintable": true},
 	"scarecrow": {"name": "Scarecrow", "item": "scarecrow", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 2.2, "solid": true, "interact": ""},
-	"gothic_trim": {"name": "Gothic Porch Trim", "item": "gothic_trim", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 3.0, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true},
+	"gothic_trim": {"name": "Gothic Porch Trim", "item": "gothic_trim", "layer": "object", "snap": "cell", "size": Vector2i(1, 1), "height": 3.0, "solid": false, "interact": "", "mount": "wall", "level_ok": true, "tintable": true, "mount_on": ["wall"]},
 }
 
 ## Crops grown in crop plots. grow_minutes = in-game minutes from planting to ripe

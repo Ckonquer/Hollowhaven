@@ -70,6 +70,12 @@ func _ready() -> void:
 
 
 ## Height of the body above the surface (used to hang it from ceilings / place it on floors).
+## The abdomen pivot (it bobs and tips with the poses): the Crossing Matron's look fits its ember scar onto it.
+## Read-only accessor; the Chapter One look is unchanged.
+func abdomen_node() -> Node3D:
+	return _abdomen
+
+
 func body_height() -> float:
 	return BODY_Y * size_scale
 

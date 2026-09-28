@@ -15,6 +15,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
+const CreatureFx := preload("res://src/enemies/creature_fx.gd")
 
 const HIP_Y := 1.0
 const BARK := Color("6e5236")
@@ -25,7 +26,8 @@ const EYE := Color("ffb14a")
 const CROWN_GLOW := Color("ff7a3d")
 const SWEEP_TINT := Color(1.0, 0.72, 0.25)
 const CHARGE_TINT := Color(0.98, 0.3, 0.2)
-const ROOTS_TINT := Color(0.55, 0.9, 0.4)
+const ROOTS_TINT := Color(0.96, 0.86, 0.62)   # pale root-cream (CR-02: the old green vanished on the meadow); = TelegraphFx.ROOT
+const KNOT := Color("1c130d")
 
 var state: String = "idle"
 var state_len: float = 0.0
@@ -51,6 +53,7 @@ var _crown_on := false
 var _tint_mat: StandardMaterial3D
 var _tint_meshes: Array = []
 var _tint_on := false
+var _tint_level_now: float = 0.0
 
 
 func _ready() -> void:
@@ -62,15 +65,16 @@ func body_height() -> float:
 
 
 func _build() -> void:
-	_tint_mat = HitFx.new_tint()
+	_tint_mat = CreatureFx.new_tint()
 	_root = Node3D.new()
 	_root.name = "Root"
 	add_child(_root)
-	var bark := Mat.outlined(Mat.toon(BARK, {"rim": 0.35, "noise": 0.22}), 0.018)
-	var bark_dark := Mat.outlined(Mat.toon(BARK_DARK, {"rim": 0.3, "noise": 0.22}), 0.016)
-	var bark_light := Mat.outlined(Mat.toon(BARK_LIGHT, {"rim": 0.4, "noise": 0.2}), 0.016)
-	var thorn := Mat.outlined(Mat.toon(THORN, {"rim": 0.3}), 0.01)
-	var moss := Mat.outlined(Mat.toon(Palette.MOSS, {"rim": 0.4, "noise": 0.25}), 0.012)
+	# Outlines scaled to its 3 m size (CR-08: the 1 m creatures' 16-18 mm ink line read as none on the Elder)
+	var bark := Mat.outlined(Mat.toon(BARK, {"rim": 0.35, "noise": 0.22}), 0.03)
+	var bark_dark := Mat.outlined(Mat.toon(BARK_DARK, {"rim": 0.3, "noise": 0.22}), 0.026)
+	var bark_light := Mat.outlined(Mat.toon(BARK_LIGHT, {"rim": 0.4, "noise": 0.2}), 0.026)
+	var thorn := Mat.outlined(Mat.toon(THORN, {"rim": 0.3}), 0.014)
+	var moss := Mat.outlined(Mat.toon(Palette.MOSS, {"rim": 0.4, "noise": 0.25}), 0.018)
 	# Root-cluster legs with splayed toes
 	for sx in [-1.0, 1.0]:
 		var leg := Node3D.new()
@@ -112,13 +116,19 @@ func _build() -> void:
 	var head := Kit.blob(0.33, bark, 67, 0.12, 0.95, 3)
 	_head.add_child(head)
 	_tint_meshes.append(head)
-	var hole := Mat.toon(Color("1c130d"), {"rim": 0.0, "noise": 0.0})
+	# Knot-hole face (CR-08: the old flat mouth blob read as a duck bill): deep dark sockets ringed by a pale bark
+	# lip, a heavy bark brow over glowing amber eyes, and a round knot-hole mouth with its own ring.
+	var hole := Mat.toon(KNOT, {"rim": 0.0, "noise": 0.0})
+	var lip := Mat.outlined(Mat.toon(BARK_LIGHT, {"rim": 0.4, "noise": 0.2}), 0.012)
 	for sx in [-1.0, 1.0]:
-		Kit.add(_head, Kit.sphere(0.085, hole, 8, 10), Vector3(sx * 0.12, 0.05, -0.27), Vector3.ZERO, Vector3(1.0, 0.8, 0.5))
-		var eye := Kit.sphere(0.04, Mat.glow(EYE, 2.0), 6, 8)
+		Kit.add(_head, Kit.sphere(0.09, hole, 8, 10), Vector3(sx * 0.13, 0.04, -0.3), Vector3.ZERO, Vector3(1.0, 0.85, 0.45))
+		Kit.add(_head, Kit.torus(0.075, 0.12, lip), Vector3(sx * 0.13, 0.04, -0.31), Vector3(90, 0, 0), Vector3(1.0, 1.0, 0.85))
+		var eye := Kit.sphere(0.05, Mat.glow(EYE, 2.2), 8, 10)
 		eye.set_meta("no_flash", true)
-		Kit.add(_head, eye, Vector3(sx * 0.12, 0.05, -0.3))
-	Kit.add(_head, Kit.sphere(0.09, hole, 8, 10), Vector3(0, -0.14, -0.27), Vector3.ZERO, Vector3(1.4, 0.55, 0.5))
+		Kit.add(_head, eye, Vector3(sx * 0.13, 0.035, -0.33), Vector3.ZERO, Vector3(1.0, 0.8, 0.6))
+	Kit.add(_head, Kit.capsule(0.06, 0.46, bark_dark), Vector3(0, 0.15, -0.3), Vector3(-10, 0, 90))
+	Kit.add(_head, Kit.sphere(0.075, hole, 8, 10), Vector3(0, -0.15, -0.3), Vector3.ZERO, Vector3(1.0, 1.15, 0.45))
+	Kit.add(_head, Kit.torus(0.065, 0.105, lip), Vector3(0, -0.15, -0.31), Vector3(90, 0, 0), Vector3(1.0, 1.0, 1.2))
 	_crown = Node3D.new()
 	_crown.name = "Crown"
 	Kit.add(_head, _crown, Vector3(0, 0.26, 0))
@@ -318,14 +328,16 @@ func _set_crown(on: bool) -> void:
 
 
 func _apply_tint(tint: float, col: Color) -> void:
-	var c := Color(0, 0, 0, 0)
+	# CR-09: a capped wash + a fresnel rim in the tell colour (CreatureFx), so the shading and outlines stay.
+	var on := false
 	if _flash_t > 0.0:
-		c = Color(HitFx.FLASH_COLOR, HitFx.flash_strength(0.75))
-	elif tint > 0.0:
-		c = Color(col, clampf(tint, 0.0, 1.0))
-	var on := c.a > 0.01
-	if on:
-		_tint_mat.albedo_color = c
+		_tint_level_now = HitFx.flash_strength(0.75)
+		CreatureFx.apply_flash(_tint_mat, HitFx.FLASH_COLOR, _tint_level_now)
+		on = true
+	elif tint > 0.01:
+		_tint_level_now = clampf(tint, 0.0, 1.0)
+		CreatureFx.apply_tint(_tint_mat, col, _tint_level_now)
+		on = true
 	if on != _tint_on:
 		_tint_on = on
 		for m in _tint_meshes:

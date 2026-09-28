@@ -231,9 +231,17 @@ func test_phase_thresholds_floor_transition_and_events() -> void:
 	b.start_fight()
 	_recoil(b, d)
 	var mx: float = float(b.health.max_hp)
+	# A huge hit takes one window's cap, no more (QA CH2-013: the cap trims a blow before it lands)...
+	var first: float = float(b.health.apply_damage(9999.0, d, Vector3.FORWARD))
+	assert_almost(first, mx * Boss.WINDOW_CAP, 0.01, "a huge hit is trimmed to the window cap")
+	assert_eq(int(b.phase), 1, "no phase skipped")
+	assert_eq(String(b.state), "glide", "the window is spent")
+	# ...and where the phase threshold is nearer than the cap, the health floor stops it right there.
+	_recoil(b, d)
+	b.health.set_hp(mx * 0.66 + 40.0)
 	var dealt: float = float(b.health.apply_damage(9999.0, d, Vector3.FORWARD))
 	assert_almost(float(b.health.hp), mx * 0.66, 0.01, "a huge hit stops at the phase-B threshold")
-	assert_almost(dealt, mx - mx * 0.66, 0.01)
+	assert_almost(dealt, 40.0, 0.01)
 	assert_eq(int(b.phase), 2)
 	assert_eq(String(b.state), "transition", "a theatrical transition beat")
 	assert_true(bool(b.health.invulnerable), "invulnerable during the transition")
@@ -264,7 +272,7 @@ func test_window_cap_sends_him_back_up() -> void:
 		b.health.apply_damage(18.0, d, Vector3.FORWARD)
 		n += 1
 	assert_ne(String(b.state), "recoil", "the window closes once the cap is reached")
-	assert_true(hp0 - float(b.health.hp) <= mx * Boss.WINDOW_CAP + 18.0 + 0.01, "one window takes at most WINDOW_CAP (+ the last swing)")
+	assert_true(hp0 - float(b.health.hp) <= mx * Boss.WINDOW_CAP + 0.01, "one window takes at most WINDOW_CAP (QA CH2-013: the last swing is trimmed)")
 	assert_eq(String(b.state), "glide")
 	assert_false(bool(b.can_be_hit_by(d)), "he whirled back out of reach")
 

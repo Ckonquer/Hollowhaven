@@ -13,7 +13,7 @@ extends RefCounted
 ## defeat he relights every candle and says his MP §17 line himself. The candles persist nothing. Arachnophobia:
 ## nothing here is spider-like (bats, velvet, candles). Comfort: the only shake / flash comes from the boss (Events).
 ##   static func build(area: Node3D) -> Dictionary   (called by src/world/areas_ch2/echo_trial.gd _ready)
-## Returns {pad, exit, exit_yaw, bounds, zone_center, zone_radius, plate, boss, candles, cover, curtains, fixture,
+## Returns {pad, exit, exit_yaw, bounds, zone_center, zone_radius, plate, plate_width, boss, candles, cover, curtains, fixture,
 ## helper_points, arena_center, arena_radius, entry}.
 ## Lead decision P58 (kept on purpose): the memory starts with all three candles lit and no teaching candle - a trial
 ## replays a fight she has already won (the candle rule was taught in the story), and lit candles keep phases B / C
@@ -32,10 +32,10 @@ const HEIGHT := 9.0
 const WALL_T := 0.5
 const DOOR_HALF := 1.6             # the Gallery doors are 3.2 m wide (GALLERY_DOOR)
 const DOOR_H := 3.6
-const CORRIDOR_END := 25.0
+const CORRIDOR_END := 28.0             # 6.2 m behind the pad: the follow camera's full arm fits on arrival (visual QA IN-00)
 const CORRIDOR_H := 4.0
 const PAD_Z := 21.8
-const EXIT_Z := CORRIDOR_END - 0.6
+const EXIT_Z := CORRIDOR_END - 0.14     # the pale door flush against the end wall (echo_trial.gd EXIT_INSET)
 
 const GOLD := Color("d9b25a")
 const CRIMSON := Color("7a1f3a")
@@ -81,7 +81,7 @@ static func build(area: Node3D) -> Dictionary:
 		helpers.append(rel(hp))
 	var out := {"pad": Vector3(0, 0, PAD_Z), "exit": Vector3(0, 0, EXIT_Z), "exit_yaw": PI,
 		"bounds": Rect2(-HALF - 0.5, -HALF - 0.5, (HALF + 0.5) * 2.0, CORRIDOR_END + HALF + 1.0),
-		"zone_center": Vector3(0, 0, 5.0), "zone_radius": 26.0, "plate": Vector3(0, 3.1, PAD_Z - 1.4),
+		"zone_center": Vector3(0, 0, 5.0), "zone_radius": 26.0, "plate": Vector3(0, 3.1, PAD_Z - 1.4), "plate_width": DOOR_HALF * 2.0 - 0.5,
 		"candles": candles, "cover": cover, "curtains": curtains, "fixture": fixture, "helper_points": helpers,
 		"arena_center": Vector3.ZERO, "arena_radius": arena_radius(), "entry": entry_point(), "boss": null}
 	out["boss"] = _spawn_boss(area, out)

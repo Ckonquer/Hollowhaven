@@ -43,11 +43,17 @@ extends Node3D
 ##   * He flies to a lit ward candle and CHANNELS to darken it: stationary, low, in reach. Strike him while he
 ##     channels, or relight a dark candle with the Lantern (any time in this phase): the light STAGGERS him -
 ##     a generous window (x1.5 damage). If the channel completes the candle goes dark (relight it to stagger him).
+##     He hovers BESIDE the candle, square to her line to it, never behind its stand: the stand is a world-layer
+##     body (Combat.LOS_MASK) and would swallow her blow silently. If she steps into the stand's shadow he eases
+##     round the candle until her line is clear (QA CH2-005), otherwise he holds still.
 ##   * The borrowed mask holds: until light has staggered him once in this phase he cannot drop below MASK_FLOOR
 ##     (strong gear helps, but at least one real interaction with the candle rule is required).
 ## Phase changes: a theatrical twirl (invulnerable, TRANSITION s), everything in flight is cleared, the phase event
 ## fires (music layers). A single big hit never skips a phase (the health floor stops at the threshold). One window
-## can take at most WINDOW_CAP of his health, then he whirls back up - no health sponge, no burst skip either.
+## can take at most WINDOW_CAP of his health, then he whirls back up - no health sponge, no burst skip either. The cap
+## is enforced BEFORE a blow lands (velour_health.gd window_room): the last blow of a window is trimmed to fit, never
+## overshoots it (QA CH2-013) - only a blow that defeats him outright lands whole (phase C once the mask is lifted: no
+## sliver of health left to chase). A light stagger opens a fresh window.
 ##
 ## DEFEAT: the enchantment disperses (bats scatter, the borrowed mask falls and fades - no gore). The victory is
 ## COMMITTED FIRST: bar hidden, Events.boss_encounter_changed(false), Events.boss_defeated("count_velour") (the manor
@@ -116,12 +122,19 @@ const DASH_HIT_DY := 1.4
 const DASH_DESCENT := 0.35
 const LANE_REFRESH := 0.1
 const CHANNEL_OFFSET := 1.1
+## QA CH2-005: the channel candle's stand (ward_candle.gd StandBody, r 0.3, on the world layer = Combat.LOS_MASK)
+## must never sit on her line to him. "Blocked" = her line passes within STAND_CLEAR of the candle; he eases round
+## the candle (STAND_EASE_SPEED m/s along the CHANNEL_OFFSET circle) while she is within STAND_SHADOW_RANGE.
+const STAND_CLEAR := 0.6
+const STAND_SHADOW_RANGE := 6.0
+const STAND_EASE_SPEED := 2.6
 const CHANNEL_MAX_DIST := 14.0
 const LEAVE_MARGIN := 6.0
 const LEAVE_TIME := 4.0
 # Rules
 const PHASE_AT := [1.0, 0.66, 0.33]
 const WINDOW_CAP := 0.16
+const WINDOW_EPS := 0.01          # a window within this of the cap counts as spent (no sliver left to "block" a blow)
 const MASK_FLOOR := 0.08          # lifted by the first light stagger; a companion's blow on the channel counts too (kept: lead decision P16)
 const STAGGER_MULT := 1.5
 const REVEAL_MULT := 1.25
@@ -248,6 +261,7 @@ var _channel_cd: float = 0.0
 var _channel_candle: Node3D = null
 var _channel_spot := Vector3.ZERO
 var _channel_from := Vector3.ZERO
+var _channel_side: float = 1.0          # which side of the candle he hovers on (+1 / -1), kept for one channel
 var _glide_target := Vector3.ZERO
 var _glide_wait: float = 0.0
 var _b_step: int = 0
@@ -319,6 +333,7 @@ func _ready() -> void:
 	health.name = "Health"
 	health.max_hp = float(data.get("hp", 380.0))
 	health.invulnerable = true
+	health.window_room = _window_room
 	add_child(health)
 	health.damaged.connect(_on_damaged)
 	health.changed.connect(_on_health_changed)
@@ -531,7 +546,7 @@ func tick(delta: float) -> void:
 					_swarm.call("stop")
 				_reform(_clamp_in_arena(global_position, ARENA_MARGIN), false)
 		"channel_fly":
-			_tick_channel_fly(delta)
+			_tick_channel_fly(delta, p)
 		"channel":
 			_tick_channel(delta, p)
 		"transition":
@@ -1109,12 +1124,8 @@ func _begin_channel(p: Node3D) -> bool:
 	channels_started += 1
 	var cp := c.global_position
 	var pp := p.global_position if p != null else arena_center
-	var away := Vector3(cp.x - pp.x, 0.0, cp.z - pp.z)
-	if away.length_squared() < 0.01:
-		away = Vector3(cp.x - arena_center.x, 0.0, cp.z - arena_center.z)
-	if away.length_squared() < 0.01:
-		away = Vector3(0, 0, -1)
-	_channel_spot = _clamp_in_arena(cp + away.normalized() * CHANNEL_OFFSET, 1.0)
+	_channel_side = _pick_channel_side(cp, pp)
+	_channel_spot = _channel_spot_for(cp, pp)
 	_channel_from = Vector3(global_position.x, _floor_y, global_position.z)
 	_enter("channel_fly", _tt(T_CH_FLY))
 	if _ring_mark != null:
@@ -1126,11 +1137,83 @@ func _begin_channel(p: Node3D) -> bool:
 	return true
 
 
-func _tick_channel_fly(_delta: float) -> void:
+## Where he channels `cp`'s candle from: CHANNEL_OFFSET beside it, square to her line to it (on _channel_side), so
+## her straight approach never runs into the stand (QA CH2-005: straight behind it, the stand ate every blow).
+func _channel_spot_for(cp: Vector3, pp: Vector3) -> Vector3:
+	var side := _channel_perp(cp, pp) * _channel_side
+	return _avoid_cover(_clamp_in_arena(cp + side * CHANNEL_OFFSET, 1.0))
+
+
+## Unit vector square to her line to the candle (XZ).
+func _channel_perp(cp: Vector3, pp: Vector3) -> Vector3:
+	var to_c := Vector3(cp.x - pp.x, 0.0, cp.z - pp.z)
+	if to_c.length_squared() < 0.01:
+		to_c = Vector3(cp.x - arena_center.x, 0.0, cp.z - arena_center.z)
+	if to_c.length_squared() < 0.01:
+		to_c = Vector3(0, 0, -1)
+	to_c = to_c.normalized()
+	return Vector3(-to_c.z, 0.0, to_c.x)
+
+
+## The side of the candle to channel from (once per channel, so re-aiming never flips him across the stand): the
+## side that stays clear of the stand after the arena / cover clamps, then the one nearer him (a short flight).
+func _pick_channel_side(cp: Vector3, pp: Vector3) -> float:
+	var perp := _channel_perp(cp, pp)
+	var here := Vector3(global_position.x, cp.y, global_position.z)
+	var best := 1.0
+	var best_score := INF
+	for s: float in [1.0, -1.0]:
+		var want := cp + perp * s * CHANNEL_OFFSET
+		var got := _avoid_cover(_clamp_in_arena(want, 1.0))
+		var score := _flat(got, want) * 10.0 + _flat(got, here)
+		if _stand_blocks(pp, got, cp):
+			score += 100.0
+		if score < best_score:
+			best_score = score
+			best = s
+	return best
+
+
+## True when the stand of the candle at `cp` sits on the line from `from` to `to` (XZ, within STAND_CLEAR).
+static func _stand_blocks(from: Vector3, to: Vector3, cp: Vector3) -> bool:
+	var ab := Vector2(to.x - from.x, to.z - from.z)
+	var ac := Vector2(cp.x - from.x, cp.z - from.z)
+	var l2 := ab.length_squared()
+	if l2 < 0.0001:
+		return ac.length() <= STAND_CLEAR
+	var t := clampf(ac.dot(ab) / l2, 0.0, 1.0)
+	return (ac - ab * t).length() <= STAND_CLEAR
+
+
+## While he channels: if she stands in the stand's shadow within striking distance, he eases round the candle (the
+## short way, on his CHANNEL_OFFSET circle) until her line to him is clear - otherwise he holds still (QA CH2-005).
+func _ease_clear_of_stand(delta: float, p: Node3D) -> void:
+	if p == null or not is_instance_valid(p) or _channel_candle == null or not is_instance_valid(_channel_candle):
+		return
+	var cp := _channel_candle.global_position
+	var pp := p.global_position
+	var bp := global_position
+	if _flat(pp, bp) > STAND_SHADOW_RANGE or not _stand_blocks(pp, bp, cp):
+		return
+	var rel := Vector2(bp.x - cp.x, bp.z - cp.z)
+	var toward := Vector2(pp.x - cp.x, pp.z - cp.z)
+	var cr := rel.cross(toward)
+	var dir := signf(cr) if absf(cr) > 0.0001 else _channel_side
+	var r := maxf(rel.length(), CHANNEL_OFFSET)
+	var ang := rel.angle() + dir * STAND_EASE_SPEED / r * delta
+	var np := _clamp_in_arena(Vector3(cp.x + cos(ang) * r, _floor_y, cp.z + sin(ang) * r), 1.0)
+	global_position = Vector3(np.x, _floor_y, np.z)
+	_face_dir(cp - global_position, 1.0)
+
+
+func _tick_channel_fly(_delta: float, p: Node3D) -> void:
 	if _channel_candle == null or not is_instance_valid(_channel_candle) or not bool(_channel_candle.call("is_lit")):
 		_channel_candle = null
 		_enter_glide()
 		return
+	if p != null and is_instance_valid(p):
+		# Re-aimed at her as she moves (same side), so he arrives beside the candle, not behind its stand.
+		_channel_spot = _channel_spot_for(_channel_candle.global_position, p.global_position)
 	var k := clampf(state_time / maxf(_state_len, 0.01), 0.0, 1.0)
 	var e := k * k * (3.0 - 2.0 * k)
 	var at := _channel_from.lerp(_channel_spot, e)
@@ -1143,11 +1226,12 @@ func _tick_channel_fly(_delta: float) -> void:
 		Audio.play_3d("shade_telegraph", get_aim_point(), -5.0, 0.1, 40.0)
 
 
-func _tick_channel(_delta: float, _p: Node3D) -> void:
+func _tick_channel(delta: float, p: Node3D) -> void:
 	if _channel_candle == null or not is_instance_valid(_channel_candle) or not bool(_channel_candle.call("is_lit")):
 		_channel_candle = null
 		_enter_glide()
 		return
+	_ease_clear_of_stand(delta, p)
 	var k := clampf(state_time / maxf(_state_len, 0.01), 0.0, 1.0)
 	if _stream != null:
 		_stream.call("show_link", _channel_candle.call("flame_position"), get_aim_point(), k, true)
@@ -1259,15 +1343,23 @@ func _on_damaged(amount: float, _source: Node, _dir: Vector3) -> void:
 		return
 	match state:
 		"drain_tele", "drain":
-			_break_drain("hit")
-			return
+			_break_drain("hit")          # he is left dazed in reach - unless that blow spent the window (below)
 		"channel":
 			_light_stagger("hit")
-			return
-	if state in VULNERABLE and _window_damage >= health.max_hp * WINDOW_CAP:
+			if state == "stagger":
+				return                   # the stagger opens a fresh window
+	if state in VULNERABLE and _window_damage >= health.max_hp * WINDOW_CAP - WINDOW_EPS:
 		Audio.play_3d("shade_drift", get_aim_point(), -4.0, 0.1, 40.0)
 		Events.caption.emit("[he whirls up out of reach]")
 		_enter_glide()
+
+
+## velour_health.gd window_room: how much more damage the current window may take (checked BEFORE a blow lands, so
+## the last blow of a window is trimmed to fit - QA CH2-013); -1 outside a window (he is armoured there anyway).
+func _window_room() -> float:
+	if health == null or not (state in VULNERABLE):
+		return -1.0
+	return maxf(health.max_hp * WINDOW_CAP - _window_damage, 0.0)
 
 
 func _on_health_changed(_hp: float, _max_hp: float) -> void:

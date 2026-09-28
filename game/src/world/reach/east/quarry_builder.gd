@@ -22,9 +22,9 @@ const LampScript := preload("res://src/world/reach/east/quarry_lamp.gd")
 const ArenaScript := preload("res://src/world/reach/east/warden_arena.gd")
 const NoteScript := preload("res://src/world/reach/east/quarry_note.gd")
 const SpawnerScript := preload("res://src/world/reach/east/guarded_spawner.gd")
+const RP := preload("res://src/world/reach/reach_props.gd")
 
 const DECOR_RANGE := 120.0
-const SIGN_FONT := "res://assets/fonts/Fredoka-Variable.ttf"
 const SMALL_RANGE := 60.0
 
 
@@ -234,24 +234,46 @@ static func _stonework(area: Node, floor_y: float, stone: NV.Merger, crystal: NV
 		faces.append([Shape.to_world(Vector2(um, Q.SHELF_WEST_V)), along_u, (u_end - Q.U_CLIFF) / float(ns), -v3])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("hr_quarry_cliff")
-	for f in faces:
+	var dark_fn := QV.stone_fn(floor_y, Q.COL_ROCK_DARK)
+	var ch := cliff_top - cliff_bot
+	for fi in faces.size():
+		var f: Array = faces[fi]
 		var c: Vector2 = f[0]
 		var bs: Basis = f[1]
 		var w: float = f[2]
 		var out: Vector3 = f[3]
 		var xf := Transform3D(bs, Vector3(c.x, (cliff_top + cliff_bot) * 0.5, c.y))
-		QV.add_block(stone, xf, Vector3(w * 1.1, cliff_top - cliff_bot, 1.7), variant, fn)
-		_box_col(solid, xf, Vector3(w, cliff_top - cliff_bot, 1.5))
+		_box_col(solid, xf, Vector3(w, ch, 1.5))
+		# a dark rock backing through the cliff line (in front of the terrain's steep face), so no pale terrain
+		# teeth show between the boulders; it stops a little under the shelf's rim
+		QV.add_box(stone, Transform3D(bs, Vector3(c.x, (cliff_top - 0.14 + cliff_bot - 0.3) * 0.5, c.y) - out * 0.22), Vector3(w * 1.02, ch + 0.16, 1.1), Q.COL_ROCK_DARK)
+		# a craggy face: one big slab of random width / height / lean, overlapped by a smaller boulder that sits
+		# higher or lower, a little in front or behind (never a row of identical upright beans)
+		var hf := rng.randf_range(0.86, 1.06)
+		var main_h := ch * hf + 0.25
+		var lean := Basis(out.cross(Vector3.UP).normalized(), rng.randf_range(-0.12, 0.12)) * Basis(Vector3.UP, rng.randf_range(-0.2, 0.2))
+		# (kept inside the collider's envelope: the front stays within ~0.1 m of the 1.5 m collision box)
+		var mc := Vector3(c.x, cliff_bot - 0.25 + main_h * 0.5, c.y) + bs.x * rng.randf_range(-0.35, 0.35) + out * rng.randf_range(-0.1, 0.05)
+		QV.add_block(stone, Transform3D(lean * bs, mc), Vector3(w * rng.randf_range(1.25, 1.6), main_h, rng.randf_range(1.5, 1.75)), variant, fn)
 		variant += 1
-		# a pale crystal seam slanting across every other face
-		if variant % 2 == 0:
-			var face := Vector3(c.x, 0.0, c.y) + out * 0.82
-			var y0 := l2 + rng.randf_range(0.8, 2.2)
-			for j in 3:
-				var p := face + bs.x * rng.randf_range(-0.6, 0.6) + Vector3(0, y0 + float(j) * 0.55, 0)
-				var tilt := Basis(bs.z, rng.randf_range(0.5, 1.1)) * Basis(bs.x, rng.randf_range(-0.4, 0.4))
-				var h := rng.randf_range(0.35, 0.7)
-				crystal.add(NV._cyl(0.07, 0.09, h, 6), Transform3D(tilt, p), Q.COL_CRYSTAL.lerp(Q.COL_CRYSTAL_DEEP, rng.randf() * 0.5))
+		var sh := ch * rng.randf_range(0.35, 0.6)
+		var up := rng.randf() < 0.5
+		var sy: float = (cliff_top - sh * 0.5 + 0.1) if up else (cliff_bot + sh * 0.5)
+		var sc := Vector3(c.x, sy, c.y) + bs.x * (w * 0.5 * (1.0 if fi % 2 == 0 else -1.0)) + out * rng.randf_range(0.0, 0.15)
+		QV.add_block(stone, Transform3D(Basis(Vector3.UP, rng.randf_range(-0.5, 0.5)) * bs, sc), Vector3(w * rng.randf_range(0.55, 0.85), sh, rng.randf_range(1.2, 1.5)), variant + 2, dark_fn if fi % 3 == 0 else fn)
+		variant += 1
+		# scree at the foot of the join with the next face: hides the terrain's pale slope between the boulders
+		var foot := Vector3(c.x, cliff_bot + 0.35, c.y) + bs.x * (w * 0.5) + out * rng.randf_range(0.3, 0.4)
+		QV.add_boulder(stone, foot, rng.randf_range(0.55, 0.65), 120 + fi, rng.randf() * TAU, dark_fn, 0.75)
+		# a pale crystal seam on a few faces only: one or two stubby crystals, never an even row of marks
+		if posmod(hash("seam|%d" % fi), 4) == 0:
+			var face := Vector3(c.x, 0.0, c.y) + out * 0.85
+			var y0 := l2 + rng.randf_range(1.0, 2.6)
+			for j in 1 + fi % 2:
+				var p := face + bs.x * rng.randf_range(-0.7, 0.7) + Vector3(0, y0 + float(j) * 0.45, 0)
+				var tilt := Basis(bs.z, rng.randf_range(0.4, 1.2)) * Basis(bs.x, rng.randf_range(-0.5, 0.5))
+				var h := rng.randf_range(0.3, 0.55)
+				crystal.add(NV._cyl(0.06, 0.1, h, 6), Transform3D(tilt, p), Q.COL_CRYSTAL.lerp(Q.COL_CRYSTAL_DEEP, 0.3 + rng.randf() * 0.5))
 	# 4) crown wall on the shelf rim: the upper shelf is reached ONLY by the gangway (never from outside)
 	var crown_r := 29.0
 	var a_steps := 44
@@ -328,24 +350,10 @@ static func _yard(root: Node3D, area: Node, floor_y: float, wood: NV.Merger, met
 	QV.add_box(wood, Transform3D(Basis(sside, Vector3.UP, sside.cross(Vector3.UP).normalized()), sgb + Vector3(0, 1.55, 0)), Vector3(1.8, 0.6, 0.08), Palette.WOOD_LIGHT)
 	QV.add_bell(metal, Transform3D(Basis(), sgb + sside * 0.95 + Vector3(0, 1.95, 0)), 0.45)
 	_box_col(wood_solid, Transform3D(Basis(sside, Vector3.UP, sside.cross(Vector3.UP).normalized()), sgb + Vector3(0, 1.0, 0)), Vector3(1.8, 2.0, 0.25))
-	var lbl := Label3D.new()
-	lbl.name = "SignText"
-	lbl.text = "Ashbell Quarry"
-	lbl.font_size = 44
-	lbl.pixel_size = 0.0075
-	lbl.modulate = Color("5a3a2a")
-	lbl.outline_size = 0
-	lbl.double_sided = false
-	if ResourceLoader.exists(SIGN_FONT):
-		var f: Variant = load(SIGN_FONT)
-		if f is Font:
-			lbl.font = f
-	root.add_child(lbl)
-	lbl.transform = Transform3D(Basis(sside, Vector3.UP, sside.cross(Vector3.UP).normalized()).rotated(Vector3.UP, PI), sgb + Vector3(0, 1.57, 0) + sface * 0.06)
-	var lbl2: Label3D = lbl.duplicate()
-	lbl2.name = "SignTextBack"
-	root.add_child(lbl2)
-	lbl2.transform = Transform3D(Basis(sside, Vector3.UP, sside.cross(Vector3.UP).normalized()), sgb + Vector3(0, 1.57, 0) - sface * 0.06)
+	# the lettering faces outward on both sides of the board and fits inside it (the shared sign helper)
+	var board_b := Basis(sside, Vector3.UP, sside.cross(Vector3.UP).normalized())
+	RP.sign_text(root, "Ashbell Quarry", Transform3D(board_b, sgb + Vector3(0, 1.55, 0)), Vector2(1.8, 0.6), 0.08,
+		{"font_size": 64, "px": 0.0075, "margin": 0.12, "color": Color("5a3a2a"), "outline_color": Color("f3e3c3"), "outline": 6})
 	# lantern posts along the haul road + bunting across it
 	var glass_at: Array = []
 	for lp in Q.LANTERN_POSTS:
@@ -407,13 +415,10 @@ static func _landmarks(area: Node, floor_y: float, metal: NV.Merger, stone: NV.M
 	var bw := Shape.to_world(Q.ASHBELL)
 	var bg := ground(area, bw)
 	var tilt := Basis(Vector3.UP, 0.7) * Basis(Vector3.RIGHT, 0.5)
-	var bronze := Q.COL_BRONZE.darkened(0.12)
-	# bell body (a big flared cylinder, crown and lip), sunk ~1 m into the bench, with a dark crack
-	metal.add(NV._cyl(0.95, 1.65, 2.2, 20), Transform3D(tilt, bg + tilt * Vector3(0, 0.55, 0)), bronze)
-	metal.add(NV._hemi(0.95, 0.8, 18), Transform3D(tilt, bg + tilt * Vector3(0, 1.62, 0)), bronze.lightened(0.08))
-	metal.add(NV._cyl(1.72, 1.72, 0.22, 20), Transform3D(tilt, bg + tilt * Vector3(0, -0.5, 0)), bronze.darkened(0.15))
-	metal.add(NV._box(Vector3(0.08, 1.5, 0.05)), Transform3D(tilt * Basis(Vector3.BACK, 0.25), bg + tilt * Vector3(0.9, 0.7, 1.05)), Color("3b2a22"))
-	metal.add(NV._cyl(0.2, 0.2, 0.5, 8), Transform3D(tilt, bg + tilt * Vector3(0, 2.1, 0)), bronze.darkened(0.25))
+	# the cracked bell, half sunk and leaning: a true bell profile (shoulder, waist, flared lip), bronze with patina,
+	# its crown loop and a dark zig-zag crack on the side that faces the yard (QV.add_ashbell)
+	var yard := Vector3(Q.ARCH.x - bw.x, 0.0, Q.ARCH.y - bw.y).normalized()
+	QV.add_ashbell(metal, Transform3D(tilt, bg), tilt.inverse() * yard)
 	for k in 5:
 		var a := TAU * float(k) / 5.0 + 0.4
 		QV.add_boulder(stone, bg + Vector3(cos(a) * 1.9, 0.05, sin(a) * 1.9), 0.45 + 0.1 * float(k % 2), 60 + k, a, fn, 0.6)

@@ -20,6 +20,7 @@ const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const Art := preload("res://src/world/works/deep/deep_art.gd")
+const WEB_SHADER := preload("res://shaders/below_web.gdshader")
 
 const REGROW_SECONDS := 40.0
 const REGROW_ASSIST_SECONDS := 150.0
@@ -301,23 +302,88 @@ func _line(parent: Node3D, a: Vector3, b: Vector3, radius: float, mat: Material)
 	mi.transform = Transform3D(Basis(side, up * length, fwd), (a + b) * 0.5)
 
 
+## Silk, not a card (VISUAL_BUGS IN-07 / CR-12): the old backing sheet (an unshaded 20 % white box) read as an
+## opaque bedsheet once blended. The veil is now real web: round webs drawn by Chapter One's cobweb shader
+## (res://shaders/below_web.gdshader, a little bolder here so the blocker reads across a room), tiled along the
+## opening so each one spans the full height, tied to the frame by sagging anchor threads, with silk tufts at
+## the corners. Thick veils get a second, denser layer and heavier cords.
+static var _web_mats: Dictionary = {}
+
+
+static func web_material(thick_web: bool) -> ShaderMaterial:
+	var key := "thick" if thick_web else "web"
+	if not _web_mats.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = WEB_SHADER
+		m.set_shader_parameter("web_color", Palette.SILK_WEB)
+		m.set_shader_parameter("opacity", 0.95 if thick_web else 0.85)
+		m.set_shader_parameter("glow", 0.32 if thick_web else 0.26)
+		m.set_shader_parameter("line_px", 1.6 if thick_web else 1.3)
+		m.set_shader_parameter("ring_spacing", 0.045 if thick_web else 0.055)
+		_web_mats[key] = m
+	return _web_mats[key]
+
+
+static func _web_quad() -> QuadMesh:
+	if not _web_mats.has("quad"):
+		var q := QuadMesh.new()
+		q.size = Vector2.ONE
+		_web_mats["quad"] = q
+	return _web_mats["quad"]
+
+
+## A sagging thread from a to b (a few straight segments along a shallow catenary).
+func _sag_line(parent: Node3D, a: Vector3, b: Vector3, sag: float, radius: float, mat: Material) -> void:
+	var prev := a
+	for i in 4:
+		var t := float(i + 1) / 4.0
+		var p := a.lerp(b, t) + Vector3.DOWN * sag * 4.0 * t * (1.0 - t)
+		_line(parent, prev, p, radius, mat)
+		prev = p
+
+
 func _build_web(rng: RandomNumberGenerator) -> void:
 	var mat := _strand_mat()
 	var hw := width * 0.5
-	var r := 0.016 if not thick else 0.03
-	var count := 7 if not thick else 13
-	for i in count:
-		var a := Vector3(rng.randf_range(-hw, hw), height, rng.randf_range(-0.08, 0.08))
-		var b := Vector3(rng.randf_range(-hw, hw), rng.randf_range(0.0, height * 0.3), rng.randf_range(-0.08, 0.08))
-		_line(_vis, a, b, r, mat)
-	for i in (4 if not thick else 8):
-		var y := rng.randf_range(0.5, height - 0.3)
-		_line(_vis, Vector3(-hw, y, 0.0), Vector3(hw, y + rng.randf_range(-0.6, 0.6), 0.0), r, mat)
-	var sheet := Kit.box(Vector3(width * 0.96, height * 0.94, 0.02), Mat.transparent(WEB_SHEER if not thick else Color(WEB_SHEER, 0.42), true))
-	sheet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	Kit.add(_vis, sheet, Vector3(0.0, height * 0.5, 0.0))
+	var r := 0.012 if not thick else 0.022
+	var tiles := maxi(int(ceilf(width / (height * 1.15))), 1)
+	var seg := width / float(tiles)
+	var size := minf(maxf(seg, height) * 1.1, height * 1.12)
+	var layers := 2 if thick else 1
+	var hubs: Array = []
+	for layer in layers:
+		for i in tiles:
+			var cx := -hw + seg * (float(i) + 0.5) + rng.randf_range(-0.08, 0.08) * seg
+			var q := MeshInstance3D.new()
+			q.name = "Web%d" % (layer * tiles + i)
+			q.mesh = _web_quad()
+			q.material_override = web_material(thick)
+			q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var s := size * (1.0 if layer == 0 else 0.92)
+			q.transform = Transform3D(Basis(Vector3.FORWARD, rng.randf_range(-0.4, 0.4)).scaled_local(Vector3(s, s, 1.0)), Vector3(cx, height * 0.5, float(layer) * 0.05 - 0.02))
+			var hub := Vector2(rng.randf_range(0.42, 0.58), rng.randf_range(0.4, 0.56))
+			q.set_instance_shader_parameter("seed", rng.randf_range(0.0, 100.0))
+			q.set_instance_shader_parameter("hub", hub)
+			q.set_instance_shader_parameter("density", 1.0)
+			_vis.add_child(q)
+			if layer == 0:
+				hubs.append(Vector3(cx, height * 0.5, 0.0))
+	# anchor threads: from the hubs out to the frame corners and the top edge (they sag a little)
+	for i in hubs.size():
+		var h: Vector3 = hubs[i]
+		var left := -hw + seg * float(i)
+		var right := left + seg
+		for corner in [Vector3(left, height - 0.04, 0.0), Vector3(right, height - 0.04, 0.0), Vector3(left, 0.05, 0.0), Vector3(right, 0.05, 0.0)]:
+			_sag_line(_vis, corner, h.lerp(corner, 0.42), 0.05, r, mat)
+	for i in (3 if not thick else 7):
+		var y := rng.randf_range(0.35, height - 0.25)
+		_sag_line(_vis, Vector3(-hw, y, 0.0), Vector3(hw, y + rng.randf_range(-0.3, 0.3), 0.0), rng.randf_range(0.12, 0.3), r, mat)
+	for i in (2 if not thick else 5):
+		var x := rng.randf_range(-hw * 0.85, hw * 0.85)
+		_sag_line(_vis, Vector3(x, height, 0.02), Vector3(x + rng.randf_range(-0.5, 0.5), rng.randf_range(0.0, height * 0.25), 0.02), 0.08, r, mat)
+	for corner in [Vector3(-hw, height - 0.08, 0.0), Vector3(hw, height - 0.08, 0.0), Vector3(-hw, 0.1, 0.0), Vector3(hw, 0.1, 0.0)]:
+		Kit.add(_vis, Kit.sphere(0.08 if not thick else 0.12, mat, 6, 8), corner, Vector3.ZERO, Vector3(1.0, 0.7, 0.6))
 	for sx in [-1.0, 1.0]:
-		Kit.add(_vis, Kit.sphere(0.07, mat, 6, 8), Vector3(sx * hw, height - 0.1, 0.0))
 		Kit.add(_stubs, Kit.cylinder(0.014, 0.014, 0.6, mat, 5), Vector3(sx * (hw - 0.05), height - 0.3, 0.0), Vector3(0, 0, sx * 12.0))
 		Kit.add(_stubs, Kit.cylinder(0.014, 0.014, 0.4, mat, 5), Vector3(sx * (hw - 0.05), 0.25, 0.0), Vector3(0, 0, -sx * 10.0))
 
@@ -327,13 +393,26 @@ func _build_veil(rng: RandomNumberGenerator) -> void:
 	var root := Mat.outlined(Mat.toon(Palette.ROOTS.lightened(0.35), {"rim": 0.4}), 0.012)
 	var bulb := Mat.glow(Color("d9f2c4"), 0.8)
 	var hw := width * 0.5
-	var panels := 3 if not thick else 5
-	for i in panels:
-		var x := lerpf(-hw * 0.66, hw * 0.66, float(i) / maxf(float(panels - 1), 1.0))
-		var h := height * rng.randf_range(0.78, 0.98)
-		var p := Kit.box(Vector3(width / float(panels) * 1.25, h, 0.02), cloth)
-		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		Kit.add(_vis, p, Vector3(x, height - h * 0.5, rng.randf_range(-0.06, 0.06)), Vector3(0, rng.randf_range(-8.0, 8.0), rng.randf_range(-3.0, 3.0)))
+	# ragged hanging strips of pale cloth with gaps between them (whole panels read as paper cards, IN-07)
+	var cloth_b := Mat.transparent(Color(VEIL_SHEER.r * 0.9, VEIL_SHEER.g * 0.88, VEIL_SHEER.b * 0.86, VEIL_SHEER.a if not thick else 0.55), true)
+	var strips := maxi(int(width / 0.42), 5)
+	var sw := width / float(strips)
+	for layer in (2 if thick else 1):
+		for i in strips:
+			var x := -hw + sw * (float(i) + 0.5) + float(layer) * sw * 0.5
+			if x > hw - sw * 0.3:
+				continue
+			var h := height * rng.randf_range(0.62, 0.97)
+			# unit boxes scaled per strip: random sizes never grow the shared mesh cache (fight threads respawn)
+			var p := Kit.box(Vector3.ONE, cloth if (i + layer) % 2 == 0 else cloth_b)
+			p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			Kit.add(_vis, p, Vector3(x, height - h * 0.5, rng.randf_range(-0.05, 0.05) + float(layer) * 0.06), Vector3(rng.randf_range(-6.0, 6.0), rng.randf_range(-10.0, 10.0), rng.randf_range(-3.0, 3.0)), Vector3(sw * rng.randf_range(0.7, 0.92), h, 0.02))
+			# a torn tail under some strips
+			if rng.randf() < 0.45:
+				var tl := rng.randf_range(0.15, 0.35) * height
+				var tail := Kit.box(Vector3.ONE, cloth)
+				tail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				Kit.add(_vis, tail, Vector3(x + rng.randf_range(-0.3, 0.3) * sw, height - h - tl * 0.45, rng.randf_range(-0.04, 0.04) + float(layer) * 0.06), Vector3(0, 0, rng.randf_range(-8.0, 8.0)), Vector3(sw * 0.3, tl, 0.02))
 	Kit.add(_vis, Kit.cylinder(0.035, 0.035, width, root, 6), Vector3(0.0, height - 0.05, 0.0), Vector3(0, 0, 90))
 	for i in (4 if not thick else 7):
 		var x := rng.randf_range(-hw * 0.9, hw * 0.9)

@@ -19,6 +19,7 @@ const TABS := [["all", "All recipes"], ["hand", "By Hand"], ["workbench", "Workb
 	["furnace", "Furnace"], ["loom", "Loom"], ["kitchen", "Kitchen"]]
 const LIST_HEIGHT := 640.0
 const LIST_HEIGHT_WITH_QUEUE := 330.0
+const QUEUE_STATUS_W := 90.0          # furnace queue: "20 s" / "waiting" column width
 
 var stations: Array = ["hand"]
 var filter := "all"
@@ -492,7 +493,10 @@ func _refresh_queue() -> void:
 		pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(pb)
-		row.add_child(Kit.label("%d s" % int(ceilf(float(j["remaining"]))) if bool(j["active"]) else "waiting", "Small"))
+		# a fixed-width status column, so every bar in the queue is the same length (visual QA UI-13)
+		var st := Kit.label("%d s" % int(ceilf(float(j["remaining"]))) if bool(j["active"]) else "waiting", "Small", HORIZONTAL_ALIGNMENT_RIGHT)
+		st.custom_minimum_size = Vector2(QUEUE_STATUS_W, 0)
+		row.add_child(st)
 		queue_box.add_child(row)
 	var out: Dictionary = p["output"]
 	var ready := Kit.hbox(12)

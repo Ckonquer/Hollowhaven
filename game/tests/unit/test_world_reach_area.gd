@@ -14,6 +14,7 @@ const Vegetation := preload("res://src/world/reach/reach_vegetation.gd")
 const Conservatory := preload("res://src/world/reach/conservatory.gd")
 const Logic := preload("res://src/player/player_logic.gd")
 const Districts := preload("res://src/world/reach/reach_districts.gd")
+const ResourceNode := preload("res://src/world/common/resource_node.gd")
 
 const SAFE_SPAWNS := ["waygate_arrival", "reach_respawn", "commons_arch", "orchard_arch", "quarry_arch", "manor_arch", "conservatory"]
 const LEGAL_TARGETS := {"surface": ["waygate"], "moonveil_manor": ["manor_entry"], "hushed_works": ["service_landing", "refuge"]}
@@ -658,6 +659,40 @@ func test_ys_bellhouse_prefetches_the_works_once_near_the_open_stair() -> void:
 	bh.apply_state()
 	w.road_lights.set_lit_instant(w.road_lights.should_be_lit())
 	w.conservatory.pedestal.refresh()
+
+
+## CH2-002 in the built region: felling a real Reach tree (hr_tree_847 by the quarry arch, the QA bot's tree) drops
+## its top, leaves the stump and brings it back on its respawn timer in the same session; a stick and a fiber tuft
+## (the other custom forage visuals) take the same path. Any SCRIPT ERROR fails the test (runner).
+func test_yt_reach_trees_fell_and_respawn_in_the_same_session() -> void:
+	var w: Node3D = await _world()
+	var veg: Node = w.vegetation
+	var nodes: Dictionary = veg.resource_nodes
+	var tree_id := "hr_tree_847" if nodes.has("hr_tree_847") else String(veg.plan_data["trees"][0]["id"])
+	var picks: Array = [nodes[tree_id], nodes[String(veg.plan_data["sticks"][0]["id"])], nodes[String(veg.plan_data["fibers"][0]["id"])]]
+	var minutes := GameState.total_minutes
+	GameState.give_item("stone_axe", 1)
+	for n in picks:
+		assert_false(n.depleted, "%s starts standing" % n.name)
+		for i in 8:
+			if n.depleted:
+				break
+			n.harvest_hit(null, "stone_axe")
+		assert_true(n.depleted, "%s harvested" % n.name)
+	var tree: Node3D = picks[0]
+	var top: Node3D = tree.get_node("Visual/Top")
+	var stump: Node3D = tree.get_node("Visual/Stump")
+	assert_true(stump.visible, "the stump shows")
+	await wait_seconds(2.5)
+	assert_false(top.visible, "the felled top has fallen and vanished")
+	GameState.total_minutes += 1441.0
+	for n in picks:
+		assert_false(bool(n.get("_busy")), "%s: the depletion animation finished" % n.name)
+		n._process(ResourceNode.RESPAWN_CHECK_SECONDS + 0.1)
+		assert_false(n.depleted, "%s respawned without an area reload" % n.name)
+	assert_true(top.visible and not stump.visible, "the tree stands again")
+	GameState.total_minutes = minutes
+	GameState.take_item("stone_axe", 1)
 
 
 func test_zz_cleanup() -> void:

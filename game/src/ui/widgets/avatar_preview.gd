@@ -13,6 +13,10 @@ extends PanelContainer
 ## `apply_armor(show, equipment)` or `set_show_armor(on)`, `play_anim("idle")`.
 ## krystal_avatar.gd (Wave B) has apply_look(look) (callable before add_child, so she is built once with the
 ## look) and apply_armor(show_armor, equipment): the preview is "live" and shows the equipped armor on demand.
+## Face mode (visual QA UI-08: on the Eyes / Skin tabs the turntable often showed her back): set_face_mode(true)
+## eases her round to a front three-quarter view (FACE_YAW), holds the spin there and moves the camera in on her head
+## and shoulders; face_front() re-faces her after a pick. Dragging or the turn keys still work; leaving face mode
+## frames her whole again and the slow spin resumes.
 
 const Kit := preload("res://src/ui/ui_kit.gd")
 const AVATAR_SCRIPT := "res://src/player/krystal_avatar.gd"
@@ -22,6 +26,11 @@ const TURN_STEP := PI / 4.0
 const DRAG_SENS := 0.012                # rad per pixel
 const CAM_POS := Vector3(0.0, 0.98, 4.1)      # frames y -0.15..2.05 m (hats included) at fov 30
 const CAM_TARGET := Vector3(0.0, 0.95, 0.0)
+const CAM_FACE_POS := Vector3(0.0, 1.24, 2.45)  # face mode: head and shoulders
+const CAM_FACE_TARGET := Vector3(0.0, 1.17, 0.0)
+const FACE_YAW := 0.32                  # front three-quarter (rad; 0 = straight at the camera)
+const FACE_TURN_TIME := 0.45
+const FRAME_TIME := 0.35
 const NOTE_LEGACY := "This preview still shows Krystal's classic look. Your choices are saved and will appear as her new outfits arrive."
 const NOTE_NONE := "Krystal's preview can't be drawn here, but your choices are still saved."
 ## Appearance API names accepted from the avatar module (first match wins).
@@ -45,6 +54,11 @@ var _dragging: bool = false
 var _size := Vector2(480, 620)
 var _look_method := ""
 var _look_prop := ""
+var face_mode: bool = false
+var _face_t := -1.0                     # >= 0 while easing round to FACE_YAW
+var _face_from := 0.0
+var _frame := 0.0                       # 0 = whole figure, 1 = face framing (tweened)
+var _frame_tw: Tween
 
 static var _script_cache: Script = null
 static var _script_checked: bool = false
@@ -245,10 +259,48 @@ func shows_looks() -> bool:
 
 ## Turns Krystal by `radians` (keyboard / buttons); the idle spin pauses for a moment.
 func turn(radians: float = TURN_STEP) -> void:
+	_face_t = -1.0
 	yaw = wrapf(yaw + radians, -PI, PI)
 	_idle = 0.0
 	if pivot != null:
 		pivot.rotation.y = yaw
+
+
+## Face-related tabs (eyes, skin, hair colour...): turn her to the front, keep her there, frame her face.
+func set_face_mode(on: bool) -> void:
+	if on == face_mode:
+		if on:
+			face_front()
+		return
+	face_mode = on
+	if on:
+		face_front()
+	else:
+		_idle = 0.0          # the slow spin comes back after the usual pause
+	_set_frame(1.0 if on else 0.0)
+
+
+## Eases her round to the front three-quarter view (and pauses the spin for RESUME_SPIN_AFTER afterwards).
+func face_front() -> void:
+	_face_from = yaw
+	_face_t = 0.0
+	_idle = 0.0
+
+
+func _set_frame(to: float) -> void:
+	if camera == null or not is_inside_tree():
+		_frame = to
+		return
+	if _frame_tw != null and _frame_tw.is_valid():
+		_frame_tw.kill()
+	_frame_tw = create_tween()
+	_frame_tw.tween_method(_apply_frame, _frame, to, FRAME_TIME).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+
+
+func _apply_frame(f: float) -> void:
+	_frame = f
+	if camera != null:
+		camera.look_at_from_position(CAM_POS.lerp(CAM_FACE_POS, f), CAM_TARGET.lerp(CAM_FACE_TARGET, f), Vector3.UP)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -266,8 +318,18 @@ func _process(delta: float) -> void:
 		return
 	if _dragging:
 		_idle = 0.0
+		_face_t = -1.0
 		return
-	if not auto_spin:
+	if _face_t >= 0.0:
+		_face_t = minf(_face_t + delta / FACE_TURN_TIME, 1.0)
+		var k := _face_t * _face_t * (3.0 - 2.0 * _face_t)
+		yaw = lerp_angle(_face_from, FACE_YAW, k)
+		pivot.rotation.y = yaw
+		_idle = 0.0
+		if _face_t >= 1.0:
+			_face_t = -1.0
+		return
+	if not auto_spin or face_mode:
 		return
 	_idle += delta
 	if _idle >= RESUME_SPIN_AFTER:

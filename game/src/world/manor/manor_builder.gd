@@ -28,6 +28,7 @@ var bodies_made: int = 0
 var _bodies: Dictionary = {}
 var _batches: Dictionary = {}
 var _lamps: int = 0
+var _room_colors: Dictionary = {}       # room id -> the colours its room_shell() used (height-step fills)
 
 static var _meshes: Dictionary = {}
 static var _flat_mat: StandardMaterial3D = null
@@ -281,6 +282,7 @@ func ceiling_rect(x0: float, x1: float, z0: float, z1: float, y: float, color: C
 func room_shell(id: String, colors: Dictionary, opts: Dictionary = {}) -> void:
 	var r: Dictionary = Layout.ROOMS[id]
 	begin(id)
+	_room_colors[id] = colors
 	var y: float = float(r["y"])
 	var surf := String(r.get("surface", "stone"))
 	var floor_c: Color = colors.get("floor", Palette.WOOD)
@@ -396,6 +398,90 @@ func _inner_band(r: Dictionary, side: String, a: float, b: float, ylo: float, he
 			c = Vector3(float(r["x1"]) - depth * 0.5, cy, (a + b) * 0.5)
 			s = Vector3(depth, height, b - a)
 	vbox(c, s, color, Basis.IDENTITY, {"shadows": false})
+
+
+## Where a taller room shares a wall with a lower neighbour that builds it (layout rule: only ONE of the two
+## builds the shared wall, at its OWN height), the band between the neighbour's top and the taller room's
+## ceiling would stay open to the void (VISUAL_BUGS IN-02: above the Cloakroom doorway in the Looking-Glass
+## Hall). Pure data: [{room, side, a, b, ylo, yhi}] with a..b along the side (x for n/s, z for w/e, the taller
+## room's wall thickness included at both ends) and ylo..yhi world heights. Open-sky rooms and parapets never
+## need one.
+static func height_steps() -> Array:
+	var out: Array = []
+	var opposite := {"n": "s", "s": "n", "w": "e", "e": "w"}
+	for id in Layout.ROOM_ORDER:
+		var r: Dictionary = Layout.ROOMS[id]
+		if bool(r.get("open_sky", false)):
+			continue
+		var top: float = float(r["y"]) + float(r["h"])
+		var walls: Dictionary = r.get("walls", {})
+		for side in ["n", "s", "w", "e"]:
+			if walls.has(side):
+				continue
+			for nid in Layout.ROOM_ORDER:
+				if nid == id:
+					continue
+				var q: Dictionary = Layout.ROOMS[nid]
+				var qwalls: Dictionary = q.get("walls", {})
+				var opp: String = opposite[side]
+				if not qwalls.has(opp) or (q.get("parapet", []) as Array).has(opp):
+					continue
+				var gap := 0.0
+				match side:
+					"n": gap = float(r["z0"]) - float(q["z1"])
+					"s": gap = float(q["z0"]) - float(r["z1"])
+					"w": gap = float(r["x0"]) - float(q["x1"])
+					"e": gap = float(q["x0"]) - float(r["x1"])
+				if absf(gap - WALL_T) > 0.01:
+					continue
+				var along_x: bool = side == "n" or side == "s"
+				var a := maxf(float(r["x0"] if along_x else r["z0"]) - WALL_T, float(q["x0"] if along_x else q["z0"]) - WALL_T)
+				var b := minf(float(r["x1"] if along_x else r["z1"]) + WALL_T, float(q["x1"] if along_x else q["z1"]) + WALL_T)
+				var qtop: float = float(q["y"]) + float(q["h"])
+				if b - a > 0.05 and qtop < top - 0.01:
+					out.append({"room": String(id), "side": side, "a": a, "b": b, "ylo": qtop, "yhi": top})
+	return out
+
+
+## Builds every height_steps() band as a solid wall piece (collision like any wall) in the taller room's wall
+## colour, standing 1 cm proud of the neighbour's ceiling slab edge (no z-fighting), with the room's crown trim
+## and a thin moulding along the seam. Call after every room_shell(). Returns the number of bands built.
+func close_height_steps() -> int:
+	var steps := height_steps()
+	var keep := room
+	for s in steps:
+		var id := String(s["room"])
+		var r: Dictionary = Layout.ROOMS[id]
+		var colors: Dictionary = _room_colors.get(id, {})
+		var wall_c: Color = colors.get("wall", Palette.CLOTH_CREAM)
+		var side := String(s["side"])
+		var a := float(s["a"])
+		var b := float(s["b"])
+		var ylo := float(s["ylo"])
+		var yhi := float(s["yhi"])
+		begin(id)
+		var box := _side_box(r, side, a, b, ylo, yhi)
+		col_box(box[0], box[1])
+		var inward := _inward(side)
+		var vis_size: Vector3 = box[1] + Vector3(absf(inward.x), 0.0, absf(inward.z)) * 0.02
+		vbox(box[0] + inward * 0.01, vis_size, wall_c)
+		_inner_band(r, side, a + WALL_T, b - WALL_T, float(r["y"]) + float(r["h"]) - 0.28, 0.28, colors.get("trim", wall_c.lightened(0.2)), 0.1)
+		_inner_band(r, side, a + WALL_T, b - WALL_T, ylo, 0.14, colors.get("trim", wall_c.lightened(0.2)), 0.06)
+	if keep != "":
+		begin(keep)
+	return steps.size()
+
+
+## Direction into the room from its `side` wall.
+static func _inward(side: String) -> Vector3:
+	match side:
+		"n":
+			return Vector3(0, 0, 1)
+		"s":
+			return Vector3(0, 0, -1)
+		"w":
+			return Vector3(1, 0, 0)
+	return Vector3(-1, 0, 0)
 
 
 func _parapet_cap(r: Dictionary, side: String, a: float, b: float, top: float, color: Color) -> void:

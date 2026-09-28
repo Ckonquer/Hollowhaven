@@ -9,7 +9,9 @@ extends "res://src/ui/panels/panel_base.gd"
 
 const Support := preload("res://src/companions/companion_support.gd")
 
-const TEXT_W := 640.0
+const TEXT_W := 720.0      # (was 640: the long "Together" lines wrapped into a window taller than the free space)
+## Kept clear under the window: the HUD hotbar stays visible below this non-dimming menu (visual QA UI-12).
+const HOTBAR_RESERVE := 124.0
 
 var cid := ""
 var first_btn: Button
@@ -38,7 +40,8 @@ func setup(p_args: Dictionary) -> void:
 	dim_background = false
 	var c := ItemDB.creature(cid)
 	title = String(c.get("name", cid.capitalize()))
-	window_min = Vector2(720, 0)
+	window_min = Vector2(800, 0)
+	bottom_reserve = HOTBAR_RESERVE
 
 
 func reopen(p_args: Dictionary) -> void:
@@ -123,11 +126,12 @@ func _build_together() -> void:
 	var ml := Kit.label("In a fight:", "Small")
 	ml.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mrow.add_child(ml)
-	_assist_btn = Kit.button("Assist", _set_mode.bind("assist"))
+	# styled like the other selectable tabs (a red outline and a light fill when chosen), not a pressed button
+	_assist_btn = Kit.button("Assist", _set_mode.bind("assist"), "TabLike")
 	_assist_btn.toggle_mode = true
 	_assist_btn.tooltip_text = "Helps with enemies you're fighting or that go for you."
 	mrow.add_child(_assist_btn)
-	_close_btn = Kit.button("Stay close", _set_mode.bind("close"))
+	_close_btn = Kit.button("Stay close", _set_mode.bind("close"), "TabLike")
 	_close_btn.toggle_mode = true
 	_close_btn.tooltip_text = "Stays right beside you and only answers enemies at your side."
 	mrow.add_child(_close_btn)
@@ -148,6 +152,7 @@ func _build_together() -> void:
 	_ribbon_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	rrow.add_child(_ribbon_l)
 	_home_l = _text(col, "Small")
+	col.add_child(Kit.spacer(0, 6))   # the last line never sits on the parchment's border
 
 
 func _setting_toggle(parent: Control, text: String, key: String, tip: String) -> CheckButton:

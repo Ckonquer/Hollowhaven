@@ -212,7 +212,7 @@ func test_echo_trial_accessories_sit_in_the_hair_and_capes_drape() -> void:
 					var r := Vector3(q.x / 0.281, q.y / 0.268, q.z / 0.268).length()
 					assert_true(r > 1.0, "chime %d hangs clear of the hair cap (%s / %s): %.3f" % [k, hair, hat, r])
 			assert_eq(bells, 3, "three chime bells")
-	var channels := {"opera_cloak": ["accent", "primary"], "chorister_capelet": ["primary", "secondary"]}
+	var channels := {"opera_cloak": ["accent", "primary"], "chorister_capelet": ["secondary", "accent"]}
 	for pid in ["opera_cloak", "chorister_capelet"]:
 		var cl := _look_with("back", pid)
 		cl["palette"] = {"primary": "rose", "secondary": "mint", "accent": "sky"}
@@ -240,6 +240,52 @@ func _look_with(slot: String, id: String) -> Dictionary:
 	var look := ItemDB.legacy_look()
 	look[slot] = id
 	return look
+
+
+## Integration pass 3 palette decisions (R3-26..R3-30, visual review AV-10 / AV-13 / AV-14 / AV-15), as rendered:
+## the Mushroom Dungarees beret is a berry toadstool (accent), not moss like the dungarees; the Pumpkin Patch preset
+## has espresso hair, a moss harvest skirt and boots and a leaf clip that stays orange; the Ghostlight Party preset is
+## sky cloth with snow trim and lavender hair, not an all-white figure; and the Chorister Capelet draws the colour its
+## wardrobe tile shows (its first channel, wardrobe_panel.gd _part_color) over every primary-coloured top.
+func test_pass3_preset_palettes_render_as_reviewed() -> void:
+	var av := _avatar()
+	var hc: Node3D = av.get("_head_c")
+	var hips: Node3D = av.get("_hosts")["hips"]
+	# R3-28: the beret takes the accent (berry in the preset); no moss (primary) anywhere on the hat
+	av.call("apply_look", _look_for_outfit("mushroom_dungarees"))
+	assert_eq(av.call("missing_ids"), [], "mushroom_dungarees")
+	var hat: Array = _unit_geometry(av, "hat", hc)["colors"]
+	assert_true(_near(hat, ItemDB.swatch_color("berry")), "the mushroom beret is berry red (accent)")
+	assert_false(_near(hat, ItemDB.swatch_color("moss"), 0.01), "the beret is not the dungarees' moss (primary)")
+	# R3-27: espresso hair, caramel cardigan, moss skirt + boots, the leaf clip keeps its fixed orange
+	av.call("apply_look", _look_for_outfit("pumpkin_patch"))
+	assert_eq(av.call("missing_ids"), [], "pumpkin_patch")
+	assert_true(_near(_unit_geometry(av, "hair", hc)["colors"], AppearanceData.HAIR_COLORS["espresso"]["base"]), "espresso hair")
+	assert_true(_near(_unit_geometry(av, "upper", hc)["colors"], ItemDB.swatch_color("caramel")), "caramel cardigan")
+	assert_true(_near(_unit_geometry(av, "lower", hc)["colors"], ItemDB.swatch_color("moss")), "moss harvest skirt")
+	assert_false(_near(_unit_geometry(av, "lower", hc)["colors"], ItemDB.swatch_color("cocoa"), 0.01), "no cocoa skirt left")
+	assert_true(_near(_unit_geometry(av, "shoes", hc)["colors"], ItemDB.swatch_color("moss")), "moss lace-up boots")
+	assert_true(_near(_unit_geometry(av, "hair_acc", hc)["colors"], AppearanceData.PARTS["leaf_clip"]["fixed"]["leaf"]), "the leaf clip stays orange")
+	# R3-26: sky bodice + tulle with snow trim, lavender hair
+	av.call("apply_look", _look_for_outfit("ghostlight_party"))
+	assert_eq(av.call("missing_ids"), [], "ghostlight_party")
+	assert_true(_near(_unit_geometry(av, "hair", hc)["colors"], AppearanceData.HAIR_COLORS["lavender"]["base"]), "lavender hair")
+	for unit in ["upper", "lower"]:
+		var cols: Array = _unit_geometry(av, unit, hc)["colors"]
+		assert_true(_near(cols, ItemDB.swatch_color("sky")), unit + ": sky cloth")
+		assert_true(_near(cols, ItemDB.swatch_color("snow")), unit + ": snow trim / underskirt")
+	# R3-30: over a primary-coloured top nothing needs swapping, so the capelet is its tile colour with an accent collar
+	for up in ["explorer_jacket", "cloud_cardigan", "moonflower_bodice", "pumpkin_cardigan", "ruffle_bodice", "ghost_bodice", "festival_bodice"]:
+		assert_eq(String((AppearanceData.PARTS[up]["channels"] as Dictionary).values()[0]), "primary", up + " is a primary-coloured top")
+		var look := _look_with("back", "chorister_capelet")
+		look["upper"] = up
+		look["palette"] = {"primary": "rose", "secondary": "mint", "accent": "sky"}
+		av.call("apply_look", look)
+		assert_eq(av.call("missing_ids"), [], up)
+		var back: Array = _unit_geometry(av, "back", hips)["colors"]
+		assert_true(_near(back, ItemDB.swatch_color("mint")), "capelet over %s = the tile colour (secondary)" % up)
+		assert_true(_near(back, ItemDB.swatch_color("sky")), "collar over %s = accent" % up)
+		assert_false(_near(back, ItemDB.swatch_color("rose"), 0.01), "no primary on the capelet over %s" % up)
 
 
 func test_colours_follow_the_catalogue() -> void:

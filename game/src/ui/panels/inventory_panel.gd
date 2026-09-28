@@ -21,7 +21,9 @@ const EQUIP_SLOTS := ["head", "body", "boots", "charm"]
 const EQUIP_NAMES := {"head": "Head", "body": "Body", "boots": "Boots", "charm": "Charm"}
 const EQUIP_PLACEHOLDERS := {"head": "hood", "body": "vest", "boots": "armor_boots", "charm": "charm_leaf"}
 const DETAIL_W := 440.0
-const MID_W := 372.0
+const MID_W := 440.0                 # equipment + stats column (visual QA UI-03: 372 hard-clipped the stat sources)
+const STAT_LABEL_W := 130.0
+const STAT_VALUE_W := 76.0
 
 var ctl: Control
 var slots: Array = []
@@ -261,15 +263,22 @@ func _refresh_stats() -> void:
 		var h := Kit.hbox(8)
 		var lab := Kit.label(String(r["label"]))
 		lab.add_theme_font_override("font", ThemeFactory.font("body_bold"))
-		lab.custom_minimum_size.x = 130
+		lab.custom_minimum_size.x = STAT_LABEL_W
+		lab.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		h.add_child(lab)
 		var val := Kit.label(String(r["value"]))
-		val.custom_minimum_size.x = 76
+		val.custom_minimum_size.x = STAT_VALUE_W
+		val.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		h.add_child(val)
+		# the source ("Ironwood Sword", "Lumi · Swiftstep Charm") wraps to a second line, and anything longer ends in
+		# an ellipsis rather than a sliced word; the tooltip keeps the whole text
 		var det := Kit.label(String(r.get("detail", "")), "Small")
-		det.clip_text = true
+		det.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		det.max_lines_visible = 2
+		det.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		det.custom_minimum_size.x = 120
 		det.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		det.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		det.tooltip_text = String(r.get("detail", ""))
 		det.mouse_filter = Control.MOUSE_FILTER_PASS
 		h.add_child(det)

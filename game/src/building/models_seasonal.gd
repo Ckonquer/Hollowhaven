@@ -10,6 +10,7 @@ const Mat := preload("res://src/art/mat.gd")
 const U := preload("res://src/building/model_util.gd")
 const Shapes := preload("res://src/building/shapes.gd")
 const Batch := preload("res://src/building/batch.gd")
+const Placement := preload("res://src/building/placement.gd")
 
 const PUMPKIN_FACES := ["friendly", "sleepy", "toothy", "cat", "moon", "ghost"]
 ## Festival carvings (data/structures.gd FESTIVAL_FACES, unlocked by the Lanternwake). The model carves any known
@@ -18,9 +19,12 @@ const PUMPKIN_FACES := ["friendly", "sleepy", "toothy", "cat", "moon", "ghost"]
 const FESTIVAL_CARVINGS := ["starry", "lanternwake"]
 const PUMPKIN_R := 0.26                # body radius (front surface)
 const PUMPKIN_Y := 0.24                 # body centre height
-static var BRASS: Color = Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04)
+static var BRASS: Color = U.keep(Palette.K_SCARF.lerp(Palette.COPPER, 0.35).darkened(0.04))   # never dyed
 static var PUMPKIN: Color = Color("f08a2e")
-static var CARVE_GLOW: Color = Color("ffc060")
+static var CARVE_GLOW: Color = Color("ffb450")
+## Dark cut edge around every carving (the shadowed inside of the cut): the face reads by day, not only at night.
+static var CARVE_RIM: Color = Color("f08a2e").darkened(0.62)
+const CARVE_RIM_EDGE := 0.026           # widest rim border added around a cut (m, total)
 
 
 # --- Wardlight (1 x 1) -----------------------------------------------------------------------------------------
@@ -57,25 +61,37 @@ static func wardlight(root: Node3D) -> Dictionary:
 
 # --- Miner's lamp (1 x 1) --------------------------------------------------------------------------------------
 
+## Tobin's lamp stand: a chunky timber tripod (rounded feet, a rope binding where the legs meet) with a brass
+## lamp on an arm, his old pick leaning on it and a lunch tin.
 static func miner_lamp(root: Node3D) -> Dictionary:
 	var mesh := U.baked("miner_lamp", func(b: Batch) -> void:
 		for k in 3:
 			var a := TAU * float(k) / 3.0
-			b.cyl(0.025, 0.03, 1.5, Vector3(cos(a) * 0.14, 0.73, sin(a) * 0.14), Palette.MINE_TIMBER, Vector3(sin(a) * -8.0, 0, cos(a) * 8.0), 8)
-		b.sphere(0.06, Vector3(0, 1.48, 0), Palette.MINE_TIMBER.darkened(0.2))
-		b.rbox(Vector3(0.36, 0.05, 0.05), Vector3(0.13, 1.45, 0), Palette.MINE_TIMBER.darkened(0.1), 0.015)
-		b.torus(0.02, 0.035, Vector3(0.28, 1.4, 0), BRASS, Vector3(90, 0, 0))
+			var foot := Vector3(cos(a) * 0.19, 0.0, sin(a) * 0.19)
+			var top := Vector3(cos(a) * 0.035, 1.46, sin(a) * 0.035)
+			var d := top - foot
+			var up := d.normalized()
+			var side := up.cross(Vector3.FORWARD).normalized()
+			var fwd := side.cross(up).normalized()
+			b.add(Shapes.prim_cylinder(0.042, 0.052, d.length(), 10), Transform3D(Basis(side, up, fwd), (foot + top) * 0.5), Palette.MINE_TIMBER)
+			b.sphere(0.07, foot + Vector3(0, 0.03, 0), Palette.MINE_TIMBER.darkened(0.15), Vector3(1.1, 0.6, 1.1))
+		b.sphere(0.085, Vector3(0, 1.48, 0), Palette.MINE_TIMBER.darkened(0.2))
+		# Rope binding just under the joint.
+		for k in 3:
+			b.torus(0.07, 0.095, Vector3(0, 1.33 + 0.045 * float(k), 0), Palette.DIRT.darkened(0.05), Vector3.ZERO, Vector3(1, 0.6, 1))
+		b.rbox(Vector3(0.42, 0.075, 0.075), Vector3(0.15, 1.45, 0), Palette.MINE_TIMBER.darkened(0.1), 0.025)
+		b.torus(0.022, 0.04, Vector3(0.3, 1.4, 0), BRASS, Vector3(90, 0, 0))
 		# The lamp: brass cap and base, a wire cage around the glass.
-		b.cyl(0.03, 0.09, 0.08, Vector3(0.28, 1.32, 0), BRASS, Vector3.ZERO, 12)
-		b.cyl(0.1, 0.1, 0.04, Vector3(0.28, 1.06, 0), BRASS, Vector3.ZERO, 12)
+		b.cyl(0.035, 0.1, 0.09, Vector3(0.3, 1.32, 0), BRASS, Vector3.ZERO, 12)
+		b.cyl(0.11, 0.11, 0.05, Vector3(0.3, 1.05, 0), BRASS, Vector3.ZERO, 12)
 		for k in 4:
 			var a2 := TAU * float(k) / 4.0 + 0.4
-			b.rbox(Vector3(0.012, 0.2, 0.012), Vector3(0.28 + cos(a2) * 0.085, 1.18, sin(a2) * 0.085), Palette.STONE_DARK, 0.004)
-		b.cyl(0.07, 0.07, 0.18, Vector3(0.28, 1.18, 0), Palette.WATER.lightened(0.3), Vector3.ZERO, 12)
+			b.rbox(Vector3(0.018, 0.2, 0.018), Vector3(0.3 + cos(a2) * 0.09, 1.18, sin(a2) * 0.09), Palette.STONE_DARK, 0.006)
+		b.cyl(0.075, 0.075, 0.18, Vector3(0.3, 1.18, 0), Palette.WATER.lightened(0.3), Vector3.ZERO, 12)
 		# Tobin's old pick leaning on the stand, and a lunch tin.
-		b.cyl(0.018, 0.018, 0.9, Vector3(-0.22, 0.43, 0.18), Palette.WOOD_DARK, Vector3(15, 0, -20), 6)
-		b.rbox(Vector3(0.36, 0.06, 0.06), Vector3(-0.07, 0.85, 0.3), Palette.STONE_DARK, 0.015, Vector3(15, 0, -20))
-		b.rbox(Vector3(0.2, 0.1, 0.13), Vector3(0.18, 0.05, 0.22), Palette.TEAL.darkened(0.2), 0.02)
+		b.cyl(0.03, 0.034, 0.9, Vector3(-0.24, 0.43, 0.2), Palette.WOOD_DARK, Vector3(15, 0, -20), 8)
+		b.rbox(Vector3(0.38, 0.08, 0.08), Vector3(-0.09, 0.85, 0.32), Palette.STONE_DARK, 0.025, Vector3(15, 0, -20))
+		b.rbox(Vector3(0.2, 0.1, 0.13), Vector3(0.2, 0.05, 0.24), Palette.TEAL.darkened(0.2), 0.02)
 	)
 	U.instance(root, mesh, U.vc_outlined(0.012))
 	var flame := MeshInstance3D.new()
@@ -83,8 +99,8 @@ static func miner_lamp(root: Node3D) -> Dictionary:
 	flame.material_override = Mat.glow(Palette.MINE_LIGHT, 3.0)
 	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(flame)
-	flame.position = Vector3(0.28, 1.17, 0)
-	return {"flame": flame, "light_pos": Vector3(0.28, 1.15, 0)}
+	flame.position = Vector3(0.3, 1.17, 0)
+	return {"flame": flame, "light_pos": Vector3(0.3, 1.15, 0)}
 
 
 # --- Thread Veil / Pale Veil Drape (1 x 1, wall) ------------------------------------------------------------------
@@ -93,7 +109,7 @@ static func miner_lamp(root: Node3D) -> Dictionary:
 static func thread_veil(root: Node3D, alt: bool) -> Dictionary:
 	var key := "thread_veil_alt" if alt else "thread_veil"
 	var mesh := U.baked(key, func(b: Batch) -> void:
-		var z := -0.42
+		var z := Placement.MOUNT_BACK + 0.035           # the rod (and its moss knots) rest on the wall face
 		b.cyl(0.03, 0.025, 1.0, Vector3(0, 2.3, z), Palette.BARK, Vector3(0, 0, 88), 8)
 		for sx in [-1.0, 1.0]:
 			b.sphere(0.035, Vector3(0.5 * sx, 2.31, z), Palette.MOSS)
@@ -141,8 +157,14 @@ static func pumpkin_lantern(root: Node3D, face: String = "") -> Dictionary:
 		b.torus(0.02, 0.032, Vector3(0.08, PUMPKIN_Y + 0.22, -0.02), Palette.FOLIAGE_DARK, Vector3(90, 30, 0))
 	)
 	U.instance(root, body, U.vc_outlined(0.011))
+	var rim := U.baked("pumpkin_face_rim|" + fid, func(b: Batch) -> void:
+		_carve({"b": b, "rim": true}, fid)
+	)
+	var rnode := U.instance(root, rim, U.vc_mat())
+	rnode.name = "FaceRim"
+	rnode.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var carving := U.baked("pumpkin_face|" + fid, func(b: Batch) -> void:
-		_carve(b, fid)
+		_carve({"b": b, "rim": false}, fid)
 	)
 	var fnode := U.instance(root, carving, Mat.glow(CARVE_GLOW, 2.2))
 	fnode.name = "Face"
@@ -156,29 +178,56 @@ static func pumpkin_lantern(root: Node3D, face: String = "") -> Dictionary:
 	return {"flame": candle, "light_pos": Vector3(0, PUMPKIN_Y + 0.05, 0.3), "face": fnode}
 
 
-## Point on the pumpkin's front surface for face coordinates (x, y relative to the body centre).
-static func _on_face(x: float, y: float) -> Vector3:
-	var r := PUMPKIN_R + 0.012
+## Point on the pumpkin's front surface for face coordinates (x, y relative to the body centre), `lift` above it.
+static func _on_face(x: float, y: float, lift: float = 0.012) -> Vector3:
+	var r := PUMPKIN_R + lift
 	var zz := sqrt(maxf(r * r - x * x - y * y * 1.35, 0.01))
 	return Vector3(x, PUMPKIN_Y + y, zz)
 
 
-## A flat carved blob placed on the surface, turned to face outward.
-static func _cut(b: Batch, x: float, y: float, size: Vector2, roll_deg: float = 0.0) -> void:
-	var p := _on_face(x, y)
+## A flat carved blob placed on the surface, turned to face outward. `c` = {"b": Batch, "rim": bool}: the glow
+## pass draws the lit cut, the rim pass a slightly larger dark blob just behind it (the cut's shadowed edge).
+static func _cut(c: Dictionary, x: float, y: float, size: Vector2, roll_deg: float = 0.0) -> void:
+	var b: Batch = c["b"]
+	var rim := bool(c.get("rim", false))
+	var p := _on_face(x, y, 0.004 if rim else 0.012)
 	var yaw := rad_to_deg(asin(clampf(x / PUMPKIN_R, -0.9, 0.9)))
 	var pitch := -rad_to_deg(asin(clampf(y / PUMPKIN_R, -0.9, 0.9)))
-	b.sphere(0.5, p, CARVE_GLOW, Vector3(size.x, size.y, 0.03), Vector3(pitch, yaw, roll_deg))
+	if rim:
+		# Thin strokes (whiskers, star rays) get a thinner rim so their shape survives.
+		var edge := clampf(minf(size.x, size.y) * 0.6, 0.01, CARVE_RIM_EDGE)
+		var sz := size + Vector2(edge, edge)
+		b.sphere(0.5, p, CARVE_RIM, Vector3(sz.x, sz.y, 0.03), Vector3(pitch, yaw, roll_deg))
+	else:
+		b.sphere(0.5, p, CARVE_GLOW, Vector3(size.x, size.y, 0.03), Vector3(pitch, yaw, roll_deg))
 
 
 ## A carved stroke from a to b (face coords), `w` wide.
-static func _stroke(b: Batch, a: Vector2, c: Vector2, w: float) -> void:
-	var mid := (a + c) * 0.5
-	var d := c - a
-	_cut(b, mid.x, mid.y, Vector2(d.length() + w, w), rad_to_deg(atan2(d.y, d.x)))
+static func _stroke(c: Dictionary, a: Vector2, e: Vector2, w: float) -> void:
+	var mid := (a + e) * 0.5
+	var d := e - a
+	_cut(c, mid.x, mid.y, Vector2(d.length() + w, w), rad_to_deg(atan2(d.y, d.x)))
 
 
-static func _carve(b: Batch, face: String) -> void:
+## A carved arc around `centre` (radius r) from angle a0 to a1 (radians) in `n` strokes, `w` wide in the middle
+## and tapering to `w_tip` at both ends (a crescent / a smile as one continuous cut).
+static func _arc(c: Dictionary, centre: Vector2, r: float, a0: float, a1: float, n: int, w: float, w_tip: float) -> void:
+	for k in n:
+		var t0 := float(k) / float(n)
+		var t1 := float(k + 1) / float(n)
+		var p0 := centre + Vector2(cos(lerpf(a0, a1, t0)), sin(lerpf(a0, a1, t0))) * r
+		var p1 := centre + Vector2(cos(lerpf(a0, a1, t1)), sin(lerpf(a0, a1, t1))) * r
+		var ww := lerpf(w_tip, w, sin(PI * (t0 + t1) * 0.5))
+		_stroke(c, p0, p1, ww)
+
+
+## A four-point sparkle star (two crossed strokes) at p.
+static func _sparkle(c: Dictionary, p: Vector2, size: float) -> void:
+	_stroke(c, p - Vector2(size, 0.0), p + Vector2(size, 0.0), size * 0.42)
+	_stroke(c, p - Vector2(0.0, size), p + Vector2(0.0, size), size * 0.42)
+
+
+static func _carve(b: Dictionary, face: String) -> void:
 	match face:
 		"sleepy":
 			for sx in [-1.0, 1.0]:
@@ -202,12 +251,10 @@ static func _carve(b: Batch, face: String) -> void:
 			_stroke(b, Vector2(-0.05, -0.05), Vector2(0.0, -0.075), 0.018)
 			_stroke(b, Vector2(0.0, -0.075), Vector2(0.05, -0.05), 0.018)
 		"moon":
-			for k in 7:
-				var a := lerpf(-1.1, 1.1, float(k) / 6.0)
-				_cut(b, -0.02 + cos(a) * 0.09 - 0.03, sin(a) * 0.1, Vector2(0.045 - 0.012 * absf(a), 0.045 - 0.012 * absf(a)))
-			for s in [Vector2(0.09, 0.08), Vector2(0.12, -0.04), Vector2(0.05, -0.1)]:
-				_cut(b, s.x, s.y, Vector2(0.03, 0.03), 45.0)
-				_cut(b, s.x, s.y, Vector2(0.045, 0.012), 0.0)
+			# One continuous crescent, centred on the face (opening to the right), and two clear sparkle stars.
+			_arc(b, Vector2(0.015, 0.0), 0.1, deg_to_rad(105.0), deg_to_rad(255.0), 11, 0.052, 0.016)
+			_sparkle(b, Vector2(0.07, 0.055), 0.03)
+			_sparkle(b, Vector2(0.095, -0.05), 0.022)
 		"ghost":
 			_cut(b, 0.0, 0.03, Vector2(0.16, 0.14))
 			_cut(b, 0.0, -0.03, Vector2(0.16, 0.12))
@@ -228,13 +275,16 @@ static func _carve(b: Batch, face: String) -> void:
 				var t := lerpf(-1.0, 1.0, float(k) / 4.0)
 				_cut(b, t * 0.075, -0.07 - 0.028 * (1.0 - t * t), Vector2(0.042, 0.03))
 		"lanternwake":
-			# Festival face: little flame-shaped eyes and a smile of round festival lanterns.
+			# Festival face: little flame-shaped eyes and one continuous smile with three round lanterns on it.
 			for sx in [-1.0, 1.0]:
 				_cut(b, 0.085 * sx, 0.05, Vector2(0.05, 0.055))
 				_cut(b, 0.085 * sx + 0.006 * sx, 0.092, Vector2(0.024, 0.04), -12.0 * sx)
-			for k in 5:
-				var t := lerpf(-1.0, 1.0, float(k) / 4.0)
-				_cut(b, t * 0.12, -0.05 - 0.05 * (1.0 - t * t), Vector2(0.038, 0.042))
+			_arc(b, Vector2(0.0, 0.03), 0.14, deg_to_rad(215.0), deg_to_rad(325.0), 6, 0.03, 0.018)
+			for k in 3:
+				var t := lerpf(-0.6, 0.6, float(k) / 2.0)
+				var a := deg_to_rad(270.0 + t * 55.0 * 0.9)
+				var p := Vector2(0.0, 0.03) + Vector2(cos(a), sin(a)) * 0.14
+				_cut(b, p.x, p.y - 0.022, Vector2(0.042, 0.046))
 		_:     # friendly
 			for sx in [-1.0, 1.0]:
 				_cut(b, 0.09 * sx, 0.06, Vector2(0.06, 0.07))
@@ -245,34 +295,57 @@ static func _carve(b: Batch, face: String) -> void:
 
 # --- Pumpkin string lights (1 x 1, wall) ---------------------------------------------------------------------------
 
+## A dark twine sagging across the cell from two wall hooks, with five chunky little jack-o'-lantern bulbs: ribbed
+## orange bodies (toon, outlined, softly self-lit so they glow at night), green stems and tiny dark eyes. High
+## enough to hang over a round window's frame.
 static func pumpkin_lights(root: Node3D) -> Dictionary:
-	var z := -0.44
+	var z := Placement.MOUNT_BACK + 0.03
 	var mesh := U.baked("pumpkin_lights", func(b: Batch) -> void:
-		var prev := Vector3(-0.48, 2.32, z)
 		for sx in [-1.0, 1.0]:
-			b.cyl(0.012, 0.012, 0.06, Vector3(0.48 * sx, 2.32, z - 0.02), BRASS, Vector3(90, 0, 0), 6)
-		for k in 9:
-			var t := float(k + 1) / 9.0
-			var x := lerpf(-0.48, 0.48, t)
-			var p := Vector3(x, 2.32 - 0.18 * sin(t * PI), z)
+			b.cyl(0.014, 0.014, 0.05, Vector3(0.47 * sx, LIGHTS_Y, z - 0.005), BRASS, Vector3(90, 0, 0), 6)
+			b.torus(0.012, 0.022, Vector3(0.47 * sx, LIGHTS_Y - 0.02, z + 0.02), BRASS, Vector3(0, 90, 0))
+		var prev := _lights_point(0.0, z)
+		for k in 12:
+			var p := _lights_point(float(k + 1) / 12.0, z)
 			var d := p - prev
-			b.rbox(Vector3(d.length() + 0.01, 0.01, 0.01), (p + prev) * 0.5, Palette.FOLIAGE_DARK, 0.0, Vector3(0, 0, rad_to_deg(atan2(d.y, d.x))))
+			b.rbox(Vector3(d.length() + 0.012, 0.018, 0.018), (p + prev) * 0.5, Palette.BARK_DARK, 0.006, Vector3(0, 0, rad_to_deg(atan2(d.y, d.x))))
 			prev = p
+		for k in LIGHTS_BULBS:
+			var c := _lights_bulb(k, z)
+			b.cyl(0.014, 0.018, 0.06, c + Vector3(0.004, 0.09, 0), Palette.FOLIAGE_DARK, Vector3(0, 0, -10), 6)
+			b.sphere(0.5, c + Vector3(-0.036, 0.094, 0.01), Palette.FOLIAGE, Vector3(0.06, 0.014, 0.036), Vector3(0, 20, -20))
+			for ex in [-1.0, 1.0]:
+				b.sphere(0.5, c + Vector3(0.032 * ex, 0.016, 0.079), Palette.UI_INK, Vector3(0.03, 0.026, 0.01))
+			b.sphere(0.5, c + Vector3(0.0, -0.024, 0.081), Palette.UI_INK, Vector3(0.046, 0.015, 0.01))
 	)
 	U.instance(root, mesh, U.vc_outlined(0.008))
 	var bulbs := U.baked("pumpkin_lights_bulbs", func(b: Batch) -> void:
-		for k in 5:
-			var t := (float(k) + 0.5) / 5.0
-			var x := lerpf(-0.48, 0.48, t)
-			var y := 2.32 - 0.18 * sin(t * PI) - 0.07
-			for r in 5:
-				var a := TAU * float(r) / 5.0
-				b.sphere(0.035, Vector3(x + cos(a) * 0.022, y, z + 0.04 + sin(a) * 0.022), PUMPKIN, Vector3(0.9, 1.1, 0.9))
-			b.cyl(0.006, 0.008, 0.03, Vector3(x, y + 0.05, z + 0.04), Palette.FOLIAGE_DARK, Vector3.ZERO, 5)
+		for k in LIGHTS_BULBS:
+			var c := _lights_bulb(k, z)
+			for r in 6:
+				var a := TAU * float(r) / 6.0
+				b.sphere(0.052, c + Vector3(cos(a) * 0.038, 0.0, sin(a) * 0.038), PUMPKIN if r % 2 == 0 else PUMPKIN.darkened(0.1), Vector3(0.9, 1.05, 0.9), Vector3(0, -rad_to_deg(a), 0))
+			b.sphere(0.07, c, PUMPKIN.darkened(0.04), Vector3(1.0, 0.82, 1.0))
 	)
-	var bi := U.instance(root, bulbs, Mat.glow(Color("ffb862"), 1.8))
+	var bi := U.instance(root, bulbs, U.vc_outlined(0.009, {"emission": Color("ff8a2c"), "emission_energy": 0.4, "rim": 0.4}))
 	bi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return {"light_pos": Vector3(0, 2.15, z + 0.2)}
+	return {"light_pos": Vector3(0, LIGHTS_Y - 0.25, z + 0.25)}
+
+
+const LIGHTS_Y := 2.46            # twine height at the hooks (sags LIGHTS_SAG in the middle)
+const LIGHTS_SAG := 0.2
+const LIGHTS_BULBS := 5
+
+
+static func _lights_point(t: float, z: float) -> Vector3:
+	return Vector3(lerpf(-0.47, 0.47, t), LIGHTS_Y - LIGHTS_SAG * sin(t * PI), z)
+
+
+## Centre of bulb k, hanging just under the twine.
+static func _lights_bulb(k: int, z: float) -> Vector3:
+	var t := (float(k) + 0.5) / float(LIGHTS_BULBS)
+	var p := _lights_point(t, z)
+	return Vector3(p.x, p.y - 0.1, z + 0.06)
 
 
 # --- Bat bunting (1 x 1, wall) ---------------------------------------------------------------------------------------
@@ -280,7 +353,7 @@ static func pumpkin_lights(root: Node3D) -> Dictionary:
 ## A garland of pennants and four little round bats (cream eyes, rosy cheeks): cute, never scary.
 static func bat_bunting(root: Node3D) -> Dictionary:
 	var mesh := U.baked("bat_bunting", func(b: Batch) -> void:
-		var z := -0.44
+		var z := Placement.MOUNT_BACK + 0.008
 		var bat := Palette.K_PANTS.darkened(0.2)
 		var pts: Array = []
 		for k in 11:
@@ -312,17 +385,26 @@ static func bat_bunting(root: Node3D) -> Dictionary:
 
 # --- Ghost lantern (1 x 1) ----------------------------------------------------------------------------------------------
 
-## A friendly little sheet ghost lantern on a crook post. Glows softly; purely decorative.
+## A friendly little sheet ghost lantern hanging from a shepherd's-crook post: the crook curls over and its tip
+## points down, a short cord runs from the tip to a loop on the ghost's head. Glows softly; purely decorative.
 static func ghost_lantern(root: Node3D) -> Dictionary:
 	var post := U.baked("ghost_lantern_post", func(b: Batch) -> void:
 		b.blob(0.2, Vector3(0, 0.06, 0), Palette.STONE, 81, 0.2, 0.5)
-		b.cyl(0.035, 0.045, 1.66, Vector3(0, 0.83, 0), Palette.WOOD_DARK, Vector3.ZERO, 8)
-		b.torus(0.12, 0.16, Vector3(0.14, 1.66, 0), Palette.WOOD_DARK, Vector3(90, 0, 0))
-		b.cyl(0.006, 0.006, 0.14, Vector3(0.28, 1.58, 0), Palette.STONE_DARK, Vector3.ZERO, 4)
+		b.cyl(0.04, 0.05, GHOST_CROOK_Y, Vector3(0, GHOST_CROOK_Y * 0.5, 0), Palette.WOOD_DARK, Vector3.ZERO, 8)
+		# Crook: a half ring over the top, then a short drop to the tip right above the ghost.
+		b.add(Shapes.arch_ring(GHOST_CROOK_R - 0.04, GHOST_CROOK_R + 0.04, 0.08, 12), Batch.xf(Vector3(GHOST_X * 0.5, GHOST_CROOK_Y, 0)), Palette.WOOD_DARK)
+		b.cyl(0.04, 0.04, 0.1, Vector3(GHOST_X, GHOST_CROOK_Y - 0.05, 0), Palette.WOOD_DARK, Vector3.ZERO, 8)
+		b.sphere(0.045, Vector3(GHOST_X, GHOST_CROOK_Y - 0.1, 0), Palette.WOOD_DARK)
+		b.torus(0.018, 0.034, Vector3(GHOST_X, GHOST_CROOK_Y - 0.15, 0), BRASS, Vector3(90, 0, 0))
+		# The cord down to the ghost's head loop.
+		var cord_top := GHOST_CROOK_Y - 0.18
+		var cord_bot := GHOST_HANG_Y + 0.17
+		b.cyl(0.011, 0.011, cord_top - cord_bot, Vector3(GHOST_X, (cord_top + cord_bot) * 0.5, 0), Palette.CLOTH_CREAM.darkened(0.25), Vector3.ZERO, 6)
 	)
 	U.instance(root, post, U.vc_outlined(0.012))
 	var ghost := U.baked("ghost_lantern_ghost", func(b: Batch) -> void:
 		var white := Color("eef2ff")
+		b.torus(0.018, 0.032, Vector3(0, 0.16, 0), BRASS, Vector3(90, 0, 0))
 		b.sphere(0.14, Vector3(0, 0.0, 0), white, Vector3(1.0, 1.05, 1.0))
 		b.cyl(0.14, 0.19, 0.2, Vector3(0, -0.1, 0), white, Vector3.ZERO, 16)
 		for k in 6:
@@ -334,10 +416,16 @@ static func ghost_lantern(root: Node3D) -> Dictionary:
 			b.sphere(0.02, Vector3(0.085 * sx, -0.03, 0.12), Palette.BLOSSOM, Vector3(1.3, 0.8, 0.5))
 		b.sphere(0.018, Vector3(0, -0.035, 0.135), Palette.UI_INK, Vector3(1.2, 0.7, 0.6))
 	)
-	var gp := U.pivot(root, Vector3(0.28, 1.28, 0), "Ghost")
-	var gm := U.instance(gp, ghost, Mat.outlined(Mat.toon(Color.WHITE, {"vertex_color": true, "emission": Color("bcd6ff"), "emission_energy": 0.45, "rim": 0.5}), 0.01))
+	var gp := U.pivot(root, Vector3(GHOST_X, GHOST_HANG_Y, 0), "Ghost")
+	var gm := U.instance(gp, ghost, Mat.outlined(Mat.toon(Color.WHITE, {"vertex_color": true, "emission": Color("bcd6ff"), "emission_energy": 0.5, "rim": 0.6}), 0.01))
 	gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return {"light_pos": Vector3(0.28, 1.25, 0.1)}
+	return {"light_pos": Vector3(GHOST_X, GHOST_HANG_Y - 0.05, 0.12)}
+
+
+const GHOST_X := 0.3              # the crook tip (and the ghost under it), from the post
+const GHOST_CROOK_Y := 1.66       # crook top (post height)
+const GHOST_CROOK_R := 0.15       # crook curl radius (half of GHOST_X)
+const GHOST_HANG_Y := 1.2         # ghost pivot (head centre)
 
 
 # --- Candy bowl (1 x 1) ---------------------------------------------------------------------------------------------------

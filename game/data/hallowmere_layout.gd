@@ -47,17 +47,21 @@ const POINTS := {
 
 const OUTPOST_BUILD_AREA := {"center": Vector2(-16, 54), "radius": 8.0}
 
-## Spawn stand points (all decided here, except waygate_arrival which is the spec point):
-## id -> {pos: Vector2, look: Vector2 (the point she faces on arrival)}. Arch spawns stand 3 m in front
-## of their arch, toward the landmark they serve.
+## Spawn stand points (all decided here; waygate_arrival stands just north of the spec point POINTS.waygate_arrival):
+## id -> {pos: Vector2, look: Vector2 (the point she faces on arrival)}. Camera rule (visual QA T1): the follow
+## camera hangs ~4.8 m behind her, so nothing it must not sit inside may stand within ~5 m behind a spawn.
+## Arch spawns stand 4.6 m in front of their arch (inside its 5 m safe circle), toward the landmark they serve: the
+## camera then comes to rest just in front of the arch's camera blocker (lantern_arch.gd), never behind the
+## bunting and the lantern. The arrival stands 5.8 m in front of the mirror waygate: the first view of Chapter Two
+## is the open festival road, with the gate behind the camera.
 const SPAWNS := {
-	"waygate_arrival": {"pos": Vector2(0, 98), "look": Vector2(0, 60)},
+	"waygate_arrival": {"pos": Vector2(0, 96.2), "look": Vector2(0, 60)},
 	"reach_respawn": {"pos": Vector2(6, 66), "look": Vector2(0, 60)},
-	"commons_arch": {"pos": Vector2(0, 75), "look": Vector2(0, 60)},
-	"orchard_arch": {"pos": Vector2(-62.5, 48.4), "look": Vector2(-82, 36)},
-	"quarry_arch": {"pos": Vector2(64.3, 36.1), "look": Vector2(86, 18)},
-	"manor_arch": {"pos": Vector2(10.9, -52.8), "look": Vector2(18, -74)},
-	"conservatory": {"pos": Vector2(0, 17), "look": Vector2(0, 6)},
+	"commons_arch": {"pos": Vector2(0, 73.4), "look": Vector2(0, 60)},
+	"orchard_arch": {"pos": Vector2(-63.88, 47.53), "look": Vector2(-82, 36)},
+	"quarry_arch": {"pos": Vector2(65.53, 35.06), "look": Vector2(86, 18)},
+	"manor_arch": {"pos": Vector2(11.45, -54.36), "look": Vector2(18, -74)},
+	"conservatory": {"pos": Vector2(0, 15.4), "look": Vector2(0, 6)},
 	"manor_door": {"pos": Vector2(18, -82), "look": Vector2(10, -50)},
 	"bellhouse_stair": {"pos": Vector2(72, -72), "look": Vector2(40, -40)},
 	"refuge_exit": {"pos": Vector2(20, 4), "look": Vector2(0, 6)},

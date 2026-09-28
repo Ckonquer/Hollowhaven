@@ -39,7 +39,19 @@ extends Node3D
 ## Phase changes: at the threshold it shrieks and climbs (invulnerable), every hazard is cleared,
 ## minions scatter when phase 3 begins, and Events.boss_phase_changed(id, phase) fires (music layers).
 ## Armour: it can only be hurt while stuck/scorched; otherwise hits glance off with a spark + hint.
-## One stun window can take at most 40% of its health (then it scrambles back up). HP 0 -> defeat: it
+## PACING (QA CH2-003: three brazier scorches used to win in ~23 s, skipping phases 2-3; MP section 8
+## "phases and decisions over health inflation" - 240 HP is unchanged):
+##   * a blow that crosses the next phase threshold stops exactly on it (never two thresholds in one
+##     opening), then the transition plays - every phase starts with its whole HP band;
+##   * one stun window takes at most WINDOW_CAP (40%: phase 1 = the Chapter One rule, one scorch can end
+##     it) or, in phases 2-3, LATE_WINDOW_CAP (15% = half a band): each later phase needs two openings. The
+##     blow that would overshoot the cap is trimmed to fit (the excess goes back to health before the death
+##     test, a would-be lethal blow included) and ends the window - never 54 hp in a 36 hp window;
+##   * phases 2-3 introduce their kit first: a brazier lit / stoked while it is overhead before it has
+##     performed that phase's first action (fan / trip-lines / release in phase 2; the channel, the
+##     combo's pounce or a fan in phase 3) still burns its anchor and still scorches it, but the scorch is
+##     BANKED (shriek, embers, caption + hint) and lands the moment that first action ends.
+## HP 0 -> defeat: it
 ## shrieks and retreats up into the deep crack (no death, no gore): story mode sets "weaver_defeated",
 ## emits Events.boss_defeated and the Heartseed pickup appears (re-created on load if still needed,
 ## never twice). A completed save never spawns the story boss again (state "gone").
@@ -49,8 +61,9 @@ extends Node3D
 ## RESET POLICY (one rule, MP section 8 "Failure, replay, comfort"):
 ##   * Krystal falls, or walks out of the chamber (stand-down): the ACTIVE encounter resets cleanly -
 ##     back up on a remaining anchor, dormant, bar hidden, music released, every fan / trip-line / sac /
-##     thread removed, minions scattered, any channel cancelled (its brazier stays lit). Her wounds, the
-##     phase reached, burned anchors and lit braziers are kept (a kinder retry that can never be
+##     thread removed, minions scattered, any channel cancelled (its brazier stays lit), a banked scorch
+##     dropped. Her wounds, the phase reached (and whether its kit was shown), burned anchors and lit
+##     braziers are kept (a kinder retry that can never be
 ##     mismatched: in phases 1-2 missed drops always open it up, in phase 3 every lit brazier can be
 ##     stoked again and a smothered one relit after its cooldown).
 ##   * Quitting / reloading the area: nothing about an unfinished fight is saved - a fresh encounter
@@ -88,7 +101,8 @@ const LEAVE_TIME := 4.0
 const SLAM_RADIUS := 2.4
 const BRAZIER_CLEARANCE := 2.6    # a scorched fall never lands on (or right beside) a brazier
 const CENTRE_CLEARANCE := 3.0     # ...nor on the arena's centrepiece (the Heartseed cocoon)
-const WINDOW_CAP := 0.4
+const WINDOW_CAP := 0.4           # phase 1: one stun window takes at most this share of max HP (the whole band)
+const LATE_WINDOW_CAP := 0.15     # phases 2-3: at most this share (36 of 240 = half a band): two openings each
 const SCORCHED_DAMAGE_MULT := 1.5
 const WEAVER_SCALE := 2.6
 const SHADE_SCALE := 2.3
@@ -197,6 +211,9 @@ var _channel_brazier: Node = null
 var _brazier_burned: Dictionary = {}   # brazier instance id -> true once its anchor burned
 var _retry := false                     # the encounter was reset once (explains the retry rule on re-entry)
 var _exit_released := false             # _exit_tree released the encounter (only once)
+var _kit_shown := false                 # phases 2-3: it has performed this phase's first action (see PACING)
+var _banked: int = 0                    # scorches waiting for that first action to end (one lands per opening)
+var _banked_fx: CPUParticles3D = null    # embers smouldering on it while a scorch is banked
 
 static var _pending_seed: Node3D = null
 
@@ -377,6 +394,23 @@ static func phase_for(hp: float, max_hp: float) -> int:
 	return 1
 
 
+## HP at which the next phase begins (a blow that crosses it stops there), or 0 in the last phase.
+func next_phase_hp() -> float:
+	if phase >= PHASE_AT.size():
+		return 0.0
+	return float(health.max_hp) * float(PHASE_AT[phase])
+
+
+## The most one stun window may take in the current phase (see PACING).
+func window_cap() -> float:
+	return float(health.max_hp) * (WINDOW_CAP if phase <= 1 else LATE_WINDOW_CAP)
+
+
+## True while a brazier's scorch waits for this phase's first action to end (see PACING).
+func scorch_banked() -> bool:
+	return _banked > 0
+
+
 func get_aim_point() -> Vector3:
 	if state in GROUND_STATES:
 		return global_position + Vector3.UP * (1.4 if _using_shade else 0.9)
@@ -536,20 +570,20 @@ func tick(delta: float) -> void:
 				if state == "recover" or state == "phase_shriek":
 					_enter_cling(-1.0)
 				else:
-					_enter_recover()
+					_finish_action()
 		"fan_tele":
 			_face_player_on_ceiling(delta)
 			if state_time >= _state_len:
 				if _combo:
 					_enter("combo_gap", _t(float(T_COMBO_GAP[_i()])))
 				else:
-					_enter_recover()
+					_finish_action()
 		"combo_gap":
 			_face_player_on_ceiling(delta)
 			if state_time >= _state_len:
 				if field != null and field.sacs_pending():
 					_combo = false
-					_enter_recover()
+					_finish_action()
 				else:
 					_begin_telegraph(true)
 		"channel":
@@ -643,6 +677,9 @@ func _enter_cling(length: float) -> void:
 		_phase_pending = false
 		_enter("phase_shriek", T_PHASE_SHRIEK)
 		return
+	if _banked > 0 and _kit_shown:
+		_fire_banked_scorch()        # a second light kept during the introduction (see _bank_scorch)
+		return
 	var r: Array = T_CLING[clampi(intensity(), 0, 2)]
 	var l := length if length >= 0.0 else _rng.randf_range(float(r[0]), float(r[1]))
 	if length < 0.0:
@@ -653,6 +690,21 @@ func _enter_cling(length: float) -> void:
 func _enter_recover() -> void:
 	_combo = false
 	_enter("recover", _t(float(T_RECOVER[_i()])))
+
+
+## A major action (fan, trip-lines, release, channel) ended: normally a recovery beat. In phases 2-3 the
+## first one also completes the phase's introduction - a scorch banked meanwhile lands now instead.
+func _finish_action() -> void:
+	_mark_kit_shown()
+	if _banked > 0:
+		_fire_banked_scorch()
+		return
+	_enter_recover()
+
+
+func _mark_kit_shown() -> void:
+	if phase >= 2:
+		_kit_shown = true
 
 
 ## What it does when a cling ends (Krystal inside the arena, allowed to be hunted).
@@ -775,6 +827,11 @@ func _slam() -> void:
 	global_transform = _to
 	_show_shadow(false)
 	_pounce = false
+	# Phases 2-3: a landed drop / pounce completes the phase's introduction; a banked scorch catches it now.
+	_mark_kit_shown()
+	if _banked > 0:
+		_take_banked_scorch()
+		_pending_scorch = true
 	Audio.play_3d(_snd("drop"), _drop_target, 0.0, 0.05, 50.0)
 	Events.camera_shake.emit(0.7, 0.4)
 	HitFx.burst(_drop_target + Vector3.UP * 0.2, Color(0.72, 0.68, 0.76), 22, 4.5, 1.6, -9.0, 0.7, 85.0)
@@ -938,7 +995,7 @@ func _tick_channel(p: Node3D) -> void:
 	var b := _channel_brazier
 	if b == null or not is_instance_valid(b) or not bool(b.is_lit()):
 		_channel_cd = float(CHANNEL_CD[_i()]) * 0.5
-		_enter_recover()
+		_finish_action()
 		return
 	var bp := (b as Node3D).global_position
 	global_transform = _lerp_xform(global_transform, _ceiling_pose(_anchor, bp), 0.1)
@@ -968,6 +1025,11 @@ func _interrupt_channel(_how: String) -> void:
 	var land := scorch_landing(global_position)
 	_to = _ground_pose(_ground_at(land), _player_pos())
 	_enter("snap_fall", T_SCORCH_FALL)
+	# The channel was this phase's first action: a banked scorch turns the snapped fall into a scorch.
+	_mark_kit_shown()
+	if _banked > 0:
+		_take_banked_scorch()
+		_pending_scorch = true
 
 
 func _complete_channel() -> void:
@@ -977,7 +1039,7 @@ func _complete_channel() -> void:
 	if b != null and is_instance_valid(b) and bool(b.is_lit()) and b.has_method("extinguish"):
 		b.extinguish(float(BRAZIER_COOLDOWN[_i()]))
 	Events.hint.emit("boss_smothered", "A smothered brazier smoulders for a while - then you can light it again.")
-	_enter_recover()
+	_finish_action()
 
 
 func _release_channel() -> void:
@@ -1009,6 +1071,7 @@ func _set_phase(np: int) -> void:
 	if np <= phase:
 		return
 	phase = np
+	_kit_shown = false            # PACING: the new phase shows its first action before a scorch lands
 	_release_channel()
 	_combo = false
 	if field != null:
@@ -1063,8 +1126,49 @@ func _brazier_scorch(brazier: Node, burn: bool) -> void:
 				global_transform = _ceiling_pose(_anchor, _player_pos())
 			return
 		start_fight()
+	if _scorch_gated():
+		_bank_scorch()
+		return
 	Audio.play_3d(_snd("shriek"), global_position, -3.0, 0.05, 60.0)
 	Events.caption.emit(_caption("scorch"))
+	_apply_scorch()
+
+
+## PACING: phases 2-3 show their kit before the light can bring it down - a scorch that arrives while it is
+## overhead (not mid-drop: a landing drop completes the introduction anyway) before that is banked.
+func _scorch_gated() -> bool:
+	return phase >= 2 and not _kit_shown and is_overhead() and state != "drop"
+
+
+## The anchor already burned (the light counts); it shrieks and clings on, smouldering, and the scorch
+## lands when this phase's first action ends (_finish_action / _slam / _interrupt_channel). A second light
+## meanwhile is kept too: it lands at the next cling after the first scorch window (_enter_cling).
+func _bank_scorch() -> void:
+	_banked += 1
+	Audio.play_3d(_snd("shriek"), global_position, -5.0, 0.05, 60.0)
+	Events.caption.emit(_caption("banked"))
+	Events.hint.emit("boss_banked", "It clings on through the heat! Watch what it does next - the light will still bring it down.")
+	HitFx.burst(get_aim_point(), Color("ffb35c"), 16, 2.6, 1.1, 1.5, 0.8, 120.0)
+	_set_banked_fx(true)
+
+
+## Consumes a banked scorch (the caller brings it down): the embers go out, the scorch shriek and caption play.
+func _take_banked_scorch() -> void:
+	_banked = maxi(_banked - 1, 0)
+	if _banked == 0:
+		_set_banked_fx(false)
+	Audio.play_3d(_snd("shriek"), global_position, -3.0, 0.05, 60.0)
+	Events.caption.emit(_caption("scorch"))
+
+
+func _fire_banked_scorch() -> void:
+	_take_banked_scorch()
+	_combo = false
+	_apply_scorch()
+
+
+## Brings it down scorched from wherever it is (the light reached it).
+func _apply_scorch() -> void:
 	match state:
 		"stuck", "scorched", "rebound":
 			_enter("scorched", _t(float(T_SCORCHED[clampi(intensity(), 0, 2)])))
@@ -1156,15 +1260,40 @@ func _nearest_anchor(pos: Vector3) -> Vector3:
 # --- Damage & defeat -----------------------------------------------------------------------------------------
 
 func _on_damaged(amount: float, _source: Node, _dir: Vector3) -> void:
+	var before: float = health.hp + amount      # apply_damage already took the blow (before its death test)
+	var shown := amount
+	var crossed := false
+	# PACING: a blow that crosses the next phase threshold stops exactly on it (set here, inside
+	# apply_damage, before its death test), so one opening never carries it across two thresholds and every
+	# phase starts with its whole band. Only a blow that started above the threshold is clamped.
+	var th := next_phase_hp()
+	if th > 0.0 and health.hp < th and before > th + 0.001:
+		shown = before - th
+		crossed = true
+	# PACING (QA: one phase-2 window took 54 of its 36 hp): the blow that would overshoot this window's cap is
+	# trimmed to the room left - checked BEFORE the window-end test, the excess goes back to health before
+	# apply_damage's death test (the count_velour / quarry_warden technique), so a window never takes more than
+	# window_cap(). Exception (lead decision, like Count Velour): a blow that would finish her in her last phase
+	# goes through - a boss escaping at a sliver of health to the ceiling feels unfair.
+	var finishing := before - shown <= 0.0      # after the threshold clamp: only a blow that really ends the fight
+	if state in VULNERABLE_STATES and not finishing:
+		var room := maxf(window_cap() - _window_damage, 0.0)
+		if shown > room:
+			shown = room
+			crossed = crossed and before - shown <= th + 0.001
+	if shown < amount:
+		health.hp = before - shown
 	HitFx.flash(self)
-	HitFx.number(get_aim_point() + Vector3.UP * 0.8, amount)
+	HitFx.number(get_aim_point() + Vector3.UP * 0.8, shown)
 	Audio.play_3d("enemy_hurt", get_aim_point(), -2.0, 0.1)
 	if health.dead:
 		return
 	if health.hp <= 0.0:
 		return        # the killing blow: `died` follows right after (no climb/shriek first)
-	_window_damage += amount
+	_window_damage += shown
 	var np := phase_for(health.hp, health.max_hp)
+	if crossed:
+		np = maxi(np, phase + 1)
 	if np > phase:
 		# Phase threshold: the window ends at once - it shrieks, climbs, and the new phase begins up there.
 		_set_phase(np)
@@ -1173,7 +1302,7 @@ func _on_damaged(amount: float, _source: Node, _dir: Vector3) -> void:
 		if state in VULNERABLE_STATES or state == "rebound":
 			_begin_climb()
 		return
-	if state in VULNERABLE_STATES and _window_damage >= health.max_hp * WINDOW_CAP:
+	if state in VULNERABLE_STATES and _window_damage >= window_cap() - 0.001:
 		Audio.play_3d(_snd("shriek"), global_position, -6.0, 0.1, 50.0)
 		_begin_climb()
 
@@ -1198,6 +1327,8 @@ func _begin_defeat() -> void:
 	state = "defeat"
 	health.invulnerable = true
 	_show_shadow(false)
+	_banked = 0
+	_set_banked_fx(false)
 	_release_channel()
 	if field != null:
 		field.clear_all(true)
@@ -1254,6 +1385,8 @@ func reset_fight() -> void:
 		return
 	_pending_scorch = false
 	_phase_pending = false
+	_banked = 0
+	_set_banked_fx(false)
 	_combo = false
 	_pounce = false
 	_release_done = false
@@ -1497,6 +1630,39 @@ func _spawn_burn_fx(a: Vector3) -> void:
 	HitFx.burst(a, Color("ffb35c"), 24, 3.0, 1.2, -6.0, 0.9, 120.0)
 
 
+## Warm embers smouldering on it while a scorch is banked (PACING): "the light has it - it just hasn't let
+## go yet". Built on first use; soft, slow and steady (no flashing).
+func _set_banked_fx(on: bool) -> void:
+	if not on:
+		if _banked_fx != null and is_instance_valid(_banked_fx):
+			_banked_fx.emitting = false
+		return
+	if _banked_fx == null or not is_instance_valid(_banked_fx):
+		_banked_fx = CPUParticles3D.new()
+		_banked_fx.name = "BankedEmbers"
+		var m := SphereMesh.new()
+		m.radius = 0.05
+		m.height = 0.1
+		m.radial_segments = 6
+		m.rings = 3
+		var pm := StandardMaterial3D.new()
+		pm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		pm.albedo_color = Color("ffb35c")
+		m.material = pm
+		_banked_fx.mesh = m
+		_banked_fx.amount = 14
+		_banked_fx.lifetime = 1.3
+		_banked_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_banked_fx.emission_sphere_radius = 0.9
+		_banked_fx.gravity = Vector3(0, 1.2, 0)
+		_banked_fx.initial_velocity_min = 0.1
+		_banked_fx.initial_velocity_max = 0.4
+		_banked_fx.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_banked_fx.position = Vector3(0, 1.0, 0)
+		add_child(_banked_fx)
+	_banked_fx.emitting = true
+
+
 func _snd(kind: String) -> String:
 	var shade := _using_shade
 	match kind:
@@ -1522,6 +1688,8 @@ func _caption(kind: String) -> String:
 			return "[a slow, gathering whisper overhead]" if shade else "[a slow, deliberate rattle overhead]"
 		"scorch":
 			return "[it wails as the light burns it]" if shade else "[it shrieks as the light scorches it]"
+		"banked":
+			return "[it wails, smouldering, but holds on]" if shade else "[it shrieks, smouldering, but clings on]"
 		"defeat":
 			return "[the Hollow Mother wails and withdraws into the deep]" if shade else "[the Weaver shrieks and flees into the deep]"
 		"fan":

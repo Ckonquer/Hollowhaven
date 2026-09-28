@@ -4,7 +4,9 @@ extends Node3D
 ## it becomes this area's return point); every later use opens the Lantern Road travel list
 ## (Game.travel_lantern_road). Neither works while Game.can_fast_travel() is false (something chasing
 ## Krystal, a boss fight, a cutscene): the prompt is shown greyed with the reason instead.
-## Interaction contract: group "interactable" + a layer-16 sphere; the two posts are solid (layer 1).
+## Interaction contract: group "interactable" + a layer-16 sphere; the two posts are solid (layer 1); a camera-only
+## blocker (src/camera/camera_block.gd) fills the top of the arch (curved top, bunting, lantern) so the follow camera
+## pulls in in front of it rather than looking through the bunting from inside the arch (visual QA RE-01).
 ##   setup({"id": "commons", "area": "hallowmere_reach", "spawn": "commons_arch", "name": "..."})
 ## id/spawn/name default from data/hallowmere_layout.gd ARCHES.
 
@@ -15,9 +17,19 @@ const NodeVisuals := preload("res://src/world/common/node_visuals.gd")
 const Props := preload("res://src/world/surface/props.gd")
 const Fx := preload("res://src/world/common/fx.gd")
 const Reach := preload("res://data/hallowmere_layout.gd")
+const CameraBlock := preload("res://src/camera/camera_block.gd")
 
 const GLOW := Color("ffb45a")
 const POST_X := 1.25
+## The hanging lantern (RE-07): smoky toon glass under a cap, on a base, hung from the top; it glows when lit.
+const GLASS_POS := Vector3(0.0, 2.95, 0.05)
+const GLASS_SCALE := 1.4
+const GLASS_UNLIT := Color("5d566b")
+const GLASS_LIT := Color("ffc66e")
+## Camera-only box over the top of the arch (local): above Krystal's camera pivot even mid-jump (y >= 2.42), and
+## covering the curved top, the bunting and the lantern.
+const CAMERA_BLOCK_CENTER := Vector3(0.0, 3.07, 0.05)
+const CAMERA_BLOCK_SIZE := Vector3(2.9, 1.3, 0.6)
 
 var arch_id: String = ""
 var area_name: String = Reach.AREA_ID     # area id this arch stands in (for the respawn point)
@@ -28,7 +40,9 @@ var display_name: String = ""
 ## it is reused for this long (like bed.gd's danger check). interact() always checks afresh.
 const PROMPT_CHECK_MS := 400
 
-var glass_material: StandardMaterial3D
+var glass: MeshInstance3D
+var glass_unlit: Material
+var glass_lit: Material
 var light: OmniLight3D
 var _t := 0.0
 var _busy := false
@@ -148,15 +162,23 @@ func _build() -> void:
 	var bunting := Props.instance(Props.garland(2.3, [Color("e9a15b"), Color("b48ad8"), Color("f3e6c8")]), trim, 90.0, false)
 	bunting.position = Vector3(0, 2.8, 0.15)
 	add_child(bunting)
-	glass_material = StandardMaterial3D.new()
-	glass_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glass_material.albedo_color = Palette.STONE_DARK
-	var glass := MeshInstance3D.new()
+	# The lantern: dark cap and base with an outline, a short hanger up to the arch, smoky glass that reads as glass
+	# (rim light + specular) while unlit and glows warm once lit (cached meshes / materials).
+	glass_unlit = Mat.outlined(Mat.toon(GLASS_UNLIT, {"rim": 0.75, "specular": 0.6, "emission": Color("9a8aa8"), "emission_energy": 0.12}), 0.014)
+	glass_lit = Mat.glow(GLASS_LIT, 2.0)
+	var metal := Mat.outlined(Mat.toon(Palette.WOOD_DARK, {"rim": 0.3}), 0.014)
+	glass = MeshInstance3D.new()
+	glass.name = "LanternGlass"
 	glass.mesh = Props.lantern_glass()
-	glass.material_override = glass_material
-	glass.position = Vector3(0, 2.95, 0.05)
-	glass.scale = Vector3.ONE * 1.4
+	glass.material_override = glass_unlit
+	glass.position = GLASS_POS
+	glass.scale = Vector3.ONE * GLASS_SCALE
+	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(glass)
+	var half_h := 0.11 * GLASS_SCALE
+	Kit.add(self, Kit.cylinder(0.035, 0.2, 0.12, metal, 8), GLASS_POS + Vector3(0, half_h + 0.06, 0))
+	Kit.add(self, Kit.cylinder(0.17, 0.14, 0.05, metal, 8), GLASS_POS + Vector3(0, -half_h - 0.02, 0))
+	Kit.add(self, Kit.cylinder(0.018, 0.018, 0.26, metal, 6), GLASS_POS + Vector3(0, half_h + 0.25, 0))
 	var body := StaticBody3D.new()
 	body.name = "Posts"
 	body.collision_layer = 1
@@ -171,6 +193,7 @@ func _build() -> void:
 		cs.shape = cyl
 		cs.position = Vector3(float(sx) * POST_X, 1.5, 0)
 		body.add_child(cs)
+	CameraBlock.add_box(self, CAMERA_BLOCK_CENTER, CAMERA_BLOCK_SIZE)
 	var ib := StaticBody3D.new()
 	ib.name = "Interact"
 	ib.collision_layer = 16
@@ -192,8 +215,8 @@ func _build() -> void:
 
 
 func _apply_lit(on: bool) -> void:
-	if glass_material != null:
-		glass_material.albedo_color = Color(1.6, 1.15, 0.6) if on else Palette.STONE_DARK
+	if glass != null:
+		glass.material_override = glass_lit if on else glass_unlit
 	if light != null:
 		light.light_energy = 1.1 if on else 0.0
 		light.visible = on

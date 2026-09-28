@@ -50,6 +50,10 @@ func test_sites_follow_the_mine_frame() -> void:
 	assert_true(d.distance_to(o) >= 6.0 and d.distance_to(o) <= 9.0, "the side door is a few metres beside the mouth (%.1f m)" % d.distance_to(o))
 	assert_true(h.distance_to(o) >= 6.0 and h.distance_to(o) <= 10.0, "the hatch is near the mouth (%.1f m)" % h.distance_to(o))
 	assert_true((d - o).dot(f) > 0.0 and (h - o).dot(f) > 0.0, "both on the apron side of the cliff")
+	# The door's arrival spot stands well out on the apron, straight in front of the door (room for the camera).
+	var ds := TobinDoor.to_world(TobinDoor.DOOR_SPAWN_LOCAL)
+	assert_true(ds.distance_to(d) >= 4.5 and ds.distance_to(d) < 6.0, "annex_door stands 4.5-6 m out from the door (%.1f m)" % ds.distance_to(d))
+	assert_true((ds - d).normalized().dot(f) > 0.95, "annex_door is straight out in front of the door")
 	var c: Array = TobinDoor.grass_clearings()
 	assert_eq(c.size(), 2, "two grass clearings")
 	assert_true(c[0][0] is Vector2 and float(c[0][1]) > 0.0, "[centre, radius] pairs")
@@ -118,13 +122,15 @@ func test_door_hatch_and_spawns_on_the_surface() -> void:
 		assert_eq(w.get_zone_at(p), "mine_mouth", "%s adds no zone (the mine mouth's music and bond xp)" % id)
 		var fwd := -xf.basis.z
 		assert_true(fwd.dot(Vector3(SL.MINE_FACING.normalized().x, 0, SL.MINE_FACING.normalized().y)) > 0.95, "%s faces out onto the apron" % id)
-	# Clear approach: capsules from the door's spawn up to the door front, and around the hatch.
+	# Clear approach: capsules every half metre from the door's spawn (5.6 m out on the apron) up to the door front,
+	# and around the hatch.
 	var sp: Vector3 = (w.spawns["annex_door"] as Transform3D).origin
-	for k in 5:
-		var t := float(k) / 4.0
-		var p := sp.lerp(door.global_position + (sp - door.global_position).normalized() * 0.6, t)
+	var front := door.global_position + (sp - door.global_position).normalized() * 0.6
+	var steps := maxi(4, int(ceil(sp.distance_to(front) / 0.5)))
+	for k in steps + 1:
+		var p := sp.lerp(front, float(k) / float(steps))
 		p.y = float(w.height_at(p.x, p.z))
-		assert_eq(_shape_hits(w, cap, Transform3D(Basis.IDENTITY, p + Vector3(0, 1.05, 0))), [], "the way to the door is clear (%d)" % k)
+		assert_eq(_shape_hits(w, cap, Transform3D(Basis.IDENTITY, p + Vector3(0, 1.05, 0))), [], "the way to the door is clear (%d/%d)" % [k, steps])
 	var box := BoxShape3D.new()
 	box.size = Vector3(1.9, 0.5, 1.9)
 	var hp := hatch.global_position
@@ -137,7 +143,9 @@ func test_door_hatch_and_spawns_on_the_surface() -> void:
 
 
 ## Arriving at either spawn, the way back is right there: the player's own interaction probe (reach, facing,
-## line of sight) focuses the side door from annex_door and the hatch from annex_hatch.
+## line of sight) focuses the hatch from annex_hatch, and the side door a few clear steps from annex_door (that spawn
+## stands 5.6 m out on the apron so the arrival camera frames the adit: from 2 m in front of the door on the
+## spawn -> door approach, inside the 2.6 m interaction reach, the door is focused).
 func test_door_and_hatch_are_usable_from_their_spawns() -> void:
 	var w: Node3D = await _world()
 	var doors := _by_script(w, "res://src/world/annex/annex_door.gd")
@@ -156,6 +164,8 @@ func test_door_and_hatch_are_usable_from_their_spawns() -> void:
 	for c in [["annex_door", doors[0]], ["annex_hatch", hatches[0]]]:
 		var target: Node3D = c[1]
 		var p: Vector3 = (w.spawns[c[0]] as Transform3D).origin
+		if c[0] == "annex_door":
+			p = _door_approach_point(w, target, p)
 		var to := target.global_position - p
 		stand.global_transform = Transform3D(Basis(Vector3.UP, atan2(-to.x, -to.z)), p)
 		probe.call("refresh")
@@ -165,6 +175,24 @@ func test_door_and_hatch_are_usable_from_their_spawns() -> void:
 		assert_true(String(info.get("text", "")) != "", "%s: a prompt is shown" % c[0])
 	probe.queue_free()
 	stand.queue_free()
+
+
+## annex_door -> the side door: the walk is short (< 6 m) and clear; returns the stand point 2 m in front of the door
+## on that approach (inside the probe's 2.6 m reach).
+func _door_approach_point(w: Node3D, door: Node3D, spawn: Vector3) -> Vector3:
+	var away := Vector3(spawn.x - door.global_position.x, 0.0, spawn.z - door.global_position.z)
+	assert_true(away.length() < 6.0, "annex_door: the door is a few steps from the spawn (%.2f m)" % away.length())
+	var p := door.global_position + away.normalized() * 2.0
+	p.y = float(w.height_at(p.x, p.z)) + TobinDoor.SPAWN_LIFT
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.35
+	cap.height = 1.6
+	var steps := maxi(4, int(ceil(spawn.distance_to(p) / 0.5)))
+	for k in steps + 1:
+		var q := spawn.lerp(p, float(k) / float(steps))
+		q.y = float(w.height_at(q.x, q.z))
+		assert_eq(_shape_hits(w, cap, Transform3D(Basis.IDENTITY, q + Vector3(0, 1.05, 0))), [], "annex_door: the walk to the door is clear (%d/%d)" % [k, steps])
+	return p
 
 
 func test_legacy_mine_mouth_untouched() -> void:
