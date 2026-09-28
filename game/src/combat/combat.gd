@@ -11,6 +11,8 @@ extends RefCounted
 ##   on_hit_blocked(attacker: Node, dir: Vector3)                        -> hit ignored (invulnerable/boss armour)
 ##   get_aim_point() -> Vector3 / hit_radius: float                     -> better targeting for big bodies
 ##   hit_color: Color                                                     -> colour of the impact particles
+##   can_be_hit_by(attacker: Node) -> bool                               -> false = the hit is refused like a
+##                                                                           blocked one (boss invulnerable/overhead)
 ## Light sources (group "light_source"): `light_radius: float`, `is_light_active() -> bool`,
 ## optional `light_strength: float` (0..1). The player's lantern counts even if the player script
 ## forgot to join the group (uses `lantern_on`).
@@ -26,6 +28,9 @@ const LIGHT_CORE := 0.45                 # fraction of light_radius that is full
 const PLAYER_LANTERN_RADIUS := 6.5       # fallback when the player isn't a registered light source
 const HITSTOP_LIGHT := 0.045
 const HITSTOP_HEAVY := 0.06
+## Areas whose threats scale with the horror intensity setting (underground: the Below and the Chapter Two
+## underground areas, spec section 9). Surface, the Reach and interiors never scale.
+const INTENSITY_SCALED_AREAS := ["below", "tobin_annex", "hushed_works"]
 
 static var _light_nodes: Array = []
 static var _light_frame: int = -1
@@ -70,6 +75,10 @@ static func melee(attacker: Node3D, origin: Vector3, forward: Vector3, reach: fl
 				continue
 			var dir := Vector3(aim.x - origin.x, 0.0, aim.z - origin.z)
 			dir = dir.normalized() if dir.length_squared() > 0.0001 else fwd
+			if not can_hit(t, attacker):
+				if t.has_method("on_hit_blocked"):
+					t.on_hit_blocked(attacker, dir)
+				continue
 			var dealt: float = float(h.apply_damage(damage, attacker, dir))
 			if dealt <= 0.0:
 				if t.has_method("on_hit_blocked"):
@@ -116,6 +125,15 @@ static func has_line_of_sight(space: PhysicsDirectSpaceState3D, from: Vector3, t
 	q.exclude = ex
 	q.collide_with_areas = false
 	return space.intersect_ray(q).is_empty()
+
+
+## False when the target refuses hits from `attacker` right now (optional `can_be_hit_by(source) -> bool`,
+## e.g. a boss while invulnerable or out of reach overhead). Melee and projectiles respect it.
+static func can_hit(t: Object, attacker: Object) -> bool:
+	if t == null or not is_instance_valid(t) or not t.has_method("can_be_hit_by"):
+		return true
+	var src: Variant = attacker if attacker != null and is_instance_valid(attacker) else null
+	return truthy(t.call("can_be_hit_by", src))
 
 
 ## Where attacks and line-of-sight checks aim at a node.
@@ -229,11 +247,11 @@ static func intensity_damage_mult(level: int) -> float:
 	return float(d.get("damage_mult", 1.0))
 
 
-## Damage multiplier for threats of an area: underground ("below") threats scale with the horror
-## intensity setting (Gentle 0.6, Standard 1.0, Intense 1.15); surface enemies never do.
-## `area` defaults to the current area.
+## Damage multiplier for threats of an area: underground threats (INTENSITY_SCALED_AREAS: the Below, Tobin's
+## annex, the Hushed Works) scale with the horror intensity setting (Gentle 0.6, Standard 1.0, Intense 1.15);
+## surface, Reach and interior enemies never do. `area` defaults to the current area.
 static func damage_mult_for_area(area: String = "") -> float:
 	var a := area if area != "" else Game.area_id
-	if a != "below":
+	if not INTENSITY_SCALED_AREAS.has(a):
 		return 1.0
 	return intensity_damage_mult(current_intensity())

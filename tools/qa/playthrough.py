@@ -1,12 +1,16 @@
-"""Full Chapter One playthrough of the PACKAGED game with real OS input.
+"""Full Chapter One playthrough of the PACKAGED game, driven only by keyboard/mouse input.
 
-Every action is a real keyboard/mouse event sent to the game window (SendInput). The bot perceives the
+By default every action is a real OS keyboard/mouse event sent to the focused game window (SendInput).
+With --second-monitor (or --virtual-input) the same scenario runs through the game's localhost virtual-input
+server instead: the window sits borderless on the second monitor, never takes focus or the cursor, and the
+owner keeps using the PC (see hhbot.py for what that mode does and does not cover). The bot perceives the
 game through the read-only QA telemetry (what's nearby, the on-screen prompt, objectives, button rects)
 and screenshots. It never grants items, teleports, or sets flags.
 
 Usage:
   python tools/qa/playthrough.py --exe builds/Hollowhaven/Hollowhaven.exe --out qa/tmp/e2e/run1 [--until STEP]
   python tools/qa/playthrough.py --continue-save ...   (start from the title's Continue instead of New Game)
+  python tools/qa/playthrough.py --second-monitor [--mute] --out qa/tmp/e2e/run2   (owner keeps the PC)
 """
 from __future__ import annotations
 
@@ -18,8 +22,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from hhbot import mouse_move, mouse_wheel  # noqa: E402
-from session import Session  # noqa: E402
+from session import Session, add_transport_args, transport_kwargs  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -328,10 +331,8 @@ class Play:
                 # scroll the list: hover the list area and wheel down/up
                 x, y, w, h = b["rect"]
                 win_h = self.st().get("window", [1600, 900])[1]
-                cx, cy, _, _ = self.bot.win.client_rect()
-                import ctypes
-                ctypes.windll.user32.SetCursorPos(int(cx + x + w // 2), int(cy + min(max(y, 250), win_h - 250)))
-                mouse_wheel(-120 if y > win_h / 2 else 120)
+                self.bot.hover(x + w // 2, min(max(y, 250), win_h - 250))
+                self.bot.wheel(-120 if y > win_h / 2 else 120)
                 time.sleep(0.25)
             else:
                 time.sleep(0.2)
@@ -410,7 +411,7 @@ class Play:
         for _ in range(20):
             if self.st().get("build", {}).get("item") == item:
                 break
-            mouse_wheel(-120)
+            self.bot.wheel(-120)
             time.sleep(0.25)
         if self.st().get("build", {}).get("item") != item:
             self.bot.tap("B")
@@ -425,7 +426,7 @@ class Play:
                     break
             self.log(f"placement invalid: {b.get('reason')}")
             # adjust: turn a bit and look a bit lower/higher
-            mouse_move(int(40 * self.bot.px_per_deg / 8), 0)
+            self.bot.mouse_move(int(40 * self.bot.px_per_deg / 8), 0)
             if k % 3 == 2:
                 self.bot.hold("S", 0.3)
             time.sleep(0.4)
@@ -479,7 +480,7 @@ def run(args):
     exe = str(Path(args.exe).resolve())
     save_dir = Path(args.save_dir) if args.save_dir else out / "saves"
     pre = ["--path", str(ROOT / "game")] if args.dev else []
-    sess = Session(exe, out, save_dir, args.name, extra=["--windowed"], pre_args=pre)
+    sess = Session(exe, out, save_dir, args.name, extra=["--windowed"], pre_args=pre, **transport_kwargs(args))
     bot = sess.start(wait_for=lambda s: s.get("mode") == "title" and len(s.get("buttons", [])) > 0, timeout=60)
     play = Play(sess)
     results = []
@@ -948,6 +949,7 @@ if __name__ == "__main__":
     ap.add_argument("--from-step", default="", help="with --continue-save: skip to this step after the title")
     ap.add_argument("--keep-open", action="store_true")
     ap.add_argument("--dev", action="store_true", help="run the project with the editor binary (for developing the bot)")
+    add_transport_args(ap)
     a = ap.parse_args()
     r = run(a)
     print(json.dumps(r, indent=1))

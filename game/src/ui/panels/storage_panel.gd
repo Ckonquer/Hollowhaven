@@ -2,11 +2,16 @@ extends "res://src/ui/panels/panel_base.gd"
 ## Storage chest <-> backpack. Same pointer rules as the backpack (pick / place / drag / split);
 ## shift-click moves a whole stack to the other side; "Take all" / "Store all" buttons.
 ## args: {"uid": structure uid}. Chest contents live in GameState.get_storage(uid).
+## Chapter Two: grids follow the real capacities (backpack 32 / 40 / 48 = GameState.inventory.size, chest 20 / 40
+## = its Inventory size) and a chest that can grow shows "Upgrade to 40 slots" with the exact cost, where it is
+## taken from (backpack first, then this chest) and what changes (same chest, same contents, same order).
 
 const ItemSlot := preload("res://src/ui/widgets/item_slot.gd")
 const SlotController := preload("res://src/ui/widgets/slot_controller.gd")
+const Crafting := preload("res://src/crafting/crafting.gd")
 
 const SLOT := 88.0
+const SLOT_COMPACT := 80.0        # used when the chest has 40 slots or the backpack more than 32
 
 var uid := ""
 var chest: RefCounted = null
@@ -15,6 +20,10 @@ var chest_slots: Array = []
 var bag_slots: Array = []
 var chest_title: Label
 var info_l: Label
+var chest_grid: GridContainer
+var upgrade_box: VBoxContainer
+var upgrade_btn: Button
+var upgrade_l: Label
 
 
 func setup(p_args: Dictionary) -> void:
@@ -22,6 +31,11 @@ func setup(p_args: Dictionary) -> void:
 	uid = String(p_args.get("uid", ""))
 	title = "Storage Chest"
 	window_min = Vector2(1540, 0)
+
+
+func _slot_size() -> float:
+	var n: int = int(chest.size) if chest != null else 0
+	return SLOT_COMPACT if n > 20 or int(GameState.inventory.size) > GameState.INVENTORY_SIZE else SLOT
 
 
 func _build() -> void:
@@ -40,23 +54,17 @@ func _build() -> void:
 	lh.add_child(section_title("Chest"))
 	lh.add_child(Kit.expander())
 	lh.add_child(Kit.button("Take all", _take_all))
-	var cg := GridContainer.new()
-	cg.columns = 5
-	cg.add_theme_constant_override("h_separation", 10)
-	cg.add_theme_constant_override("v_separation", 10)
-	left.add_child(cg)
-	var n: int = int(chest.size) if chest != null else 0
-	for i in n:
-		var s := ItemSlot.new(SLOT)
-		s.index = i
-		s.inv = chest
-		chest_slots.append(s)
-		ctl.register(s)
-		cg.add_child(s)
+	chest_grid = GridContainer.new()
+	chest_grid.add_theme_constant_override("h_separation", 10)
+	chest_grid.add_theme_constant_override("v_separation", 10)
+	left.add_child(chest_grid)
+	_build_chest_slots()
 	if chest == null:
 		left.add_child(Kit.wrap_label("This chest seems to be stuck shut.", "Muted", 400))
 	info_l = Kit.label("", "Small")
 	left.add_child(info_l)
+	upgrade_box = Kit.vbox(6)
+	left.add_child(upgrade_box)
 	cols.add_child(VSeparator.new())
 	# backpack
 	var right := Kit.vbox(10)
@@ -73,8 +81,9 @@ func _build() -> void:
 	bg.add_theme_constant_override("h_separation", 10)
 	bg.add_theme_constant_override("v_separation", 10)
 	right.add_child(bg)
-	for i in GameState.INVENTORY_SIZE:
-		var s2 := ItemSlot.new(SLOT)
+	var ss := _slot_size()
+	for i in int(GameState.inventory.size):
+		var s2 := ItemSlot.new(ss)
 		s2.index = i
 		s2.inv = GameState.inventory
 		s2.hotbar_row = i < GameState.HOTBAR_SIZE
@@ -88,16 +97,97 @@ func _build() -> void:
 		chest.connect("changed", refresh)
 
 
+## (Re)creates the chest slot widgets for the chest's current size (5 columns up to 20 slots, 8 beyond).
+func _build_chest_slots() -> void:
+	for s in chest_slots:
+		(ctl.get("slots") as Array).erase(s)   # the controller must never touch a freed slot
+		if is_instance_valid(s):
+			(s as Node).queue_free()
+	chest_slots.clear()
+	var n: int = int(chest.size) if chest != null else 0
+	chest_grid.columns = 5 if n <= 20 else 8
+	var ss := _slot_size()
+	for i in n:
+		var s := ItemSlot.new(ss)
+		s.index = i
+		s.inv = chest
+		chest_slots.append(s)
+		ctl.register(s)
+		chest_grid.add_child(s)
+
+
 func refresh() -> void:
 	for s in chest_slots:
 		var c: Control = s
-		c.set_stack(chest.get_slot(c.index) if chest != null else null)
+		if is_instance_valid(c):
+			c.set_stack(chest.get_slot(c.index) if chest != null else null)
 	for s2 in bag_slots:
 		var c2: Control = s2
 		c2.set_stack(GameState.inventory.get_slot(c2.index))
 	if chest != null:
 		info_l.text = "%d of %d spaces free" % [int(chest.free_slots()), int(chest.size)]
+	_refresh_upgrade()
 
+
+# --- Chest upgrade (recipe chest_upgrade_40) --------------------------------------------------------------
+
+func _refresh_upgrade() -> void:
+	if upgrade_box == null:
+		return
+	var info := Crafting.chest_upgrade_info(uid) if uid != "" and chest != null else {}
+	var offer := bool(info.get("offer", false))
+	upgrade_box.visible = offer
+	if not offer:
+		return
+	if upgrade_btn == null:
+		var h := Kit.hbox(12)
+		upgrade_box.add_child(h)
+		upgrade_btn = Kit.button("Upgrade to 40 slots", _upgrade, "AccentButton")
+		h.add_child(upgrade_btn)
+		upgrade_l = Kit.wrap_label("", "Small", 420)
+		upgrade_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		upgrade_l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(upgrade_l)
+	upgrade_btn.text = "Upgrade to %d slots" % int(info["to"])
+	upgrade_btn.disabled = not bool(info["ok"])
+	upgrade_btn.tooltip_text = String(info.get("reason", ""))
+	upgrade_l.text = upgrade_preview_text(info)
+
+
+## "Costs 6 Wood (you have 10), 2 Iron Bar (you have 1). 20 -> 40 slots; ..." (exact cost and source).
+static func upgrade_preview_text(info: Dictionary) -> String:
+	var cost: Dictionary = info.get("cost", {})
+	var bits: PackedStringArray = []
+	var src: Array = info.get("sources", [])
+	for id in cost:
+		bits.append("%d %s (you have %d)" % [int(cost[id]), ItemDB.display_name(String(id)), Crafting.count_available(String(id), src)])
+	var text := "Costs " + ", ".join(bits) + ". %d -> %d slots: same chest, everything inside stays where it is." % [int(info.get("from", 20)), int(info.get("to", 40))]
+	var pl: Dictionary = info.get("plan", {})
+	var chests: Array = pl.get("chests", [])
+	if not chests.is_empty():
+		var inside := {}
+		for c in chests:
+			var items: Dictionary = c["items"]
+			for id in items:
+				inside[id] = int(inside.get(id, 0)) + int(items[id])
+		text += " Uses %s from this chest." % Crafting.describe_items(inside)
+	elif not bool(info.get("ok", false)) and String(info.get("reason", "")) != "":
+		text += " " + String(info["reason"])
+	return text
+
+
+func _upgrade() -> void:
+	ctl.cancel()
+	if Crafting.upgrade_chest(uid):
+		Audio.play_ui("ui_craft")
+		_build_chest_slots()
+		refresh()
+	else:
+		Audio.play_ui("ui_error")
+		info_l.text = Crafting.last_reason
+
+
+# --- Moving items ----------------------------------------------------------------------------------------------
 
 func _quick_move(s: Control) -> void:
 	if chest == null:
@@ -127,7 +217,7 @@ func _store_all() -> void:
 		return
 	ctl.cancel()
 	var any := false
-	for i in range(GameState.HOTBAR_SIZE, GameState.INVENTORY_SIZE):
+	for i in range(GameState.HOTBAR_SIZE, int(GameState.inventory.size)):
 		if GameState.inventory.get_slot(i) != null:
 			if int(GameState.inventory.transfer_slot_to(chest, i)) > 0:
 				any = true

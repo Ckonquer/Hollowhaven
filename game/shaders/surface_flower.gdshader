@@ -11,7 +11,7 @@ uniform float emission_boost = 0.0;
 uniform float band_softness : hint_range(0.0, 0.5) = 0.2;
 uniform sampler2D occ_tex : filter_linear, repeat_disable, hint_default_black;   // built structures (1 = occupied)
 uniform vec2 terrain_origin = vec2(-128.0, -128.0);
-uniform float terrain_samples = 257.0;
+uniform vec2 terrain_samples = vec2(257.0);   // grid samples (x, z); a square grid by default (Woods)
 
 varying vec3 v_col;
 

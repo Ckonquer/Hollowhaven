@@ -3,7 +3,7 @@ extends "res://src/ui/panels/panel_base.gd"
 
 const GROUPS := [
 	["Moving", [["move", "Move"], ["look", "Look around"], ["jump", "Jump"], ["sprint", "Sprint (hold)"], ["dodge", "Dodge roll"], ["zoom", "Zoom camera"]]],
-	["Doing", [["attack", "Attack / gather"], ["interact", "Interact / pick up"], ["use_item", "Use / eat held item"], ["lantern", "Raise lantern"], ["companion_command", "Companion: follow / wait"], ["hotbar", "Choose hotbar slot"]]],
+	["Doing", [["attack", "Attack / gather"], ["interact", "Interact / pick up"], ["use_item", "Use / eat held item"], ["lantern", "Raise lantern"], ["companion_command", "Companion: follow / wait"], ["companion_skill", "Companion skill"], ["hotbar", "Choose hotbar slot"]]],
 	["Menus", [["inventory", "Backpack"], ["craft", "Crafting"], ["build", "Build mode"], ["build_rotate", "Rotate (building)"], ["build_dismantle", "Dismantle (building)"], ["journal", "Journal"], ["map", "Map"], ["pause", "Pause"], ["help", "This help"], ["screenshot", "Screenshot"]]],
 ]
 

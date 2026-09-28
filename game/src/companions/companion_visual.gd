@@ -35,6 +35,10 @@ const ACTIONS := {
 	"refuse": [1.9, 0.1], "present": [1.5, 0.55], "glow_pulse": [1.3, 0.3], "salute": [1.7, 0.4],
 	"wave": [1.3, 0.2], "polish": [2.2, 0.5], "stretch": [1.6, 0.5], "tumble": [1.0, 0.8],
 	"sniff": [1.6, 0.5], "bounce_off": [0.7, 0.1], "stomp": [0.7, 0.5], "peek": [1.1, 0.35],
+	# Chapter Two (MP §6): basic attacks (the damage lands on the impact frame, see companion_combat.gd),
+	# the signature-skill cast, Mochi's brave step and the 5-heart affectionate animations.
+	"spore_puff": [0.75, 0.42], "stone_bump": [0.8, 0.45], "light_bolt": [0.7, 0.4], "cast": [1.0, 0.35],
+	"brave_step": [1.6, 0.55], "mochi_twirl": [1.8, 0.4], "pebble_hug": [1.8, 0.4], "lumi_glow_spin": [1.8, 0.4],
 }
 const MOODS := ["idle", "sleep", "scared", "alert", "pinned", "rest"]
 
@@ -386,7 +390,7 @@ func _action_pose(a: String, k: float) -> void:
 			p_arm_l = 0.7 * dip
 			p_arm_r = 0.7 * dip
 			p_mouth = 0.3 * dip
-		"headbutt":
+		"headbutt", "stone_bump":
 			if k < 0.35:
 				p_lean -= 0.35 * (k / 0.35)
 				p_squash *= 1.0 - 0.08 * (k / 0.35)
@@ -395,6 +399,72 @@ func _action_pose(a: String, k: float) -> void:
 			else:
 				p_lean += 0.7 * (1.0 - (k - 0.5) / 0.5)
 			p_brow = -1.0
+			if a == "stone_bump" and k > 0.35 and k < 0.6:
+				p_hop += 0.08 * sin((k - 0.35) / 0.25 * PI)     # a little leap into the bump
+		"spore_puff":
+			# Crouch and gather (wind-up), then a round "puff!" at the impact frame.
+			if k < 0.42:
+				var w := k / 0.42
+				p_squash *= 1.0 - 0.16 * w
+				p_lean -= 0.12 * w
+				p_mouth = 0.2 * w
+			else:
+				var r := (k - 0.42) / 0.58
+				p_squash *= 1.0 + 0.2 * (1.0 - r) * sin(r * PI * 0.5 + PI * 0.5)
+				p_hop += 0.1 * (1.0 - r)
+				p_mouth = 0.9 * (1.0 - r)
+				p_lean += 0.18 * (1.0 - r)
+			p_brow = -0.3
+		"light_bolt":
+			# Rear back while the glow gathers, then flick forward as the bolt leaves.
+			if k < 0.4:
+				p_lean -= 0.25 * (k / 0.4)
+				p_glow_boost = 0.8 * (k / 0.4)
+			else:
+				var r2 := (k - 0.4) / 0.6
+				p_lean += 0.3 * (1.0 - r2)
+				p_glow_boost = 1.2 * (1.0 - r2)
+			p_brow = -0.4
+			p_tail = env
+		"cast":
+			p_hop += 0.14 * env
+			p_squash *= 1.0 + 0.1 * env
+			p_arm_l = 1.1 * env
+			p_arm_r = 1.1 * env
+			p_eye_happy = 0.5 * env
+			p_glow_boost = env
+			p_mouth = 0.6 * env
+		"brave_step":
+			# A deep breath, a determined look, one small step forward.
+			p_brow = -0.8
+			p_eye = 1.1
+			if k < 0.5:
+				p_squash *= 1.0 + 0.08 * sin(k / 0.5 * PI)
+				p_lean -= 0.06 * sin(k / 0.5 * PI)
+			else:
+				var s2 := (k - 0.5) / 0.5
+				p_step = 1.0
+				p_step_lift = 2.0 * sin(s2 * PI)
+				p_hop += 0.06 * sin(s2 * PI)
+				p_lean += 0.12 * sin(s2 * PI)
+			p_mouth = 0.3 * env
+		"mochi_twirl", "lumi_glow_spin":
+			p_spin += ease(k, -1.8) * TAU
+			p_hop += absf(sin(k * PI * 3.0)) * 0.16
+			p_eye_happy = env
+			p_mouth = 0.8 * env
+			p_tail = env
+			p_arm_l = 0.8 * env
+			p_arm_r = 0.8 * env
+			if a == "lumi_glow_spin":
+				p_glow_boost = env
+		"pebble_hug":
+			p_arm_l = 1.3 * env
+			p_arm_r = 1.3 * env
+			p_lean += 0.2 * env
+			p_squash *= 1.0 - 0.06 * env
+			p_eye_happy = env
+			p_roll += sin(k * PI * 4.0) * 0.06 * env
 		"pat":
 			p_lean += 0.35 * env
 			p_hop += absf(sin(k * PI * 6.0)) * 0.04
@@ -579,6 +649,12 @@ func _on_action_fire(a: String) -> void:
 			Fx.sparkles(parent, global_position + Vector3.UP * 0.4, 0.45, 16)
 		"present":
 			Fx.sparkles(parent, global_position + Vector3.UP * 0.35 + global_basis.z * 0.25, 0.2, 8)
+		"spore_puff":
+			Fx.poof(parent, global_position + Vector3.UP * 0.45 + global_basis.z * 0.25, Color(1.0, 0.86, 0.9), 8, 0.55)
+		"cast":
+			Fx.sparkles(parent, global_position + Vector3.UP * 0.45, 0.4, 10)
+		"mochi_twirl", "pebble_hug", "lumi_glow_spin":
+			Fx.hearts(parent, head_world_position(), 3)
 
 
 func _on_mood_changed(_was: String, _now: String) -> void:

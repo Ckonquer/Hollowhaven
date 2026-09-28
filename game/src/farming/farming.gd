@@ -17,7 +17,12 @@ const STAGE_LEAVES := 1
 const STAGE_BUSHY := 2
 const STAGE_RIPE := 3
 const STAGE_NAMES := ["Sprouting", "Leafy", "Bushy", "Ripe"]
+## The restored Haven's blessing (legacy, unchanged): applied at READ time from the flag, never stored in a
+## record, so loading any number of times can never compound it.
 const WARD_GROWTH_MULT := 1.5
+## Optional-goal flags set by a real harvest (data/optional_goals.gd): "A Gardener's Afternoon" (grow and harvest
+## a sunflax or roseberry crop at home) and "A Pumpkin With a Face" (grow and harvest a pumpkin).
+const HARVEST_FLAGS := {"sunflax": "c1x_grew_new_crop", "roseberry": "c1x_grew_new_crop", "pumpkin": "ch2_pumpkin_harvested"}
 
 
 static func record(uid: String) -> Dictionary:
@@ -98,6 +103,19 @@ static func format_minutes(m: float) -> String:
 	return "%dh %dm" % [h, mm]
 
 
+## The main produce item of a crop: the first yield entry that isn't its seed ("sweetroot", "roseberries"...).
+static func produce_item(crop: String) -> String:
+	var def := ItemDB.crop(crop)
+	var seed_item := String(def.get("seed", ""))
+	var y: Dictionary = def.get("yield", {})
+	if y.has(crop):
+		return crop
+	for item in y:
+		if String(item) != seed_item:
+			return String(item)
+	return crop
+
+
 ## Seed item id -> crop id ("" if the item is not a plantable seed).
 static func crop_for_seed(item_id: String) -> String:
 	if not ItemDB.has_item(item_id):
@@ -166,9 +184,11 @@ static func harvest(uid: String, drop_pos: Variant = null, rng: RandomNumberGene
 	GameState.crops[uid] = {"crop": "", "planted_at": 0.0, "tended_minutes": 0.0}
 	for item in got:
 		GameState.give_item(String(item), int(got[item]), drop_pos)
-	# The crop's own produce (e.g. "sweetroot") is the headline count for listeners.
-	var main_count: int = int(got.get(crop, 0))
+	# The crop's produce (e.g. "sweetroot", "roseberries") is the headline count for listeners.
+	var main_count: int = int(got.get(produce_item(crop), 0))
 	GameState.add_counter("crops_harvested")
+	if HARVEST_FLAGS.has(crop):
+		GameState.set_flag(String(HARVEST_FLAGS[crop]), true)
 	Events.crop_harvested.emit(uid, crop, main_count)
 	_sound("harvest_crop", drop_pos)
 	return got

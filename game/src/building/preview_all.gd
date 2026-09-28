@@ -4,6 +4,9 @@ extends Node3D
 ##       --preview-args='{"mode":"all"}'          every structure in a grid (default)
 ##       --preview-args='{"mode":"house"}'        a little cottage with furniture, farm and decor
 ##       --preview-args='{"mode":"crops"}'        crop plot: empty + the four growth stages
+##       --preview-args='{"mode":"upstairs"}'     Chapter Two: a two-storey cottage (stairs, upper floor,
+##                                                 railings, upstairs roofs, furniture and seasonal decor)
+##       --preview-args='{"mode":"pumpkins"}'     the six carved pumpkin faces in a row
 ##       --preview-args='{"ids":["bed","storage_chest"]}'   just these, in a row
 ## Also used by the house screenshot harness (build_harness.gd).
 
@@ -30,6 +33,13 @@ func _ready() -> void:
 		"crops":
 			for i in 5:
 				_put("crop_plot", Vector3(-5.0 + i * 2.5, 0, 0), 0, {"stage": i - 1})
+		"upstairs":
+			for e in upstairs_layout():
+				_put(String(e[0]), e[1], int(e[2]), e[3] if e.size() > 3 else {})
+		"pumpkins":
+			var faces: Array = ItemDB.structure("pumpkin_lantern").get("faces", [])
+			for i in faces.size():
+				_put("pumpkin_lantern", Vector3((float(i) - float(faces.size() - 1) * 0.5) * 0.9, 0, 0), 0, {"face": faces[i]})
 		_:
 			_grid(ItemDB.all_structure_ids())
 
@@ -99,3 +109,36 @@ func house(parent: Node3D) -> void:
 		parent.add_child(n)
 		n.position = e[1]
 		n.rotation.y = deg_to_rad(float(e[2]))
+
+
+## Chapter Two two-storey cottage on a 4 x 6 m footprint (x 0..4, z 0..6; heights as placement.gd computes
+## them: upper floor 3.0, upstairs walls 3.0, upstairs roofs 6.0). [id, pos, rot, params?]
+static func upstairs_layout() -> Array:
+	var up := 3.0
+	var top := up + 0.12
+	return [
+		# Ground storey: walls, a doorway at the foot of the stairs, a floor and the stairs.
+		["wood_wall", Vector3(1, 0, 0), 180], ["arched_window", Vector3(3, 0, 0), 180],
+		["wood_doorway", Vector3(1, 0, 6), 0], ["crescent_window", Vector3(3, 0, 6), 0],
+		["wood_wall", Vector3(0, 0, 1), 270], ["wood_wall", Vector3(0, 0, 3), 270], ["wood_window", Vector3(0, 0, 5), 270],
+		["wood_wall", Vector3(4, 0, 1), 90], ["wood_window", Vector3(4, 0, 3), 90], ["wood_wall", Vector3(4, 0, 5), 90],
+		["wood_floor", Vector3(3, 0, 1), 0], ["wood_floor", Vector3(3, 0, 3), 0], ["wood_floor", Vector3(3, 0, 5), 0],
+		["wood_stairs", Vector3(1, 0, 4), 0],
+		["kitchen_counter", Vector3(3, 0.12, 0.5), 0], ["bookshelf", Vector3(3.5, 0.12, 3), 270],
+		# Upper storey: floor tiles around the stairwell, railings along it, walls, furniture.
+		["upper_floor", Vector3(1, up, 1), 0], ["upper_floor", Vector3(3, up, 1), 0],
+		["upper_floor", Vector3(3, up, 3), 0], ["upper_floor", Vector3(3, up, 5), 0],
+		["wood_railing", Vector3(2, up, 3), 90], ["wood_railing", Vector3(2, up, 5), 90],
+		["wood_wall", Vector3(1, up, 0), 180], ["arched_window", Vector3(3, up, 0), 180], ["half_wall", Vector3(3, up, 6), 0],
+		["wood_wall", Vector3(4, up, 1), 90], ["crescent_window", Vector3(4, up, 3), 90], ["wood_wall", Vector3(4, up, 5), 90],
+		["bed", Vector3(3.5, top, 1.0), 0], ["wardrobe", Vector3(3, top, 4.5), 180], ["companion_bed", Vector3(2.5, top, 2.5), 0],
+		["pumpkin_lantern", Vector3(3.5, top, 5.5), 0, {"face": "cat"}],
+		# Upstairs roofs on the upstairs walls (the stairwell roofs lean on their neighbours).
+		["gable_roof", Vector3(1, up * 2.0, 1), 0], ["gable_roof", Vector3(3, up * 2.0, 1), 0],
+		["wood_roof", Vector3(3, up * 2.0, 3), 90], ["wood_roof", Vector3(3, up * 2.0, 5), 90],
+		["roof_corner", Vector3(1, up * 2.0, 3), 0], ["wood_roof", Vector3(1, up * 2.0, 5), 270],
+		# Porch and seasonal decor outside the door.
+		["porch_post", Vector3(-0.5, 0, 7.5), 0], ["cottage_bench", Vector3(3, 0, 7.5), 0],
+		["pumpkin_lantern", Vector3(0.5, 0, 7.5), 0, {"face": "friendly"}], ["candy_bowl", Vector3(1.5, 0, 7.5), 0],
+		["flower_box", Vector3(3.5, 0, 6.5), 0], ["scarecrow", Vector3(6.5, 0, 6.5), 0], ["ghost_lantern", Vector3(5.5, 0, 4.5), 0],
+	]

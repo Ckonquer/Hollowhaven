@@ -1,4 +1,5 @@
-"""Persistence playthrough of the PACKAGED game with real OS input.
+"""Persistence playthrough of the PACKAGED game with real OS input (or, with --second-monitor /
+--virtual-input, through the game's localhost virtual-input server while the owner keeps the PC; hhbot.py).
 
 1. New Game -> play (real inputs) through Pebble (workbench placed, 2 companions, resources).
 2. Save from the pause menu, snapshot what the player can observe, quit the process through the menu.
@@ -18,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from playthrough import Play, StepFailed, build_steps, dist2, xz  # noqa: E402
-from session import Session  # noqa: E402
+from session import Session, add_transport_args, transport_kwargs  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -49,7 +50,7 @@ def run(a):
     results = []
 
     def launch(name):
-        sess = Session(exe, out, save_dir, name, extra=["--windowed"])
+        sess = Session(exe, out, save_dir, name, extra=["--windowed"], **transport_kwargs(a))
         sess.start(wait_for=lambda s: s.get("mode") == "title" and len(s.get("buttons", [])) > 0, timeout=60)
         return sess, Play(sess)
 
@@ -159,4 +160,5 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--exe", default=str(ROOT / "builds" / "Hollowhaven" / "Hollowhaven.exe"))
     ap.add_argument("--out", default=str(ROOT / "qa" / "tmp" / "e2e" / "persist"))
+    add_transport_args(ap)
     run(ap.parse_args())

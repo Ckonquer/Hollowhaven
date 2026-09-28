@@ -2,6 +2,8 @@ extends Control
 ## One inventory / hotbar / chest slot. Draws its own background, icon, count, hotbar key number and
 ## selection / hover / drop highlights. Emits pointer signals; the owning panel implements the rules
 ## (click-to-pick, drag-and-drop, split, quick-move). Tooltips show the item's name, description and stats.
+## Chapter Two: tooltips add equipment lines (tier, protection, charm effects, wand numbers: equipment_stat_lines)
+## and an empty slot may show a faint `placeholder_icon` (equipment slots: hood / vest / boots / charm).
 
 signal pressed_slot(slot: Control, button: int, shift: bool, double: bool)
 signal released_slot(slot: Control, button: int)
@@ -12,6 +14,7 @@ const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
 const Palette := preload("res://src/art/palette.gd")
+const EquipmentData := preload("res://data/equipment.gd")
 
 var index: int = -1
 var inv: RefCounted = null              # owning inventory (for the panel's bookkeeping)
@@ -23,6 +26,7 @@ var dimmed: bool = false               # source of the stack being carried
 var drop_hint: bool = false
 var hotbar_row: bool = false           # subtle tint for the hotbar row inside the backpack
 var slot_size: float = 92.0
+var placeholder_icon: String = ""      # faint icon drawn while the slot is empty (equipment slots)
 var _hover := false
 var _pop := 0.0
 
@@ -115,7 +119,9 @@ static func build_tooltip(item_id: String) -> Control:
 	desc.add_theme_font_size_override("font_size", 20)
 	desc.add_theme_color_override("font_color", ThemeFactory.INK)
 	v.add_child(desc)
-	for line in UiUtil.item_stat_lines(item_id):
+	var lines: Array = UiUtil.item_stat_lines(item_id)
+	lines.append_array(equipment_stat_lines(item_id))
+	for line in lines:
 		var sl := Label.new()
 		sl.text = "•  " + String(line)
 		sl.add_theme_font_size_override("font_size", 19)
@@ -124,6 +130,69 @@ static func build_tooltip(item_id: String) -> Control:
 		sl.custom_minimum_size.x = 340
 		v.add_child(sl)
 	return p
+
+
+## Extra stat lines for Chapter Two gear (armor, charms, wands, tiered tools/weapons), from the item data.
+## Complements UiUtil.item_stat_lines (which covers heal / tool / damage / stack). Pure; see tests.
+static func equipment_stat_lines(item_id: String) -> Array:
+	var out: Array = []
+	if not ItemDB.has_item(item_id):
+		return out
+	var d: Dictionary = ItemDB.item(item_id)
+	var cat := String(d.get("cat", ""))
+	if not (cat in ["armor", "charm", "wand", "tool", "weapon"]):
+		return out
+	var tier: int = ItemDB.item_tier(item_id)
+	if tier > 0 and EquipmentData.TIERS.has(tier):
+		out.append("Tier: %s" % String(EquipmentData.TIERS[tier]))
+	match cat:
+		"armor":
+			var slot := String(d.get("slot", ""))
+			out.append("Worn on the %s: %s protection" % [slot, _pct(float(d.get("reduction", 0.0)))])
+			var set_def: Dictionary = EquipmentData.SETS.get(String(d.get("set", "")), {})
+			if not set_def.is_empty():
+				out.append("Full %s set: %s" % [String(set_def.get("name", "")), _pct(float(set_def.get("total", 0.0)))])
+		"charm":
+			var fx: Variant = d.get("effects")
+			if fx is Dictionary:
+				for k in fx:
+					out.append(_effect_line(String(k), float(fx[k])))
+			out.append("Worn in the charm slot (one charm at a time)")
+		"wand":
+			var w: Dictionary = ItemDB.wand(item_id)
+			if not w.is_empty():
+				out.append("Spark: %d damage, up to %d m" % [int(round(float(w.get("damage", 0.0)))), int(round(float(w.get("range", 0.0))))])
+				out.append("Costs %d stamina, one spark every %.1f s" % [int(round(float(w.get("stamina", 0.0)))), float(w.get("cooldown", 0.0))])
+				out.append("Select it on the hotbar to cast with %s" % Settings.action_label("attack"))
+		"tool":
+			var pw := float(d.get("power", 1.0))
+			if pw > 1.0:
+				out.append("Gathers %s faster than stone" % _pct(pw - 1.0))
+	return out
+
+
+static func _pct(v: float) -> String:
+	var p := v * 100.0
+	if absf(p - roundf(p)) < 0.05:
+		return "%d%%" % int(roundf(p))
+	return "%.1f%%" % p
+
+
+static func _effect_line(effect: String, v: float) -> String:
+	match effect:
+		"gather":
+			return "Gathering +%s" % _pct(v)
+		"stamina_save":
+			return "Stamina costs -%s" % _pct(v)
+		"heal_received":
+			return "Healing received +%s" % _pct(v)
+		"move":
+			return "Speed +%s (within the usual cap)" % _pct(v)
+		"lantern_radius":
+			return "Lantern light +%s wider" % _pct(v)
+		"damage_reduction":
+			return "Protection +%s" % _pct(v)
+	return "%s %s" % [effect.capitalize(), _pct(v)]
 
 
 func _draw() -> void:
@@ -154,6 +223,9 @@ func _draw() -> void:
 	# inner soft well
 	var inner := r.grow(-7.0)
 	draw_style_box(ThemeFactory.box(Color(1, 1, 1, 0.16 if not selected else 0.3), 11), inner)
+	if stack == null and placeholder_icon != "":
+		var pad0 := sz.x * 0.2
+		draw_texture_rect(IconFactory.icon(placeholder_icon, Color(0.55, 0.45, 0.4), 96), Rect2(Vector2(pad0, pad0), sz - Vector2(pad0, pad0) * 2.0), false, Color(1, 1, 1, 0.28))
 	if stack != null:
 		var id := String(stack["id"])
 		var tex := IconFactory.item_icon(id)

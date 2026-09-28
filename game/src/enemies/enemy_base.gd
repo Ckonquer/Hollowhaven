@@ -6,6 +6,17 @@ extends CharacterBody3D
 ## Attacks ONLY the player (target group "player"), never companions.
 ## All decisions live in tick(delta) so tests can drive the machine with manual delta steps
 ## (set `target_override` and call tick). Movement happens in _physics_process after tick.
+##
+## Chapter Two shared mechanics (ADDITIVE: with the defaults every legacy enemy behaves exactly as before):
+##   committed_states          custom attack states (charge, leap, swing...) that keep the attack token (the
+##                             MAX_ATTACKERS cap counts them), count as threatening and are never flinched
+##   attack_reach() / _choose_attack() / _telegraph_finished()   hooks around the chase -> telegraph -> attack step
+##   attack_def(id), attack_telegraph(def), attack_recover(def), attack_damage_for(def)   data/enemies.gd "attacks"
+##   can_be_hit_by(source), can_stagger(amount, source), _is_uninterruptible(), _stagger(...)
+##   mark() / hide_mark()      this enemy's ground telegraph (src/enemies/telegraph_fx.gd)
+##   charge_begin/charge_step, leap_begin/leap_step/leap_land_hit, lane_clip, lane_hits, pulse_hits,
+##   deal_damage_to, fire_projectile, apply_slow (static), announce_tell
+##   setup key "defeat_flag"   flag set once when this enemy is defeated (content modules)
 
 signal defeated
 signal state_changed(new_state: String)
@@ -13,7 +24,10 @@ signal state_changed(new_state: String)
 const Combat := preload("res://src/combat/combat.gd")
 const HitFx := preload("res://src/combat/hit_fx.gd")
 const Health := preload("res://src/combat/health.gd")
+const TelegraphFx := preload("res://src/enemies/telegraph_fx.gd")
 const WORLD_ITEM := "res://src/world/common/world_item.gd"
+const LOCAL_PROJECTILE := "res://src/enemies/enemy_projectile.gd"
+const SHARED_PROJECTILE := "res://src/combat/projectile.gd"
 
 const GRAVITY := 22.0
 const PERCEPTION_INTERVAL := 0.2
@@ -27,6 +41,12 @@ const TURN_RATE := 7.0
 const LEASH_HEAL_PER_SEC := 0.35     # fraction of max hp regained per second while returning home
 const LEASH_HEAL_DELAY := 2.5        # no leash healing this soon after taking a hit (no out-healing Krystal)
 const THREAT_STATES := ["chase", "telegraph", "attack", "recover", "flinch", "backoff"]
+# Chapter Two shared mechanics
+const MIN_COMMITTED_TELEGRAPH := 1.0 # committed attacks never wind up faster than this (MP 8 / 12)
+const TARGET_BODY_RADIUS := 0.35     # Krystal's body radius for lane / landing hit tests
+const SLOW_MIN_MULT := 0.5           # the strongest slow an enemy may apply (spec 9: bounded)
+const SLOW_MAX_SECONDS := 3.0
+const CAPTION_GAP_MS := 6000
 
 var enemy_id: String = ""
 var data: Dictionary = {}
@@ -68,6 +88,30 @@ var _since_hurt: float = 999.0
 var _separation := Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
 
+# --- Chapter Two shared mechanics (defaults keep the legacy behaviour) ---
+var committed_states: Array = []      # subclass: custom committed attack states (see header)
+var needs_clear_shot := false         # subclass: perception also checks a world|structure line to the target
+var defeat_flag: String = ""          # setup key: flag set once when this enemy is defeated
+var _shot_clear := true
+var _mark: Node3D = null
+var _leap_active := false
+var _leap_from := Vector3.ZERO
+var _leap_to := Vector3.ZERO
+var _leap_t: float = 0.0
+var _leap_len: float = 0.4
+var _leap_height: float = 0.8
+var _charge_active := false
+var _charge_dir := Vector3.FORWARD
+var _charge_len: float = 0.0
+var _charge_travel: float = 0.0
+var _charge_speed: float = 0.0
+var _charge_wall := false
+var _charge_hit := false
+
+static var _slow_immune_until_ms: int = -1
+static var _told: Dictionary = {}        # hint ids already emitted this session
+static var _captioned: Dictionary = {}   # enemy id -> last caption msec
+
 static var _enemy_cache: Array = []
 static var _enemy_cache_frame: int = -100
 ## Pack fairness: at most MAX_ATTACKERS enemies wind up / attack at once and their wind-ups start
@@ -88,6 +132,7 @@ static func reset_attack_tokens() -> void:
 	_attackers.clear()
 	_last_attack_ms = -100000
 	_last_attacker = 0
+	_slow_immune_until_ms = -1              # Chapter Two: shared slow immunity (tests / area loads)
 
 
 func _attack_token_available() -> bool:
@@ -118,6 +163,7 @@ func setup(params: Dictionary) -> void:
 	if bool(params.get("alert", false)):
 		_alert_boost = 12.0
 	damage_scale = float(params.get("damage_scale", damage_scale))
+	defeat_flag = String(params.get("defeat_flag", defeat_flag))
 
 
 func _ready() -> void:
@@ -136,7 +182,7 @@ func _ready() -> void:
 	cs.shape = cap
 	cs.position.y = cap.height * 0.5
 	add_child(cs)
-	health = Health.new()
+	health = _make_health()
 	health.name = "Health"
 	health.max_hp = float(data.get("hp", 30.0))
 	add_child(health)
@@ -168,7 +214,7 @@ func _exit_tree() -> void:
 # --- Public API -------------------------------------------------------------------------------------
 
 func is_threatening() -> bool:
-	return state in THREAT_STATES and not is_dead()
+	return (state in THREAT_STATES or state in committed_states) and not is_dead()
 
 
 func is_dead() -> bool:
@@ -267,11 +313,15 @@ func _enter(new_state: String, length: float = 0.0) -> void:
 	state = new_state
 	state_time = 0.0
 	_state_len = length
+	_leap_active = false                    # a new state always ends a leap / charge in progress
+	_charge_active = false
+	if _mark != null and new_state != "telegraph" and not (new_state in committed_states):
+		hide_mark()
 	if new_state == "telegraph":
 		_attackers[get_instance_id()] = true
 		_last_attack_ms = _now_ms()
 		_last_attacker = get_instance_id()
-	elif new_state != "attack":
+	elif new_state != "attack" and not (new_state in committed_states):
 		_attackers.erase(get_instance_id())
 	match new_state:
 		"telegraph":
@@ -292,6 +342,7 @@ func _enter(new_state: String, length: float = 0.0) -> void:
 			var a := _rng.randf_range(0.0, TAU)
 			var r := sqrt(_rng.randf()) * wander_radius
 			_move_target = home + Vector3(cos(a) * r, 0.0, sin(a) * r)
+	_on_state_changed(prev, new_state)
 	if visual != null and visual.has_method("set_state"):
 		visual.set_state(new_state, length)
 	state_changed.emit(new_state)
@@ -324,10 +375,11 @@ func _st_chase(delta: float) -> void:
 	to.y = 0.0
 	var dist := to.length()
 	var dir := to / dist if dist > 0.001 else _forward()
-	var reach := float(data.get("attack_range", 1.8))
+	var reach := attack_reach()
 	if dist <= reach and _cooldown <= 0.0 and _can_start_attack():
 		if _attack_token_available():
 			_face(dir, delta, 3.0)
+			_choose_attack()
 			_enter("telegraph", telegraph_duration())
 			return
 		# Someone else is winding up: circle at the edge of reach instead of piling in.
@@ -353,8 +405,7 @@ func _st_telegraph(delta: float) -> void:
 		if to.length() > 0.01:
 			_face(to.normalized(), delta, 1.4)
 	if state_time >= _state_len:
-		_attack_dir = _forward()
-		_enter("attack", ATTACK_TIME)
+		_telegraph_finished()
 
 
 func _st_attack(_delta: float) -> void:
@@ -413,6 +464,8 @@ func _perceive() -> void:
 	_player_dist = global_position.distance_to(_player.global_position)
 	_can_hunt = hunt_allowed(_player)
 	_player_visible = _player_dist <= aggro_radius() * 2.2 and _line_of_sight(_player)
+	if needs_clear_shot:
+		_shot_clear = _player_visible and _can_hunt and has_clear_shot(_player)
 	_perceive_extra()
 
 
@@ -513,6 +566,9 @@ func _apply_movement(delta: float) -> void:
 	if state == "dead":
 		velocity = Vector3.ZERO
 		return
+	if _leap_active:
+		velocity = Vector3.ZERO             # leaps are kinematic (leap_step moves the body inside tick)
+		return
 	var v := _desired_vel + _separation_push()
 	v += _knock
 	_knock *= exp(-7.0 * delta)
@@ -574,11 +630,10 @@ func _on_damaged(amount: float, source: Node, _dir: Vector3) -> void:
 		_player = source as Node3D
 		_player_visible = true
 		_alert_boost = maxf(_alert_boost, 6.0)
-	if state == "attack" or state == "recover" or state == "stunned":
+	if _is_uninterruptible():
 		return
-	if _flinch_immune <= 0.0:
-		_flinch_immune = FLINCH_IMMUNITY
-		_enter("flinch", FLINCH_TIME)
+	if can_stagger(amount, source):
+		_stagger(amount, source)
 	elif state in ["idle", "wander", "return"]:
 		_enter("chase")
 
@@ -592,9 +647,11 @@ func _on_died() -> void:
 	var pos := global_position
 	if drops_enabled:
 		_drop_loot(pos)
+	if defeat_flag != "":
+		GameState.set_flag(defeat_flag, true)
 	GameState.stats["enemies_defeated"] = int(GameState.stats.get("enemies_defeated", 0)) + 1
 	Events.enemy_killed.emit(enemy_id, pos)
-	Audio.play_3d("enemy_defeat", pos, -2.0)
+	Audio.play_3d(_defeat_sound(), pos, -2.0)
 	defeated.emit()
 	if is_inside_tree():
 		await _play_defeat()
@@ -638,11 +695,448 @@ static func give_drop(item: String, count: int, pos: Vector3) -> void:
 
 
 func _on_player_died() -> void:
-	if state in ["chase", "telegraph", "flinch", "backoff"]:
+	if state in ["chase", "telegraph", "flinch", "backoff"] or state in committed_states:
 		_enter("return")
 
 
+# --- Chapter Two shared mechanics ----------------------------------------------------------------------------------
+
+## Whether `source` may damage this enemy right now (spec 9: companion attacks and projectiles respect it).
+## False when defeated or invulnerable; enemies never damage each other.
+func can_be_hit_by(source: Node) -> bool:
+	if is_dead() or health == null or bool(health.invulnerable):
+		return false
+	if source != null and is_instance_valid(source) and source != self and source.is_in_group("enemy"):
+		return false
+	return true
+
+
+## Stagger eligibility: may a non-lethal hit of `amount` from `source` interrupt the current state with a
+## flinch? Default = the legacy rule (not within FLINCH_IMMUNITY of the previous flinch).
+func can_stagger(_amount: float, _source: Node) -> bool:
+	return _flinch_immune <= 0.0
+
+
+## The node this enemy hunts right now (Game.player or target_override), or null.
+func current_target() -> Node3D:
+	return _player if _player != null and is_instance_valid(_player) else null
+
+
+## Faction / target filter: only Krystal (group "player", or the scripted target_override) can be damaged by
+## enemy attacks. Companions, wildlife, decorations and other enemies never are.
+func is_valid_victim(t: Node) -> bool:
+	if t == null or not is_instance_valid(t) or t == self:
+		return false
+	if t == target_override:
+		return true
+	return t.is_in_group("player") and not t.is_in_group("companion") and not t.is_in_group("enemy")
+
+
+## One entry of data "attacks" by id ({} if missing). Allocation-free (chase reach checks call it every tick).
+func attack_def(attack_id: String) -> Dictionary:
+	var list: Variant = data.get("attacks")
+	if list is Array:
+		for a in list:
+			if a is Dictionary and (a as Dictionary).get("id") == attack_id:
+				return a
+	return {}
+
+
+## Wind-up of an attack from data, never shorter than MIN_COMMITTED_TELEGRAPH (readable committed attacks).
+func attack_telegraph(def: Dictionary) -> float:
+	return maxf(float(def.get("telegraph", data.get("telegraph", MIN_COMMITTED_TELEGRAPH))), MIN_COMMITTED_TELEGRAPH)
+
+
+func attack_recover(def: Dictionary) -> float:
+	return float(def.get("recover", data.get("recover", 1.0)))
+
+
+## Damage of an attack: data damage x horror intensity (underground threats only) x damage_scale.
+func attack_damage_for(def: Dictionary) -> float:
+	return float(def.get("damage", data.get("damage", 10.0))) * threat_damage_mult() * damage_scale
+
+
+## Horror-intensity damage multiplier: enemies marked "underground" in data (and legacy "below" ones) scale
+## like the Below threats (Gentle 0.6 / Standard 1.0 / Intense 1.15); surface enemies never do.
+func threat_damage_mult() -> float:
+	if bool(data.get("underground", false)) or String(data.get("area", "")) == "below":
+		return Combat.intensity_damage_mult(Combat.current_intensity())
+	return 1.0
+
+
+## Where this enemy's attacks and shot checks start.
+func attack_origin() -> Vector3:
+	return global_position + Vector3.UP * (_body_height() * 0.6)
+
+
+## A clear world|structure line from `from` (default attack_origin()) to `t`'s aim point. One ray: call it at
+## decisions (perception, wind-up start, release), never every frame.
+func has_clear_shot(t: Node3D, from: Vector3 = Vector3.INF) -> bool:
+	if t == null or not is_instance_valid(t):
+		return false
+	if not is_inside_tree() or not t.is_inside_tree():
+		return true
+	var o := attack_origin() if not from.is_finite() else from
+	return Combat.has_line_of_sight(get_world_3d().direct_space_state, o, Combat.aim_point(t), [self, t], Combat.LOS_MASK)
+
+
+## Clips a flat lane from `from` along `dir` against world|structure (one ray at `height`).
+## Returns {"length": clipped length (a body radius short of the obstacle), "wall": true when a wall - not a
+## walkable slope - ended the lane early}.
+func lane_clip(from: Vector3, dir: Vector3, length: float, height: float = 0.6) -> Dictionary:
+	var d := Vector3(dir.x, 0.0, dir.z)
+	if d.length_squared() < 0.0001 or length <= 0.0 or not is_inside_tree():
+		return {"length": maxf(length, 0.0), "wall": false}
+	d = d.normalized()
+	var o := from + Vector3.UP * height
+	var q := PhysicsRayQueryParameters3D.create(o, o + d * (length + _body_radius()), Combat.LOS_MASK)
+	var ex: Array[RID] = [get_rid()]
+	q.exclude = ex
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty():
+		return {"length": length, "wall": false}
+	var hp: Vector3 = hit["position"]
+	var n: Vector3 = hit["normal"]
+	var dist := Vector2(hp.x - o.x, hp.z - o.z).length()
+	return {"length": clampf(dist - _body_radius() - 0.05, 0.0, length), "wall": n.y < 0.6}
+
+
+## Dash-line / lane helper: is `t` inside the lane a-b (`half_width` either side plus her body radius), at a
+## reachable height, with no wall between the lane and her?
+func lane_hits(t: Node3D, a: Vector3, b: Vector3, half_width: float, max_dy: float = 1.4) -> bool:
+	if t == null or not is_instance_valid(t):
+		return false
+	var p := t.global_position
+	var c := TelegraphFx.closest_on_segment(a, b, p)
+	if absf(p.y - c.y) > max_dy:
+		return false
+	if Vector2(p.x - c.x, p.z - c.z).length() > half_width + TARGET_BODY_RADIUS:
+		return false
+	return has_clear_shot(t, c + Vector3.UP * 0.6)
+
+
+## Radial pulse (full circle, LOS-checked) of `radius` around `center`; only the player group is hit.
+func pulse_hits(center: Vector3, radius: float, damage: float, knockback_force: float) -> Array:
+	return Combat.melee(self, center + Vector3.UP * 0.8, _forward(), radius, 360.0, damage, ["player"], knockback_force)
+
+
+## Applies ONE hit to `t` through its health (dodge i-frames, armour and shields apply there), with knockback,
+## impact feedback and a tiny hitstop. Returns the damage dealt (0 = dodged / blocked / not a valid victim).
+func deal_damage_to(t: Node3D, damage: float, dir: Vector3, knockback_force: float) -> float:
+	if not is_valid_victim(t) or damage <= 0.0:
+		return 0.0
+	var h := Combat.find_health(t)
+	if h == null:
+		return 0.0
+	var d := Vector3(dir.x, 0.0, dir.z)
+	d = d.normalized() if d.length_squared() > 0.0001 else _forward()
+	var dealt := float(h.apply_damage(damage, self, d))
+	if dealt <= 0.0:
+		if t.has_method("on_hit_blocked"):
+			t.on_hit_blocked(self, d)
+		return 0.0
+	if knockback_force > 0.0 and t.has_method("knockback"):
+		t.knockback(d, knockback_force)
+	var col: Variant = t.get("hit_color")
+	HitFx.impact(Combat.aim_point(t) - d * 0.25, dealt, col if col is Color else HitFx.DEFAULT_IMPACT)
+	Events.hitstop.emit(Combat.HITSTOP_HEAVY if dealt >= 15.0 else Combat.HITSTOP_LIGHT)
+	return dealt
+
+
+## Starts a committed straight charge along `dir` (call right after entering the charge state). The lane is
+## clipped once against world|structure; returns its length.
+func charge_begin(dir: Vector3, distance: float, speed: float) -> float:
+	var d := Vector3(dir.x, 0.0, dir.z)
+	_charge_dir = d.normalized() if d.length_squared() > 0.0001 else _forward()
+	_charge_speed = maxf(speed, 0.1)
+	var clip := lane_clip(global_position, _charge_dir, distance)
+	_charge_len = float(clip["length"])
+	_charge_wall = bool(clip["wall"])
+	_charge_travel = 0.0
+	_charge_hit = false
+	_charge_active = true
+	_attack_dir = _charge_dir
+	return _charge_len
+
+
+## One charge tick: runs along the lane and hits the target at most once when she is in the lane just ahead
+## (`hit_ahead` metres beyond the body, `half_width` either side). Returns "run" (still going), "hit" (struck
+## her: the charge ends), "wall" (bonked into a wall / structure: the charge ends early) or "done" (lane end).
+## A dodged hit (i-frames) lets the charge run on and never re-tests her.
+func charge_step(delta: float, hit_ahead: float, half_width: float, damage: float, knockback_force: float) -> String:
+	if not _charge_active:
+		return "done"
+	_desired_vel = _charge_dir * _charge_speed
+	_face(_charge_dir, delta, 3.0)
+	_charge_travel += _charge_speed * delta
+	var t := current_target()
+	if not _charge_hit and t != null and is_valid_victim(t):
+		var a := global_position
+		var b := a + _charge_dir * (_body_radius() + hit_ahead)
+		if lane_hits(t, a, b, half_width):
+			_charge_hit = true
+			var lat := Vector3(-_charge_dir.z, 0.0, _charge_dir.x)
+			var s := signf(lat.dot(t.global_position - a))
+			var kdir := (_charge_dir + lat * (s if s != 0.0 else 1.0) * 0.7).normalized()
+			if deal_damage_to(t, damage, kdir, knockback_force) > 0.0:
+				_charge_active = false
+				return "hit"
+	if is_inside_tree() and _charge_travel > 0.4 and is_on_wall():
+		_charge_active = false
+		return "wall"
+	if _charge_travel >= _charge_len:
+		_charge_active = false
+		return "wall" if _charge_wall else "done"
+	return "run"
+
+
+## End point of the current / planned charge lane.
+func charge_lane_end() -> Vector3:
+	return global_position + _charge_dir * _charge_len
+
+
+## Starts a kinematic leap toward `to` (flat distance capped at `max_distance`, stopped short of walls) that
+## lasts `duration` s with apex `height`. Returns the landing point. Call right after entering the leap state;
+## leap_step() then moves the body inside tick (no move_and_slide while airborne).
+func leap_begin(to: Vector3, duration: float, height: float, max_distance: float = INF) -> Vector3:
+	var from := global_position
+	var land := leap_target(to, max_distance)
+	var flat := Vector3(land.x - from.x, 0.0, land.z - from.z)
+	var dir := flat.normalized() if flat.length_squared() > 0.000001 else _forward()
+	_leap_from = from
+	_leap_to = land
+	_leap_len = maxf(duration, 0.05)
+	_leap_height = height
+	_leap_t = 0.0
+	_leap_active = true
+	_attack_dir = dir
+	return land
+
+
+## Where a leap toward `to` would land: flat distance capped at `max_distance`, stopped a body radius short of
+## any wall or structure in between (one ray). Use it to place the landing mark before the leap starts.
+func leap_target(to: Vector3, max_distance: float = INF) -> Vector3:
+	var from := global_position
+	var flat := Vector3(to.x - from.x, 0.0, to.z - from.z)
+	var want := flat.length()
+	var dir := flat / want if want > 0.001 else _forward()
+	var dist := minf(want, max_distance)
+	var got := float(lane_clip(from, dir, dist, 0.5)["length"])
+	var land := from + dir * got
+	if got < dist - 0.01:
+		land.y = from.y                                          # stopped short by a wall: stay on its own level
+	elif dist < want - 0.01:
+		land.y = lerpf(from.y, to.y, dist / want)                # capped short of `to`: follow the slope toward it
+	else:
+		land.y = to.y
+	return land
+
+
+## One leap tick along the arc. True on the tick it lands.
+func leap_step(delta: float) -> bool:
+	if not _leap_active:
+		return false
+	_leap_t = minf(_leap_t + delta, _leap_len)
+	var k := _leap_t / _leap_len
+	var p := _leap_from.lerp(_leap_to, k)
+	p.y += sin(k * PI) * _leap_height
+	global_position = p
+	move_speed_now = _leap_from.distance_to(_leap_to) / _leap_len
+	if k >= 1.0:
+		_leap_active = false
+		return true
+	return false
+
+
+## Landing hit: damages the target once if she stands within `radius` (+ her body) of where it landed, at a
+## reachable height, with a clear line. Returns the damage dealt.
+func leap_land_hit(radius: float, damage: float, knockback_force: float) -> float:
+	var t := current_target()
+	if t == null or not is_valid_victim(t):
+		return 0.0
+	var c := global_position
+	var p := t.global_position
+	if absf(p.y - c.y) > 1.3:
+		return 0.0
+	if Vector2(p.x - c.x, p.z - c.z).length() > radius + TARGET_BODY_RADIUS:
+		return 0.0
+	if not has_clear_shot(t, c + Vector3.UP * 0.5):
+		return 0.0
+	var dir := Vector3(p.x - c.x, 0.0, p.z - c.z)
+	return deal_damage_to(t, damage, dir if dir.length_squared() > 0.0001 else _attack_dir, knockback_force)
+
+
+## Fires one projectile at `t` from `from`: the shared pooled src/combat/projectile.gd (spec 9) when it is
+## present, else the local src/enemies/enemy_projectile.gd. Either way it is parented to the area (never to
+## the shooter, so it outlives a defeated shooter), checks walls on every step, targets only group "player",
+## damages at most once and the number alive is capped. params: damage, speed, range, knockback, color, radius,
+## homing (local only), max_per_shooter (default 1). Returns the node, or null when refused.
+func fire_projectile(from: Vector3, t: Node3D, params: Dictionary) -> Node:
+	if t == null or not is_valid_victim(t):
+		return null
+	var shared := _shared_projectile_script()
+	if shared != null:
+		var sp := {"shooter": self, "from": from, "target": t, "groups": ["player"], "hitstop": true, "kind": enemy_id,
+			"damage": float(params.get("damage", 8.0)), "speed": float(params.get("speed", 6.0)),
+			"range": float(params.get("range", 12.0)), "knockback": float(params.get("knockback", 0.0)),
+			"radius": float(params.get("radius", 0.22)), "max_per_shooter": int(params.get("max_per_shooter", 1)),
+			"light": bool(params.get("light", false))}
+		if params.get("color") is Color:
+			sp["color"] = params["color"]
+		var fired: Variant = shared.call("fire", sp)
+		return fired as Node if fired is Node else null
+	var script := _projectile_script()
+	if script == null or not bool(script.call("can_fire")):
+		return null
+	var parent: Node = null
+	if Game.area != null and is_instance_valid(Game.area) and Game.area.is_inside_tree():
+		parent = Game.area
+	elif get_parent() != null:
+		parent = get_parent()
+	if parent == null:
+		return null
+	var p: Node = script.new()
+	var prm := params.duplicate()
+	prm["shooter"] = self
+	prm["target"] = t
+	p.call("setup", prm)
+	parent.add_child(p)
+	p.call("launch", from, t)
+	return p
+
+
+## Is `p` (a projectile this enemy fired) still flying for it? Pooled shared projectiles stay valid after they
+## land (hidden, re-used later by anyone), so validity alone is not enough.
+func projectile_in_flight(p: Variant) -> bool:
+	if p == null or not is_instance_valid(p) or not (p is Node) or not (p as Node).is_inside_tree():
+		return false
+	var n := p as Node
+	if "active" in n:
+		return bool(n.get("active")) and n.get("shooter") == self
+	return String(n.get("result")) == ""
+
+
+static var _proj_script: Script = null
+static var _shared_proj: Script = null
+static var _shared_checked := false
+
+
+## The shared projectile script if it exists, compiles and offers static fire(params) (else null).
+static func _shared_projectile_script() -> Script:
+	if not _shared_checked:
+		_shared_checked = true
+		if ResourceLoader.exists(SHARED_PROJECTILE):
+			var s: Script = load(SHARED_PROJECTILE)
+			if s != null and s.can_instantiate() and s.has_method("fire"):
+				_shared_proj = s
+	return _shared_proj
+
+
+static func _projectile_script() -> Script:
+	if _proj_script == null and ResourceLoader.exists(LOCAL_PROJECTILE):
+		var s: Script = load(LOCAL_PROJECTILE)
+		if s != null and s.can_instantiate():
+			_proj_script = s
+	return _proj_script
+
+
+## Applies a bounded, non-chaining slow to Krystal (GameState buff "slow", consumed by Stats / the player):
+## mult is clamped to [SLOW_MIN_MULT, 0.95] and seconds to SLOW_MAX_SECONDS; it is refused while a slow is
+## active and for `immunity` seconds after one ends, so slows can never chain. Only the player can be slowed.
+## When the target offers its own `apply_slow(mult, seconds, source) -> bool` (player.gd: Stats bounds, its own
+## immunity, stat refresh) the slow goes through it; otherwise the buff is written directly.
+static func apply_slow(t: Node, mult: float, seconds: float, immunity: float = 4.0, source: String = "") -> bool:
+	if t == null or not is_instance_valid(t) or not t.is_in_group("player"):
+		return false
+	var now := _now_ms()
+	if GameState.buffs.has("slow") or (_slow_immune_until_ms >= 0 and now < _slow_immune_until_ms):
+		return false
+	var m := clampf(mult, SLOW_MIN_MULT, 0.95)
+	var s := clampf(seconds, 0.1, SLOW_MAX_SECONDS)
+	var applied := true
+	if t.has_method("apply_slow"):
+		applied = Combat.truthy(t.call("apply_slow", m, s, source))
+	else:
+		GameState.add_buff("slow", m, s)
+	if applied:
+		_slow_immune_until_ms = now + int((s + maxf(immunity, 0.0)) * 1000.0)
+	return applied
+
+
+## This enemy's ground telegraph (src/enemies/telegraph_fx.gd): created on first use as a top_level child, so
+## it is freed with the enemy; hidden automatically when a state other than telegraph / committed starts.
+func mark() -> Node3D:
+	if _mark == null or not is_instance_valid(_mark):
+		_mark = TelegraphFx.new()
+		_mark.name = "Telegraph"
+		add_child(_mark)
+	return _mark
+
+
+func hide_mark() -> void:
+	if _mark != null and is_instance_valid(_mark):
+		_mark.hide_mark()
+
+
+## Teaches an attack: the data "tell" (alt_tell in arachnophobia mode) as a one-time hint (the HUD also keeps
+## it once per save), plus an optional rate-limited sound caption so every tell reads with the sound muted.
+func announce_tell(def: Dictionary, caption: String = "") -> void:
+	var tell := String(def.get("tell", ""))
+	if bool(Settings.get_value("arachnophobia")) and String(def.get("alt_tell", "")) != "":
+		tell = String(def["alt_tell"])
+	var hid := "tell_%s_%s" % [enemy_id, String(def.get("id", "attack"))]
+	if tell != "" and not _told.has(hid):
+		_told[hid] = true
+		Events.hint.emit(hid, tell)
+	if caption != "":
+		var now := Time.get_ticks_msec()
+		if now - int(_captioned.get(enemy_id, -100000)) >= CAPTION_GAP_MS:
+			_captioned[enemy_id] = now
+			Events.caption.emit(caption)
+
+
 # --- Hooks for subclasses ---------------------------------------------------------------------------------------
+
+## Distance at which the chase may start a wind-up (default: data attack_range).
+func attack_reach() -> float:
+	return float(data.get("attack_range", 1.8))
+
+
+## Called right before a wind-up starts (pick the attack here; telegraph_duration() may read it).
+func _choose_attack() -> void:
+	pass
+
+
+## Called when the telegraph ends. Default: the legacy short lunge attack.
+func _telegraph_finished() -> void:
+	_attack_dir = _forward()
+	_enter("attack", ATTACK_TIME)
+
+
+## Called at the end of every _enter (after the state's own setup, before the visual update).
+func _on_state_changed(_prev: String, _new_state: String) -> void:
+	pass
+
+
+## States in which hits never interrupt. Default: attack, recover, stunned and every committed state.
+func _is_uninterruptible() -> bool:
+	return state == "attack" or state == "recover" or state == "stunned" or state in committed_states
+
+
+## Reaction to a staggering hit. Default: the legacy flinch with its immunity window.
+func _stagger(_amount: float, _source: Node) -> void:
+	_flinch_immune = FLINCH_IMMUNITY
+	_enter("flinch", FLINCH_TIME)
+
+
+## The health component (a subclass may return a health.gd subclass, e.g. directional armour).
+func _make_health() -> Node:
+	return Health.new()
+
+
+func _defeat_sound() -> String:
+	return "enemy_defeat"
+
 
 func _default_id() -> String:
 	return "brambling"

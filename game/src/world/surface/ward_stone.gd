@@ -14,8 +14,10 @@ extends Node3D
 ##   ch2_accepted -> a small menu of the options that apply: Read the inscription / Change your look
 ##       (Game.open_panel("wardrobe"), a toast until that panel exists) / Travel the Lantern Road (once
 ##       any arch is lit) / Celebrate the Lanternwake (after ch2_homecoming) / Close.
-##   ch2_choir_defeated, first visit -> flag ch2_homecoming + "Light kept. Roads found. Welcome home."
+##   ch2_choir_defeated, first visit -> homecoming(): flag ch2_homecoming + "Light kept. Roads found. Welcome
+##       home, Krystal." (the only line; the story glue adds the journal note and the Celebrate hint)
 ##   ch2_homecoming or chapter_two_complete -> reading gives that return line.
+##   "Celebrate the Lanternwake" -> celebrate(): the story glue's celebrate("haven") = Game.complete_chapter_two()
 ## Nothing here auto-teleports; the new lines mention nothing spider-like (the legacy warning keeps its
 ## arachnophobia wording).
 ## set_restored(t) blends the look from dim (0) to restored (1); play_glow_burst() for the ending.
@@ -363,9 +365,7 @@ func accept_chapter_two() -> void:
 ## After acceptance: the homecoming (once the Choir is gone), else the menu of options that apply.
 func _chapter_two_visit(who: Node) -> void:
 	if bool(GameState.get_flag(CH2_CHOIR_FLAG)) and not bool(GameState.get_flag(CH2_HOMECOMING_FLAG)):
-		GameState.set_flag(CH2_HOMECOMING_FLAG, true)
-		_pulse_once()
-		_say([CH2_RETURN_LINE % GameState.player_name])
+		homecoming()
 		return
 	var buttons: Array = []
 	for o in menu_options():
@@ -398,9 +398,49 @@ func choose(option: String) -> void:
 			if Game.has_method("travel_lantern_road"):
 				await Game.travel_lantern_road()
 		"celebrate":
-			if bool(GameState.get_flag(CH2_HOMECOMING_FLAG)) and Game.has_method("complete_chapter_two"):
-				var rewards: Dictionary = Game.chapter_two_rewards() if Game.has_method("chapter_two_rewards") else {}
-				await Game.complete_chapter_two(rewards)
+			await celebrate()
+
+
+## Step 19 "Bring the Celebration Home" (MP §11 / §17, story module C9): the first reading after the Choir.
+## Sets ch2_homecoming, flares the stone and says the MP §17 return line (only that line); the story glue adds
+## the journal note and a hint that "Celebrate" is now on the stone's menu (and at the Commons lantern).
+func homecoming() -> void:
+	if bool(GameState.get_flag(CH2_HOMECOMING_FLAG)):
+		return
+	GameState.set_flag(CH2_HOMECOMING_FLAG, true)
+	_pulse_once()
+	_say([CH2_RETURN_LINE % GameState.player_name])
+	var story := _story_script()
+	if story != null:
+		story.call("on_homecoming")
+
+
+## Step 20 "The Lanternwake" from home: the stone flares and the story glue runs Game.complete_chapter_two()
+## (rewards committed and saved first; then the celebration outside the build area, the ending card, credits
+## and free play). Nothing happens before the homecoming or after the chapter is complete. Awaitable.
+func celebrate() -> void:
+	if not bool(GameState.get_flag(CH2_HOMECOMING_FLAG)) or bool(GameState.get_flag(CH2_COMPLETE_FLAG)):
+		return
+	_busy = true
+	_pulse_once()
+	play_glow_burst(2.0)
+	var story := _story_script()
+	if story != null:
+		await story.call("celebrate", "haven")
+	elif Game.has_method("complete_chapter_two"):
+		var rewards: Dictionary = Game.chapter_two_rewards() if Game.has_method("chapter_two_rewards") else {}
+		await Game.complete_chapter_two(rewards)
+	if is_instance_valid(self):
+		_busy = false
+
+
+## The Chapter Two story glue (src/world/story_ch2/story_ch2.gd), loaded safely: the stone keeps working without it.
+static func _story_script() -> Script:
+	var path := "res://src/world/story_ch2/story_ch2.gd"
+	if not ResourceLoader.exists(path):
+		return null
+	var s: Variant = load(path)
+	return s if s is Script and (s as Script).can_instantiate() else null
 
 
 ## The Chapter Two reading: the return line once she is home for good, else thanks + reassurance

@@ -50,11 +50,33 @@ const MELEE_ARC := 110.0
 
 # --- Interaction ---------------------------------------------------------------------------------------
 const INTERACT_RANGE := 2.6
+## Tier names for prompts (= data/equipment.gd TIERS).
+const TIER_NAMES := {1: "Familiar", 2: "Copperwood", 3: "Ironwood", 4: "Moonsteel"}
+
+# --- Wand (Chapter Two; numbers per wand live in data/items.gd) ----------------------------------------------
+const CAST_TIME := 0.45             # the cast gesture (the wand's own cooldown decides the fire rate)
+const CAST_RELEASE := 0.16          # seconds into the cast when the spark leaves the wand
+const CAST_QUEUE_WINDOW := 0.35     # a click this close to the end of the cooldown fires as soon as it is ready
+const WAND_AIM_CONE := 0.5          # cos of the half-angle in which the wand looks for a target (60 deg)
 
 # --- Recovery --------------------------------------------------------------------------------------------
 const OUTSIDE_MARGIN := 12.0        # metres past WORLD_HALF_EXTENT before the surface recovers you
 const BELOW_FLOOR_MARGIN := 2.5     # metres under the terrain surface that count as "stuck below"
 const MAX_AIR_TIME := 6.0           # falling this long means something went wrong
+
+# --- Areas (spec section 9: outdoor / underground / interior) -----------------------------------------------
+## Outdoor areas: world-bounds + under-terrain recovery, lantern softened by daylight (= Game.OUTDOOR_AREAS).
+const OUTDOOR_AREAS := ["surface", "hallowmere_reach"]
+## Interiors: lantern at full strength like underground, but a warmer candle-like glow.
+const INTERIOR_AREAS := ["moonveil_manor", "echo_trial"]
+## Playable half extents (x, z) of the outdoor areas: data/world_layout.gd WORLD_HALF_EXTENT (surface) and
+## data/hallowmere_layout.gd HALF_X / HALF_Z (Reach). Kept here so this file stays scene/autoload free.
+const AREA_HALF_EXTENTS := {"surface": Vector2(110.0, 110.0), "hallowmere_reach": Vector2(140.0, 110.0)}
+## Kill heights of areas whose floors go deeper than data/world_layout.gd KILL_Y (-40): the Hushed Works'
+## floors span y -34 .. -6 (spec section 10).
+const AREA_KILL_Y := {"hushed_works": -60.0}
+const LANTERN_WARM := Color("ffb066")      # interior lantern tint (Palette.LANTERN_GLOW ffc978 is the default)
+const LANTERN_WARM_MIX := 0.45
 
 
 ## Stamina model: sprint drain, regeneration delay, exhaustion hysteresis and costs.
@@ -70,12 +92,13 @@ class Stamina extends RefCounted:
 		delay_left = 0.0
 		exhausted = false
 
-	## Advances by dt. `draining` = currently sprinting. regen_mult comes from food buffs.
-	func tick(dt: float, draining: bool, regen_mult: float = 1.0) -> void:
+	## Advances by dt. `draining` = currently sprinting. regen_mult comes from food buffs; drain_mult is the
+	## sprint stamina cost multiplier (Stats.stamina_cost_mult("sprint"), 1.0 = legacy).
+	func tick(dt: float, draining: bool, regen_mult: float = 1.0, drain_mult: float = 1.0) -> void:
 		if dt <= 0.0:
 			return
 		if draining:
-			value -= SPRINT_DRAIN * dt
+			value -= SPRINT_DRAIN * maxf(drain_mult, 0.0) * dt
 			delay_left = REGEN_DELAY
 			if value <= 0.0:
 				value = 0.0
@@ -263,18 +286,52 @@ class SafeTracker extends RefCounted:
 
 # --- Static helpers ---------------------------------------------------------------------------------
 
-## Why the player must be recovered, or "" when all is well.
+## Why the player must be recovered, or "" when all is well (legacy signature: world bounds only apply to
+## "surface" with a square half extent; see recovery_reason_bounds for every area).
 ## ground_h: terrain height under the player (NAN when unknown).
 static func recovery_reason(pos: Vector3, area_id: String, kill_y: float, half_extent: float, ground_h: float, air_time: float) -> String:
+	var bounds := Vector2(half_extent, half_extent) if area_id == "surface" else Vector2.ZERO
+	return recovery_reason_bounds(pos, bounds, kill_y, ground_h, air_time)
+
+
+## Area-aware recovery: `bounds` = playable half extents (x, z) of an outdoor area (Vector2.ZERO = no world
+## bounds, e.g. underground and interiors); "outside" once past them by OUTSIDE_MARGIN.
+static func recovery_reason_bounds(pos: Vector3, bounds: Vector2, kill_y: float, ground_h: float, air_time: float) -> String:
 	if pos.y < kill_y:
 		return "fell"
-	if area_id == "surface" and (absf(pos.x) > half_extent + OUTSIDE_MARGIN or absf(pos.z) > half_extent + OUTSIDE_MARGIN):
+	if bounds.x > 0.0 and bounds.y > 0.0 and (absf(pos.x) > bounds.x + OUTSIDE_MARGIN or absf(pos.z) > bounds.y + OUTSIDE_MARGIN):
 		return "outside"
 	if not is_nan(ground_h) and pos.y < ground_h - BELOW_FLOOR_MARGIN:
 		return "below_floor"
 	if air_time > MAX_AIR_TIME:
 		return "falling"
 	return ""
+
+
+static func is_outdoor(area_id: String) -> bool:
+	return OUTDOOR_AREAS.has(area_id)
+
+
+static func is_interior(area_id: String) -> bool:
+	return INTERIOR_AREAS.has(area_id)
+
+
+## Playable half extents of an outdoor area (Vector2.ZERO when the area has no world bounds).
+static func world_half_extents(area_id: String) -> Vector2:
+	return AREA_HALF_EXTENTS.get(area_id, Vector2.ZERO)
+
+
+## True while `pos` is inside the area's playable bounds (+ margin); always true without bounds.
+static func in_world_bounds(pos: Vector3, area_id: String, margin: float = 2.0) -> bool:
+	var b := world_half_extents(area_id)
+	if b.x <= 0.0 or b.y <= 0.0:
+		return true
+	return absf(pos.x) <= b.x + margin and absf(pos.z) <= b.y + margin
+
+
+## Kill height of an area (`default_kill_y` = data/world_layout.gd KILL_Y unless the area goes deeper).
+static func kill_y_for(area_id: String, default_kill_y: float) -> float:
+	return float(AREA_KILL_Y.get(area_id, default_kill_y))
 
 
 ## Interaction prompt from a target's interaction / harvest info.
@@ -285,9 +342,17 @@ static func recovery_reason(pos: Vector3, area_id: String, kill_y: float, half_e
 ## even when they also answer get_interaction (resource nodes do): LMB is how tools are used and pressing
 ## E on them swings the tool too. Everything else prompts its interaction first (hand harvestables such as
 ## sticks and berry bushes are picked with E), then a plain "Gather X" attack prompt.
+## A harvest with "min_tier" (e.g. Moon Crystal: 3) needs an owned tool of at least that tier
+## (ItemDB.item_tier); otherwise the prompt is "Needs an Ironwood Pickaxe" (disabled).
 static func build_prompt(interaction: Dictionary, harvest: Dictionary, owned_tool: String) -> Dictionary:
 	var htool := String(harvest.get("tool", "hand")) if not harvest.is_empty() else ""
 	var tool_harvest := htool != "" and htool != "hand"
+	var need_tier := 0
+	var mt: Variant = harvest.get("min_tier")
+	if mt is int or mt is float:
+		need_tier = int(mt)
+	if tool_harvest and need_tier > 1 and owned_tool != "" and owned_tool != "hand" and ItemDB.item_tier(owned_tool) < need_tier:
+		return {"text": "Needs " + tier_tool_article_name(htool, need_tier), "action": "attack", "enabled": false}
 	if not tool_harvest and not interaction.is_empty() and String(interaction.get("text", "")) != "":
 		var p := {"text": String(interaction["text"]), "action": "interact", "enabled": _truthy(interaction.get("enabled", true), true)}
 		if String(interaction.get("reason", "")) != "":
@@ -321,6 +386,18 @@ static func harvest_verb(tool: String) -> String:
 		"pickaxe":
 			return "Mine"
 	return "Gather"
+
+
+## "an Ironwood Pickaxe" for ("pickaxe", 3); the plain article name for tier <= 1.
+static func tier_tool_article_name(tool: String, tier: int) -> String:
+	if tier <= 1:
+		return tool_article_name(tool)
+	var tn := String(TIER_NAMES.get(tier, ""))
+	var base := tool_article_name(tool)
+	if tn == "":
+		return base
+	var noun := base.substr(base.find(" ") + 1)
+	return ("an " if "AEIOU".contains(tn.left(1)) else "a ") + tn + " " + noun
 
 
 static func tool_article_name(tool: String) -> String:
@@ -367,10 +444,10 @@ static func score_candidate(player_pos: Vector3, facing: Vector3, target_pos: Ve
 	return s
 
 
-## Lantern brightness multiplier: softer in surface daylight (a raised lantern at noon should not paint
-## a spotlight on the grass), full strength at dusk, night and anywhere underground.
+## Lantern brightness multiplier: softer in outdoor daylight (surface and the Reach: a raised lantern at noon
+## should not paint a spotlight on the grass), full strength at dusk, night, underground and indoors.
 static func lantern_scale(area_id: String, hour: float) -> float:
-	if area_id != "surface":
+	if not OUTDOOR_AREAS.has(area_id):
 		return 1.0
 	var h := fposmod(hour, 24.0)
 	var day := 0.45
@@ -381,6 +458,13 @@ static func lantern_scale(area_id: String, hour: float) -> float:
 	if h > 5.5 and h < 8.0:
 		return lerpf(1.0, day, (h - 5.5) / 2.5)
 	return 1.0
+
+
+## Lantern light colour: the default glow everywhere, a warmer candle tone indoors (manor, trials).
+static func lantern_tint(area_id: String, base: Color) -> Color:
+	if INTERIOR_AREAS.has(area_id):
+		return base.lerp(LANTERN_WARM, LANTERN_WARM_MIX)
+	return base
 
 
 ## Horizontal dodge speed over the roll (t = 0..1): fast burst that eases out.

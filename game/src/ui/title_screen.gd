@@ -1,8 +1,11 @@
 extends Node
 ## Title screen: a cosy 3D clearing at dusk behind a storybook menu. "Hollowhaven" logo with a warm
 ## glow, the dedication "For Krystal", and Continue (shows day & goal from SaveSystem.peek(); hidden
-## without a save) / New Game (overwrite warning) / Settings / Credits / Quit.
-## New Game -> comfort screen -> Game.new_game().
+## without a save; disabled with the reason for a newer-version save) / New Game (overwrite warning) /
+## Settings / Credits / Quit.
+## New Game -> comfort screen -> "Meet Krystal" creation screen -> Game.new_game(look). Back / Esc on the
+## creation screen returns to the comfort screen, Esc there returns to the title: nothing is written or
+## deleted until Confirm (the old save stays byte-identical).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -10,9 +13,11 @@ const Kit := preload("res://src/ui/ui_kit.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
 const Diorama := preload("res://src/ui/title/title_diorama.gd")
 const ComfortScreen := preload("res://src/ui/screens/comfort_screen.gd")
+const CreationScreen := preload("res://src/ui/screens/creation_screen.gd")
 const ConfirmDialog := preload("res://src/ui/screens/confirm_dialog.gd")
 const SettingsPanel := preload("res://src/ui/panels/settings_panel.gd")
 const CreditsPanel := preload("res://src/ui/panels/credits_panel.gd")
+const FOOTERS := {1: "Chapter One  ·  The Dimming Ward", 2: "Chapter Two  ·  The Lanterns of Hallowmere"}
 
 var diorama: Node3D
 var canvas: CanvasLayer
@@ -24,9 +29,13 @@ var continue_sub: Label
 var new_btn: Button
 var msg_l: Label
 var fade: ColorRect
+var footer_l: Label
 var _panel: Control = null
 var _busy := false
 var _save_meta: Dictionary = {}
+var _draft_look: Dictionary = {}       # the look being styled, kept while going Back to the comfort screen
+## Tests replace the hand-over to Game.new_game(look) (receives the look) to stop before a scene change.
+var launch_override: Callable = Callable()
 
 
 func _ready() -> void:
@@ -155,7 +164,7 @@ func _menu_button(text: String, cb: Callable) -> Button:
 
 
 func _build_footer() -> void:
-	var v := Kit.label("Chapter One  ·  The Dimming Ward  ·  v%s" % String(ProjectSettings.get_setting("application/config/version", "0.1")), "HudSmall", HORIZONTAL_ALIGNMENT_RIGHT)
+	var v := Kit.label(footer_text({}), "HudSmall", HORIZONTAL_ALIGNMENT_RIGHT)
 	v.modulate.a = 0.75
 	v.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	v.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -163,6 +172,14 @@ func _build_footer() -> void:
 	v.offset_right = -36
 	v.offset_bottom = -26
 	root.add_child(v)
+	footer_l = v
+
+
+## "Chapter One  ·  The Dimming Ward  ·  v1.0" (Chapter Two once the save being continued is in it). Pure.
+static func footer_text(save_data: Dictionary) -> String:
+	var meta: Dictionary = save_data.get("meta", {}) if save_data.get("meta", {}) is Dictionary else {}
+	var ch := 2 if float(meta.get("chapter", 1)) >= 2.0 else 1
+	return "%s  ·  v%s" % [String(FOOTERS[ch]), String(ProjectSettings.get_setting("application/config/version", "0.1"))]
 
 
 ## "Day 4  ·  A Timid Friend" from a save's metadata ("" if nothing to show). Pure; see tests.
@@ -177,7 +194,14 @@ static func continue_text(save_data: Dictionary) -> String:
 	# the title text baked into the save is only a fallback (e.g. "Chapter complete", unknown steps).
 	var st := String(meta.get("step_title", ""))
 	var step_id := String(meta.get("step", ""))
-	if step_id != "" and GameState.quests != null:
+	if step_id != "" and float(meta.get("chapter", 1)) >= 2.0:
+		# A Chapter Two step (not a grouped one: its title is the group's, kept in step_title).
+		var log2: Variant = GameState.get("chapter2")
+		if log2 is Object and (log2 as Object).has_method("step_by_id"):
+			var s2: Dictionary = log2.step_by_id(step_id)
+			if not s2.is_empty() and String(s2.get("group", "")) == "":
+				st = String(log2.step_string(s2, "title"))
+	elif step_id != "" and GameState.quests != null:
 		var step: Dictionary = GameState.quests.step_by_id(step_id)
 		if not step.is_empty():
 			st = String(GameState.quests.step_string(step, "title"))
@@ -201,6 +225,8 @@ func _refresh_continue() -> void:
 	continue_btn.disabled = blocked
 	continue_sub.get_parent().visible = has
 	continue_sub.text = SaveSystem.FUTURE_ERROR if blocked else continue_text(_save_meta)
+	if footer_l != null:
+		footer_l.text = footer_text(_save_meta)
 
 
 func _focus_menu() -> void:
@@ -310,17 +336,38 @@ func _on_new_game() -> void:
 			[["new", "Start fresh", "AccentButton"], ["cancel", "Keep my save", ""]])
 		if choice != "new":
 			return
-	var c := ComfortScreen.new()
-	c.setup({"first_time": true})
-	_open_panel(c)
-	await c.confirmed
-	if not c.accepted:
-		return   # closed with Esc / X: stay on the title
-	# The confirmation above is the player's permission to set a newer-version save aside (never deleted).
-	SaveSystem.replace_future_allowed = future_save
+	_draft_look = {}
+	while true:
+		var c := ComfortScreen.new()
+		c.setup({"first_time": true})
+		_open_panel(c)
+		await c.confirmed
+		if not c.accepted:
+			SaveSystem.replace_future_allowed = false
+			return   # closed with Esc / X: stay on the title (nothing written, nothing deleted)
+		# The confirmation above is the player's permission to set a newer-version save aside (never deleted).
+		# It only matters for a save written after Confirm; backing out to the title withdraws it.
+		SaveSystem.replace_future_allowed = future_save
+		var cs := CreationScreen.new()
+		cs.setup({"look": _draft_look})
+		_open_panel(cs)
+		await cs.finished
+		_draft_look = cs.look.duplicate(true)
+		if cs.accepted:
+			break
+		# Back / Esc / X on "Meet Krystal": return to the comfort screen (the draft look is kept).
+	await _start_new_game(_draft_look)
+
+
+## Hands the confirmed look to Game.new_game(look) after the fade (tests: launch_override).
+func _start_new_game(look: Dictionary) -> void:
 	_busy = true
 	await _fade_to_black(1.1)
-	Game.new_game.call_deferred()
+	if launch_override.is_valid():
+		launch_override.call(look.duplicate(true))
+		return
+	CreationScreen.arm_new_journey_marks()
+	Game.new_game.call_deferred(look.duplicate(true))
 
 
 func _on_settings() -> void:
@@ -367,12 +414,22 @@ func _debug_show(what: String) -> void:
 			var c := ComfortScreen.new()
 			c.setup({"first_time": true})
 			_open_panel(c)
+		"creation":
+			var cs := CreationScreen.new()
+			cs.setup({})
+			_open_panel(cs)
 		"continue":
 			_on_continue()
 		"newgame":
+			# Accepts the comfort screen, then "Meet Krystal" (classic look), like the Begin / Confirm buttons.
 			_on_new_game()
-			await get_tree().create_timer(1.0).timeout
-			if _panel != null:
+			for i in 2:
+				await get_tree().create_timer(1.0).timeout
+				if _panel == null or _busy:
+					break
+				if _panel is CreationScreen:
+					_panel.call("_confirm")
+					break
 				_panel.set("accepted", true)
 				_panel.request_close()
 		"confirm":

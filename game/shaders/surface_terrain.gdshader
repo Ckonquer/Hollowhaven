@@ -5,7 +5,7 @@ shader_type spatial;
 
 uniform sampler2D splat_tex : filter_linear, repeat_disable;
 uniform vec2 terrain_origin = vec2(-128.0, -128.0);
-uniform float terrain_samples = 257.0;
+uniform vec2 terrain_samples = vec2(257.0);   // grid samples (x, z); a square grid by default (Woods)
 uniform vec4 path_color : source_color = vec4(0.79, 0.64, 0.43, 1.0);
 uniform vec4 path_edge_color : source_color = vec4(0.61, 0.46, 0.31, 1.0);
 uniform vec4 sand_color : source_color = vec4(0.9, 0.83, 0.64, 1.0);

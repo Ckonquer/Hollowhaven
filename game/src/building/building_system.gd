@@ -1,5 +1,6 @@
 extends RefCounted
-## ENTRY POINT of the Haven building system (called by Game right after the surface area loads):
+## ENTRY POINT of the Haven building system (called by Game right after the surface area loads, and in
+## Hallowmere Reach for the small optional outpost at the Commons):
 ##   BuildingSystem.attach(area)
 ## Spawns every saved structure of that area (GameState.structures) under area/"Structures" and adds
 ## the BuildMode node (group "build_mode": begin(item_id), is_active()).
@@ -28,12 +29,27 @@ static func attach(area: Node) -> void:
 			if Factory.spawn_structure(area, String(uid)) != null:
 				count += 1
 	Ops.notify_area(area)
+	Ops.update_upstairs_flag(aid)     # repairs "A House With an Upstairs" for a save made before the flag existed
 	if area.get_node_or_null("BuildMode") == null:
 		var bm: Node = BuildModeScript.new()
 		bm.name = "BuildMode"
 		area.add_child(bm)
 	if count > 0:
 		print("BuildingSystem: spawned %d structures in %s" % [count, aid])
+		if OS.is_debug_build():
+			_report_audit(aid)
+
+
+## Debug builds: one line about grandfathered pieces that today's rules would refuse (reported, never touched).
+static func _report_audit(aid: String) -> void:
+	var issues := Ops.audit(aid)
+	if issues.is_empty():
+		return
+	var kinds := {}
+	for i in issues:
+		var k := String(i["issue"]).get_slice(":", 0)
+		kinds[k] = int(kinds.get(k, 0)) + 1
+	print("BuildingSystem: kept %d saved pieces as they are (%s), e.g. %s" % [issues.size(), str(kinds), str(issues[0])])
 
 
 static func spawn_structure(area: Node, uid: String) -> Node3D:

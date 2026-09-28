@@ -8,6 +8,8 @@ extends CanvasLayer
 ## Handles the UI input actions: inventory, craft, journal, map, pause (Esc closes the top panel
 ## first), help (F1 controls overlay). Panels call Game.push_ui/pop_ui through here, and full-screen
 ## panels pause the tree via Game.set_paused.
+## Chapter Two: the "wardrobe" panel (pause menu, Ward Stone, wardrobe / mirror furniture), has_panel(name),
+## and the one-time "Your wardrobe is ready" notice for older saves (tick_wardrobe_notice / show_wardrobe_notice).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -32,12 +34,21 @@ const PANELS := {
 	"controls": "res://src/ui/panels/controls_panel.gd",
 	"comfort": "res://src/ui/screens/comfort_screen.gd",
 	"confirm": "res://src/ui/screens/confirm_dialog.gd",
+	"wardrobe": "res://src/ui/panels/wardrobe_panel.gd",
 }
 ## Panels that freeze the world while open.
-const FULLSCREEN := ["inventory", "crafting", "storage", "journal", "map", "pause", "settings", "controls", "comfort", "confirm"]
+const FULLSCREEN := ["inventory", "crafting", "storage", "journal", "map", "pause", "settings", "controls", "comfort", "confirm", "wardrobe"]
 ## Panels the gameplay hotkeys may switch between.
-const GAMEPLAY_PANELS := ["inventory", "crafting", "storage", "journal", "map", "companion", "controls"]
+const GAMEPLAY_PANELS := ["inventory", "crafting", "storage", "journal", "map", "companion", "controls", "wardrobe"]
 const HOTKEYS := {"inventory": "inventory", "craft": "crafting", "journal": "journal", "map": "map", "help": "controls"}
+## One-time notice for saves from before the wardrobe existed (MP §4 "Existing save").
+const WARDROBE_NOTICE_TITLE := "Your Wardrobe"
+const WARDROBE_NOTICE_TEXT := "Your wardrobe is ready. You can change your look without starting over."
+const WARDROBE_NOTICE_SAFE_SECONDS := 3.0   # continuous safe, quiet play before it appears
+const WARDROBE_NOTICE_POLL := 0.25
+## Command-line args (debug boots, screenshots, demos) that switch the notice off; --ui-show=wardrobe_notice
+## still shows it on demand.
+const NOTICE_OFF_ARGS := ["cams", "shot-dir", "shots", "area", "preview", "player-demo", "no-wardrobe-notice"]
 
 var root: Control
 var hud: Control
@@ -56,12 +67,22 @@ var _card: Control = null
 var _tw: Dictionary = {}
 var _warm: Array = []
 var _debug_done := false
+## The wardrobe notice waits for a safe moment. Off in headless runs and screenshot tooling (tests drive
+## tick_wardrobe_notice() directly), like Game.autosave_enabled.
+var wardrobe_notice_enabled: bool = true
+var _notice_safe_t := 0.0
+var _notice_poll_t := 0.0
+var _notice_showing := false
 
 
 func _ready() -> void:
 	layer = 50
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	name = "UIRoot"
+	wardrobe_notice_enabled = DisplayServer.get_name() != "headless"
+	for a in NOTICE_OFF_ARGS:   # debug boots / screenshot tooling never get a surprise card
+		if Debug.has_arg(String(a)):
+			wardrobe_notice_enabled = false
 	root = Control.new()
 	root.name = "Root"
 	Kit.full_rect(root)
@@ -215,11 +236,19 @@ func close(panel_name: String) -> void:
 	Audio.play_ui("ui_close")
 	if panel_name == "settings":
 		UiUtil.save_settings()
+	if top_panel() != "":
+		_focus_top.call_deferred()
+
+
+## Gives keyboard focus to whatever panel is on top NOW (deferred from close(): a hotkey may have opened
+## another panel in the same frame, e.g. switching away from the wardrobe opened over the pause menu).
+func _focus_top() -> void:
 	var top := top_panel()
-	if top != "":
-		var tp: Control = panels[top]
-		if tp.has_method("_focus_default"):
-			tp.call_deferred("_focus_default")
+	if top == "" or not panels.has(top):
+		return
+	var tp: Control = panels[top]
+	if is_instance_valid(tp) and tp.has_method("_focus_default"):
+		tp.call("_focus_default")
 
 
 func close_all() -> void:
@@ -229,6 +258,11 @@ func close_all() -> void:
 
 func is_open(panel_name: String) -> bool:
 	return panels.has(panel_name)
+
+
+## True when a panel of that name is registered (e.g. the Ward Stone asks for "wardrobe").
+func has_panel(panel_name: String) -> bool:
+	return PANELS.has(panel_name)
 
 
 func top_panel() -> String:
@@ -449,18 +483,84 @@ func _on_area_loaded(_area_id: String) -> void:
 		hud.hints.on_hint("quest_" + String(step.get("id", "")), hint)
 	# Warm the icon cache in the background (one icon per frame).
 	_warm = ItemDB.all_item_ids().duplicate()
+	_notice_safe_t = 0.0
 	if Debug.is_cheat_allowed() and not _debug_done:
 		_debug_done = true
 		_debug_boot.call_deferred()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _warm.is_empty():
 		IconFactory.item_icon(String(_warm.pop_back()))
+	if wardrobe_notice_enabled:
+		tick_wardrobe_notice(delta)
+
+
+# --- Wardrobe notice (existing saves) ------------------------------------------------------------------
+
+## A loaded journey that has never been told about the wardrobe (GameState.wardrobe.notice_shown false;
+## new journeys set it when Krystal is styled on the creation screen).
+func wardrobe_notice_pending() -> bool:
+	if not GameState.active or _notice_showing:
+		return false
+	var w: Variant = GameState.wardrobe
+	return w is Dictionary and not bool((w as Dictionary).get("notice_shown", false))
+
+
+## A quiet, safe moment: playing, no menu, no fade or overlay (chapter card, death, ending, the Chapter Two
+## card other modules add to overlay_layer), no boss, and either free to save here or standing in a safe
+## zone (nothing chasing her).
+func wardrobe_notice_safe_now() -> bool:
+	if not Game.gameplay_input_allowed() or _fade_busy() or _death != null or _ending != null:
+		return false
+	if overlay_layer != null and overlay_layer.get_child_count() > 0:
+		return false
+	if Game.has_method("boss_active") and bool(Game.boss_active()):
+		return false
+	var can: Dictionary = Game.can_manual_save()
+	return bool(can.get("ok", false)) or bool(Game.player_in_safe_zone())
+
+
+## Polled at 4 Hz while enabled: shows the notice after WARDROBE_NOTICE_SAFE_SECONDS of continuous safe
+## play. Returns true when it opened the notice.
+func tick_wardrobe_notice(delta: float) -> bool:
+	if not wardrobe_notice_pending():
+		_notice_safe_t = 0.0
+		return false
+	_notice_poll_t += delta
+	if _notice_poll_t < WARDROBE_NOTICE_POLL:
+		return false
+	var dt := _notice_poll_t
+	_notice_poll_t = 0.0
+	if not wardrobe_notice_safe_now():
+		_notice_safe_t = 0.0
+		return false
+	_notice_safe_t += dt
+	if _notice_safe_t < WARDROBE_NOTICE_SAFE_SECONDS:
+		return false
+	show_wardrobe_notice()
+	return true
+
+
+## The dismissible "Your wardrobe is ready" card with a button that opens the wardrobe. Marks it shown at
+## once (it never comes back, whatever the answer). Awaitable; returns the choice ("open" / "later" /
+## "cancel").
+func show_wardrobe_notice() -> String:
+	if _notice_showing:
+		return "cancel"
+	_notice_showing = true
+	_notice_safe_t = 0.0
+	GameState.wardrobe["notice_shown"] = true
+	var pick: String = await confirm(WARDROBE_NOTICE_TITLE, WARDROBE_NOTICE_TEXT,
+		[["open", "Open the wardrobe", "AccentButton"], ["later", "Maybe later", ""]])
+	_notice_showing = false
+	if pick == "open" and is_inside_tree():
+		open("wardrobe")
+	return pick
 
 
 ## Debug/QA only: --ui-open=<panel> [--ui-args=<json>] --ui-demo[=build|combat] --ui-lore=id,id
-## --ui-show=death|ending|chapter|comfort
+## --ui-show=death|ending|chapter|comfort|wardrobe_notice
 func _debug_boot() -> void:
 	if not Debug.is_cheat_allowed():
 		return
@@ -479,6 +579,8 @@ func _debug_boot() -> void:
 			show_chapter_card("Chapter One", "The Dimming Ward")
 		"comfort":
 			show_comfort(true)
+		"wardrobe_notice":
+			show_wardrobe_notice()
 	if Debug.has_arg("ui-open"):
 		var a: Variant = JSON.parse_string(Debug.arg("ui-args", "{}"))
 		for pn in Debug.arg("ui-open").split(",", false):

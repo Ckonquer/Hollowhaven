@@ -5,10 +5,23 @@ extends Node3D
 ## burns with flame particles + a warm OmniLight3D, plays brazier_light and emits `lit`.
 ##   var B = load("res://src/enemies/boss_brazier.gd"); var b: Node3D = B.new()
 ##   b.setup({"id": "brazier_1"}); area.add_child(b); b.global_position = ...
-## Optional setup keys: "lit": true (start lit), "persist_flag": "boss_brazier_1" (saved via GameState).
+## Optional setup keys: "lit": true (start lit), "persist_flag": "boss_brazier_1" (saved via GameState),
+## "light_radius": 7.0.
+##
+## Matron rework (MP section 8, phase 3), all driven by the boss:
+##   set_reusable(on, cooldown)  a LIT brazier can be stoked again once its embers have gathered heat for
+##                               `cooldown` seconds (a readable ring fills round the bowl, the interaction
+##                               counts down): "Stoke the brazier" (1.0 s, needs the Lantern) -> `flared`.
+##   extinguish(cooldown)        the Matron smothered it: dark, out of "light_source", smoulders for
+##                               `cooldown` s, then it can be lit again (-> `lit` once more). `extinguished`.
+##   set_dim(k)                  0..1 while the Matron's thread drains it (flame and light shrink).
+##   reset_cold()                back to an unlit, ready brazier (full encounter resets, echo trials).
+## In phases 1-2 nothing changes: a lit brazier simply burns ("The brazier burns brightly").
 
 signal lit
 signal kindling_started
+signal flared
+signal extinguished
 
 const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
@@ -17,18 +30,27 @@ const HitFx := preload("res://src/combat/hit_fx.gd")
 const Combat := preload("res://src/combat/combat.gd")
 
 const KINDLE_TIME := 1.5
+const STOKE_TIME := 1.0
 const KINDLE_MAX_DIST := 4.0
 const BOWL_Y := 1.28
 const FLAME_COLOR := Color("ffb347")
+const EMBER_COLOR := Color("ff6a2a")
+const READY_COLOR := Color("ffd27a")
 
 var brazier_id: String = ""
 var light_radius: float = 7.0
 var persist_flag: String = ""
-var kindle_progress: float = 0.0        # 0..1 while kindling
+var kindle_progress: float = 0.0        # 0..1 while kindling / stoking
+var reusable := false                   # phase 3: lit braziers can be stoked again after reuse_cooldown
+var reuse_cooldown: float = 11.0
 
 var _lit := false
 var _kindling := false
+var _stoking := false
 var _kindler: Node3D = null
+var _cool_left: float = 0.0             # lit + reusable: until it can be stoked; cold: until it can be relit
+var _cool_total: float = 0.0
+var _dim: float = 0.0
 var _t: float = 0.0
 var _light: OmniLight3D
 var _fire: CPUParticles3D
@@ -81,18 +103,34 @@ func _kindler_down() -> bool:
 # --- Interaction contract -------------------------------------------------------------------------
 
 func get_interaction(_player: Node) -> Dictionary:
-	if _lit:
-		return {"text": "The brazier burns brightly", "enabled": false}
 	if _kindling:
-		return {"text": "Kindling...", "enabled": false}
+		return {"text": "Stoking..." if _stoking else "Kindling...", "enabled": false}
+	if _lit:
+		if reusable:
+			if _cool_left > 0.0:
+				return {"text": "The brazier is gathering heat (%d s)" % ceili(_cool_left), "enabled": false}
+			if not GameState.has_item("lantern"):
+				return {"text": "Stoke the brazier (you need a Lantern)", "enabled": false}
+			return {"text": "Stoke the brazier", "enabled": true}
+		return {"text": "The brazier burns brightly", "enabled": false}
+	if _cool_left > 0.0:
+		return {"text": "The brazier is still smouldering (%d s)" % ceili(_cool_left), "enabled": false}
 	if not GameState.has_item("lantern"):
 		return {"text": "Light the brazier (you need a Lantern)", "enabled": false}
 	return {"text": "Light the brazier", "enabled": true}
 
 
 func interact(player: Node) -> void:
-	if _lit or _kindling or not GameState.has_item("lantern"):
+	if _kindling or not GameState.has_item("lantern"):
 		return
+	if _lit:
+		if not can_stoke():
+			return
+		_stoking = true
+	elif _cool_left > 0.0:
+		return
+	else:
+		_stoking = false
 	_kindling = true
 	_kindler = player as Node3D
 	kindle_progress = 0.0
@@ -108,13 +146,42 @@ func is_light_active() -> bool:
 	return _lit
 
 
+func is_kindling() -> bool:
+	return _kindling
+
+
+## Seconds until it can be stoked (lit, reusable) or relit (cold, smouldering). 0 = ready.
+func cooldown_left() -> float:
+	return _cool_left
+
+
+## 0..1 progress of the current cooldown (1 = ready). Drives the ring round the bowl.
+func cooldown_progress() -> float:
+	if _cool_total <= 0.0:
+		return 1.0
+	return clampf(1.0 - _cool_left / _cool_total, 0.0, 1.0)
+
+
+func is_cooling() -> bool:
+	return _cool_left > 0.0
+
+
+func can_stoke() -> bool:
+	return _lit and reusable and _cool_left <= 0.0 and not _kindling
+
+
 ## Lights immediately (debug, scripted beats, tests).
 func light() -> void:
 	if _lit:
 		return
 	_kindling = false
+	_stoking = false
 	kindle_progress = 1.0
 	_lit = true
+	_dim = 0.0
+	_cool_left = 0.0
+	if reusable:
+		_start_cooldown(reuse_cooldown)
 	_apply_lit(false)
 	if persist_flag != "":
 		GameState.set_flag(persist_flag, true)
@@ -123,21 +190,114 @@ func light() -> void:
 	lit.emit()
 
 
+## A lit, reusable brazier flares up again (the stoke finished, or tests / scripted beats).
+func flare() -> void:
+	if not _lit:
+		return
+	_kindling = false
+	_stoking = false
+	kindle_progress = 1.0
+	_start_cooldown(reuse_cooldown)
+	Audio.play_3d("brazier_light", global_position + Vector3.UP * BOWL_Y, 0.0, 0.05)
+	Events.caption.emit("[the brazier flares up]")
+	HitFx.burst(global_position + Vector3.UP * (BOWL_Y + 0.3), FLAME_COLOR, 18, 4.0, 1.4, -3.0, 0.7)
+	flared.emit()
+
+
+## Phase 3: lit braziers become reusable. A lit one starts gathering heat now (readable countdown).
+func set_reusable(on: bool, cooldown: float = -1.0) -> void:
+	if cooldown >= 0.0:
+		reuse_cooldown = cooldown
+	if on == reusable:
+		return
+	reusable = on
+	if on and _lit:
+		_start_cooldown(reuse_cooldown)
+	elif not on and _lit:
+		_cool_left = 0.0
+		_cool_total = 0.0
+
+
+## The Matron smothered it: out, dark, smouldering for `cooldown` s (default reuse_cooldown).
+func extinguish(cooldown: float = -1.0) -> void:
+	var was_lit := _lit
+	if _kindling:
+		_fizzle()
+	_lit = false
+	_dim = 0.0
+	_start_cooldown(reuse_cooldown if cooldown < 0.0 else cooldown)
+	if persist_flag != "":
+		GameState.set_flag(persist_flag, false)
+	if was_lit:
+		_apply_unlit()
+		HitFx.burst(global_position + Vector3.UP * (BOWL_Y + 0.2), Color(0.45, 0.42, 0.5, 0.8), 12, 1.6, 1.2, 1.0, 1.0)
+		Audio.play_3d("lantern_off", global_position + Vector3.UP * BOWL_Y, -2.0, 0.05)
+		Events.caption.emit("[the brazier gutters out]")
+	extinguished.emit()
+
+
+## 0..1: the flame and its light shrink while the Matron's thread drains it.
+func set_dim(k: float) -> void:
+	_dim = clampf(k, 0.0, 1.0)
+
+
+func dim_amount() -> float:
+	return _dim
+
+
+## Back to a cold, ready brazier (no cooldown, not reusable) - a full encounter reset.
+func reset_cold() -> void:
+	if _kindling:
+		_fizzle()
+	var was_lit := _lit
+	_lit = false
+	_dim = 0.0
+	_cool_left = 0.0
+	_cool_total = 0.0
+	reusable = false
+	if persist_flag != "":
+		GameState.set_flag(persist_flag, false)
+	if was_lit:
+		_apply_unlit()
+
+
+func _start_cooldown(seconds: float) -> void:
+	_cool_total = maxf(seconds, 0.0)
+	_cool_left = _cool_total
+
+
 func _process(delta: float) -> void:
 	_t += delta
+	if _cool_left > 0.0:
+		_cool_left = maxf(_cool_left - delta, 0.0)
 	if _kindling:
 		if _kindler_down():
 			_fizzle()
 		elif _kindler != null and is_instance_valid(_kindler) and _kindler.global_position.distance_to(global_position) > KINDLE_MAX_DIST:
 			_fizzle()
 		else:
-			kindle_progress = minf(kindle_progress + delta / KINDLE_TIME, 1.0)
+			kindle_progress = minf(kindle_progress + delta / (STOKE_TIME if _stoking else KINDLE_TIME), 1.0)
 			if kindle_progress >= 1.0:
-				light()
+				if _stoking:
+					flare()
+				else:
+					light()
 	# Visual update
+	if _flame == null:
+		return
 	if _lit:
-		_light.light_energy = 2.2 + sin(_t * 11.0) * 0.12 + sin(_t * 17.3) * 0.08
-		_flame.scale = Vector3(1.0 + sin(_t * 9.0) * 0.06, 1.0 + sin(_t * 13.0) * 0.1, 1.0 + cos(_t * 8.0) * 0.06)
+		var dim_k := 1.0 - 0.8 * _dim
+		_light.light_energy = (2.2 + sin(_t * 11.0) * 0.12 + sin(_t * 17.3) * 0.08) * dim_k
+		var fs := 1.0 - 0.6 * _dim
+		_flame.scale = Vector3(fs * (1.0 + sin(_t * 9.0) * 0.06), fs * (1.0 + sin(_t * 13.0) * 0.1), fs * (1.0 + cos(_t * 8.0) * 0.06))
+		if _kindling and _stoking:
+			_ring.visible = true
+			_ring.scale = Vector3.ONE * lerpf(1.25, 1.0, kindle_progress)
+			_ring_mat.albedo_color = Color(READY_COLOR, 0.35 + 0.55 * kindle_progress)
+		elif reusable:
+			_show_cooldown_ring(READY_COLOR)
+		elif _ring.visible:
+			_ring.visible = false
 	elif _kindling:
 		var k := kindle_progress
 		_flame.visible = true
@@ -147,17 +307,43 @@ func _process(delta: float) -> void:
 		_ring.visible = true
 		_ring.scale = Vector3.ONE * lerpf(1.25, 1.0, k)
 		_ring_mat.albedo_color = Color(FLAME_COLOR, 0.25 + 0.6 * k)
+	elif _cool_left > 0.0:
+		_show_cooldown_ring(EMBER_COLOR)
+	elif _ring.visible:
+		_ring.visible = false
 	for i in _embers.size():
 		var e := _embers[i] as Node3D
 		e.scale = Vector3.ONE * (0.8 + 0.35 * sin(_t * (2.0 + float(i) * 0.7) + float(i)))
 
 
+## A ring round the bowl that closes in and firms up as the cooldown runs out; once ready it breathes
+## slowly (a steady glow with reduce_flashing) so "this one can be used again" reads at a glance.
+func _show_cooldown_ring(col: Color) -> void:
+	var p := cooldown_progress()
+	_ring.visible = true
+	_ring.scale = Vector3.ONE * lerpf(1.35, 1.0, p)
+	var a := 0.12 + 0.45 * p
+	if _cool_left <= 0.0:
+		a = 0.75 if HitFx.reduce_flashing() else 0.6 + 0.25 * (0.5 + 0.5 * sin(_t * 3.0))
+		if bool(Settings.get_value("high_visibility_cues")):
+			# High-visibility cues: a ready brazier's ring is solid and wider (shape and brightness, not
+			# colour alone), so "this one can be stoked again" reads from across the chamber.
+			a = 0.95
+			_ring.scale = Vector3.ONE * 1.15
+	_ring_mat.albedo_color = Color(col, a)
+
+
 func _fizzle() -> void:
 	_kindling = false
+	var was_stoke := _stoking
+	_stoking = false
 	_kindler = null
 	kindle_progress = 0.0
-	_flame.visible = false
-	_light.visible = false
+	if _flame == null:
+		return
+	if not was_stoke and not _lit:
+		_flame.visible = false
+		_light.visible = false
 	_ring.visible = false
 	HitFx.burst(global_position + Vector3.UP * (BOWL_Y + 0.2), Color(0.5, 0.45, 0.5, 0.8), 6, 1.2, 1.0, 0.8, 0.8)
 
@@ -196,10 +382,11 @@ func _build() -> void:
 	for m in [outer, inner]:
 		(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_flame.visible = false
-	# Kindling ring
+	# Kindling ring (also the phase-3 cooldown / "ready to stoke" ring)
 	_ring_mat = HitFx.new_tint()
 	_ring = Kit.torus(0.66, 0.72, _ring_mat)
 	Kit.add(self, _ring, Vector3(0, BOWL_Y + 0.06, 0))
+	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_ring.visible = false
 	# Light (warm, shadowed: there are only three of these)
 	_light = OmniLight3D.new()
@@ -294,3 +481,16 @@ func _apply_lit(instant: bool) -> void:
 		var tw := create_tween()
 		tw.tween_property(_flame, "scale", Vector3.ONE * 1.25, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.tween_property(_flame, "scale", Vector3.ONE, 0.3)
+
+
+## Dark again (smothered / reset): out of the light sources, flame and light hidden, embers dull.
+func _apply_unlit() -> void:
+	remove_from_group("light_source")
+	if _flame == null:
+		return
+	_flame.visible = false
+	_light.visible = false
+	_fire.emitting = false
+	(_rune as MeshInstance3D).material_override = Mat.glow(Palette.LANTERN_GLOW, 0.7)
+	for e in _embers:
+		(e as MeshInstance3D).material_override = Mat.glow(Color("ff7a3a"), 1.3)

@@ -10,6 +10,19 @@ extends Node
 ## `build_mode_active` flag is set while active (and cleared shortly after exit so the exit key doesn't
 ## also trigger an interaction), and is_active() tells the camera to ignore wheel zoom.
 ## Emits Events.build_mode_changed / build_selection_changed / build_placement_state(valid, reason).
+##
+## Chapter Two:
+##   storeys  the cursor's storey comes from what it hits (the top of an upper floor = upstairs); stairs,
+##            upper floors and roofs pick their own storey (placement.gd requested_level)
+##   undo     Z (action "build_undo" when bound): first press highlights the last piece you placed and says
+##            what will be refunded, a second press within UNDO_CONFIRM_SECONDS takes it back (exact refund,
+##            the build counter goes back too). Up to UNDO_DEPTH recent placements, newest first.
+##   recolour P (action "build_recolor"): cycles the piece under the cursor through natural wood and the dye
+##            palettes made at the Loom (data.tint; uid and contents kept). Never automatic.
+##   variant  N (action "build_variant"): with a carved pumpkin selected, picks its face BEFORE placing
+##            (saved as data.face; the ghost shows it); pointing at a placed pumpkin re-carves it.
+##   The fallback keys (FALLBACK_KEYS) avoid every default binding (T is the companion skill, F the lantern),
+##   so build mode never shadows another action.
 
 const Placement := preload("res://src/building/placement.gd")
 const Factory := preload("res://src/building/structure_factory.gd")
@@ -18,19 +31,30 @@ const Ops := preload("res://src/building/build_ops.gd")
 const U := preload("res://src/building/model_util.gd")
 const Palette := preload("res://src/art/palette.gd")
 
+const Tints := preload("res://src/building/tints.gd")
+
 const MAX_REACH := 8.0
 const RAY_LENGTH := 45.0
 const REVALIDATE_SECONDS := 0.2
 const MSG_NOTHING := "Nothing to build yet. Craft pieces at a Workbench."
+const UNDO_DEPTH := 10
+const UNDO_CONFIRM_SECONDS := 4.0
+const UPSTAIRS_NORMAL_Y := 0.7        # only the TOP of an upper-storey piece selects the upper storey
+## Keys used until Settings binds the Chapter Two build actions (rebindable once the actions exist).
+const FALLBACK_KEYS := {"build_undo": KEY_Z, "build_recolor": KEY_P, "build_variant": KEY_N}
 
 signal placed(uid: String)
 signal dismantled(uid: String)
+signal undone(uid: String)
+signal recolored(uid: String, tint: String)
 
 var active := false
 var selected_item := ""
 var rot_deg := 0
-## Automated tests / the debug harness can pin the cursor to a world point instead of the camera ray.
+## Automated tests / the debug harness can pin the cursor to a world point instead of the camera ray
+## (and say which storey it points at).
 var debug_cursor: Variant = null
+var debug_level := 0
 
 var _sid := ""
 var _ghost: Node3D
@@ -55,6 +79,12 @@ var _cursor_collider: Object = null
 var _wiggle: Tween
 var _pending_item := ""
 var _pending_until_ms := 0
+var _cursor_level := 0
+var _undo: Array = []                 # [{"uid", "item", "name"}], oldest first
+var _undo_armed := ""
+var _undo_armed_until_ms := 0
+var _face_index := 0
+var _height_fn: Callable
 
 
 ## Contract helper: spawn a saved structure (used when loading).
@@ -90,9 +120,13 @@ func area() -> Node:
 
 
 ## Snapshot for UIs that open mid-way (build bar): {active, item, structure, valid, reason, rotation, placeables}.
+## Chapter Two keys: level (cursor storey), face (selected pumpkin face or ""), undo (name of the piece the
+## undo key would take back, "" = nothing), undo_armed (a second press confirms).
 func get_state() -> Dictionary:
+	_prune_undo()
 	return {"active": active, "item": selected_item, "structure": _sid, "valid": _state_valid, "reason": _state_reason,
-		"rotation": rot_deg, "placeables": placeables()}
+		"rotation": rot_deg, "placeables": placeables(), "level": _cursor_level, "face": selected_face(),
+		"undo": String(_undo.back()["name"]) if not _undo.is_empty() else "", "undo_armed": _undo_is_armed()}
 
 
 # --- Enter / exit ----------------------------------------------------------------------------------
@@ -135,8 +169,10 @@ func begin(item_id: String = "") -> void:
 		# {attack}/{build} are standard HUD tokens; the build-only keys are filled in here.
 		Events.hint.emit("build_controls", "Place with {attack}. %s rotates, %s takes a piece apart (full refund). Mouse wheel or 1-8 picks a piece. {build} or Esc to finish." % [
 			Settings.action_label("build_rotate"), Settings.action_label("build_dismantle")])
+		Events.hint.emit("build_controls_ch2", "%s undoes your last piece (press twice). %s recolours the piece you point at with dyes from the Loom. Stairs lead up to upper floors, held up by walls or porch posts." % [
+			key_label("build_undo"), key_label("build_recolor")])
 		if not _player_in_build_area():
-			Events.notify.emit(Placement.MSG_OUTSIDE + ".", "warn")
+			Events.notify.emit(Placement.outside_reason(Ops.build_area_for(Ops.area_id_of(area()))) + ".", "warn")
 	var pick: String = item_id if Ops.structure_for_item(item_id) != "" and GameState.has_item(item_id) else ""
 	if pick == "":
 		pick = _default_selection()
@@ -190,6 +226,12 @@ func _input(event: InputEvent) -> void:
 		rotate_step()
 	elif event.is_action_pressed("build_dismantle"):
 		try_dismantle()
+	elif _pressed(event, "build_undo"):
+		request_undo()
+	elif _pressed(event, "build_recolor"):
+		recolor_under_cursor()
+	elif _pressed(event, "build_variant") and _variant_applies():
+		cycle_variant()
 	elif event.is_action_pressed("zoom_in"):
 		cycle(-1)
 	elif event.is_action_pressed("zoom_out"):
@@ -205,6 +247,39 @@ func _input(event: InputEvent) -> void:
 			handled = true      # swallow releases too, so nothing else reacts to build clicks
 	if handled:
 		get_viewport().set_input_as_handled()
+
+
+## True for the Chapter Two build actions: the bound action when Settings has it, else FALLBACK_KEYS. A
+## fallback key the player has bound to another action (e.g. the journal rebound to N) belongs to that action:
+## build mode never swallows it.
+func _pressed(event: InputEvent, action: String) -> bool:
+	if InputMap.has_action(action):
+		return event.is_action_pressed(action)
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo:
+		var k := event as InputEventKey
+		var want: int = int(FALLBACK_KEYS.get(action, KEY_NONE))
+		if want == KEY_NONE or not (k.physical_keycode == want or (k.physical_keycode == KEY_NONE and k.keycode == want)):
+			return false
+		return not _key_bound_elsewhere(k)
+	return false
+
+
+## Is this key bound to some other action in the player's (possibly rebound) controls? Only runs on a key
+## press that matches a fallback key.
+static func _key_bound_elsewhere(k: InputEventKey) -> bool:
+	if Settings.has_method("actions_using"):
+		return not (Settings.actions_using(k) as Array).is_empty()
+	return false
+
+
+static func key_label(action: String) -> String:
+	if InputMap.has_action(action):
+		return Settings.action_label(action)
+	var k := InputEventKey.new()
+	k.physical_keycode = int(FALLBACK_KEYS.get(action, KEY_NONE)) as Key
+	if _key_bound_elsewhere(k):
+		return "-"      # the player gave this key to another action (bind the build action to use it)
+	return OS.get_keycode_string(int(FALLBACK_KEYS.get(action, KEY_NONE)))
 
 
 # --- Selection ----------------------------------------------------------------------------------------------
@@ -234,11 +309,15 @@ func _select(item_id: String, force: bool = false) -> void:
 	var changed := item_id != selected_item
 	selected_item = item_id
 	_sid = Ops.structure_for_item(item_id)
+	if changed:
+		_face_index = 0
 	_last_key = ""
 	_dirty = true
 	_rebuild_ghost()
 	if changed or force:
 		Events.build_selection_changed.emit(item_id)
+		if active and not _faces().is_empty():
+			Events.hint.emit("build_pumpkin_face", "%s picks the carved face before you place it. Interact with a placed pumpkin to carve it a new one." % key_label("build_variant"))
 
 
 func cycle(dir: int) -> void:
@@ -301,7 +380,7 @@ func _update(delta: float) -> void:
 	if _sid == "":
 		_has_target = false
 		_hide_ghost()
-		_set_highlight(_under_uid)
+		_set_highlight(_undo_armed if _undo_is_armed() else _under_uid)
 		if _under_uid != "":
 			_set_state(false, "Press %s to take this apart" % Settings.action_label("build_dismantle"))
 		else:
@@ -309,7 +388,7 @@ func _update(delta: float) -> void:
 		return
 	var def := Placement.def_of(_sid)
 	var snapped := Placement.snap_position(def, point, float(rot_deg))
-	var key := "%s|%d|%.2f|%.2f" % [_sid, rot_deg, snapped.x, snapped.z]
+	var key := "%s|%d|%.2f|%.2f|%d" % [_sid, rot_deg, snapped.x, snapped.z, _cursor_level]
 	_revalidate_t -= delta
 	if key != _last_key or _dirty or _revalidate_t <= 0.0:
 		_last_key = key
@@ -320,7 +399,7 @@ func _update(delta: float) -> void:
 	_has_target = true
 	var ok := bool(_result.get("ok", false))
 	var blocker := String(_result.get("blocker", ""))
-	_set_highlight(blocker)
+	_set_highlight(_undo_armed if _undo_is_armed() else blocker)
 	var reason := String(_result.get("reason", ""))
 	if blocker != "":
 		reason += " (%s to take it apart)" % Settings.action_label("build_dismantle")
@@ -332,7 +411,7 @@ func _update(delta: float) -> void:
 func _make_ctx() -> Dictionary:
 	var p: Node = Game.player
 	var ppos: Variant = (p as Node3D).global_position if p is Node3D and is_instance_valid(p) else null
-	var ctx := Ops.make_ctx(area(), ppos)
+	var ctx := Ops.make_ctx(area(), ppos, _cursor_level)
 	ctx["physics_fn"] = _physics_check
 	return ctx
 
@@ -370,7 +449,9 @@ func _camera() -> Camera3D:
 func _cursor() -> Variant:
 	_cursor_collider = null
 	if debug_cursor is Vector3:
+		_cursor_level = debug_level
 		return debug_cursor
+	_cursor_level = 0
 	var cam := _camera()
 	if cam == null or not cam.is_inside_tree():
 		return null
@@ -383,20 +464,32 @@ func _cursor() -> Variant:
 		q.exclude = [(p as CollisionObject3D).get_rid()]
 	var hit := cam.get_world_3d().direct_space_state.intersect_ray(q)
 	var point: Vector3
+	# Upstairs, aim on the upper floor's plane: a ray that misses the floor (past its edge) or dips to the
+	# ground far below still points at the spot next to the floor, where the next tile or railing goes.
+	var upstairs := _is_upstairs(origin)
 	if not hit.is_empty():
 		point = hit["position"]
 		_cursor_collider = hit["collider"]
-	elif dir.y < -0.02:
+		_cursor_level = _level_of_hit(_cursor_collider, hit.get("normal", Vector3.UP))
+	if upstairs and (hit.is_empty() or point.y < origin.y - 0.6) and dir.y < -0.02:
 		point = from + dir * ((origin.y - from.y) / dir.y)
-	else:
-		point = origin + Vector3(dir.x, 0.0, dir.z).normalized() * 3.0
+		_cursor_collider = null
+		_cursor_level = 1
+	elif hit.is_empty():
+		if dir.y < -0.02:
+			point = from + dir * ((origin.y - from.y) / dir.y)
+		else:
+			point = origin + Vector3(dir.x, 0.0, dir.z).normalized() * 3.0
+		if upstairs:
+			_cursor_level = 1
 	var flat := Vector2(point.x - origin.x, point.z - origin.z)
 	if flat.length() > MAX_REACH:
 		flat = flat.normalized() * MAX_REACH
 		point = Vector3(origin.x + flat.x, origin.y, origin.z + flat.y)
 		_cursor_collider = null
+		_cursor_level = 1 if upstairs else 0
 		var hf := Ops.height_fn(area())
-		if hf.is_valid():
+		if hf.is_valid() and not upstairs:
 			point.y = float(hf.call(point.x, point.z))
 	return point
 
@@ -413,8 +506,31 @@ func _structure_under_cursor(point: Vector3) -> String:
 	if _occ_dirty:
 		_occ = Placement.build_occupancy(GameState.structures, Ops.area_id_of(area()))
 		_occ_dirty = false
-	var ctx := {"structures": GameState.structures, "area_id": Ops.area_id_of(area()), "occupancy": _occ}
+	var ctx := {"structures": GameState.structures, "area_id": Ops.area_id_of(area()), "occupancy": _occ, "level": _cursor_level}
 	return Placement.structure_at_point(point, ctx)
+
+
+## True when Krystal stands on an upper storey (well above the ground under her).
+func _is_upstairs(feet: Vector3) -> bool:
+	if not _height_fn.is_valid():
+		_height_fn = Ops.height_fn(area())     # cached: no per-frame Callable
+		if not _height_fn.is_valid():
+			return false
+	return feet.y - float(_height_fn.call(feet.x, feet.z)) > Placement.UPSTAIRS_CLEARANCE
+
+
+## Storey the cursor points at: the top surface of a piece that stands upstairs (an upper floor tile, a
+## table up there...) selects that storey; walls, undersides and the ground are the ground storey.
+static func _level_of_hit(collider: Object, normal: Variant) -> int:
+	if not (normal is Vector3) or (normal as Vector3).y < UPSTAIRS_NORMAL_Y:
+		return 0
+	var n: Variant = collider
+	while n is Node and is_instance_valid(n):
+		if (n as Node).has_meta("structure_uid"):
+			var rec: Variant = GameState.structures.get(String((n as Node).get_meta("structure_uid")))
+			return Placement.level_of(rec) if rec is Dictionary else 0
+		n = (n as Node).get_parent()
+	return 0
 
 
 func _player_in_build_area() -> bool:
@@ -470,7 +586,30 @@ func _physics_check(structure_id: String, pos: Vector3, rot: int) -> String:
 		q2.collision_mask = 1
 		if not space.intersect_shape(q2, 1).is_empty():
 			return "Something is in the way"
+		# Gatherables (sticks, stones, tall grass around the expanded Haven) have no world collider: ask
+		# Krystal to pick them up first instead of building over them.
+		var q3 := PhysicsShapeQueryParameters3D.new()
+		q3.shape = q2.shape
+		q3.transform = Transform3D(Basis.IDENTITY, centre + Vector3.UP * (hh * 0.5))
+		q3.collision_mask = 16
+		for r in space.intersect_shape(q3, 8):
+			var owner: Node = _harvestable_owner(r.get("collider"))
+			if owner != null:
+				var info: Variant = owner.call("get_harvest_info") if owner.has_method("get_harvest_info") else {}
+				var nm2: String = String((info as Dictionary).get("name", "")) if info is Dictionary else ""
+				return ("Gather the %s first" % nm2) if nm2 != "" else "Gather what's growing here first"
 	return ""
+
+
+static func _harvestable_owner(c: Variant) -> Node:
+	var n: Variant = c
+	while n is Node and is_instance_valid(n):
+		if (n as Node).is_in_group("harvestable"):
+			return n
+		if (n as Node).has_meta("structure_uid"):
+			return null
+		n = (n as Node).get_parent()
+	return null
 
 
 static func _box(size: Vector3) -> BoxShape3D:
@@ -493,10 +632,17 @@ func try_place() -> String:
 		_fail_feedback()
 		return ""
 	var pos := Vector3(_target.x, float(res.get("y", _target.y)), _target.z)
-	var uid := Ops.place_structure(area(), selected_item, pos, float(rot_deg))
+	var data := {}
+	if selected_face() != "":
+		data["face"] = selected_face()
+	# Remember the item first: placing the LAST one empties the stack, and the inventory listener switches the
+	# selection before place_structure returns (the undo entry must still name what was placed).
+	var item := selected_item
+	var uid := Ops.place_structure(area(), item, pos, float(rot_deg), int(res.get("level", 0)), data)
 	if uid == "":
 		_fail_feedback()
 		return ""
+	_push_undo(uid, item)
 	_mark_dirty()
 	_last_key = ""
 	placed.emit(uid)
@@ -507,7 +653,8 @@ func try_place() -> String:
 func try_dismantle() -> bool:
 	if not active:
 		return false
-	var uid: String = _highlight_uid if _highlight_uid != "" else _under_uid
+	# The piece she points at (or the one blocking the ghost), never the one an armed undo is highlighting.
+	var uid: String = target_uid()
 	if uid == "" or not GameState.structures.has(uid):
 		Audio.play_ui("build_invalid")
 		Events.notify.emit("Point at something you built to take it apart.", "info")
@@ -519,10 +666,144 @@ func try_dismantle() -> bool:
 		return false
 	_set_highlight("")
 	_under_uid = ""
+	_undo_armed = ""
 	_mark_dirty()
 	_last_key = ""
 	dismantled.emit(uid)
 	return true
+
+
+# --- Undo (Chapter Two) --------------------------------------------------------------------------------------
+
+func _push_undo(uid: String, item_id: String) -> void:
+	var sid := Ops.structure_for_item(item_id)
+	_undo.append({"uid": uid, "item": item_id, "name": ItemDB.structure_display_name(sid) if sid != "" else item_id})
+	while _undo.size() > UNDO_DEPTH:
+		_undo.pop_front()
+	_undo_armed = ""
+
+
+## Drops entries whose piece is gone (dismantled, undone) or was replaced.
+func _prune_undo() -> void:
+	var i := _undo.size() - 1
+	while i >= 0:
+		var e: Dictionary = _undo[i]
+		var rec: Variant = GameState.structures.get(String(e["uid"]))
+		if not (rec is Dictionary) or String((rec as Dictionary).get("id", "")) != Ops.structure_for_item(String(e["item"])):
+			_undo.remove_at(i)
+		i -= 1
+
+
+func _undo_is_armed() -> bool:
+	return _undo_armed != "" and Time.get_ticks_msec() <= _undo_armed_until_ms and GameState.structures.has(_undo_armed)
+
+
+## Undo key: the first press previews (highlights the last placed piece and says what comes back), a second
+## press within UNDO_CONFIRM_SECONDS undoes it. `confirm` = undo right away (tests, UI buttons).
+## Returns true when a piece was taken back.
+func request_undo(confirm: bool = false) -> bool:
+	_prune_undo()
+	if _undo.is_empty():
+		_undo_armed = ""
+		Audio.play_ui("build_invalid")
+		Events.notify.emit(Ops.MSG_NOTHING_TO_UNDO, "info")
+		return false
+	var e: Dictionary = _undo.back()
+	var uid := String(e["uid"])
+	if not confirm and not (_undo_is_armed() and _undo_armed == uid):
+		_undo_armed = uid
+		_undo_armed_until_ms = Time.get_ticks_msec() + int(UNDO_CONFIRM_SECONDS * 1000.0)
+		_set_highlight(uid)
+		Audio.play_ui("ui_hover")
+		Events.notify.emit("Press %s again to undo the %s (it goes back into your bag)." % [key_label("build_undo"), String(e["name"])], "info")
+		return false
+	_undo_armed = ""
+	var res := Ops.undo_place(area(), uid, String(e["item"]))
+	if not bool(res.get("ok", false)):
+		Audio.play_ui("build_invalid")
+		Events.notify.emit(String(res.get("reason", Ops.MSG_NOTHING_TO_UNDO)), "warn")
+		return false
+	_undo.pop_back()
+	_set_highlight("")
+	_under_uid = ""
+	_mark_dirty()
+	_last_key = ""
+	Events.notify.emit("Undone: %s." % String(e["name"]), "info")
+	undone.emit(uid)
+	return true
+
+
+# --- Recolour and pumpkin faces (Chapter Two) ----------------------------------------------------------------
+
+## The piece a dismantle, recolour or re-carve applies to: the highlighted one (the ghost's blocker, or the
+## piece under the cursor), else the one under the cursor; never the piece an armed undo is previewing.
+func target_uid() -> String:
+	var previewing_undo := _undo_is_armed() and _highlight_uid == _undo_armed
+	if _highlight_uid != "" and not previewing_undo and GameState.structures.has(_highlight_uid):
+		return _highlight_uid
+	return _under_uid if GameState.structures.has(_under_uid) else ""
+
+
+## Cycles the piece under the cursor to its next tint (natural, then each dye palette made at the Loom).
+func recolor_under_cursor() -> bool:
+	var uid := target_uid()
+	if uid == "":
+		Events.notify.emit("Point at a piece you built to recolour it.", "info")
+		return false
+	var opts := Ops.tint_options(uid)
+	if opts.is_empty():
+		Audio.play_ui("build_invalid")
+		Events.notify.emit(Ops.MSG_NO_TINT, "info")
+		return false
+	if opts.size() < 2:
+		Events.notify.emit("Make a dye at the Loom to recolour your home.", "info")
+		return false
+	var tint := Ops.next_tint(uid)
+	var res := Ops.recolor(area(), uid, tint)
+	if not bool(res.get("ok", false)):
+		Events.notify.emit(String(res.get("reason", "")), "warn")
+		return false
+	Audio.play_ui("ui_click")
+	var rec: Dictionary = GameState.structures.get(uid, {})
+	Events.notify.emit("%s: %s" % [ItemDB.structure_display_name(String(rec.get("id", ""))), Tints.display_name(tint)], "info")
+	recolored.emit(uid, tint)
+	return true
+
+
+## Face ids of the selected piece ([] when it has none).
+func _faces() -> Array:
+	var f: Variant = Placement.def_of(_sid).get("faces", []) if _sid != "" else []
+	return f if f is Array else []
+
+
+## The face the selected pumpkin will be carved with ("" when the selection has no faces).
+func selected_face() -> String:
+	var f := _faces()
+	return String(f[posmod(_face_index, f.size())]) if not f.is_empty() else ""
+
+
+func _variant_applies() -> bool:
+	if not _faces().is_empty():
+		return true
+	var uid := target_uid()
+	if uid == "":
+		return false
+	var faces: Variant = Placement.def_of(String(GameState.structures[uid].get("id", ""))).get("faces", [])
+	return faces is Array and not (faces as Array).is_empty()
+
+
+## Next face for the selected pumpkin (before placing), or re-carves the pumpkin under the cursor.
+func cycle_variant() -> void:
+	var f := _faces()
+	if not f.is_empty():
+		_face_index = posmod(_face_index + 1, f.size())
+		_rebuild_ghost()
+		Audio.play_ui("ui_click")
+		Events.notify.emit("Face: %s" % selected_face().capitalize(), "info")
+		return
+	var n := Factory.find_node(area(), target_uid())
+	if n != null and n.has_method("set_face") and n.has_method("next_face"):
+		n.set_face(n.next_face())
 
 
 func _fail_feedback() -> void:
@@ -549,7 +830,7 @@ func _rebuild_ghost() -> void:
 	_ghost_model = Node3D.new()
 	_ghost_model.name = "Model"
 	_ghost.add_child(_ghost_model)
-	Models.build(_sid, _ghost_model)
+	Models.build(_sid, _ghost_model, {"face": selected_face()} if selected_face() != "" else {})
 	var def := Placement.def_of(_sid)
 	var snap := Placement.snap_kind(def)
 	if snap != "roof2":
@@ -722,6 +1003,8 @@ func _retry_pending() -> void:
 
 func _on_area_exiting(_area_id: String) -> void:
 	end()
+	_undo.clear()
+	_undo_armed = ""
 
 
 func _on_cutscene(on: bool) -> void:

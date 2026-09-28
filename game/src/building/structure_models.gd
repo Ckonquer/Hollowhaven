@@ -1,7 +1,10 @@
 extends RefCounted
 ## Dispatcher for structure visuals and collision shapes (every id in data/structures.gd).
 ##   var parts := StructureModels.build("storage_chest", model_root)   # -> {"lid": Node3D}
+##   StructureModels.build("pumpkin_lantern", root, {"face": "cat"})   # Chapter Two model options
 ## Build previews (ghosts) reuse build() and then swap every material for a translucent one.
+## Chapter Two pieces: models_storey.gd (stairs, upper floors, railings, walls, roofs, trim), models_cozy.gd
+## (furniture and stations), models_seasonal.gd (lights, keepsakes and Halloween decor).
 
 const Palette := preload("res://src/art/palette.gd")
 const U := preload("res://src/building/model_util.gd")
@@ -9,13 +12,16 @@ const Batch := preload("res://src/building/batch.gd")
 const Furniture := preload("res://src/building/models_furniture.gd")
 const Parts := preload("res://src/building/models_building.gd")
 const Decor := preload("res://src/building/models_decor.gd")
+const Storey := preload("res://src/building/models_storey.gd")
+const Cozy := preload("res://src/building/models_cozy.gd")
+const Seasonal := preload("res://src/building/models_seasonal.gd")
 const CropModels := preload("res://src/farming/crop_models.gd")
 const Placement := preload("res://src/building/placement.gd")
 
 static var _shape_cache: Dictionary = {}
 
 
-static func build(structure_id: String, root: Node3D) -> Dictionary:
+static func build(structure_id: String, root: Node3D, opts: Dictionary = {}) -> Dictionary:
 	match structure_id:
 		"workbench": return Furniture.workbench(root)
 		"storage_chest": return Furniture.storage_chest(root)
@@ -36,6 +42,41 @@ static func build(structure_id: String, root: Node3D) -> Dictionary:
 		"echo_chime": return Decor.echo_chime(root)
 		"heartbloom_lamp": return Decor.heartbloom_lamp(root)
 		"haven_banner": return Decor.haven_banner(root)
+		# --- Chapter Two ---
+		"wood_stairs": return Storey.wood_stairs(root)
+		"upper_floor": return Storey.upper_floor(root)
+		"wood_railing": return Storey.wood_railing(root)
+		"half_wall": return Storey.half_wall(root)
+		"porch_post": return Storey.porch_post(root)
+		"arched_window": return Storey.arched_window(root)
+		"crescent_window": return Storey.crescent_window(root)
+		"gable_roof": return Storey.gable_roof(root)
+		"roof_corner": return Storey.roof_corner(root)
+		"gothic_trim": return Storey.gothic_trim(root)
+		"flower_box": return Cozy.flower_box(root)
+		"curtain": return Cozy.curtain(root)
+		"bookshelf": return Cozy.bookshelf(root)
+		"wardrobe": return Cozy.wardrobe(root)
+		"vanity_mirror": return Cozy.vanity_mirror(root)
+		"kitchen_counter": return Cozy.kitchen_counter(root)
+		"furnace": return Cozy.furnace(root)
+		"loom": return Cozy.loom(root)
+		"companion_bed": return Cozy.companion_bed(root)
+		"companion_perch": return Cozy.companion_perch(root)
+		"sturdy_planter": return CropModels.planter(root)
+		"cottage_bench": return Cozy.cottage_bench(root)
+		"music_box": return Cozy.music_box(root)
+		"expedition_board": return Cozy.expedition_board(root)
+		"lanternwake_table": return Cozy.lanternwake_table(root)
+		"wardlight": return Seasonal.wardlight(root)
+		"miner_lamp": return Seasonal.miner_lamp(root)
+		"thread_veil": return Seasonal.thread_veil(root, bool(Settings.get_value("arachnophobia")))
+		"pumpkin_lantern": return Seasonal.pumpkin_lantern(root, String(opts.get("face", "")))
+		"pumpkin_lights": return Seasonal.pumpkin_lights(root)
+		"bat_bunting": return Seasonal.bat_bunting(root)
+		"ghost_lantern": return Seasonal.ghost_lantern(root)
+		"candy_bowl": return Seasonal.candy_bowl(root)
+		"scarecrow": return Seasonal.scarecrow(root)
 	return _fallback(structure_id, root)
 
 
@@ -54,7 +95,7 @@ static func _fallback(structure_id: String, root: Node3D) -> Dictionary:
 
 ## Footstep surface for colliders ("wood" / "stone").
 static func surface_kind(structure_id: String) -> String:
-	if structure_id in ["pebble_cairn", "flower_pot"]:
+	if structure_id in ["pebble_cairn", "flower_pot", "furnace", "wardlight"]:
 		return "stone"
 	return "wood"
 
@@ -76,7 +117,7 @@ static func collision_shapes(structure_id: String) -> Array:
 				pts.append(Vector3(c.x * 1.28, 0.0, c.y * 1.28))
 			cp.points = pts
 			out.append([cp, Transform3D.IDENTITY])
-		"wood_wall", "wood_window":
+		"wood_wall", "wood_window", "arched_window", "crescent_window":
 			out.append([_box(Vector3(2.1, 3.0, Placement.WALL_THICKNESS)), Transform3D(Basis.IDENTITY, Vector3(0, 1.5, 0))])
 		"wood_doorway":
 			var side_w := 1.12 - Parts.DOOR_HALF
@@ -99,6 +140,34 @@ static func collision_shapes(structure_id: String) -> Array:
 			cyl.radius = 0.46
 			cyl.height = 0.8
 			out.append([cyl, Transform3D(Basis.IDENTITY, Vector3(0, 0.4, 0))])
+		# --- Chapter Two ---
+		"wood_stairs":
+			# One ramp under the treads: 37.95 deg (< the 46 deg the player can walk, 52 for companions),
+			# ending flush with the landing's walkable top.
+			var sp := ConvexPolygonShape3D.new()
+			sp.points = Storey.stair_collision_points()
+			out.append([sp, Transform3D.IDENTITY])
+		"upper_floor":
+			var slab := Storey.UPPER_SLAB
+			out.append([_box(Vector3(2.0, slab.y, 2.0)), Transform3D(Basis.IDENTITY, Vector3(0, Placement.UPPER_TOP - slab.y * 0.5, 0))])
+		"wood_railing":
+			out.append([_box(Vector3(2.04, 1.0, 0.14)), Transform3D(Basis.IDENTITY, Vector3(0, 0.5, 0))])
+		"half_wall":
+			out.append([_box(Vector3(2.1, 1.2, Placement.WALL_THICKNESS)), Transform3D(Basis.IDENTITY, Vector3(0, 0.6, 0))])
+		"porch_post":
+			out.append([_box(Vector3(0.3, 3.0, 0.3)), Transform3D(Basis.IDENTITY, Vector3(0, 1.5, 0))])
+		"gable_roof":
+			var gp := ConvexPolygonShape3D.new()
+			gp.points = Storey.gable_collision_points()
+			out.append([gp, Transform3D.IDENTITY])
+		"roof_corner":
+			var cp2 := ConvexPolygonShape3D.new()
+			cp2.points = Storey.corner_collision_points()
+			out.append([cp2, Transform3D.IDENTITY])
+		"wardlight":
+			out.append([_box(Vector3(0.4, 2.4, 0.4)), Transform3D(Basis.IDENTITY, Vector3(0, 1.2, 0))])
+		"scarecrow":
+			out.append([_box(Vector3(0.3, 2.0, 0.3)), Transform3D(Basis.IDENTITY, Vector3(0, 1.0, 0))])
 		_:
 			var margin := 0.08
 			out.append([_box(Vector3(float(s.x) - margin, h, float(s.y) - margin)), Transform3D(Basis.IDENTITY, Vector3(0, h * 0.5, 0))])

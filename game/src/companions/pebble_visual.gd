@@ -150,7 +150,7 @@ func _action_pose(a: String, k: float) -> void:
 	super(a, k)
 	var env := sin(k * PI)
 	match a:
-		"headbutt":
+		"headbutt", "stone_bump":
 			p_arm_l = -0.6 * env
 			p_arm_r = -0.6 * env
 		"salute":
@@ -202,5 +202,5 @@ func _apply_pose(delta: float) -> void:
 func _on_action_fire(a: String) -> void:
 	super(a)
 	match a:
-		"headbutt", "stomp":
+		"headbutt", "stomp", "stone_bump":
 			Fx.chips(_fx_parent(), global_position + global_basis.z * 0.3 + Vector3.UP * 0.2, STONE, 5)

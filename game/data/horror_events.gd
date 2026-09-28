@@ -50,3 +50,31 @@ const EVENTS := {
 	"gloomling_ambush": {"kind": "spawn", "zones": ["mine", "ruins"], "states": ["anticipation"], "weight": 1.2, "cooldown": 150.0, "major": true, "min_intensity": 1, "anchor": "spawn", "enemy": "gloomling", "count": [1, 2], "sound": "gloomling_alert", "caption": "[hissing nearby]"},
 	"stalker_pass": {"kind": "stalker_pass", "zones": ["silk"], "states": ["anticipation"], "weight": 1.5, "cooldown": 110.0, "major": true, "min_intensity": 0, "anchor": "ceiling", "sound": "weaver_skitter", "alt_sound": "shade_drift", "caption": "[skittering overhead]", "alt_caption": "[something drifts overhead]", "spider": true},
 }
+
+# --- Chapter Two: the Hushed Works (works module C7, ADDITIVE) --------------------------------------------------
+## The Works director does NOT use EVENTS above (Chapter One pacing and RNG stay untouched): the Works area
+## hands WORKS_EVENTS to its director through area.director_config() (src/horror/director.gd setup). Only the
+## hw_* zones of docs/CHAPTER_TWO_SPEC.md §7.2 appear here. Quiet on purpose (no event lists them): the safe
+## rooms, the Tool Lockers (its taught Hollow Drudge fight gets no ambush on top), the Hall of Closed Eyes
+## (quiet after combat; it holds an authored moment instead) and the boss / authored rooms of the deep module.
+## Puzzle rooms (WORKS_PUZZLE_HOLDS) are held quiet by the area until their line is restored.
+## Rooms 9-14 (deep module) get events only where it places matching anchors: hw_winch scratch needs
+## "ceiling" anchors, hw_wisp_drift needs "spawn" anchors in hw_wrong_landing; ambient sounds need none.
+const WORKS_ZONES := ["hw_landing", "hw_lockers", "hw_rails", "hw_sluice", "hw_bells", "hw_eyes", "hw_refuge",
+	"hw_lightwell", "hw_winch", "hw_crossing", "hw_wrong_landing", "hw_porch", "hw_throat", "hw_vault"]
+const WORKS_QUIET_ZONES := ["hw_landing", "hw_lockers", "hw_eyes", "hw_refuge", "hw_crossing", "hw_porch", "hw_throat", "hw_vault"]
+## Zone -> the line flag that releases its puzzle hold (while unset the director keeps quiet there).
+const WORKS_PUZZLE_HOLDS := {"hw_sluice": "ch2_line_water", "hw_bells": "ch2_line_bell", "hw_lightwell": "ch2_line_light"}
+
+const WORKS_EVENTS := {
+	"hw_rail_hum": {"kind": "sound", "zones": ["hw_rails", "hw_wrong_landing"], "states": ["calm", "unease"], "weight": 2.5, "cooldown": 70.0, "major": false, "min_intensity": 0, "anchor": "sound", "sound": "mine_cart", "caption": "[the rails hum somewhere down the line]"},
+	"hw_far_clank": {"kind": "sound", "zones": ["hw_rails", "hw_sluice", "hw_bells", "hw_lightwell", "hw_winch"], "states": ["calm", "unease", "anticipation"], "weight": 2.0, "cooldown": 50.0, "major": false, "min_intensity": 0, "anchor": "", "sound": "mine_hit", "caption": "[a far-off clank of metal]"},
+	"hw_drip_echo": {"kind": "sound", "zones": ["hw_rails", "hw_sluice", "hw_lightwell"], "states": ["calm", "unease"], "weight": 2.0, "cooldown": 45.0, "major": false, "min_intensity": 0, "anchor": "", "sound": "water_drip", "caption": "[water drips, and the echo drips twice]"},
+	"hw_footsteps": {"kind": "sound", "zones": ["hw_rails", "hw_wrong_landing"], "states": ["unease", "anticipation"], "weight": 1.5, "cooldown": 90.0, "major": false, "min_intensity": 1, "anchor": "", "sound": "dir_footsteps", "caption": "[footsteps, keeping a little behind you]"},
+	"hw_borrowed_hum": {"kind": "sound", "zones": ["hw_rails", "hw_bells", "hw_wrong_landing"], "states": ["unease", "anticipation"], "weight": 1.2, "cooldown": 110.0, "major": false, "min_intensity": 1, "anchor": "sound", "sound": "dir_whisper", "caption": "[a hum, like a choir learning a tune]"},
+	"hw_lamp_flicker": {"kind": "flicker", "zones": ["hw_rails", "hw_sluice", "hw_bells", "hw_lightwell", "hw_winch", "hw_wrong_landing"], "states": ["unease", "anticipation"], "weight": 2.0, "cooldown": 60.0, "major": false, "min_intensity": 0, "anchor": "", "sound": "dir_flicker", "caption": ""},
+	"hw_lumi_notices": {"kind": "notice", "zones": ["hw_rails", "hw_sluice", "hw_bells", "hw_lightwell", "hw_winch", "hw_wrong_landing"], "states": ["unease", "anticipation"], "weight": 2.0, "cooldown": 80.0, "major": false, "min_intensity": 0, "anchor": "doorway", "sound": "lumi_warn", "caption": "[Lumi chimes softly]", "needs_companion": "lumi"},
+	"hw_silence": {"kind": "silence", "zones": ["hw_rails", "hw_wrong_landing"], "states": ["anticipation"], "weight": 1.2, "cooldown": 150.0, "major": false, "min_intensity": 0, "anchor": "", "sound": "", "caption": "[the hum of the works falls silent]"},
+	"hw_winch_dust": {"kind": "scratch", "zones": ["hw_winch"], "states": ["anticipation"], "weight": 2.0, "cooldown": 80.0, "major": false, "min_intensity": 0, "anchor": "ceiling", "sound": "dir_scratch", "alt_sound": "shade_drift", "caption": "[scratching above you]", "alt_caption": "[dust drifts down from above]", "spider": true},
+	"hw_wisp_drift": {"kind": "spawn", "zones": ["hw_wrong_landing"], "states": ["anticipation"], "weight": 1.0, "cooldown": 180.0, "major": true, "min_intensity": 1, "anchor": "spawn", "enemy": "borrowed_wisp", "count": [1, 1], "sound": "shade_whisper", "caption": "[a warm light that lights nothing drifts closer]"},
+}

@@ -5,6 +5,18 @@ extends Node
 ## on-screen prompt, objectives, open UI, visible buttons (window pixel rects), nearby objects,
 ## recent messages. An external bot (tools/qa/hhbot.py) reads it and drives the game with real
 ## OS-level keyboard/mouse input (SendInput). Nothing here changes game state.
+## Chapter Two additions (read-only, refreshed every PROGRESS_INTERVAL s, see progress_snapshot()): "area_info"
+## (area, zone, safe, map kind, discovered landmarks), "chapter2" (availability, current step ids, done ids),
+## "tracker" (what the HUD tracker shows), "optional" (done / pending goal ids), "equipment", "companion_skills"
+## (signature cooldowns from the saved skill_ready_at timeline) and "music" (current cue); plus messages for
+## chapter-two steps, optional goals, discoveries, music cues, companion skills and equipment changes.
+## Second-monitor QA additions: "window_pos", "window_focused", "mouse_mode" and "qa_input" (the virtual input
+## server's status when --qa-input-port is given; the bot then drives the game through src/qa/qa_input.gd
+## instead of SendInput).
+
+const Tracker := preload("res://src/ui/hud/tracker.gd")
+const MapView := preload("res://src/ui/widgets/map_view.gd")
+const PROGRESS_INTERVAL := 0.5
 
 var _file: FileAccess
 var _interval := 0.1
@@ -16,6 +28,9 @@ var _buttons: Array = []
 var _messages: Array = []
 var _build := {"active": false, "item": "", "valid": false, "reason": ""}
 var _seq := 0
+var _progress_t := PROGRESS_INTERVAL
+var _progress: Dictionary = {}
+var _music_cue := ""
 
 
 func setup(path: String, interval: float) -> void:
@@ -37,6 +52,15 @@ func _ready() -> void:
 	Events.build_placement_state.connect(func(valid: bool, reason: String):
 		_build["valid"] = valid
 		_build["reason"] = reason)
+	Events.chapter2_step_started.connect(func(id: String): _push_msg("quest", "ch2 started " + id))
+	Events.chapter2_step_completed.connect(func(id: String): _push_msg("quest", "ch2 completed " + id))
+	Events.optional_goal_completed.connect(func(id: String): _push_msg("quest", "optional completed " + id))
+	Events.landmark_discovered.connect(func(area: String, id: String): _push_msg("discover", area + ":" + id))
+	Events.music_cue_changed.connect(func(cue: String):
+		_music_cue = cue
+		_push_msg("music", cue))
+	Events.companion_skill_used.connect(func(cid: String, skill: String): _push_msg("skill", cid + ": " + skill))
+	Events.equipment_changed.connect(func(slot: String, item: String): _push_msg("equip", slot + "=" + item))
 
 
 func _push_msg(kind: String, text: String) -> void:
@@ -57,6 +81,10 @@ func _process(delta: float) -> void:
 	if _buttons_t >= 0.2:
 		_buttons_t = 0.0
 		_buttons = _collect_buttons()
+	_progress_t += delta
+	if _progress_t >= PROGRESS_INTERVAL:
+		_progress_t = 0.0
+		_progress = progress_snapshot()
 	if _t < _interval:
 		return
 	_t = 0.0
@@ -91,6 +119,14 @@ func _snapshot() -> Dictionary:
 	d["buttons"] = _buttons
 	var win := DisplayServer.window_get_size()
 	d["window"] = [win.x, win.y]
+	# Second-monitor QA mode: where the window is, whether it ever had focus, the OS cursor mode and the virtual
+	# input server's state (src/qa/qa_input.gd; the QA bot checks the owner's focus was never taken).
+	var wpos := DisplayServer.window_get_position()
+	d["window_pos"] = [wpos.x, wpos.y]
+	d["window_focused"] = DisplayServer.window_is_focused()
+	d["mouse_mode"] = int(Input.mouse_mode)
+	if Debug.qa_input != null and is_instance_valid(Debug.qa_input) and Debug.qa_input.has_method("status"):
+		d["qa_input"] = Debug.qa_input.call("status")
 	var p = Game.player
 	if p != null and is_instance_valid(p):
 		var pd := {"pos": _v(p.global_position), "vel": _v(p.velocity) if "velocity" in p else [0, 0, 0],
@@ -119,7 +155,75 @@ func _snapshot() -> Dictionary:
 			comps[id] = {"pos": _v(c.global_position), "assignment": GameState.companion(id)["assignment"],
 				"befriended": GameState.is_befriended(id), "bond": GameState.bond_level(id)}
 	d["companion_nodes"] = comps
+	for k in _progress:
+		d[k] = _progress[k]
 	return d
+
+
+## Chapter Two / progression state as the QA bot sees it (read-only; allocates, so _process refreshes it only
+## every PROGRESS_INTERVAL seconds). Keys: area_info, chapter2, tracker, optional, equipment,
+## companion_skills, music.
+func progress_snapshot() -> Dictionary:
+	var out := {}
+	out["area_info"] = {"area": Game.area_id, "zone": Game.zone_id, "safe": Game.in_safe_zone,
+		"map": MapView.map_kind(Game.area_id), "discovered": GameState.discovered_in(Game.area_id)}
+	var log: RefCounted = GameState.chapter2
+	var cur: Array = []
+	for s in log.current_steps():
+		cur.append(String(s["id"]))
+	out["chapter2"] = {"available": log.is_available(), "active": log.is_active(), "finished": log.is_finished(),
+		"chapter": GameState.chapter(), "current": cur, "title": log.display_title() if not cur.is_empty() else "",
+		"done": (log.done as Array).duplicate()}
+	var vw := Tracker.objective_view()
+	var targets: Array = []
+	for t in Tracker.pending_targets(vw):
+		targets.append({"id": String(t["id"]), "area": String(t["area"])})
+	out["tracker"] = {"kind": String(vw["kind"]), "title": String(vw["title"]), "step": String(vw["step_id"]),
+		"targets": targets}
+	var og: RefCounted = GameState.optional_goals
+	var done: Array = []
+	var pending: Array = []
+	for g in og.visible_goals():
+		var gid := String(g["id"])
+		if og.is_done(gid):
+			done.append(gid)
+		else:
+			pending.append(gid)
+	out["optional"] = {"done": done, "pending": pending, "done_count": og.done_count()}
+	out["equipment"] = GameState.equipment.duplicate()
+	out["companion_skills"] = companion_skill_info()
+	if _music_cue == "":
+		var dir: Node = Audio.music_director() if Audio.has_method("music_director") else null
+		if dir != null and dir.has_method("current_cue"):
+			_music_cue = String(dir.call("current_cue"))
+	out["music"] = {"cue": _music_cue, "director": Audio.music_director_active() if Audio.has_method("music_director_active") else false}
+	return out
+
+
+## Signature-skill cooldown of every befriended companion from the saved timeline (skill_ready_at vs
+## stats.play_seconds): {id: {skill, cooldown, ready_at, left, ready, active, mode[, node]}}. "node" is the
+## companion node's own get_skill_state() when it provides one.
+static func companion_skill_info() -> Dictionary:
+	var out := {}
+	var now_v: Variant = GameState.stats.get("play_seconds", 0.0)
+	var now: float = float(now_v) if (now_v is float or now_v is int) else 0.0
+	for id in GameState.companions:
+		var rec: Variant = GameState.companions[id]
+		if not (rec is Dictionary) or not bool((rec as Dictionary).get("befriended", false)):
+			continue
+		var ra: Variant = (rec as Dictionary).get("skill_ready_at", 0.0)
+		var ready_at: float = float(ra) if (ra is float or ra is int) else 0.0
+		var sig: Dictionary = ItemDB.companion_skill(String(id)).get("signature", {})
+		var e := {"skill": String(sig.get("id", "")), "cooldown": float(sig.get("cooldown", 0.0)),
+			"ready_at": snappedf(ready_at, 0.1), "left": snappedf(maxf(ready_at - now, 0.0), 0.1), "ready": ready_at <= now,
+			"active": GameState.active_companion == String(id), "mode": String((rec as Dictionary).get("combat_mode", "assist"))}
+		var node: Variant = Game.companion_nodes.get(id)
+		if node is Node and is_instance_valid(node) and (node as Node).has_method("get_skill_state"):
+			var st: Variant = (node as Node).call("get_skill_state")
+			if st is Dictionary:
+				e["node"] = st
+		out[String(id)] = e
+	return out
 
 
 ## Nearby objects of gameplay interest within 80 m, closest first (max 60 entries).

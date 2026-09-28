@@ -3,8 +3,30 @@ extends RefCounted
 ## and returns plain values so it can be unit tested (tests/unit/test_companions_*.gd).
 ##   const Logic := preload("res://src/companions/companion_logic.gd")
 
+const Reach := preload("res://data/hallowmere_layout.gd")
+
 const ORDER := ["mochi", "pebble", "lumi"]
 const SURFACE_AREAS := ["surface", "arena"]    # areas that have homes / wild spots / the threshold
+## Area classes (docs/CHAPTER_TWO_SPEC.md §9 "Underground vs outdoor"). The Haven areas above keep every legacy
+## rule (homes, wild spots, the mine threshold). Outdoor and interior areas take the follower along (Mochi
+## too) plus anyone told to wait there; underground areas only take a follower that dares (Mochi needs
+## courage). Unknown ids stay "underground": the legacy default for dungeon-like areas.
+const OUTDOOR_AREAS := ["hallowmere_reach"]
+const INTERIOR_AREAS := ["moonveil_manor", "echo_trial"]
+const UNDERGROUND_AREAS := ["below", "tobin_annex", "hushed_works"]
+## Where a timid follower waits when Krystal goes underground without it: the doorstep of that area, in the
+## area it is entered from. "threshold": the surface mine threshold (Tobin's side door and hatch are at the
+## same mine mouth); otherwise a fixed point of that outer area (grounded when spawned). "arrivals": arriving
+## at one of these spawns of the outer area while the companion waits at the doorstep reunites it.
+## "entries" {inner spawn: {"spawn", "arrivals"}}: entered through another door (the arrival spawn inside), the
+## companion waits at THAT door instead (where Krystal left it), e.g. the Works' refuge shortcut hatch.
+const SURFACE_REUNITE_ARRIVALS := ["mine_exit", "annex_door", "annex_hatch"]
+const DOORSTEPS := {
+	"below": {"area": "surface", "threshold": true},
+	"tobin_annex": {"area": "surface", "threshold": true},
+	"hushed_works": {"area": "hallowmere_reach", "spawn": "bellhouse_stair", "arrivals": ["bellhouse_stair"],
+		"entries": {"refuge": {"spawn": "refuge_exit", "arrivals": ["refuge_exit"]}}},
+}
 
 const PET_BOND := 5
 const FEED_BOND := 8
@@ -22,8 +44,92 @@ const THRESHOLD_MATCH := 6.0       # a wait spot this close to the threshold cou
 const PINNED_BOULDER_ID := "pebble_boulder"
 
 
+## True for the Haven areas (homes, wild spots, the mine threshold). Hallowmere Reach is outdoor but has no
+## homes: see area_class() / is_outdoor_area().
 static func is_surface_area(area_id: String) -> bool:
 	return SURFACE_AREAS.has(area_id)
+
+
+## "haven" | "outdoor" | "interior" | "underground" (see the constants above).
+static func area_class(area_id: String) -> String:
+	if SURFACE_AREAS.has(area_id):
+		return "haven"
+	if OUTDOOR_AREAS.has(area_id):
+		return "outdoor"
+	if INTERIOR_AREAS.has(area_id):
+		return "interior"
+	return "underground"
+
+
+## Open sky: the Haven woods and Hallowmere Reach (Mochi always comes along).
+static func is_outdoor_area(area_id: String) -> bool:
+	var c := area_class(area_id)
+	return c == "haven" or c == "outdoor"
+
+
+static func is_underground_area(area_id: String) -> bool:
+	return area_class(area_id) == "underground"
+
+
+## Whether a creature follows Krystal underground: brave by nature (enters_below) or, for Mochi, once
+## Brave Little Steps gave it courage.
+static func dares_underground(def: Dictionary, courage: bool) -> bool:
+	return bool(def.get("enters_below", false)) or courage
+
+
+## Where a timid follower waits when Krystal enters `area_id` without it: {"area", "pos": Vector3|null}.
+## `threshold` is the surface mine threshold (or null); `reach_doorsteps` optional {spawn id: Vector3}
+## overrides for the fixed outer points (else data/hallowmere_layout.gd SPAWNS, y = 0). `entry_spawn`: the
+## spawn Krystal arrives at inside `area_id` (another door of it may have its own doorstep, "entries").
+static func doorstep(area_id: String, threshold: Variant, reach_doorsteps: Dictionary = {}, entry_spawn: String = "") -> Dictionary:
+	var d: Dictionary = DOORSTEPS.get(area_id, {"area": "surface", "threshold": true})
+	if bool(d.get("threshold", false)):
+		return {"area": String(d.get("area", "surface")), "pos": threshold if threshold is Vector3 else null}
+	var sp := String(d.get("spawn", ""))
+	var entries: Dictionary = d.get("entries", {})
+	if entry_spawn != "" and entries.get(entry_spawn) is Dictionary:
+		sp = String((entries[entry_spawn] as Dictionary).get("spawn", sp))
+	var p: Variant = reach_doorsteps.get(sp)
+	if not (p is Vector3):
+		var s: Dictionary = Reach.SPAWNS.get(sp, {})
+		var v: Variant = s.get("pos")
+		p = Vector3(v.x, 0.0, v.y) if v is Vector2 else null
+	return {"area": String(d.get("area", "surface")), "pos": p}
+
+
+## Doorsteps that lie in `area_id` (an outer area): [{"pos": Vector3, "arrivals": [spawn ids]}].
+static func doorsteps_in(area_id: String, reach_doorsteps: Dictionary = {}) -> Array:
+	var out: Array = []
+	for inner in DOORSTEPS:
+		var d: Dictionary = DOORSTEPS[inner]
+		if String(d.get("area", "")) != area_id or bool(d.get("threshold", false)):
+			continue
+		var ds := doorstep(String(inner), null, reach_doorsteps)
+		if ds["pos"] is Vector3:
+			out.append({"pos": ds["pos"], "arrivals": d.get("arrivals", [])})
+		var entries: Dictionary = d.get("entries", {})
+		for en in entries:
+			var de := doorstep(String(inner), null, reach_doorsteps, String(en))
+			if de["pos"] is Vector3:
+				out.append({"pos": de["pos"], "arrivals": (entries[en] as Dictionary).get("arrivals", [])})
+	return out
+
+
+## Spawn ids of the doorsteps that lie in `area_id` (main door + other entries), for the spawner to resolve.
+static func doorstep_spawns_in(area_id: String) -> Array:
+	var out: Array = []
+	for inner in DOORSTEPS:
+		var d: Dictionary = DOORSTEPS[inner]
+		if String(d.get("area", "")) != area_id or bool(d.get("threshold", false)):
+			continue
+		if d.has("spawn"):
+			out.append(String(d["spawn"]))
+		var entries: Dictionary = d.get("entries", {})
+		for en in entries:
+			var s := String((entries[en] as Dictionary).get("spawn", ""))
+			if s != "" and not out.has(s):
+				out.append(s)
+	return out
 
 
 static func vec_from(v: Variant) -> Variant:
@@ -42,8 +148,15 @@ static func vec_from(v: Variant) -> Variant:
 ## boulder_gone: GameState.is_depleted("pebble_boulder"). threshold: mine threshold position or null.
 ## Returns {"spawns": [{"id", "mode", "pos"?}], "changes": [{"id", "assignment", "wait_area", "wait_pos"}], "boulder": bool}
 ## Modes: wild | pinned | home | wait | follow | reunite (rejoins as follower) | reunite_home
+## Area classes (area_class): the Haven keeps every rule above. Outdoor / interior areas (Hallowmere Reach,
+## the manor, trials): the follower comes along whoever it is, companions told to wait there reappear at
+## their spot (one waiting at a doorstep reunites when Krystal comes back up through it), nobody lives
+## there. Underground: only a follower that dares (defs[id].enters_below; the spawner passes true for Mochi
+## once she has courage); a timid one waits at that area's doorstep in the outer area instead (the surface
+## mine threshold for the Below and Tobin's annex, the Bellhouse stair in the Reach for the Hushed Works).
+## `reach_doorsteps` (optional): {spawn id: Vector3} registered positions of the outer doorsteps.
 static func plan_spawns(area_id: String, records: Dictionary, active: String, arrival_spawn: String,
-		defs: Dictionary, boulder_gone: bool, threshold: Variant) -> Dictionary:
+		defs: Dictionary, boulder_gone: bool, threshold: Variant, reach_doorsteps: Dictionary = {}) -> Dictionary:
 	var spawns: Array = []
 	var changes: Array = []
 	var boulder := false
@@ -80,7 +193,7 @@ static func plan_spawns(area_id: String, records: Dictionary, active: String, ar
 				var wp: Variant = vec_from(rec.get("wait_pos"))
 				if String(rec.get("wait_area", "")) == area_id and wp != null:
 					var at_threshold := threshold is Vector3 and _flat_dist(wp, threshold) <= THRESHOLD_MATCH
-					if at_threshold and arrival_spawn == "mine_exit":
+					if at_threshold and SURFACE_REUNITE_ARRIVALS.has(arrival_spawn):
 						if follower == "":
 							follower = id
 							changes.append({"id": id, "assignment": "follow"})
@@ -98,15 +211,15 @@ static func plan_spawns(area_id: String, records: Dictionary, active: String, ar
 			if assignment != "home":
 				changes.append({"id": id, "assignment": "home"})
 			spawns.append({"id": id, "mode": "home"})
-	else:
+	elif area_class(area_id) == "underground":
 		# The Below (and any other dungeon-like area): only the follower, and only if it dares.
 		if active != "" and bool(records.get(active, {}).get("befriended", false)):
 			var def: Dictionary = defs.get(active, {})
 			if bool(def.get("enters_below", false)):
 				spawns.append({"id": active, "mode": "follow"})
 			else:
-				var tpos: Variant = threshold if threshold is Vector3 else null
-				changes.append({"id": active, "assignment": "wait", "wait_area": "surface", "wait_pos": tpos})
+				var ds := doorstep(area_id, threshold, reach_doorsteps, arrival_spawn)
+				changes.append({"id": active, "assignment": "wait", "wait_area": String(ds["area"]), "wait_pos": ds["pos"]})
 		# ...plus anyone Krystal told to wait down here (e.g. after continuing from a lantern save):
 		# they are still where she left them, never silently gone.
 		for id in ids:
@@ -119,6 +232,38 @@ static func plan_spawns(area_id: String, records: Dictionary, active: String, ar
 				continue
 			var wpos: Variant = vec_from(wrec.get("wait_pos"))
 			if wpos != null:
+				spawns.append({"id": id, "mode": "wait", "pos": wpos})
+	else:
+		# Outdoor (Hallowmere Reach) and interiors: the follower comes along, whoever it is.
+		var follower := active
+		if follower != "" and not bool(records.get(follower, {}).get("befriended", false)):
+			follower = ""
+		if follower != "":
+			spawns.append({"id": follower, "mode": "follow"})
+		var steps := doorsteps_in(area_id, reach_doorsteps)
+		for id in ids:
+			if id == follower:
+				continue
+			var wrec: Dictionary = records.get(id, {})
+			if not bool(wrec.get("befriended", false)) or String(wrec.get("assignment", "")) != "wait":
+				continue
+			if String(wrec.get("wait_area", "")) != area_id:
+				continue
+			var wpos: Variant = vec_from(wrec.get("wait_pos"))
+			if wpos == null:
+				continue
+			var reunite := false
+			for st in steps:
+				if (st["arrivals"] as Array).has(arrival_spawn) and _flat_dist(wpos, st["pos"]) <= THRESHOLD_MATCH:
+					reunite = true
+			if reunite and follower == "":
+				follower = id
+				changes.append({"id": id, "assignment": "follow"})
+				spawns.append({"id": id, "mode": "reunite", "pos": wpos})
+			elif reunite:
+				# Someone else is following: it heads home to the Haven, happily (nobody lives out here).
+				changes.append({"id": id, "assignment": "home"})
+			else:
 				spawns.append({"id": id, "mode": "wait", "pos": wpos})
 	return {"spawns": spawns, "changes": changes, "boulder": boulder}
 
@@ -423,3 +568,99 @@ static func wild_prompt(id: String, def: Dictionary, ctx: Dictionary) -> Diction
 				return {"text": "The little light is too frightened", "enabled": false}
 			return {"text": "Reach out to the little light", "enabled": true}
 	return {"text": "Say hello", "enabled": true}
+
+
+# --- Combat & support (Chapter Two, MP §6) ------------------------------------------------------------------
+
+## Seconds until a signature skill is ready. `ready_at` and `now` are on the GameState.stats.play_seconds
+## timeline (it only advances while playing: pause, menus that pause and loading freeze it). Clamped to the
+## skill's cooldown, so a damaged or rewound save can never lock a skill for longer than one cooldown.
+static func cooldown_remaining(ready_at: float, now: float, cooldown: float) -> float:
+	return clampf(ready_at - now, 0.0, maxf(cooldown, 0.0))
+
+
+## Heal-over-time: the part of `total` that belongs between elapsed times `from_t` and `to_t` of a
+## `duration`-second effect (linear). Summed over any tick pattern it gives exactly `total`.
+static func hot_amount(total: float, duration: float, from_t: float, to_t: float) -> float:
+	if duration <= 0.0:
+		return total if from_t <= 0.0 and to_t >= 0.0 else 0.0
+	var a := clampf(from_t / duration, 0.0, 1.0)
+	var b := clampf(to_t / duration, 0.0, 1.0)
+	return maxf(b - a, 0.0) * total
+
+
+## Picks the basic-attack target. `cands`: [{"pos": Vector3 (feet), "engaged": bool (fighting Krystal or
+## attacking her), "attacking": bool (telegraphing / striking right now), "valid": bool (alive, hittable,
+## not a boss while invulnerable, not a dummy)}]. opts: "range" (attack range of this pet), "max_dy",
+## "engage_radius" (from Krystal), "close" (Stay close mode: only enemies right at Krystal, within
+## "close_radius"; the pet never strays farther than that), "melee" (bool: walks to its target, so no range
+## check here; projectiles need the target within range of where the pet stands).
+## Never a peaceful (not engaged) enemy. Prefers enemies attacking Krystal, then the one nearest to her.
+## Returns the index in `cands` or -1.
+static func pick_attack_target(me: Vector3, player: Vector3, cands: Array, opts: Dictionary) -> int:
+	var rng := float(opts.get("range", 2.0))
+	var max_dy := float(opts.get("max_dy", 1.6))
+	var engage := float(opts.get("engage_radius", 12.0))
+	var close := bool(opts.get("close", false))
+	var close_r := float(opts.get("close_radius", 4.0))
+	var melee := bool(opts.get("melee", false))
+	var best := -1
+	var best_score := INF
+	for i in cands.size():
+		var c: Dictionary = cands[i]
+		if not bool(c.get("valid", false)) or not bool(c.get("engaged", false)):
+			continue
+		var p: Vector3 = c.get("pos", Vector3.INF)
+		if p == Vector3.INF:
+			continue
+		var dp := _flat_dist(p, player)
+		var dm := _flat_dist(p, me)
+		if absf(p.y - me.y) > max_dy:
+			continue
+		if dp > (close_r if close else engage):
+			continue
+		if not melee and dm > rng:
+			continue
+		var score := dp + dm * 0.25 - (3.0 if bool(c.get("attacking", false)) else 0.0)
+		if score < best_score:
+			best_score = score
+			best = i
+	return best
+
+
+## Whether the signature skill should cast itself. `sig`: the signature table at the current bond level.
+## ctx: "hp_ratio", "missing_hp", "hot_active", "shield_active", "threats_near" (threatening enemies within
+## ~6 m of Krystal), "attacking_near" (one of them telegraphing / striking), "shadow_near" (a light-fearing
+## enemy threatening within the pulse radius).
+##   Bloomguard: Krystal meaningfully hurt (hp <= autocast_hp_ratio) and missing at least 75% of what it
+##               heals (no overheal spam), not while a heal is already running.
+##   Stoneheart: a threat is right at Krystal and about to strike (or she is below half health), no shield.
+##   Glimmerstep: a threat near and either a shadow enemy to expose or Krystal low (a burst to get away).
+static func should_autocast(sig: Dictionary, ctx: Dictionary) -> bool:
+	var hp := float(ctx.get("hp_ratio", 1.0))
+	var threats := int(ctx.get("threats_near", 0))
+	match String(sig.get("id", "")):
+		"bloomguard":
+			if bool(ctx.get("hot_active", false)):
+				return false
+			return hp <= float(sig.get("autocast_hp_ratio", 0.6)) and float(ctx.get("missing_hp", 0.0)) >= float(sig.get("heal", 18.0)) * 0.75
+		"stoneheart":
+			if bool(ctx.get("shield_active", false)) or threats <= 0:
+				return false
+			return bool(ctx.get("attacking_near", false)) or hp < 0.5
+		"glimmerstep":
+			if threats <= 0:
+				return false
+			return bool(ctx.get("shadow_near", false)) or hp < 0.4
+	return false
+
+
+## The next bond perk not reached yet: {"level", "text"} or {} when every perk is unlocked.
+## `perks`: data/companion_skills.gd SKILLS[id]["perks"]; `levels`: PERK_LEVELS.
+static func next_perk(perks: Dictionary, levels: Array, bond_level: int, arachno: bool = false) -> Dictionary:
+	for lvl in levels:
+		if int(lvl) > bond_level and perks.has(lvl):
+			var p: Dictionary = perks[lvl]
+			var t := String(p.get("alt_text", p.get("text", ""))) if arachno else String(p.get("text", ""))
+			return {"level": int(lvl), "text": t}
+	return {}

@@ -203,6 +203,33 @@ func test_bed_across_a_doorway_wakes_her_on_the_open_side() -> void:
 	assert_false(P.would_enclose(w, _ctx(w)), "the wake spot has a way out")
 
 
+## A bed upstairs, pushed to the edge of the upper floor: its preferred side (+x) is in the air past the
+## floor's edge (in clear sight over the ground-storey wall tops). She wakes on the upper floor beside the
+## bed, never in the air to drop a storey.
+func test_bed_upstairs_wakes_her_on_the_upper_floor() -> void:
+	_make_area()
+	for w in [[Vector3(-5, 0, 0), 0.0], [Vector3(-6, 0, 1), 90.0], [Vector3(-4, 0, 1), 90.0]]:
+		_place("wood_wall", w[0], float(w[1]), OUTSIDE)
+	_place("upper_floor", Vector3(-5, 0, 1), 0.0, OUTSIDE)
+	var ctx := _ctx(OUTSIDE)
+	ctx["level"] = 1
+	var pos: Vector3 = P.snap_position(P.def_of("bed"), Vector3(-4.5, 0, 1.0), 0.0)
+	var res := P.validate("bed", pos, 0.0, ctx)
+	assert_true(bool(res["ok"]), "the bed goes upstairs (%s)" % res["reason"])
+	assert_eq(int(res["level"]), 1)
+	GameState.give_item("bed", 1)
+	var buid := Ops.place_structure(_area, "bed", Vector3(pos.x, float(res["y"]), pos.z), 0.0, int(res["level"]))
+	assert_ne(buid, "")
+	await wait_physics(2)
+	var bed: Node3D = Factory.find_node(_area, buid)
+	var floor_top: float = P.LEVEL_HEIGHT + P.UPPER_TOP
+	assert_almost(bed.global_position.y, floor_top, 0.01, "the bed stands on the upper floor")
+	var w: Vector3 = bed.wake_transform().origin
+	assert_true(w.x > -6.0 and w.x < -4.0 and w.z > 0.0 and w.z < 2.0, "wakes on the upper floor tile, not past its edge (got %s)" % w)
+	assert_almost(w.y, floor_top + 0.05, 0.02, "at the upper floor's height")
+	assert_true(w.distance_to(bed.global_position) > 0.9, "beside the bed, not in it")
+
+
 # --- The "bed" spawn follows later building ---------------------------------------------------------------------
 
 ## Sleep, then build a chest right on the registered wake spot: the spawn moves to a free side.

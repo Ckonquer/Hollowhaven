@@ -22,6 +22,22 @@ Read first: `GAME_SPEC.md` (design) and `docs/ARCHITECTURE.md` (code contracts).
 * Preview one visual script:        `... -- --preview=res://src/companions/mochi.gd --shot-dir=<abs dir>`
 * Release build + zip:              `powershell -ExecutionPolicy Bypass -File tools/build_release.ps1`
 * Drive a running build with real OS input: `tools/winctl.ps1 -ProcId <pid> -Action seq -Seq "W:800,E:80"`
+* Second-monitor QA playthrough (the owner keeps full use of monitor 1; virtual input, no SendInput, no focus):
+  `python tools/qa/playthrough.py --second-monitor --mute --out qa/tmp/e2e/sm1` (packaged build; same flags for
+  `tools/qa/persistence.py`). Current sources without a rebuild: add `--dev --exe .tools/godot/Godot_v4.7.2-stable_win64.exe`.
+  It launches the game with `-- --qa-input-port=<free port> --qa-no-focus --qa-window=1920,0,1920,1080
+  --settings-file=<out>/qa_settings.cfg --save-dir=<out>/saves --qa-telemetry=<file> [--qa-mute]`, from a
+  hard-linked copy of the exe in `<out>/qa_exe/` with an `override.cfg` (windowed, borderless,
+  `display/window/size/no_focus`) so the window never activates; `--dev` runs cannot use that override and may
+  take focus once while the boot window leaves fullscreen. Game side: `game/src/qa/qa_input.gd` (127.0.0.1 only,
+  JSON lines: `k`, `mb`, `mm`, `move`, `click`, `shot`, `release_all`), `Debug` (flags), `Settings`
+  (`--settings-file`, `--qa-window` / `--qa-screen`). The flags work in release builds too and grant no cheats.
+  Honest scope: injected input bypasses the OS input layer (no Windows focus / raw input / cursor capture); from
+  `Input.parse_input_event` on it takes the same InputMap / `_input` / GUI / `_unhandled_input` path as a real
+  keyboard and mouse, and the camera turns through `CameraRig.rotate_by()` with the same delta its `_input()`
+  would get. OS-level input problems are only caught by the default SendInput transport. Don't click on the QA
+  monitor while it runs (mouse clicks there still reach the game). Verified headless (unit tests
+  `tools/test.sh qa_input` + a Python client against headless Godot); a visible second-monitor run is still to do.
 
 ## Rules
 * Follow the Golden Rules in docs/ARCHITECTURE.md (no class_name, scripts build their own children,

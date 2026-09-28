@@ -26,20 +26,28 @@ static func spawn_for_area(area: Node, area_id: String, player: Node3D) -> Dicti
 	var surface := Logic.is_surface_area(area_id)
 	var defs: Dictionary = {}
 	for id in ItemDB.creature_ids():
-		defs[id] = ItemDB.creature(id)
+		defs[id] = courage_def(String(id))
+	_repair_home_spots()
 	var threshold: Variant = null
 	if surface:
 		threshold = _spawn_pos(area, "mine_threshold", false)
 	else:
 		var h: Vector2 = Layout.SPAWN_HINTS.get("mine_threshold", Vector2(50, -66))
 		threshold = Vector3(h.x, 0.0, h.y)
+	# Doorsteps of underground areas that lie in this (outer) area, at their registered spawn positions.
+	var doorsteps := {}
+	for sn in Logic.doorstep_spawns_in(area_id):
+		var p: Variant = _spawn_pos(area, String(sn), false)
+		if p is Vector3:
+			doorsteps[String(sn)] = p
 	var plan := Logic.plan_spawns(area_id, GameState.companions, GameState.active_companion,
-		String(GameState.player.get("spawn", "")), defs, GameState.is_depleted(Logic.PINNED_BOULDER_ID), threshold)
+		String(GameState.player.get("spawn", "")), defs, GameState.is_depleted(Logic.PINNED_BOULDER_ID), threshold, doorsteps)
 	for ch in plan["changes"]:
 		GameState.set_companion_assignment(String(ch["id"]), String(ch["assignment"]),
 			String(ch.get("wait_area", "")), ch.get("wait_pos"))
+	var extra := {} if surface else outer_threshold_params(area_id, doorsteps)
 	for sp in plan["spawns"]:
-		var node := _spawn_one(area, sp, surface, threshold, player)
+		var node := _spawn_one(area, sp, surface, threshold, player, extra)
 		if node != null:
 			out[String(sp["id"])] = node
 	if Debug.is_cheat_allowed() and (Debug.has_arg("companion-walk") or Debug.has_arg("companion-log")) and ResourceLoader.exists(DEBUG_SCRIPT):
@@ -50,14 +58,20 @@ static func spawn_for_area(area: Node, area_id: String, player: Node3D) -> Dicti
 	return out
 
 
-static func _spawn_one(area: Node, sp: Dictionary, surface: bool, threshold: Variant, player: Node3D) -> Node3D:
+static func _spawn_one(area: Node, sp: Dictionary, surface: bool, threshold: Variant, player: Node3D, extra: Dictionary = {}) -> Node3D:
 	var id := String(sp["id"])
 	var mode := String(sp["mode"])
-	var home: Vector3 = _spawn_pos(area, "companion_home_" + id, true)
+	var home_default: Vector3 = _spawn_pos(area, "companion_home_" + id, true)
+	var home := home_default
+	# A companion bed / perch chosen as its home spot (companion_nook.gd), Haven only.
+	var hs: Variant = Logic.vec_from(GameState.companion(id).get("home_spot")) if surface else null
+	if hs is Vector3:
+		home = _ground(area, hs)
 	var wild: Vector3 = _spawn_pos(area, "companion_wild_" + id, true)
-	var params := {"id": id, "mode": mode, "home": home, "wild": wild}
+	var params := {"id": id, "mode": mode, "home": home, "wild": wild, "home_default": home_default}
 	if surface and threshold is Vector3:
 		params["threshold"] = threshold
+	params.merge(extra, false)
 	var pos := home
 	match mode:
 		"wild", "pinned":
@@ -89,6 +103,45 @@ static func _spawn_one(area: Node, sp: Dictionary, surface: bool, threshold: Var
 		area.add_child(b)
 		b.global_position = wild
 	return c
+
+
+## The creature definition the spawn plan uses: Mochi dares the underground areas once she has courage
+## (Brave Little Steps: flag data/creatures.gd "courage_flag"). data/ stays read-only: a copy is changed.
+static func courage_def(id: String) -> Dictionary:
+	var def: Dictionary = ItemDB.creature(id)
+	var flag := String(def.get("courage_flag", ""))
+	if flag != "" and not bool(def.get("enters_below", false)) and bool(GameState.get_flag(flag)):
+		var d := def.duplicate(true)
+		d["enters_below"] = true
+		return d
+	return def
+
+
+## In an outer area with an underground doorstep (Hallowhaven Reach: the Bellhouse stair down to the Hushed
+## Works), a timid follower refuses at that stair like at the mine (only once the stair is revealed).
+static func outer_threshold_params(area_id: String, doorsteps: Dictionary) -> Dictionary:
+	for inner in Logic.DOORSTEPS:
+		var d: Dictionary = Logic.DOORSTEPS[inner]
+		if String(d.get("area", "")) != area_id or not d.has("spawn"):
+			continue
+		var p: Variant = doorsteps.get(String(d["spawn"]))
+		if not (p is Vector3):
+			p = Logic.doorstep(String(inner), null)["pos"]
+		if p is Vector3:
+			return {"threshold": p, "refuse_line": "refuse_deep", "threshold_flag": "ch2_lamps_linked"}
+	return {}
+
+
+## A home spot whose nook is gone (dismantled while its companion was away) falls back to the Haven default.
+static func _repair_home_spots() -> void:
+	for id in GameState.companions:
+		var rec: Variant = GameState.companions[id]
+		if not (rec is Dictionary):
+			continue
+		var nook := String((rec as Dictionary).get("home_nook", ""))
+		if nook != "" and not GameState.structures.has(nook):
+			(rec as Dictionary)["home_nook"] = ""
+			(rec as Dictionary)["home_spot"] = null
 
 
 ## Position of a registered spawn; falls back to the layout hint (snapped to the terrain).

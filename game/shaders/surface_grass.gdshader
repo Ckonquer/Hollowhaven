@@ -10,7 +10,7 @@ uniform sampler2D mask_tex : filter_linear, repeat_disable;
 uniform sampler2D color_tex : source_color, filter_linear, repeat_disable;
 uniform sampler2D occ_tex : filter_linear, repeat_disable, hint_default_black;   // built structures (1 = occupied)
 uniform vec2 terrain_origin = vec2(-128.0, -128.0);
-uniform float terrain_samples = 257.0;
+uniform vec2 terrain_samples = vec2(257.0);   // grid samples (x, z); a square grid by default (Woods)
 uniform float fade_start = 24.0;
 uniform float fade_end = 34.0;
 uniform float blade_height = 0.52;

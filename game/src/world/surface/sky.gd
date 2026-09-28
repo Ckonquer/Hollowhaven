@@ -31,6 +31,11 @@ var sun: DirectionalLight3D
 var moon: DirectionalLight3D
 var sky_mat: ShaderMaterial
 var warmth := 0.0
+## Area colour grade (Hallowmere Reach: plum twilight, amber sun; docs/ch2/maps/world_areas.md 6a step 5).
+## tint.rgb multiplies the sky, cloud, fog and ambient colours, blended in by tint.a; sun_tint.rgb replaces
+## the sun colour by sun_tint.a. Both default to alpha 0 = no change (Hollowhaven Woods is untouched).
+var tint := Color(1, 1, 1, 0)
+var sun_tint := Color(1, 1, 1, 0)
 var daylight := 1.0
 var is_night := false
 var hour_override := -1.0
@@ -156,6 +161,10 @@ static func moon_direction(hour: float) -> Vector3:
 	return Vector3(cos(el) * cos(phi) * 0.9, sin(el), -0.35 + cos(el) * sin(phi) * 0.5).normalized()
 
 
+func _grade(c: Color) -> Color:
+	return c.lerp(Color(c.r * tint.r, c.g * tint.g, c.b * tint.b, c.a), clampf(tint.a, 0.0, 1.0))
+
+
 func update_sky() -> void:
 	if env == null:
 		return
@@ -181,6 +190,16 @@ func update_sky() -> void:
 		sun_c = sun_c.lerp(warm, warmth * 0.3)
 		horizon = horizon.lerp(Color("ffd0b0"), warmth * 0.2)
 		amb_e += warmth * 0.08
+	if tint.a > 0.0:
+		top = _grade(top)
+		horizon = _grade(horizon)
+		ground = _grade(ground)
+		fog = _grade(fog)
+		amb = _grade(amb)
+		cl = _grade(cl)
+		cd = _grade(cd)
+	if sun_tint.a > 0.0:
+		sun_c = sun_c.lerp(Color(sun_tint.r, sun_tint.g, sun_tint.b), clampf(sun_tint.a, 0.0, 1.0))
 	daylight = clampf(sun_e / 1.2, 0.0, 1.0)
 	is_night = sun_e < 0.2
 	var sd := sun_direction(hour)

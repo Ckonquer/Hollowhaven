@@ -28,9 +28,9 @@ const SAVE_REFUSALS := {
 const OUTDOOR_AREAS := ["surface", "hallowmere_reach"]
 ## Areas whose arrival neither saves nor moves the respawn point (a trial always returns to its origin).
 const TRANSIENT_AREAS := ["echo_trial"]
-## Areas that get the horror director (created before companions spawn).
-## Wave C hook: add "hushed_works" here once data/horror_events.gd knows its anchor zones (hw_*).
-const DIRECTOR_AREAS := ["below"]
+## Areas that get the horror director (created before companions spawn). The Hushed Works hands the
+## director its own hw_* event table (data/horror_events.gd WORKS_EVENTS) through area.director_config().
+const DIRECTOR_AREAS := ["below", "hushed_works"]
 ## Where Krystal wakes in a Chapter Two area until she has rested somewhere there (spec §1).
 const AREA_DEFAULT_RESPAWN := {
 	"hallowmere_reach": "commons_arch",
@@ -343,7 +343,7 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	GameState.player["yaw"] = xform.basis.get_euler().y
 	# Area systems: building (surface) and the horror director (below).
 	# BuildMode is added after the player on purpose so its _input() runs first.
-	if target_area == "surface" or (target_area == "arena" and Debug.is_cheat_allowed()):
+	if target_area == "surface" or target_area == "hallowmere_reach" or (target_area == "arena" and Debug.is_cheat_allowed()):
 		var bs: Script = _safe_load(BUILDING_SYSTEM)
 		if bs != null and bs.has_method("attach"):
 			bs.attach(area)
@@ -646,7 +646,8 @@ func _update_mouse() -> void:
 	if Debug.headless:
 		return
 	var want_captured := mode == "playing" and _ui_stack.is_empty()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if want_captured else Input.MOUSE_MODE_VISIBLE
+	# Debug.mouse_mode_for() keeps the OS cursor visible in QA no-capture runs (--qa-no-focus).
+	Input.mouse_mode = Debug.mouse_mode_for(want_captured)
 
 
 func set_cutscene(active: bool) -> void:
@@ -912,12 +913,30 @@ func complete_chapter_two(rewards: Dictionary = {}) -> bool:
 	var was_playing := mode == "playing"
 	if was_playing:
 		set_cutscene(true)
+	# --- Presentation only from here on (story module C9): everything above is committed and saved. ---
+	var story: Script = _safe_load("res://src/world/story_ch2/story_ch2.gd")
+	# The ledger entry's wardrobe / furnishing unlocks: normally already applied inside grant_once (the story
+	# tracker listens to Events.reward_granted), so this is a no-op; without the tracker it applies them here.
+	if story != null and bool(story.call("sync_feast_unlocks")):
+		SaveSystem.save_game(true)
 	for id in companion_nodes:
 		var c: Variant = companion_nodes[id]
 		if c is Node and is_instance_valid(c) and (c as Node).has_method("react"):
 			(c as Node).react("celebrate")
 	Events.chapter2_completed.emit()
-	await _show_chapter_two_ending()
+	if was_playing:
+		# A small skippable celebration in the current area (festival lights outside the build area, a
+		# validated camera shot or the player's own), then the ending card, credits and free play.
+		var cel: Node = story.call("start_celebration") if story != null else null
+		if cel != null and is_instance_valid(cel) and cel.has_method("play"):
+			await cel.play()
+		await _show_chapter_two_ending()
+		if cel != null and is_instance_valid(cel) and cel.has_method("finish"):
+			cel.finish()
+	else:
+		_show_chapter_two_card()   # scripted / headless runs: nothing blocks
+	if story != null:
+		story.call("after_ending")   # journal note + the lasting festival dressing in this area
 	if was_playing and mode == "cutscene":
 		set_cutscene(false)
 	GameState.request_quest_eval()
@@ -945,8 +964,10 @@ func _feast_step_rewards() -> Dictionary:
 	return {}
 
 
-## The Lanternwake reward items {item_id: count} (the final step's "give"; the Wardlight itself comes
+## The Lanternwake reward items {item_id: count} (the final step's "give" plus the Lanternwake's continued
+## resources, story module C9: src/world/story_ch2/story_ch2.gd FEAST_EXTRAS; the Wardlight itself comes
 ## earlier, with ch2_homecoming). Only ids ItemDB knows. CH2_FEAST_REWARDS_DEFAULT when there is no data.
+## The ending commits them with the final step's flags under the one ledger entry rw_ch2_feast.
 func chapter_two_rewards() -> Dictionary:
 	var src: Variant = CH2_FEAST_REWARDS_DEFAULT
 	var oc := _feast_step_rewards()
@@ -957,6 +978,12 @@ func chapter_two_rewards() -> Dictionary:
 		for id in src:
 			if ItemDB.has_item(String(id)):
 				out[String(id)] = int(src[id])
+	var story: Script = _safe_load("res://src/world/story_ch2/story_ch2.gd")
+	var extras: Variant = story.call("feast_extras") if story != null else {}
+	if extras is Dictionary:
+		for id in extras:
+			if ItemDB.has_item(String(id)):
+				out[String(id)] = maxi(int(out.get(String(id), 0)), int(extras[id]))
 	return out
 
 
@@ -993,7 +1020,9 @@ func _grant_chapter_two_rewards(rewards: Dictionary) -> bool:
 
 
 ## The Chapter Two ending presentation: a dedicated UI ending if the UI offers one (show_chapter_two_ending()
-## or show_ending(variant)), else the chapter card plus the MP §17 ending line.
+## or show_ending(variant)), else the Chapter Two variant of the ending screen on the UI root's overlay layer
+## (the same layer the Chapter One ending uses), else the chapter card plus the MP §17 ending line.
+## Awaitable: returns when the player continues into free play.
 func _show_chapter_two_ending() -> void:
 	if ui == null or not is_instance_valid(ui):
 		return
@@ -1001,7 +1030,20 @@ func _show_chapter_two_ending() -> void:
 		await ui.show_chapter_two_ending()
 	elif ui.has_method("show_ending") and ui.get_method_argument_count("show_ending") >= 1:
 		await ui.show_ending("chapter_two")
-	elif ui.has_method("show_chapter_card"):
+	elif ui.get("overlay_layer") is Control and _safe_load("res://src/ui/screens/ending_screen.gd") != null:
+		if ui.has_method("close_all"):
+			ui.close_all()
+		var es: Control = _safe_load("res://src/ui/screens/ending_screen.gd").new()
+		es.call("setup", {"variant": "chapter_two"})
+		(ui.get("overlay_layer") as Control).add_child(es)
+		await es.play()
+	else:
+		_show_chapter_two_card()
+
+
+## Non-blocking stand-in (no ending UI, or a scripted / headless completion): the card and the ending line.
+func _show_chapter_two_card() -> void:
+	if ui != null and is_instance_valid(ui) and ui.has_method("show_chapter_card"):
 		ui.show_chapter_card("Chapter Two Complete", "The Lanterns of Hallowmere")
 		Events.say.emit("", CH2_ENDING_TEXT, 9.0)
 

@@ -112,12 +112,19 @@ func wake_transform() -> Transform3D:
 ## has room on the far side of it. Among the sides in clear sight: one with a way out (not shut in by
 ## walls) beats one without, then one with room for Krystal beats one a small piece crowds (she is
 ## nudged free). With every side out of sight she wakes on top of the bed, never behind a wall.
+## A bed upstairs (Chapter Two storeys) only wakes her on a side with the upper floor under it: never in
+## the air past the floor's edge (with no such side, on top of the bed). Ground beds are unchanged.
 func _wake_spot() -> Dictionary:
 	if not is_inside_tree():
 		return {"xf": _wake_xf(position, transform * (WAKE_SPOTS[0] as Vector3)), "shut_in": false}
 	var centre := global_position
 	var space := get_world_3d().direct_space_state
 	var own := _own_rids()
+	var level := Placement.level_of(record())
+	var floors: Dictionary = {}
+	if level >= 1:
+		var occ := Placement.build_occupancy(GameState.structures, String(record().get("area", "surface")))
+		floors = occ.get(Placement.layer_key("floor", level), {})
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.36
 	cap.height = 1.6
@@ -129,6 +136,8 @@ func _wake_spot() -> Dictionary:
 		var ray := PhysicsRayQueryParameters3D.create(centre + Vector3.UP * SIGHT_HEIGHT, at + Vector3.UP * SIGHT_HEIGHT, 1 | 32, own)
 		if not space.intersect_ray(ray).is_empty():
 			continue
+		if level >= 1 and not floors.has(Vector2i(floori(at.x), floori(at.z))):
+			continue      # past the edge of the upper floor (or over the stairwell)
 		var q := PhysicsShapeQueryParameters3D.new()
 		q.shape = cap
 		q.transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * 0.9)
@@ -163,15 +172,17 @@ func _own_rids() -> Array[RID]:
 
 
 ## True when built pieces leave no way out from `pos` (the build mode's enclosure rule).
-## `ignore_self` leaves this bed out (for the spot on top of it).
-func _is_shut_in(pos: Vector3, ignore_self: bool = false) -> bool:
+## `ignore_self` leaves this bed out (for the spot on top of it). `level`: the storey `pos` is on (-1 = the
+## bed's own storey; a bed upstairs is checked on the upper floor, where the stairwell is a way out).
+func _is_shut_in(pos: Vector3, ignore_self: bool = false, level: int = -1) -> bool:
 	var aid: String = String(record().get("area", "surface"))
 	var recs: Dictionary = GameState.structures
 	if ignore_self and recs.has(uid):
 		recs = recs.duplicate()
 		recs.erase(uid)
 	var ops: Script = load("res://src/building/build_ops.gd")   # load, not preload: build_ops -> factory -> bed
-	var ctx := {"structures": recs, "area_id": aid, "build_area": ops.build_area_for(aid)}
+	var lv: int = level if level >= 0 else Placement.level_of(record())
+	var ctx := {"structures": recs, "area_id": aid, "build_area": ops.build_area_for(aid), "player_level": lv}
 	return Placement.would_enclose(pos, ctx)
 
 
@@ -211,7 +222,8 @@ func _open_haven_spawn(a: Node, fallback: Transform3D) -> Transform3D:
 	if sp is Dictionary:
 		for id in ["haven_respawn", "haven_start"]:
 			var xf: Variant = (sp as Dictionary).get(id)
-			if xf is Transform3D and not _is_shut_in((xf as Transform3D).origin):
+			# The Haven's wake-up spots are on the ground, whatever storey the bed is on.
+			if xf is Transform3D and not _is_shut_in((xf as Transform3D).origin, false, 0):
 				return xf
 	return fallback
 

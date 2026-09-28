@@ -1,6 +1,7 @@
 extends Control
-## Top-centre banner for quest notifications ("New goal: ...", "Goal complete: ..."). Queued, one at a
-## time, with a soft drop-in and the ui_quest chime.
+## Top-centre banner for quest notifications of both chapters and the optional goals ("New goal: ...",
+## "Goal complete: ...", "Optional goal complete: ..."). Queued (max 4, a line already queued or on screen is
+## not repeated), one at a time, with a soft drop-in and the ui_quest chime.
 
 const Kit := preload("res://src/ui/ui_kit.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -11,6 +12,7 @@ var label: Label
 var sub: Label
 var _queue: Array = []
 var _busy := false
+var _current := ""               # text on screen while _busy
 
 
 func _ready() -> void:
@@ -37,6 +39,10 @@ func _ready() -> void:
 
 
 func show_text(text: String) -> void:
+	# The same line twice in a row (e.g. a Chapter One and a Chapter Two evaluation announcing together, or a
+	# repeated notify while the banner waits behind a menu) is shown once.
+	if _queue.has(text) or (_busy and _current == text):
+		return
 	_queue.append(text)
 	if _queue.size() > 4:
 		_queue.pop_front()
@@ -52,6 +58,7 @@ func _next() -> void:
 		return
 	_busy = true
 	var text: String = _queue.pop_front()
+	_current = text
 	var parts := text.split(":", true, 1)
 	if parts.size() == 2:
 		sub.text = parts[0].strip_edges().to_upper()

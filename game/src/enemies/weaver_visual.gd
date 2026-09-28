@@ -6,6 +6,9 @@ extends Node3D
 ## orient it to ceilings. setup({"scale": 2.6, "boss": true}) for the Matron.
 ## States: idle, move, telegraph (rattle: front legs raised, whole body trembling, eyes blaze),
 ## lunge, recoil, stunned (legs curled, twitching), shriek, cling (flatter pose), dead.
+## Matron rework: spit (abdomen tipped up and pumping - web fan / trip-lines are coming), channel (front
+## legs reach down along the thread, slow sway - it is smothering a brazier). supports_state(name) tells
+## the boss which of these this look can show (the Shade look falls back to "telegraph").
 
 const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
@@ -149,6 +152,10 @@ func set_clinging(on: bool) -> void:
 	clinging = on
 
 
+func supports_state(s: String) -> bool:
+	return s in ["idle", "move", "telegraph", "lunge", "recoil", "stunned", "shriek", "dead", "spit", "channel"]
+
+
 func play_anim(anim: String) -> void:
 	match anim:
 		"walk":
@@ -218,6 +225,20 @@ func _process(delta: float) -> void:
 		"dead":
 			curl = 1.0
 			body_y = 0.2
+		"spit":
+			var k := clampf(_st / 0.3, 0.0, 1.0)
+			front_raise = 30.0 * k
+			body_pitch = 0.3 * k
+			tremble = 0.006 * k
+			abd_bob = sin(_t * 14.0) * 0.035 * k
+			eye_hot = true
+		"channel":
+			front_raise = 45.0 + sin(_t * 5.0) * 8.0
+			body_pitch = -0.18
+			body_y += 0.05
+			tremble = 0.003
+			abd_bob = sin(_t * 3.0) * 0.03
+			eye_hot = true
 	if clinging and state in ["idle", "move"]:
 		elev_add -= 12.0
 		drop_add -= 10.0

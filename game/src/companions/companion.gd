@@ -11,12 +11,26 @@ extends CharacterBody3D
 ##
 ## States: a base `mode` driven by the GameState assignment (wild | follow | wait | home) plus a
 ## temporary `override` (working | afraid | refuse | celebrate | notice | befriending | reunite |
-## charge | dizzy | leaving). get_state() returns the override if one is active.
+## charge | dizzy | leaving | attack | brave). get_state() returns the override if one is active.
+##
+## Chapter Two (MP §6, spec §9): `combat` (companion_combat.gd: basic attacks, the signature skill with one
+## shared cooldown, Bloomguard / Stoneheart / Glimmerstep), `nav` (companion_nav.gd: obstacle-aware approach),
+## `home_life` (companion_home.gd: bounded home behaviours). Commands gain "skill", "assist", "close", "ribbon".
+## The Companion Skill action (companion_skill, default T) is read here by the follower (_unhandled_input,
+## only when Game.gameplay_input_allowed()). Mochi's courage: flag c1x_mochi_courage (Brave Little Steps).
 
 signal state_changed(state: String)
+signal skill_changed(remaining: float, cooldown: float)
 
 const Logic := preload("res://src/companions/companion_logic.gd")
+const Support := preload("res://src/companions/companion_support.gd")
+const CombatCtl := preload("res://src/companions/companion_combat.gd")
+const Nav := preload("res://src/companions/companion_nav.gd")
+const HomeLife := preload("res://src/companions/companion_home.gd")
 const Fx := preload("res://src/companions/companion_fx.gd")
+const VisualBase := preload("res://src/companions/companion_visual.gd")
+const Mat := preload("res://src/art/mat.gd")
+const Kit := preload("res://src/art/mesh_kit.gd")
 const CreaturesData := preload("res://data/creatures.gd")
 const Layout := preload("res://data/world_layout.gd")
 const VISUALS := {
@@ -37,6 +51,10 @@ const MOCHI_FEAR_RANGE := 8.0
 const PEBBLE_CHARGE_RANGE := 7.0
 const CHARGE_MAX_RISE := 1.6       # Pebble only charges enemies roughly on its own level
 const HIDE_SECONDS := 4.0
+const BRAVE_HIDE_SECONDS := 1.5    # Mochi with courage still trembles on horror cues, but only briefly
+const CLOSE_FOLLOW_MULT := 0.6     # "Stay close": follow this much nearer
+const ATTACK_OVERRIDE_SECONDS := 6.0
+const ATTACK_STALL_SECONDS := 2.5  # no progress toward a melee target this long -> give up on it
 const VISUAL_SCALE := 1.15         # a touch bigger in the world so they read well in tall grass
 ## Each creature has three voices (docs/ARCHITECTURE.md Audio names); generic cues map onto them.
 const VOICE_MAP := {
@@ -120,18 +138,40 @@ var _plast := Vector3.INF
 var _blocked_t: float = 0.0
 var _bag_full_noted: bool = false
 
+# --- Chapter Two ---
+var combat: RefCounted = null         # companion_combat.gd
+var nav: RefCounted = null            # companion_nav.gd
+var home_life: RefCounted = null      # companion_home.gd
+var recoveries: int = 0               # safe-teleport recoveries (tests / telemetry)
+var refuse_line: String = "refuse_below"
+var threshold_flag: String = ""       # refusal at this threshold only once the flag is set ("" = always)
+var _attack_best: float = INF
+var _attack_stall: float = 0.0
+var _skill_note_ms: int = -100000
+var _safe_floor := Vector3.INF        # last spot it stood on while following (a fall mid boss fight returns here)
+var _safe_floor_t: float = 0.0
+var _ribbon_node: Node3D = null
+var _default_home := Vector3.ZERO     # companion_home_<id> (used again when its nook is taken away)
+
 static var _last_any_say_ms: int = -100000
 static var _enemy_cache: Array = []
 static var _enemy_cache_ms: int = -100000
 
 
 ## params: {"id", "mode" (wild|pinned|home|wait|follow|reunite|reunite_home), "home": Vector3,
-##          "wild": Vector3, "wait": Vector3, "threshold": Vector3|null}
+##          "wild": Vector3, "wait": Vector3, "threshold": Vector3|null,
+##          "refuse_line": creature line context said when refusing there (default "refuse_below"),
+##          "threshold_flag": refuse there only once this flag is set (default: always)}
 func setup(params: Dictionary) -> void:
 	companion_id = String(params.get("id", companion_id))
 	_spawn_mode = String(params.get("mode", ""))
+	refuse_line = String(params.get("refuse_line", refuse_line))
+	threshold_flag = String(params.get("threshold_flag", threshold_flag))
 	if params.get("home") is Vector3:
 		home_pos = params["home"]
+		_default_home = home_pos
+	if params.get("home_default") is Vector3:
+		_default_home = params["home_default"]
 	if params.get("wild") is Vector3:
 		wild_pos = params["wild"]
 	if params.get("wait") is Vector3:
@@ -192,8 +232,18 @@ func _ready() -> void:
 	Events.zone_entered.connect(_on_zone_entered)
 	Events.flag_set.connect(_on_flag_set)
 	Events.enemy_killed.connect(_on_enemy_killed)
+	Events.companion_bond_changed.connect(_on_bond_changed)
+	Events.structure_placed.connect(_on_structure_placed)
+	Events.structure_removed.connect(_on_structure_removed)
+	Events.horror_event.connect(_on_horror_event)
+	combat = CombatCtl.new(self, companion_id)
+	nav = Nav.new(self)
+	home_life = HomeLife.new(self, companion_id)
 	_init_mode()
 	_init_threshold_guard()
+	refresh_ribbon()
+	if is_befriended() and Logic.is_surface_area(Game.area_id):
+		home_life.call_deferred("build_cairn")
 
 
 func _init_mode() -> void:
@@ -254,7 +304,53 @@ func is_befriended() -> bool:
 	return GameState.is_befriended(companion_id)
 
 
-## Commands from the companion panel / hotkey: pet, follow, wait, home, feed.
+## Signature skill (manual: the Companion Skill action / Friends panel; else the autocast). One cooldown for
+## both, on the play_seconds timeline. Returns {"ok", "reason", "skill"}.
+func use_skill(manual: bool = true) -> Dictionary:
+	var r: Dictionary = combat.use_skill(manual)
+	skill_changed.emit(Support.remaining(companion_id), Support.cooldown(companion_id))
+	return r
+
+
+## {"ready", "remaining", "cooldown", "ok", "reason", "name", "range"} for the UI.
+func skill_status() -> Dictionary:
+	return combat.skill_status()
+
+
+## Telemetry (src/qa/qa_telemetry.gd companion_skill_info): skill_status() plus what the combat layer is doing.
+func get_skill_state() -> Dictionary:
+	var s := skill_status()
+	s["state"] = get_state()
+	s["target"] = String(combat.target.name) if combat.has_target() else ""
+	s["attacks"] = int(combat.attacks_fired)
+	s["healing"] = not (combat.hot as Dictionary).is_empty()
+	s["nav"] = String(nav.last_result) if nav != null else ""
+	return s
+
+
+## The Companion Skill action (rebindable, default T): only the follower answers, only while gameplay input
+## is allowed (menus, pause, cutscenes and UI focus never leak it).
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion or event is InputEventJoypadMotion:
+		return
+	if not InputMap.has_action("companion_skill") or not event.is_action_pressed("companion_skill") or event.is_echo():
+		return
+	if mode != "follow" or GameState.active_companion != companion_id or not is_befriended():
+		return
+	if not Game.gameplay_input_allowed():
+		return
+	if is_inside_tree():
+		get_viewport().set_input_as_handled()
+	var r := use_skill(true)
+	if not bool(r.get("ok", false)) and String(r.get("reason", "")) != "":
+		var now := Time.get_ticks_msec()
+		if now - _skill_note_ms > 900:
+			_skill_note_ms = now
+			Events.notify.emit(String(r["reason"]), "warn")
+
+
+## Commands from the companion panel / hotkey: pet, follow, wait, home, feed, and (Chapter Two) skill,
+## assist, close (behaviour modes) and ribbon (tie the Comfort Ribbon).
 ## Returns {"ok": bool, "text": String, "bond": int}.
 func command(cmd: String) -> Dictionary:
 	if not is_befriended():
@@ -265,11 +361,19 @@ func command(cmd: String) -> Dictionary:
 	match cmd:
 		"pet":
 			var xp := Logic.pet_bond(rec, day)
+			var perks: Array = Support.table(companion_id).get("perks_active", [])
+			var affection := perks.has(5) and _affection_action() != ""
 			if xp > 0:
 				GameState.add_bond(companion_id, xp)
-				_say("pet", 3.0, true)
+				_say("affection" if affection else "pet", 3.0, true)
 			_face_player_now()
-			_reaction_visual("happy")
+			if affection and not visual.is_busy():
+				# 5-heart perk: a special affectionate animation (data/companion_skills.gd "affection").
+				visual.play_action(_affection_action())
+				visual.show_emote("heart", 2.0)
+				Fx.hearts(get_parent(), global_position + Vector3.UP * 0.8, 3)
+			else:
+				_reaction_visual("happy")
 			_voice("happy")
 			Events.companion_reaction.emit(companion_id, "happy")
 			return {"ok": true, "text": "", "bond": xp}
@@ -314,6 +418,29 @@ func command(cmd: String) -> Dictionary:
 				_say("home", 2.5, true)
 				visual.show_emote("heart", 1.4)
 			return {"ok": true, "text": cmd, "bond": 0}
+		"skill":
+			var r := use_skill(true)
+			return {"ok": bool(r.get("ok", false)), "text": String(r.get("reason", "")), "bond": 0}
+		"assist", "close":
+			if Support.mode(companion_id) == cmd:
+				return {"ok": true, "text": cmd, "bond": 0}
+			Support.set_mode(companion_id, cmd)
+			if cmd == "close" and override == "attack":
+				_clear_override()
+			_settled = false
+			_say(cmd, 2.5, true)
+			visual.show_emote("exclaim" if cmd == "assist" else "heart", 1.2)
+			return {"ok": true, "text": cmd, "bond": 0}
+		"ribbon":
+			if not Support.give_ribbon(companion_id):
+				return {"ok": false, "text": String(Support.ribbon_check(companion_id).get("reason", "")), "bond": 0}
+			refresh_ribbon()
+			_face_player_now()
+			visual.play_action("happy")
+			visual.show_emote("heart", 2.0)
+			_voice("happy")
+			_say("ribbon", 4.0, true)
+			return {"ok": true, "text": "ribbon", "bond": 0}
 	return {"ok": false, "text": "unknown", "bond": 0}
 
 
@@ -380,15 +507,40 @@ func notice_threat(pos: Vector3) -> void:
 	if pinned or not is_befriended() or _uninterruptible():
 		return
 	if companion_id == "mochi":
-		_hide_from(pos, HIDE_SECONDS)
+		if Support.has_courage(companion_id) and mode == "follow":
+			# Brave Mochi still trembles and shelters behind Krystal, but only briefly: it keeps following
+			# and healing (the combat layer works while "afraid").
+			var was := override
+			_hide_from(pos, BRAVE_HIDE_SECONDS)
+			if was != "afraid" and _fear_line_cd <= 0.0:
+				_fear_line_cd = 40.0
+				_say("tremble", 3.0, false)
+		else:
+			_hide_from(pos, HIDE_SECONDS)
 	else:
 		_notice(pos, true)
+
+
+## Horror cues (Events.horror_event: director events and authored moments). Mochi, following Krystal,
+## shelters behind her: briefly once she found her courage (MP 6.4: a personality reaction that never stops
+## the following or the healing), the old longer hide otherwise. Others keep their own authored reactions.
+func _on_horror_event(_event_id: String, data: Dictionary) -> void:
+	if companion_id != "mochi" or mode != "follow" or not is_befriended() or _player == null:
+		return
+	if override in ["afraid", "refuse", "brave", "befriending", "leaving"]:
+		return
+	var p: Variant = data.get("pos")
+	if not (p is Vector3) or (p as Vector3) == Vector3.ZERO:
+		p = _player.global_position + _player_forward() * 6.0     # somewhere ahead in the dark
+	notice_threat(p)
 
 
 func on_player_respawned() -> void:
 	_clear_override()
 	_threat_pos = null
 	_guard_t = 0.0
+	if combat != null:
+		combat.reset()
 	if mode == "follow":
 		_refresh_player(true)
 		if _player != null:
@@ -417,6 +569,8 @@ func teleport_near(pos: Vector3) -> void:
 	_progress = {}
 	_los_track = {}
 	_settled = false
+	if nav != null:
+		nav.reset()
 	Fx.poof(parent, spot, Color(1.0, 0.97, 0.92), 10, 0.8)
 
 
@@ -515,7 +669,7 @@ func _physics_process(delta: float) -> void:
 			_state_afraid(delta)
 		"refuse":
 			_state_refuse(delta)
-		"notice", "celebrate", "dizzy", "befriending":
+		"notice", "celebrate", "dizzy", "befriending", "brave":
 			_state_hold(delta)
 		"reunite":
 			_state_reunite(delta)
@@ -523,20 +677,28 @@ func _physics_process(delta: float) -> void:
 			_state_charge(delta)
 		"leaving":
 			_state_leaving(delta)
+		"attack":
+			_state_attack(delta)
 	if mode == "follow" and override != "befriending" and override != "leaving":
 		_scan_t -= delta
 		if _scan_t <= 0.0:
 			_scan_t = 0.45
 			_scan_threats()
+	if combat != null and is_befriended():
+		combat.tick(delta)
 	# Safety net: the stuck detectors only run in plain follow. A follower busy with an override
 	# (Mochi hiding while a Brambling keeps chasing Krystal can stay "afraid" for a long time,
 	# working, cheering...) must never be left behind either.
-	if mode == "follow" and override != "" and not (override in ["befriending", "leaving", "refuse"]):
+	if mode == "follow" and override != "" and not (override in ["befriending", "leaving", "refuse", "brave"]):
 		if _player != null and _dist_player() > Logic.STUCK_FAR + 4.0:
 			_recover("far")
 	_move(delta)
 	_update_visual()
 	_check_fall()
+	_safe_floor_t -= delta
+	if _safe_floor_t <= 0.0 and mode == "follow" and is_on_floor():
+		_safe_floor_t = 0.5
+		_safe_floor = global_position
 
 
 func _tick_timers(delta: float) -> void:
@@ -685,7 +847,7 @@ func _state_follow(delta: float) -> void:
 		goal = ppos + away.normalized() * 1.05 + away.normalized().cross(Vector3.UP) * side * 0.35
 		_look = tp + Vector3.UP * 0.5
 	else:
-		var cands := Logic.goal_candidates(ppos, _player_move_dir(), side, follow_distance)
+		var cands := Logic.goal_candidates(ppos, _player_move_dir(), side, _follow_dist())
 		if _los_t >= 0.24 or _goal_choice >= cands.size():
 			_goal_choice = _pick_goal_choice(cands, ppos, cam)
 		goal = cands[_goal_choice]
@@ -711,7 +873,7 @@ func _state_follow(delta: float) -> void:
 	if can_settle and cam != null and Logic.in_camera_corridor(global_position, ppos, cam.global_position):
 		can_settle = false
 	if _settled:
-		_settled = can_settle and d > 0.9 and d < follow_distance * 1.6
+		_settled = can_settle and d > 0.9 and d < _follow_dist() * 1.6
 	else:
 		_settled = can_settle and dg < 0.45
 	if _settled:
@@ -720,8 +882,13 @@ func _state_follow(delta: float) -> void:
 	else:
 		_goal = goal
 		_goal_speed = Logic.follow_speed(dg, move_speed, player_speed)
+	# Walking a found path around an obstacle: that IS progress (the detour may first lead away from her).
+	if nav != null and nav.progressing():
+		Logic.reset_stuck(_stuck)
+		_progress = {}
+		_los_track = {}
 	# Recovery: too far, not closing the distance, not actually getting anywhere, or cut off.
-	var status := Logic.stuck_update(_stuck, d, delta, follow_distance)
+	var status := Logic.stuck_update(_stuck, d, delta, _follow_dist())
 	if status == "" and Logic.progress_update(_progress, global_position, _goal is Vector3 and dg > 1.0, delta):
 		status = "no_progress"
 	if status == "" and Logic.los_update(_los_track, _has_los, d, delta):
@@ -731,6 +898,13 @@ func _state_follow(delta: float) -> void:
 		return
 	_follow_abilities(delta, d)
 	_check_threshold()
+
+
+## Follow distance for the current behaviour mode ("Stay close" follows nearer).
+func _follow_dist() -> float:
+	if is_befriended() and Support.mode(companion_id) == "close":
+		return follow_distance * CLOSE_FOLLOW_MULT
+	return follow_distance
 
 
 ## First follow spot Krystal can see (no wall between her and it), camera-safe.
@@ -785,12 +959,21 @@ func _state_home(delta: float) -> void:
 	if not Logic.is_surface_area(Game.area_id) and Game.area_id != "":
 		return
 	if GameState.is_night():
+		if home_life != null:
+			if float(home_life.nap_left) > 0.0:
+				home_life.interrupt()
+			# Lumi pulses with the Haven's lamps once before bed (MP 6.5).
+			if not _sleeping and home_life.tick_night(delta):
+				return
 		if dh > 0.6:
 			_goal = home_pos
 			_goal_speed = move_speed * 0.6
 			_set_sleeping(false)
 		else:
 			_set_sleeping(true)
+		return
+	if home_life != null and float(home_life.nap_left) > 0.0:
+		home_life.tick_day(delta, d)      # a little nap near home: stay asleep until it ends
 		return
 	_set_sleeping(false)
 	if dh > 3.5:
@@ -807,6 +990,8 @@ func _state_home(delta: float) -> void:
 	if d < 6.0:
 		_look = _player_head()
 	_wander(delta, home_pos, 3.0, 1.0)
+	if home_life != null and home_life.tick_day(delta, d):
+		return
 	_home_abilities(delta, d)
 	_idle_line(delta, d)
 
@@ -924,6 +1109,42 @@ func _state_charge(_delta: float) -> void:
 	Events.camera_shake.emit(0.08, 0.12)
 
 
+## Melee pets (Pebble) walk to the enemy Krystal is fighting (obstacle-aware, leashed to her) and headbutt it
+## on the cadence of companion_combat.gd; gives up when it can't get closer (never chases into geometry).
+func begin_attack_approach() -> void:
+	if override != "" or mode != "follow" or combat == null or not combat.has_target():
+		return
+	_attack_best = INF
+	_attack_stall = 0.0
+	_set_override("attack", ATTACK_OVERRIDE_SECONDS)
+
+
+func _state_attack(delta: float) -> void:
+	if combat == null or not combat.approach_ok():
+		# Leash reached (or the target stopped counting): leave that enemy alone for a moment.
+		if combat != null and combat.has_target():
+			combat.give_up_target()
+		_clear_override()
+		return
+	var t: Node3D = combat.target
+	_look = t.global_position + Vector3.UP * 0.4
+	if combat.within_reach(t):
+		_goal = null
+		_attack_best = INF
+		_attack_stall = 0.0
+		return
+	_goal = combat.melee_spot()
+	_goal_speed = move_speed * 1.35
+	var dist := _flat(t.global_position - global_position).length()
+	if dist < _attack_best - 0.3 or (nav != null and nav.progressing()):
+		_attack_best = minf(dist, _attack_best)
+		_attack_stall = 0.0
+	else:
+		_attack_stall += delta
+		if _attack_stall > ATTACK_STALL_SECONDS:
+			combat.give_up_target()
+
+
 func _state_leaving(_delta: float) -> void:
 	if _player != null:
 		var away := _flat(global_position - _player.global_position)
@@ -942,12 +1163,17 @@ func _idle_look(_delta: float) -> void:
 func _move(delta: float) -> void:
 	var want := Vector3.ZERO
 	if _goal is Vector3:
-		var to := _flat(_goal - global_position)
+		var g: Vector3 = _goal
+		var seek := g
+		if nav != null and _nav_wanted():
+			seek = nav.route(g, delta)      # around walls when the straight line is blocked (companion_nav.gd)
+		var to := _flat(seek - global_position)
 		var dist := to.length()
-		if dist > 0.12:
+		var dist_goal := _flat(g - global_position).length()
+		if dist > 0.12 and dist_goal > 0.12:
 			var spd := _goal_speed
-			if dist < 0.6:
-				spd *= clampf(dist / 0.6, 0.25, 1.0)
+			if dist_goal < 0.6:
+				spd *= clampf(dist_goal / 0.6, 0.25, 1.0)
 			want = to / dist * spd
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
 	var accel := ACCEL if is_on_floor() else ACCEL * 0.35
@@ -971,6 +1197,12 @@ func _move(delta: float) -> void:
 		var rate := 10.0 if hv.length() > 0.35 else 4.0
 		_yaw = lerp_angle(_yaw, target_yaw, 1.0 - exp(-rate * delta))
 	visual.rotation.y = _yaw
+
+
+## Obstacle-aware routing is for travelling; work targets (rocks, bushes) are solid on purpose and a charge
+## runs straight.
+func _nav_wanted() -> bool:
+	return not (override in ["working", "charge", "leaving", "befriending"]) and not pinned
 
 
 ## Small hops over low obstacles and gaps while travelling.
@@ -1018,11 +1250,27 @@ func _check_fall() -> void:
 		velocity = Vector3.ZERO
 
 
-func _recover(_reason: String) -> void:
+func _recover(reason: String) -> void:
 	if _player == null:
 		return
-	if override in ["working", "charge", "reunite"]:
+	if Game.boss_active() and _dist_player() > 12.0:
+		# Never pop a fighting pet into a closed boss room: it keeps walking (breadcrumbs / nav) instead.
+		# A pet that actually fell (off a ledge, out of the world) goes back to the last floor it stood on.
+		if reason == "fell" and _safe_floor != Vector3.INF and global_position.y < _safe_floor.y - 4.0:
+			global_position = _safe_floor
+			velocity = Vector3.ZERO
+			_trail.clear()
+			if nav != null:
+				nav.reset()
+		Logic.reset_stuck(_stuck)
+		_progress = {}
+		_los_track = {}
+		if override == "attack":
+			_clear_override()
+		return
+	if override in ["working", "charge", "reunite", "attack"]:
 		_clear_override()
+	recoveries += 1
 	teleport_near(_player.global_position)
 
 
@@ -1209,7 +1457,12 @@ func _finish_work() -> void:
 
 
 func _on_visual_action(action_name: String) -> void:
+	# Combat first: an attack's impact frame resolves its hit (whatever the override is).
+	if combat != null and combat.on_action(action_name):
+		return
 	if override != "working":
+		return
+	if home_life != null and home_life.on_work_action(_work, action_name):
 		return
 	var kind := String(_work.get("kind", ""))
 	var pos: Vector3 = _work.get("pos", global_position)
@@ -1313,6 +1566,13 @@ func _on_zone_entered(zone_id: String) -> void:
 
 
 func _on_flag_set(flag: String, value: Variant) -> void:
+	var cf := String(def.get("courage_flag", ""))
+	if cf != "" and flag == cf and _truthy(value):
+		# Courage found: no more refusing at the mine (an active refusal ends where it is).
+		_refused_this_approach = false
+		if override == "refuse":
+			_clear_override()
+		return
 	if companion_id == "lumi" and flag == _rescue_flag() and bool(value) and not is_befriended():
 		_glow_target = 1.0
 		visual.set_glow(1.0)
@@ -1398,7 +1658,11 @@ func _scan_threats() -> void:
 		"pebble":
 			if threatening != null and threat_d < PEBBLE_CHARGE_RANGE and _charge_cd <= 0.0 and override == "":
 				# Only things on the ground: never "charge" the Weaver on the ceiling or a stalker overhead.
+				# Chapter Two: the brave opener obeys the combat rules too (auto attack on, Assist, a hittable
+				# target in sight: never an armoured boss or through a wall).
 				var reachable := absf(threatening.global_position.y - global_position.y) < CHARGE_MAX_RISE
+				if reachable and combat != null and not combat.may_charge(threatening):
+					reachable = false
 				if reachable and threatening.global_position.distance_to(global_position) < 11.0:
 					_charge_cd = 14.0
 					_charge_target = threatening
@@ -1406,6 +1670,9 @@ func _scan_threats() -> void:
 					visual.show_emote("exclaim", 1.0)
 					_voice("grunt")
 					_say("brave", 3.0, false)
+	# Basic-attack target (companion_combat.gd): enemies Krystal is fighting, in sight, never peaceful ones.
+	if combat != null:
+		combat.scan(_enemies())
 
 
 func _notice(pos: Vector3, warn: bool) -> void:
@@ -1468,17 +1735,43 @@ func _hide_spot() -> Variant:
 func _check_threshold() -> void:
 	if not (threshold_pos is Vector3) or _player == null or override != "":
 		return
+	if threshold_flag != "" and not _truthy(GameState.get_flag(threshold_flag)):
+		return
 	var tp: Vector3 = threshold_pos
 	var dt := _flat(_player.global_position - tp).length()
 	if Logic.approach_reset(dt):
 		_refused_this_approach = false
-	if Logic.should_refuse(bool(def.get("enters_below", true)), mode, dt, _refused_this_approach):
+	var dares := bool(def.get("enters_below", true)) or Support.has_courage(companion_id)
+	if Logic.should_refuse(dares, mode, dt, _refused_this_approach):
 		_refused_this_approach = true
 		_work = {}
 		_set_override("refuse", 5.5)
 		visual.show_emote("drop", 2.0)
 		_voice("scared")
-		_say("refuse_below", 4.5, true)
+		_say(refuse_line, 4.5, true)
+
+
+## Brave Little Steps (MP 6.4): wearing its Comfort Ribbon, beside the lit lantern at the OUTSIDE mine
+## threshold (src/world/surface/c1x/courage_lantern.gd), Mochi finds its courage: the line, a brave little
+## step, flag c1x_mochi_courage (+ the optional goal reads it). Mochi follows Krystal again afterwards.
+func brave_step(at: Vector3) -> bool:
+	var cf := String(def.get("courage_flag", ""))
+	if cf == "" or not is_befriended() or _uninterruptible():
+		return false
+	_clear_override()
+	_refused_this_approach = false
+	if mode != "follow":
+		GameState.set_companion_assignment(companion_id, "follow")
+	GameState.set_flag(cf, true)
+	GameState.request_quest_eval()
+	_face_towards(at)
+	_set_override("brave", 2.4)
+	visual.play_action("brave_step")
+	visual.show_emote("sparkle", 2.2)
+	Fx.sparkles(get_parent(), global_position + Vector3.UP * 0.4, 0.45, 12, Color(1.0, 0.85, 0.9))
+	_voice("happy")
+	_say("courage", 5.0, true)
+	return true
 
 
 func _finish_refuse() -> void:
@@ -1583,6 +1876,14 @@ func _on_assignment_changed(id: String, assignment: String) -> void:
 	_set_sleeping(false)
 	if not pinned and visual != null:
 		visual.set_mood("idle")
+	if home_life != null:
+		home_life.interrupt()
+	if nav != null:
+		nav.reset()
+	if combat != null and assignment != "follow":
+		combat.reset()
+		if override == "attack":
+			_clear_override()
 	match assignment:
 		"follow":
 			mode = "follow"
@@ -1629,7 +1930,10 @@ func _clear_override() -> void:
 	_override_t = 0.0
 	if was == "working":
 		_work = {}
-	if was in ["afraid", "notice", "refuse", "dizzy"]:
+	if was == "attack":
+		_attack_best = INF
+		_attack_stall = 0.0
+	if was in ["afraid", "notice", "refuse", "dizzy", "brave"]:
 		visual.set_mood("idle")
 	if companion_id == "lumi" and is_befriended():
 		_glow_target = 1.0
@@ -1707,7 +2011,8 @@ func _idle_line(delta: float, d: float) -> void:
 	_idle_line_t -= delta
 	if _idle_line_t <= 0.0:
 		_idle_line_t = _rng.randf_range(120.0, 220.0)
-		_say("idle_below" if Game.area_id == "below" else "idle", 3.0, false)
+		var below := Game.area_id != "" and Logic.is_underground_area(Game.area_id)
+		_say("idle_below" if below else "idle", 3.0, false)
 
 
 func _say(context: String, duration: float = 3.0, priority: bool = false) -> void:
@@ -1905,3 +2210,83 @@ func _validate_spot(c: Vector3, center: Vector3) -> Variant:
 	if not _line_clear(center + Vector3.UP * 0.5, p + Vector3.UP * 0.5):
 		return null
 	return p + Vector3.UP * 0.05
+
+
+# --- Chapter Two helpers ------------------------------------------------------------------------------------------------
+
+static func _truthy(v: Variant) -> bool:
+	if v is bool:
+		return v
+	if v is int or v is float:
+		return v != 0
+	return false
+
+
+## The 5-heart affectionate animation id (data/companion_skills.gd perks[5].affection), "" if none.
+func _affection_action() -> String:
+	var perks: Dictionary = ItemDB.companion_skill(companion_id).get("perks", {})
+	var p: Dictionary = perks.get(5, {})
+	var a := String(p.get("affection", ""))
+	return a if VisualBase.ACTIONS.has(a) else ""
+
+
+## Shows the ribbon the companion wears (the Comfort Ribbon, or the 5-heart bond ribbon). Shared meshes.
+const RIBBON_ANCHORS := {"mochi": Vector3(0.15, 0.5, 0.06), "pebble": Vector3(0.13, 0.46, 0.1), "lumi": Vector3(0.0, 0.36, -0.14)}
+const RIBBON_COLORS := {"comfort_ribbon": Color("f4a0ab"), "bond_ribbon": Color("f2c14e")}
+
+
+func refresh_ribbon() -> void:
+	if visual == null:
+		return
+	var r := Support.ribbon(companion_id) if is_befriended() else ""
+	if r == "":
+		if _ribbon_node != null and is_instance_valid(_ribbon_node):
+			_ribbon_node.visible = false
+		return
+	var col: Color = RIBBON_COLORS.get(r, Color("f4a0ab"))
+	if _ribbon_node == null or not is_instance_valid(_ribbon_node):
+		var parent: Variant = visual.get("body")
+		var host: Node3D = parent if parent is Node3D else visual
+		_ribbon_node = Node3D.new()
+		_ribbon_node.name = "Ribbon"
+		host.add_child(_ribbon_node)
+		_ribbon_node.position = RIBBON_ANCHORS.get(companion_id, Vector3(0.12, 0.45, 0.05))
+	for ch in _ribbon_node.get_children():
+		ch.queue_free()
+	var m := Mat.outlined(Mat.toon(col, {"rim": 0.3}), 0.008, Color(0.2, 0.13, 0.15))
+	for s in [-1.0, 1.0]:
+		var loop := Kit.sphere(0.05, m, 8, 12)
+		Kit.add(_ribbon_node, loop, Vector3(0.045 * s, 0.0, 0.0), Vector3(0, 0, 20.0 * s), Vector3(1.0, 0.62, 0.42))
+	var knot := Kit.sphere(0.022, m, 6, 10)
+	Kit.add(_ribbon_node, knot, Vector3.ZERO)
+	_ribbon_node.visible = true
+
+
+func _on_bond_changed(id: String, _level: int) -> void:
+	if id == companion_id:
+		refresh_ribbon()
+
+
+## A home spot from a companion nook (bed / perch), or null to go back to the Haven default.
+func set_home_spot(pos: Variant) -> void:
+	if pos is Vector3:
+		home_pos = pos
+	elif _default_home != Vector3.ZERO:
+		home_pos = _default_home
+	_wander_goal = null
+	_home_far_t = 0.0
+	if home_life != null:
+		home_life.build_cairn()
+
+
+func _on_structure_placed(uid: String, structure_id: String) -> void:
+	if home_life != null and mode == "home" and is_befriended() and Logic.is_surface_area(Game.area_id):
+		home_life.on_structure_placed(uid, structure_id)
+
+
+func _on_structure_removed(uid: String, _structure_id: String) -> void:
+	var rec := GameState.companion(companion_id)
+	if uid != "" and String(rec.get("home_nook", "")) == uid:
+		rec["home_nook"] = ""
+		rec["home_spot"] = null
+		set_home_spot(null)

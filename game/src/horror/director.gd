@@ -14,6 +14,9 @@ extends Node
 ## Events.horror_event for every executed event.
 ## When the runner cannot carry out a chosen event (blocked anchor, no light, busy stalker...) the
 ## core rolls its pacing back (director_core.gd on_event_failed), so nothing "phantom" costs a recovery.
+## Chapter Two (additive): Game also creates it for "hushed_works" (Game.DIRECTOR_AREAS); an area may hand
+## its own tables through director_config() (see _core_params), and hold(id) / release(id) give puzzles,
+## bosses and authored scenes a stacking-safe quiet period next to suppress().
 ## Debug: --director-log=<path> writes the decision log to a file;
 ##        --director-force=<id>[,<id>...] (debug builds) fires events a few seconds after start;
 ##        --director-probe (debug builds) checks every spawn anchor against real physics and logs it.
@@ -32,6 +35,7 @@ const WORLD_MASK := 1 | 32
 const VIEW_MARGIN := 0.06            # screen fraction: points just outside the frame count as visible
 const BLOCKING_MODES := ["dead", "loading", "cutscene"]
 const ONCE_FLAG_PREFIX := "horror_once_"   # GameState flag per "once" event: once per playthrough
+const HELD_ZONE := "held"                   # pseudo zone reported to the core while any hold() is active
 
 var core: Core = null
 var runner: Runner = null
@@ -64,6 +68,7 @@ var _enemies_nearby: int = 0
 var _force_queue: Array = []
 var _force_t: float = 0.0
 var _probe_at: float = -1.0
+var _holds: Dictionary = {}          # hold id -> true (hold()/release(); Chapter Two)
 
 
 func setup(params: Dictionary) -> void:
@@ -73,7 +78,25 @@ func setup(params: Dictionary) -> void:
 	seed_value = int(params.get("seed", 0))
 	tick_seconds = maxf(float(HorrorData.DIRECTOR.get("tick_seconds", 1.0)), 0.1)
 	core = Core.new()
-	core.setup({"seed": seed_value})
+	core.setup(_core_params(params))
+
+
+## Chapter Two (additive): the core gets the event / tuning / intensity tables passed in `params`, else the
+## ones the area offers through director_config() -> {"events", "tuning", "intensity"} (the Hushed Works),
+## else the Chapter One defaults (the Below: identical to before).
+func _core_params(params: Dictionary) -> Dictionary:
+	var out := {"seed": seed_value}
+	var cfg: Dictionary = {}
+	if params.has("events") or params.has("tuning") or params.has("intensity"):
+		cfg = params
+	elif area != null and area.has_method("director_config"):
+		var c: Variant = area.director_config()
+		if c is Dictionary:
+			cfg = c
+	for k in ["events", "tuning", "intensity"]:
+		if cfg.get(k) is Dictionary:
+			out[k] = cfg[k]
+	return out
 
 
 func _ready() -> void:
@@ -138,6 +161,36 @@ func suppress(seconds: float, replace: bool = false) -> void:
 		core.suppress(seconds, replace)
 	if runner != null:
 		runner.cancel_all("suppressed")
+
+
+## Stacking-safe quiet period (Chapter Two, additive): while ANY hold id is active the director treats
+## Krystal's zone as quiet (tension frozen, nothing fires, pending work cancelled once). Unlike suppress(),
+## holds never replace each other: puzzles, bosses and authored scenes each hold and release their own id.
+## Releasing the last hold re-enters the real zone with the core's usual start grace.
+func hold(hold_id: String) -> void:
+	if hold_id == "" or _holds.has(hold_id):
+		return
+	_holds[hold_id] = true
+	if runner != null:
+		runner.cancel_all("held by " + hold_id)
+	if core != null:
+		core.log_line("held by '%s' (%d hold(s))" % [hold_id, _holds.size()])
+
+
+func release(hold_id: String) -> void:
+	if not _holds.has(hold_id):
+		return
+	_holds.erase(hold_id)
+	if core != null:
+		core.log_line("hold '%s' released (%d left)" % [hold_id, _holds.size()])
+
+
+func is_held() -> bool:
+	return not _holds.is_empty()
+
+
+func held_ids() -> Array:
+	return _holds.keys()
 
 
 ## One director step. Called every tick_seconds; tests call it directly.
@@ -214,6 +267,9 @@ func build_context(dt: float) -> Dictionary:
 			ctx["zone"] = String(area.get_zone_at(ppos))
 		if area.has_method("is_safe_zone"):
 			ctx["in_safe_zone"] = bool(area.is_safe_zone(ppos))
+	if not _holds.is_empty():
+		ctx["zone"] = HELD_ZONE        # no event lists it: the core stays quiet ("zone 'held' is quiet")
+		ctx["held"] = _holds.keys()
 	ctx["player_hp_ratio"] = _player_hp_ratio(player)
 	if player.has_method("is_sprinting"):
 		ctx["sprinting"] = bool(player.is_sprinting())

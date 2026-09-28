@@ -264,6 +264,26 @@ func is_inside_bounds(pos: Vector3, margin: float = 0.0) -> bool:
 	return absf(pos.x) < lim and absf(pos.z) < lim and Vector2(pos.x, pos.z).length() < lim / 0.86
 
 
+## Haven safe zone (Chapter Two, MP §3 / spec 7.1): the legacy "haven" zone (and any other safe zone), plus
+## every buildable region of the expanded Haven (data/world_layout.gd BUILD_AREA "extra") with a
+## HAVEN_SAFE_BUFFER margin. Only authored regions count: player-built lights never make a safe field.
+## Cheap and allocation-free (the Game zone poll and enemies call it often).
+const HAVEN_SAFE_BUFFER := 4.0
+
+func is_safe_zone(pos: Vector3) -> bool:
+	if super.is_safe_zone(pos):
+		return true
+	var p := Vector2(pos.x, pos.z)
+	var ba: Dictionary = Layout.BUILD_AREA
+	if p.distance_to(ba["center"]) <= float(ba["radius"]) + HAVEN_SAFE_BUFFER:
+		return true
+	var extra: Array = ba["extra"]
+	for r in extra:
+		if p.distance_to(r["center"]) <= float(r["radius"]) + HAVEN_SAFE_BUFFER:
+			return true
+	return false
+
+
 ## Saved positions must be on solid ground, inside the boundary and not under water. A bridge deck or
 ## stepping stone standing clearly above the stream bed is dry footing, even over deep water. Open-water
 ## depth is still measured to height_at() at the saved x/z (NOT to the ray hit: the stream is ~0.60 m

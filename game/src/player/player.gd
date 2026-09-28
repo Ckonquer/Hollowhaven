@@ -6,14 +6,28 @@ extends CharacterBody3D
 ## probe, food, lantern, companion follow/wait, fall recovery and health/state sync.
 ## Children (built in code): Health, CollisionShape, KrystalAvatar (top-level, interpolated),
 ## CameraRig (top-level), InteractionProbe.
+## Chapter Two (equipment module, docs/CHAPTER_TWO_SPEC.md sections 5 and 9):
+##   * Health is src/player/player_health.gd: i-frames -> Stats reduction -> shield -> hp, heal x Stats.heal_mult.
+##   * Speed: walk/sprint x Stats.move_mult() in ONE place (cached, refreshed every STATS_REFRESH s and on
+##     Events.stats_changed); stamina costs x Stats.stamina_cost_mult(action); melee = Stats.melee_damage.
+##   * Tools: the best owned tool (Stats.best_tool) that meets the node's min_tier; the wand is never auto-picked.
+##   * Wand: with a wand selected on the hotbar, attack casts a spark (src/combat/projectile.gd): finite range,
+##     shared stamina, cooldown, LOS, at most WAND_RULES.max_projectiles_alive in flight.
+##   * Support API for other modules: add_shield(), apply_slow() / clear_slow(), resist_knockback().
+##   * Area-aware recovery (outdoor bounds + under-terrain for surface and the Reach) and lantern look.
 
 const Logic := preload("res://src/player/player_logic.gd")
 const AvatarScript := preload("res://src/player/krystal_avatar.gd")
 const ProbeScript := preload("res://src/player/interaction_probe.gd")
 const CameraRigScript := preload("res://src/camera/camera_rig.gd")
-const HealthScript := preload("res://src/combat/health.gd")
+const HealthScript := preload("res://src/player/player_health.gd")
+const Stats := preload("res://src/core/stats.gd")
+const EquipmentData := preload("res://data/equipment.gd")
+const HitFx := preload("res://src/combat/hit_fx.gd")
+const Palette := preload("res://src/art/palette.gd")
 const Layout := preload("res://data/world_layout.gd")
 const COMBAT_PATH := "res://src/combat/combat.gd"
+const PROJECTILE_PATH := "res://src/combat/projectile.gd"
 const DEMO_PATH := "res://src/player/player_demo.gd"
 const HOTBAR_ACTIONS: Array[StringName] = [&"hotbar_1", &"hotbar_2", &"hotbar_3", &"hotbar_4", &"hotbar_5", &"hotbar_6", &"hotbar_7", &"hotbar_8"]
 const HURT_IFRAMES := 0.6
@@ -21,6 +35,11 @@ const HURT_KNOCKBACK := 4.5
 const DANGER_SECONDS := 5.0
 const EAT_TIME := 1.0
 const DEATH_RETRY := 2.5
+const BASE_LIGHT_RADIUS := 6.0          # light_radius without a lantern-radius charm
+const LANTERN_RANGE := 7.0              # the avatar's lantern OmniLight range without a charm
+const STATS_REFRESH := 0.1              # seconds between cached Stats refreshes (move mult, sprint cost)
+const KB_RESIST_WINDOW_MS := 250        # one resisted knockback covers every push of that same hit
+const WAND_KNOCKBACK := 1.5
 
 # --- Contract ----------------------------------------------------------------------------------------
 var health: Node                         # src/combat/health.gd
@@ -86,6 +105,26 @@ var _wish := Vector3.ZERO
 var _recover_seq: int = 0
 var _death_wait: float = 0.0
 var _visual_offset := Vector3.ZERO    # smooths step-ups so the avatar and camera glide instead of popping
+# Chapter Two: stats, wand, support effects
+var _move_mult: float = 1.0
+var _sprint_cost: float = 1.0
+var _stats_t: float = 0.0
+var _base_max_hp: float = 100.0
+var _wand_cd: float = 0.0
+var _cast_pending: bool = false
+var _swing_ranged: bool = false
+var _cast_target: Node3D = null
+var _cast_dir := Vector3.FORWARD
+var _projectile: Script = null
+var _projectile_checked: bool = false
+var _slow_immune_until_ms: int = 0
+var _kb_resist: int = 0
+var _kb_resist_left: float = 0.0
+var _kb_resist_used_ms: int = -1000000
+var _light_mult: float = 1.0
+var _lantern_tint_area: String = "?"
+## The last bolt fired (tests / telemetry).
+var last_bolt: Node3D = null
 
 
 func _init() -> void:
@@ -132,7 +171,11 @@ func _ready() -> void:
 	health.healed.connect(_on_healed)
 	health.died.connect(_on_died)
 	health.changed.connect(_on_health_changed)
+	if health.has_signal("shield_hit"):
+		health.shield_hit.connect(_on_shield_hit)
 	Events.build_mode_changed.connect(_on_build_mode_changed)
+	Events.stats_changed.connect(refresh_stats)
+	Events.equipment_changed.connect(_on_equipment_changed)
 	_facing_yaw = rotation.y
 	_cur_yaw = _facing_yaw
 	_prev_yaw = _facing_yaw
@@ -140,6 +183,7 @@ func _ready() -> void:
 	_prev_pos = _cur_pos
 	_place_avatar(1.0)
 	rig.snap(_facing_yaw)
+	refresh_stats()
 	_refresh_owned()
 	if Debug.is_cheat_allowed() and Debug.has_arg("player-demo") and ResourceLoader.exists(DEMO_PATH):
 		var ds: Script = load(DEMO_PATH)
@@ -165,8 +209,10 @@ func teleport(xform: Transform3D) -> void:
 	_stagger = 0.0
 	_swing.cancel()
 	_swing_target = null
+	_clear_cast()
 	_air_time = 0.0
 	_fall_speed = 0.0
+	_ground_h = NAN          # a height sampled at the old spot must not trigger another recovery here
 	_jump.clear()
 	_prev_pos = xform.origin
 	_cur_pos = xform.origin
@@ -185,7 +231,10 @@ func teleport(xform: Transform3D) -> void:
 func read_from_state() -> void:
 	var p: Dictionary = GameState.player
 	var mx: float = float(p.get("max_hp", 100.0))
-	health.max_hp = maxf(mx, 1.0)
+	_base_max_hp = maxf(mx, 1.0)
+	health.max_hp = _base_max_hp + Stats.max_hp_bonus()   # the save keeps the BASE max (spec section 3)
+	if health.has_method("clear_shield"):
+		health.clear_shield()
 	var hp: float = float(p.get("hp", mx))
 	if hp <= 0.0:
 		hp = health.max_hp
@@ -194,9 +243,12 @@ func read_from_state() -> void:
 	_dead = false
 	_death_wait = 0.0
 	_recovering = false
+	_wand_cd = 0.0
+	_clear_cast()
 	if avatar != null:
 		avatar.cancel_action(true)
 	set_lantern(bool(p.get("lantern_on", false)) and GameState.has_item("lantern"), true)
+	refresh_stats()
 
 
 func write_to_state() -> void:
@@ -211,7 +263,7 @@ func write_to_state() -> void:
 		p["pos"] = [v.x, v.y, v.z]
 	p["yaw"] = _facing_yaw
 	p["hp"] = float(health.hp)
-	p["max_hp"] = float(health.max_hp)
+	p["max_hp"] = _base_max_hp
 	p["stamina"] = _stamina.value
 	p["max_stamina"] = _stamina.max_value
 	p["lantern_on"] = lantern_on
@@ -292,6 +344,8 @@ func play_emote(emote_name: String) -> void:
 func knockback(dir: Vector3, force: float) -> void:
 	if _dodge_t >= 0.0 or _recovering:
 		return
+	if force > 0.0 and _consume_knockback_resist():
+		return
 	var d := Vector3(dir.x, 0.0, dir.z)
 	if d.length() < 0.01:
 		return
@@ -324,6 +378,113 @@ func seconds_since_damage() -> float:
 	return float(Time.get_ticks_msec() - _last_damage_ms) / 1000.0
 
 
+# --- Chapter Two support API (spec section 9) -----------------------------------------------------------------
+
+## Transient shield absorbed AFTER armor mitigation (Pebble's Stoneheart). Never stacks: the larger shield
+## wins. Emits Events.player_shield_changed. Returns the shield now held.
+func add_shield(amount: float, seconds: float, source: String = "") -> float:
+	if _dead or not health.has_method("add_shield"):
+		return 0.0
+	return float(health.add_shield(amount, seconds, source))
+
+
+func shield_amount() -> float:
+	var v: Variant = health.get("shield")
+	return float(v) if v is float or v is int else 0.0
+
+
+## Enemy slow: speed x `mult` for `seconds`, bounded (never below Stats.SLOW_FLOOR, never longer than
+## Stats.SLOW_MAX_SECONDS) and never chained: after a slow, new ones are ignored until it has ended plus
+## Stats.SLOW_IMMUNITY. Moonpetal tea's slow_resist weakens it (Stats.slow_mult). True when applied.
+func apply_slow(mult: float, seconds: float, _source: String = "") -> bool:
+	if _dead or seconds <= 0.0:
+		return false
+	var m := clampf(mult, Stats.SLOW_FLOOR, 1.0)
+	if m >= 0.999:
+		return false
+	var now := Time.get_ticks_msec()
+	if now < _slow_immune_until_ms:
+		return false
+	var secs := minf(seconds, Stats.SLOW_MAX_SECONDS)
+	GameState.add_buff("slow", m, secs)
+	_slow_immune_until_ms = now + int((secs + Stats.SLOW_IMMUNITY) * 1000.0)
+	refresh_stats()
+	return true
+
+
+## Removes an active slow (Mochi's Bloomguard at 3 hearts). True when one was cleared.
+func clear_slow() -> bool:
+	if not GameState.buffs.has("slow"):
+		return false
+	GameState.buffs.erase("slow")
+	refresh_stats()
+	return true
+
+
+## Alias used by the companions module (Mochi's Bloomguard cleanse).
+func cleanse_slow() -> bool:
+	return clear_slow()
+
+
+func is_slowed() -> bool:
+	return GameState.buffs.has("slow")
+
+
+## The next `count` knockbacks within `seconds` are shrugged off (Pebble's Stoneheart at 3 hearts).
+func resist_knockback(count: int = 1, seconds: float = 6.0) -> void:
+	_kb_resist = maxi(_kb_resist, count)
+	_kb_resist_left = maxf(_kb_resist_left, seconds)
+
+
+## Alias used by the companions module (Pebble's Stoneheart perk).
+func add_knockback_resist(count: int = 1, seconds: float = 6.0) -> void:
+	resist_knockback(count, seconds)
+
+
+func _consume_knockback_resist() -> bool:
+	var now := Time.get_ticks_msec()
+	if now - _kb_resist_used_ms < KB_RESIST_WINDOW_MS:
+		return true
+	if _kb_resist > 0 and _kb_resist_left > 0.0:
+		_kb_resist -= 1
+		_kb_resist_used_ms = now
+		return true
+	return false
+
+
+## The cached movement multiplier the physics step uses (Stats.move_mult()).
+func move_mult() -> float:
+	return _move_mult
+
+
+## Re-reads the cached stat values (called on Events.stats_changed, equipment changes, slows and every
+## STATS_REFRESH seconds; never allocates).
+func refresh_stats() -> void:
+	_stats_t = STATS_REFRESH
+	_move_mult = Stats.move_mult()
+	_sprint_cost = Stats.stamina_cost_mult("sprint")
+
+
+func _on_equipment_changed(_slot: String, _item_id: String) -> void:
+	refresh_stats()
+	_refresh_owned()
+
+
+## The wand selected on the hotbar ("" when the selected item is not a wand).
+func selected_wand() -> String:
+	var slot: Variant = GameState.selected_slot()
+	if not (slot is Dictionary):
+		return ""
+	var id := String((slot as Dictionary).get("id", ""))
+	if id == "" or not ItemDB.has_item(id) or not bool(ItemDB.item(id).get("ranged", false)):
+		return ""
+	return id
+
+
+func wand_cooldown_left() -> float:
+	return _wand_cd
+
+
 # =====================================================================================================
 # Physics
 # =====================================================================================================
@@ -347,6 +508,14 @@ func _physics_process(delta: float) -> void:
 	_eat_lock = maxf(0.0, _eat_lock - dt)
 	_jump_lock = maxf(0.0, _jump_lock - dt)
 	_stagger = maxf(0.0, _stagger - dt)
+	_wand_cd = maxf(0.0, _wand_cd - dt)
+	if _kb_resist_left > 0.0:
+		_kb_resist_left = maxf(0.0, _kb_resist_left - dt)
+		if _kb_resist_left <= 0.0:
+			_kb_resist = 0
+	_stats_t -= dt
+	if _stats_t <= 0.0:
+		refresh_stats()
 	_jump.tick(dt, grounded and _jump_lock <= 0.0)
 	# Input -> camera-relative wish direction
 	var raw := Vector2.ZERO
@@ -361,7 +530,7 @@ func _physics_process(delta: float) -> void:
 	# Sprint & stamina
 	var hs := _hspeed()
 	_sprinting = can_act and Input.is_action_pressed("sprint") and _wish.length() > 0.2 and _stamina.can_sprint() and _dodge_t < 0.0 and not _swing.active and _eat_lock <= 0.0
-	_stamina.tick(dt, _sprinting and hs > 1.0, GameState.buff_mult("stamina_regen"))
+	_stamina.tick(dt, _sprinting and hs > 1.0, GameState.buff_mult("stamina_regen"), _sprint_cost)
 	# Horizontal velocity
 	var hv := Vector3(velocity.x, 0.0, velocity.z)
 	if _dodge_t >= 0.0:
@@ -373,6 +542,7 @@ func _physics_process(delta: float) -> void:
 			hv = _dodge_dir * Logic.dodge_speed(k)
 	if _dodge_t < 0.0:
 		var top := Logic.SPRINT_SPEED if _sprinting else Logic.WALK_SPEED
+		top *= _move_mult       # the ONE movement multiplier (Stats.move_mult: companions, Glimmerstep, charms, slows)
 		if _swing.active:
 			top *= 0.35
 		if _eat_lock > 0.0:
@@ -420,6 +590,10 @@ func _physics_process(delta: float) -> void:
 		_on_strike()
 	if ev & Logic.Swing.FINISHED:
 		_on_swing_finished()
+	if _cast_pending and _wand_cd <= 0.0 and not _swing.active:
+		_cast_pending = false
+		if _can_act() and not build_mode_active and _dodge_t < 0.0 and _eat_lock <= 0.0 and selected_wand() != "":
+			_start_swing()
 	GameState.player["stamina"] = _stamina.value
 	_store_visual_state()
 
@@ -475,9 +649,19 @@ func _feed_avatar() -> void:
 
 func _refresh_owned() -> void:
 	var owned := GameState.has_item("lantern")
+	var mult := Stats.lantern_radius_mult()
+	light_radius = BASE_LIGHT_RADIUS * mult
 	if avatar != null:
 		avatar.lantern_owned = owned
 		avatar.lantern_energy_scale = Logic.lantern_scale(Game.area_id, GameState.hour())
+		var l: OmniLight3D = avatar.get_lantern_light()
+		if l != null:
+			if not is_equal_approx(_light_mult, mult):
+				_light_mult = mult
+				l.omni_range = LANTERN_RANGE * mult
+			if _lantern_tint_area != Game.area_id:
+				_lantern_tint_area = Game.area_id
+				l.light_color = Logic.lantern_tint(Game.area_id, Palette.LANTERN_GLOW)
 	if lantern_on and not owned:
 		set_lantern(false)
 
@@ -614,12 +798,13 @@ func _try_dodge() -> void:
 		return
 	if _swing.active and not _swing.can_cancel():
 		return
-	if not _stamina.try_spend(Logic.DODGE_COST):
+	if not _stamina.try_spend(Logic.DODGE_COST * Stats.stamina_cost_mult("dodge")):
 		if avatar != null and avatar.current_action() == "":
 			avatar.play_action("tired")
 		return
 	_swing.cancel()
 	_swing_target = null
+	_clear_cast()
 	var dir := _wish
 	if dir.length() < 0.1:
 		dir = get_facing()
@@ -659,6 +844,7 @@ func _start_swing() -> void:
 	_swing_harvest = false
 	_swing_tool = ""
 	_swing_face = Vector3.ZERO
+	_clear_cast()
 	var kind := "hands"
 	if probe != null:
 		probe.refresh()
@@ -668,15 +854,27 @@ func _start_swing() -> void:
 	var foe_dir := _soft_lock_dir()
 	if foe_dir.length() > 0.1:
 		target = null
+	# A wand selected on the hotbar casts, unless something focused is being gathered (the wand is never
+	# used to mine or chop, and never picked automatically).
+	var wand := selected_wand()
+	if wand != "" and target == null:
+		_start_cast(wand, foe_dir)
+		return
 	if target != null:
 		var info: Dictionary = probe.focus_harvest
 		var tool := String(info.get("tool", "hand"))
+		var need_tier := _harvest_min_tier(info)
 		var owned := ""
 		if tool == "hand" or tool == "":
 			owned = "hand"
 		else:
-			owned = GameState.best_tool(tool)
-		if owned != "":
+			owned = Stats.best_tool(tool, need_tier)
+			if owned == "" and need_tier > 1 and Stats.best_tool(tool) != "":
+				_need_tier_notice(tool, need_tier)
+				target = null
+		if target == null:
+			pass
+		elif owned != "":
 			_swing_harvest = true
 			_swing_target = target
 			_swing_tool = "" if owned == "hand" else owned
@@ -686,18 +884,27 @@ func _start_swing() -> void:
 		else:
 			_need_tool_notice(tool)
 	if not _swing_harvest:
-		_swing_tool = GameState.best_weapon()
+		_swing_tool = Stats.best_melee_weapon()
 		var d: Dictionary = ItemDB.item(_swing_tool) if _swing_tool != "" else {}
 		kind = Logic.weapon_kind(_swing_tool, String(d.get("cat", "")), String(d.get("tool", "")))
 		_swing_face = foe_dir
 		if _swing_face.length() < 0.1 and _wish.length() > 0.1:
 			_swing_face = _wish.normalized()
-	var full := _stamina.spend_soft(Logic.SWING_COST)
+	var full := _stamina.spend_soft(Logic.SWING_COST * Stats.stamina_cost_mult("swing"))
 	var mult := 1.0 if full else Logic.TIRED_SWING_MULT
 	_swing.start(kind, Logic.SWING_TIME * mult, Logic.SWING_STRIKE * mult)
 	if avatar != null:
 		avatar.cancel_action()
 		avatar.show_tool(kind, Logic.SWING_TIME * mult + 0.35)
+
+
+static func _harvest_min_tier(info: Dictionary) -> int:
+	var mt: Variant = info.get("min_tier")
+	return int(mt) if mt is int or mt is float else 0
+
+
+func _need_tier_notice(tool: String, tier: int) -> void:
+	_notify("You need %s or better for this." % Logic.tier_tool_article_name(tool, tier), "warn", "need_tier_" + tool, 3.0)
 
 
 func _need_tool_notice(tool: String) -> void:
@@ -707,6 +914,9 @@ func _need_tool_notice(tool: String) -> void:
 
 
 func _on_strike() -> void:
+	if _swing_ranged:
+		_fire_bolt()
+		return
 	Audio.play_3d("swing", global_position + Vector3.UP, -4.0, 0.1, 20.0)
 	if _swing_harvest:
 		var t := _swing_target
@@ -720,17 +930,14 @@ func _on_strike() -> void:
 
 func _on_swing_finished() -> void:
 	_swing_target = null
+	_clear_cast()
 	if _swing.take_buffer() and _can_act() and _dodge_t < 0.0:
 		_start_swing()
 
 
 func _melee_hit() -> Array:
-	var dmg := Logic.HAND_DAMAGE
-	var reach := Logic.HAND_REACH
-	if _swing_tool != "" and ItemDB.has_item(_swing_tool):
-		var d: Dictionary = ItemDB.item(_swing_tool)
-		dmg = maxf(float(d.get("damage", dmg)), Logic.HAND_DAMAGE)
-		reach = float(d.get("reach", reach))
+	var dmg := Stats.melee_damage(_swing_tool)
+	var reach := Stats.melee_reach(_swing_tool)
 	var origin := global_position + Vector3.UP * 0.9
 	var fwd := get_facing()
 	var combat := _combat_script()
@@ -752,6 +959,165 @@ func _combat_script() -> Script:
 			if s != null and s.can_instantiate() and s.has_method("melee"):
 				_combat = s
 	return _combat
+
+
+func _projectile_script() -> Script:
+	if not _projectile_checked:
+		_projectile_checked = true
+		if ResourceLoader.exists(PROJECTILE_PATH):
+			var s: Script = load(PROJECTILE_PATH)
+			if s != null and s.can_instantiate() and s.has_method("fire"):
+				_projectile = s
+	return _projectile
+
+
+# --- Wand -------------------------------------------------------------------------------------------------------
+
+## Starts a cast with `wand_id` (stamina, cooldown, target pick). The spark leaves at Logic.CAST_RELEASE.
+## A click shortly before the cooldown ends is remembered and fires as soon as it can. True when casting.
+func _start_cast(wand_id: String, foe_dir: Vector3 = Vector3.ZERO) -> bool:
+	var w: Dictionary = ItemDB.wand(wand_id)
+	if w.is_empty():
+		return false
+	if _wand_cd > 0.0:
+		if _wand_cd <= Logic.CAST_QUEUE_WINDOW:
+			_cast_pending = true
+		return false
+	var proj := _projectile_script()
+	if proj == null:
+		return false
+	var cap := int(EquipmentData.WAND_RULES.get("max_projectiles_alive", 3))
+	if int(proj.call("live_count", self)) >= cap:
+		return false
+	var cost := float(w.get("stamina", 8.0)) * Stats.stamina_cost_mult("wand")
+	if not _stamina.try_spend(cost):
+		if avatar != null and avatar.current_action() == "":
+			avatar.play_action("tired")
+		_notify("Too tired to cast. Catch your breath first.", "info", "wand_tired", 3.0)
+		return false
+	_cast_pending = false
+	_wand_cd = maxf(float(w.get("cooldown", 0.8)), Logic.CAST_TIME)
+	_swing_ranged = true
+	_swing_tool = wand_id
+	var aim := foe_dir if foe_dir.length() > 0.1 else _aim_forward()
+	_cast_target = _ranged_target(float(w.get("range", 14.0)), aim)
+	if _cast_target != null:
+		var to := _aim_point_of(_cast_target) - _wand_origin()
+		_cast_dir = to.normalized() if to.length() > 0.05 else aim
+	else:
+		_cast_dir = aim
+	var flat := Vector3(_cast_dir.x, 0.0, _cast_dir.z)
+	_swing_face = flat.normalized() if flat.length() > 0.05 else get_facing()
+	_swing.start("wand", Logic.CAST_TIME, Logic.CAST_RELEASE)
+	if avatar != null:
+		avatar.cancel_action()
+		avatar.show_tool("wand", Logic.CAST_TIME + 0.3)
+	return true
+
+
+## Releases the spark: toward the picked target if it is still alive and in sight, else straight ahead.
+func _fire_bolt() -> Node3D:
+	var id := _swing_tool
+	var target := _cast_target
+	var dir := _cast_dir
+	_clear_cast()
+	var w: Dictionary = ItemDB.wand(id)
+	var proj := _projectile_script()
+	if w.is_empty() or proj == null:
+		return null
+	Audio.play_3d("swing", global_position + Vector3.UP, -7.0, 0.15, 20.0)
+	var origin := _wand_origin()
+	var chest := global_position + Vector3.UP * 1.15
+	var combat := _combat_script()
+	if combat != null and is_inside_tree() and not combat.has_line_of_sight(get_world_3d().direct_space_state, chest, origin, [self]):
+		HitFx.spark(chest.lerp(origin, 0.5))    # the wand is against a wall: the spark fizzles, never passes through
+		return null
+	var pd: Dictionary = w.get("projectile", {})
+	var params := {"shooter": self, "from": origin, "damage": Stats.wand_damage(id), "kind": "wand",
+		"speed": float(pd.get("speed", 16.0)), "range": float(w.get("range", 14.0)), "radius": float(pd.get("radius", 0.22)),
+		"groups": ["enemy"], "knockback": WAND_KNOCKBACK, "light": true,
+		"max_per_shooter": int(EquipmentData.WAND_RULES.get("max_projectiles_alive", 3))}
+	var col: Variant = pd.get("color", null)
+	if col is Color:
+		params["color"] = col
+	if target != null and is_instance_valid(target) and target.is_inside_tree() and not _target_dead(target):
+		params["target"] = target
+	else:
+		params["dir"] = dir
+	var b: Variant = proj.call("fire", params)
+	last_bolt = b if b is Node3D else null
+	return last_bolt
+
+
+func _clear_cast() -> void:
+	_swing_ranged = false
+	_cast_target = null
+
+
+## Where the spark leaves the wand (right hand height, a little in front).
+func _wand_origin() -> Vector3:
+	return global_position + Vector3.UP * 1.15 + get_facing() * 0.45
+
+
+## Aim without a target: where the camera looks (flat), else where Krystal faces.
+func _aim_forward() -> Vector3:
+	if rig != null and rig.has_method("forward"):
+		var f: Vector3 = rig.forward()
+		f.y = 0.0
+		if f.length() > 0.05:
+			return f.normalized()
+	return get_facing()
+
+
+static func _target_dead(t: Node) -> bool:
+	var h: Variant = t.get("health")
+	return h is Node and Logic._truthy((h as Node).get("dead"), false)
+
+
+func _aim_point_of(t: Node3D) -> Vector3:
+	var combat := _combat_script()
+	if combat != null:
+		return combat.aim_point(t)
+	return t.global_position + Vector3.UP * 0.8
+
+
+## The wand's target: one scan of group "enemy" at cast time (never per frame): alive, within range, inside
+## the aim cone, accepting hits (can_be_hit_by) and in line of sight. Closest to the aim line wins.
+func _ranged_target(max_range: float, aim: Vector3) -> Node3D:
+	if not is_inside_tree():
+		return null
+	var origin := _wand_origin()
+	var combat := _combat_script()
+	var space := get_world_3d().direct_space_state
+	var best: Node3D = null
+	var best_score := INF
+	var a := Vector3(aim.x, 0.0, aim.z)
+	a = a.normalized() if a.length() > 0.05 else get_facing()
+	for e in get_tree().get_nodes_in_group("enemy"):
+		if not (e is Node3D) or not is_instance_valid(e) or not (e as Node3D).is_inside_tree() or _target_dead(e):
+			continue
+		if (e as Node).is_in_group("stalker"):
+			continue     # the ceiling stalker is never auto-aimed (horror pacing; light is the answer to it)
+		var t := e as Node3D
+		var ap := _aim_point_of(t)
+		var to := ap - origin
+		var d := to.length()
+		if d > max_range or d < 0.05:
+			continue
+		var flat := Vector3(to.x, 0.0, to.z)
+		var dot := a.dot(flat.normalized()) if flat.length() > 0.05 else 1.0
+		if dot < Logic.WAND_AIM_CONE:
+			continue
+		if combat != null:
+			if not combat.can_hit(t, self):
+				continue
+			if not combat.has_line_of_sight(space, origin, ap, [self, t]):
+				continue
+		var score := d * (1.0 + (1.0 - dot) * 3.0)
+		if score < best_score:
+			best = t
+			best_score = score
+	return best
 
 
 ## Used only if src/combat/combat.gd is missing: simple arc query over group "enemy".
@@ -829,8 +1195,11 @@ func _interact() -> void:
 	if probe.focused_harvestable() != null:
 		var tool := String(probe.focus_harvest.get("tool", "hand"))
 		if tool != "hand" and tool != "":
-			if GameState.best_tool(tool) == "":
+			var need_tier := _harvest_min_tier(probe.focus_harvest)
+			if Stats.best_tool(tool) == "":
 				_need_tool_notice(tool)
+			elif Stats.best_tool(tool, need_tier) == "":
+				_need_tier_notice(tool, need_tier)
 			else:
 				_on_attack_pressed()
 			return
@@ -874,6 +1243,26 @@ func _use_item() -> void:
 				_toggle_lantern()
 		"tool", "weapon":
 			_notify("Tools and weapons are used automatically with %s." % Settings.action_label("attack"), "info", "tool_hint", 4.0)
+		"wand":
+			if _swing.request():
+				_start_swing_wand(id)
+		"armor", "charm":
+			if GameState.equip(id, GameState.hotbar_index):
+				_notify("Now wearing: %s." % ItemDB.display_name(id), "success", "equip", 0.5)
+			elif GameState.last_equip_error != "":
+				_notify(GameState.last_equip_error, "warn", "equip_err", 1.0)
+
+
+## use_item with a wand selected: cast (never gathers).
+func _start_swing_wand(wand_id: String) -> void:
+	if _eat_lock > 0.0:
+		return      # same gate as the attack button: no casting mid-bite
+	_swing_target = null
+	_swing_harvest = false
+	_swing_tool = ""
+	_swing_face = Vector3.ZERO
+	_clear_cast()
+	_start_cast(wand_id, _soft_lock_dir())
 
 
 ## Eats one of `id` from the backpack. Returns true when eaten.
@@ -898,11 +1287,9 @@ func eat(id: String) -> bool:
 		_eat_lock = EAT_TIME
 	var healed: float = float(health.heal(heal))
 	if has_buff:
-		var bd: Dictionary = buff
-		var secs := float(bd.get("seconds", 60.0))
-		for k in bd:
-			if String(k) != "seconds":
-				GameState.add_buff(String(k), float(bd[k]), secs)
+		# Food buff families (data/items.gd BUFF_FAMILIES): a stronger food replaces, a weaker one refreshes.
+		Stats.apply_food_buff(id)
+		refresh_stats()
 	Audio.play_sfx("eat")
 	Events.item_consumed.emit(id)
 	if avatar != null:
@@ -915,6 +1302,8 @@ func eat(id: String) -> bool:
 		msg += " restored %d health" % roundi(healed)
 	if has_buff and (buff as Dictionary).has("stamina_regen"):
 		msg += (" and" if healed >= 1.0 else "") + " warms you up: stamina recovers faster for a while"
+	elif has_buff and (buff as Dictionary).has("slow_resist"):
+		msg += (" and" if healed >= 1.0 else "") + " steadies your feet: slows are weaker for a while"
 	Events.notify.emit(msg + ".", "success")
 	return true
 
@@ -1010,17 +1399,25 @@ func _on_damaged(amount: float, source: Node, dir: Vector3) -> void:
 		if _swing.can_cancel():
 			_swing.cancel()
 			_swing_target = null
+			_clear_cast()
 		if avatar != null:
 			avatar.play_action("hurt")
+
+
+## The shield swallowed a whole hit: a soft glance instead of the hurt reaction.
+func _on_shield_hit(_absorbed: float) -> void:
+	Audio.play_3d("hit_soft", global_position + Vector3.UP, -6.0, 0.1, 20.0)
+	HitFx.spark(global_position + Vector3.UP * 1.0)
+	Events.camera_shake.emit(0.08, 0.1)
 
 
 func _on_healed(amount: float) -> void:
 	Events.player_healed.emit(amount)
 
 
-func _on_health_changed(hp: float, max_hp: float) -> void:
+func _on_health_changed(hp: float, _max_hp: float) -> void:
 	GameState.player["hp"] = hp
-	GameState.player["max_hp"] = max_hp
+	GameState.player["max_hp"] = _base_max_hp     # the BASE max; bonuses come from Stats (spec section 3)
 
 
 func _on_died() -> void:
@@ -1031,6 +1428,8 @@ func _on_died() -> void:
 	_sprinting = false
 	_swing.cancel()
 	_swing_target = null
+	_clear_cast()
+	_cast_pending = false
 	_dodge_t = -1.0
 	if avatar != null:
 		avatar.play_action("death")
@@ -1081,11 +1480,9 @@ func surface_name() -> String:
 # Fall recovery
 # =====================================================================================================
 
+## Outdoor areas (surface, the Reach) have world bounds; underground areas and interiors do not.
 func _in_world_bounds() -> bool:
-	if Game.area_id != "surface":
-		return true
-	var p := global_position
-	return absf(p.x) <= Layout.WORLD_HALF_EXTENT + 2.0 and absf(p.z) <= Layout.WORLD_HALF_EXTENT + 2.0
+	return Logic.in_world_bounds(global_position, Game.area_id, 2.0)
 
 
 func _current_area() -> Node:
@@ -1102,11 +1499,13 @@ func _check_recovery(dt: float) -> void:
 		_ground_check_t = 0.5
 		_ground_h = NAN
 		# Only consider "below the terrain" while airborne: legit caves under the terrain have floors.
-		if _air_time > 0.4 and Game.area_id == "surface":
+		# Outdoor areas only (surface, the Reach): underground/interior floors are not a heightfield.
+		if _air_time > 0.4 and Logic.is_outdoor(Game.area_id):
 			var a := _current_area()
 			if a != null and a.has_method("height_at"):
 				_ground_h = float(a.height_at(global_position.x, global_position.z))
-	var reason := Logic.recovery_reason(global_position, Game.area_id, Layout.KILL_Y, Layout.WORLD_HALF_EXTENT, _ground_h, _air_time)
+	var reason := Logic.recovery_reason_bounds(global_position, Logic.world_half_extents(Game.area_id),
+		Logic.kill_y_for(Game.area_id, Layout.KILL_Y), _ground_h, _air_time)
 	if reason != "":
 		recover(reason)
 

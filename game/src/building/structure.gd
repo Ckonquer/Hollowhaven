@@ -9,6 +9,7 @@ const Models := preload("res://src/building/structure_models.gd")
 const U := preload("res://src/building/model_util.gd")
 const Shapes := preload("res://src/building/shapes.gd")
 const Palette := preload("res://src/art/palette.gd")
+const Tints := preload("res://src/building/tints.gd")
 
 const LAYER_INTERACT := 16
 const LAYER_STRUCTURE := 32
@@ -37,7 +38,8 @@ func _ready() -> void:
 	model = Node3D.new()
 	model.name = "Model"
 	add_child(model)
-	parts = Models.build(structure_id, model)
+	parts = Models.build(structure_id, model, model_opts())
+	_apply_saved_tint()
 	_build_colliders()
 	if is_interactable():
 		add_to_group("interactable")
@@ -49,12 +51,48 @@ func _setup_behaviour() -> void:
 	pass
 
 
+## Model options from the saved record (Chapter Two): {"face": pumpkin face id} when set. Subclasses may add.
+func model_opts() -> Dictionary:
+	var o := {}
+	var data: Variant = record().get("data", {})
+	if data is Dictionary and (data as Dictionary).has("face"):
+		o["face"] = String((data as Dictionary)["face"])
+	return o
+
+
+## Saved recolour (data.tint), applied right after the model is built.
+func _apply_saved_tint() -> void:
+	var t := Tints.tint_of(record())
+	if t != Tints.NATURAL:
+		Tints.apply(model, t)
+
+
+## Recolours the model in place (the record's data.tint is the caller's job: BuildOps.recolor).
+func apply_tint(tint_id: String) -> void:
+	if model != null:
+		Tints.apply(model, tint_id)
+
+
+## Rebuilds the model from the saved record (e.g. a new pumpkin face), keeping colliders and behaviour.
+func rebuild_model() -> void:
+	if model == null or _removing:
+		return
+	for c in model.get_children():
+		model.remove_child(c)
+		c.queue_free()
+	parts = Models.build(structure_id, model, model_opts())
+	_apply_saved_tint()
+	if _highlighted:
+		_apply_overlay(model, U.highlight_mat())
+
+
 func is_interactable() -> bool:
 	return String(def.get("interact", "")) != ""
 
 
+## Player-facing name (the data name; the arachnophobia alt_name when that setting is on).
 func display_name() -> String:
-	return String(def.get("name", structure_id))
+	return ItemDB.structure_display_name(structure_id) if not def.is_empty() else structure_id
 
 
 ## GameState record for this structure ({} for preview-only nodes).

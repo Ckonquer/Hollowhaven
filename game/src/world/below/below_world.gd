@@ -9,6 +9,12 @@ extends "res://src/world/area_base.gd"
 ## "flicker_light"). Progression is persistent through GameState flags: gallery_cleared,
 ## foreman_key_taken, lower_gate_open, cp_lit_<id>, reached_silk_hollows, weaver_defeated.
 ## Debug (cheats only): --below-debug-light adds a lantern-like light that follows the camera.
+## Chapter Two (module B9): the reworked three-phase Matron gets the arena mouth ("entrance") so no
+## trip-line or egg sac is ever put across it; once "weaver_defeated" is set, a pale echo stone beside the
+## arena checkpoint offers "Echo Trial: The Thread Above (a remembered challenge)" (echo_trial.gd), which
+## returns here (cp_arena) when Krystal leaves or falls. The real chamber and its flags are never touched.
+## The chamber's fight hold (music, director suppression) also follows Events.boss_encounter_changed, so a
+## fight the Matron starts on her own is covered too.
 
 const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
@@ -36,6 +42,11 @@ const ENEMY_SPAWNER := "res://src/enemies/enemy_spawner.gd"
 const STALKER := "res://src/enemies/stalker.gd"
 const BOSS := "res://src/enemies/weaver_boss.gd"
 const BRAZIER := "res://src/enemies/boss_brazier.gd"
+const ECHO_TRIAL := "res://src/world/areas_ch2/echo_trial.gd"
+## The echo stone: against the antechamber's west wall, 3 m north of the arena checkpoint lantern
+## (clear of the walking line between the two openings; no collision).
+const ECHO_ENTRY_POS := Vector3(101.1, -10.0, -112.4)
+const ARENA_ENTRANCE := Vector3(105.0, -12.0, -126.5)
 const RESOURCE_NODE := "res://src/world/common/resource_node.gd"
 
 ## Per-zone mood: fog albedo / emission and ambient colour.
@@ -64,6 +75,7 @@ var boss: Node = null
 var braziers: Array = []
 var spawners: Array = []
 var stalker: Node = null
+var echo_entry: Node3D = null
 var fight_active: bool = false
 var mood_zone: String = ""
 
@@ -99,6 +111,7 @@ func _ready() -> void:
 	_place_resources()
 	_place_enemies()
 	_place_boss()
+	_place_echo_trial()
 	_place_anchors()
 	moments = Moments.new()
 	moments.setup(self)
@@ -109,6 +122,7 @@ func _ready() -> void:
 	Events.boss_defeated.connect(_on_boss_defeated)
 	Events.player_respawned.connect(_on_player_respawned)
 	Events.player_died.connect(_on_player_died)
+	Events.boss_encounter_changed.connect(_on_boss_encounter_changed)
 	if bool(GameState.get_flag("weaver_defeated")):
 		_apply_after_boss_state(false)
 	if Debug.is_cheat_allowed() and Debug.has_arg("below-debug-light"):
@@ -518,11 +532,66 @@ func _place_boss() -> void:
 		return
 	boss = boss_script.new()
 	if boss.has_method("setup"):
-		boss.setup({"arena_center": Layout.ARENA_CENTER, "anchors": ceiling, "braziers": braziers})
+		boss.setup({"arena_center": Layout.ARENA_CENTER, "anchors": ceiling, "braziers": braziers, "entrance": ARENA_ENTRANCE})
 	boss.name = "WeaverBoss"
 	if boss is Node3D:
 		(boss as Node3D).position = Layout.ARENA_CENTER
 	add_child(boss)
+
+
+# --- Echo Trial entry (completed saves only) ------------------------------------------------------------
+
+func _place_echo_trial() -> void:
+	if not bool(GameState.get_flag("weaver_defeated")):
+		return
+	var s := _load_script(ECHO_TRIAL)
+	if s == null:
+		return
+	var it: Node3D = Interactable.new()
+	it.setup({"text": "Echo Trial", "size": Vector3(1.3, 1.8, 1.3), "offset": Vector3(0, 0.9, 0),
+		"handler": Callable(self, "_enter_echo_trial"), "text_func": Callable(self, "_echo_trial_prompt"),
+		"accent": true, "accent_color": Color("cbb8ff")})
+	it.name = "EchoTrialEntry"
+	it.position = ECHO_ENTRY_POS
+	add_child(it)
+	_build_echo_stone(it)
+	echo_entry = it
+
+
+func _echo_trial_prompt() -> Dictionary:
+	var s := _load_script(ECHO_TRIAL)
+	if s == null or not bool(GameState.get_flag("weaver_defeated")):
+		return {}
+	return {"text": String(s.call("entry_text", "matron")), "enabled": true}
+
+
+## Explains that it is a memory (not undone history), then travels; the arena checkpoint becomes the
+## return point (leaving or falling in the trial brings Krystal back here).
+func _enter_echo_trial(_player: Node) -> void:
+	if fight_active or _riding or Game.mode != "playing":
+		return
+	var s := _load_script(ECHO_TRIAL)
+	if s == null:
+		return
+	if Game.ui != null and is_instance_valid(Game.ui) and Game.ui.has_method("confirm"):
+		var c: String = await Game.ui.confirm(String(s.call("entry_text", "matron")),
+			"An echo of your battle with %s, remembered by the stone. It is a memory, not undone history: the real chamber stays at peace, and nothing on your journey changes. Leave by the pale door at any time, or fall, and you wake here at the lantern." % ItemDB.enemy_display_name("weaver_matron"),
+			[["enter", "Enter the echo", "AccentButton"], ["cancel", "Not now", ""]])
+		if c != "enter" or not is_instance_valid(self) or Game.mode != "playing":
+			return
+	s.call("begin", "matron", "below", "cp_arena")
+
+
+func _build_echo_stone(parent: Node3D) -> void:
+	var stone := Mat.outlined(Mat.toon(Color("6a6282"), {"rim": 0.35, "noise": 0.18}), 0.014)
+	var body := Kit.blob(0.42, stone, 13, 0.18, 1.9, 2)
+	Kit.add(parent, body, Vector3(0, 0.62, 0))
+	var band := Kit.torus(0.43, 0.48, Mat.glow(Color("cbb8ff"), 1.2))
+	Kit.add(parent, band, Vector3(0, 0.72, 0), Vector3.ZERO, Vector3(1, 1.8, 1))
+	band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var ring := Kit.torus(0.6, 0.68, Mat.glow(Color("a998e6"), 0.6))
+	Kit.add(parent, ring, Vector3(0, 0.03, 0), Vector3.ZERO, Vector3(1, 0.2, 1))
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 static func _script_has(s: Script, method: String) -> bool:
@@ -573,9 +642,11 @@ func _director_suppress(seconds: float) -> void:
 		Game.director.suppress(seconds)
 
 
-func _on_boss_defeated(_boss_id: String) -> void:
+func _on_boss_defeated(boss_id: String) -> void:
 	if Game.area != self and Game.area != null:
 		return
+	if boss_id != "weaver_matron":
+		return            # another boss (or a trial) never marks this chamber as won
 	GameState.set_flag("weaver_defeated", true)
 	var was_fighting := fight_active
 	if fight_active:
@@ -588,6 +659,27 @@ func _on_boss_defeated(_boss_id: String) -> void:
 	stalker = null
 	if was_fighting:
 		_director_suppress(240.0)     # a calm walk home after the climax (ends the 9999 s fight hold)
+
+
+## Module B9: the reworked Matron can wake on her own before the room tracker sees Krystal in the arena
+## (she steps within its engage radius on the entrance ramp, or lights a brazier from the edge): the
+## chamber then takes the same fight hold as on entering (music, boss ambience, the random director
+## suppressed for the whole encounter - MP section 14). When the encounter stands down because she walked
+## out, the hold is released to a normal quiet period. A fall (_on_player_died) and the victory
+## (_on_boss_defeated) keep their own, longer recovery holds.
+func _on_boss_encounter_changed(boss_id: String, active: bool) -> void:
+	if boss_id != "weaver_matron" or (Game.area != self and Game.area != null) or not boss_alive():
+		return
+	if active:
+		if not fight_active:
+			_start_fight()
+		return
+	if not fight_active or Game.mode == "dead":
+		return
+	var st: Variant = boss.get("state")
+	if st is String and String(st) in ["defeat", "gone"]:
+		return
+	_stop_fight_music()
 
 
 func _on_player_died() -> void:

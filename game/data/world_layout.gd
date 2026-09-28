@@ -15,7 +15,25 @@ const BUILD_AREA := {"center": Vector2(0, 0), "radius": 16.0, "grid": 1.0,
 				 {"center": Vector2(0, 7), "radius": 1.8} ],   # start path: generic "needs to stay clear" message
 	# Chapter Two (append-only): extra buildable regions [{center: Vector2, radius, blocked?}] added by the
 	# Haven expansion (spec 7.1). Empty = the legacy build circle only.
-	"extra": []}
+	# Chosen from the real terrain + Vegetation.plan() (tests/unit/test_building_haven_area.gd re-checks it all):
+	# every circle stays >= 5 m from the stream centreline, off the paths leaving the Haven (and so off the
+	# legacy start path), clear of the Ward Stone / campfire / start-path circles, the Haven sign and the Old
+	# Oak radius, >= 2 m from every tree, rock, ore, berry bush, decorative bush and log, on ground that rises
+	# less than 0.2 m per metre, and overlaps the legacy circle or another region (one connected home).
+	# Legacy placements inside the 16 m circle keep exactly the legacy rules.
+	"extra": [
+		{"center": Vector2(-9, 19), "radius": 6.5},      # south-west lawn, west of the meadow path
+		{"center": Vector2(-8, 24), "radius": 4.7},
+		{"center": Vector2(-14, 21), "radius": 4.25},
+		{"center": Vector2(-12, 10), "radius": 4.75},    # joins the south-west lawn to the clearing
+		{"center": Vector2(-17, 10), "radius": 2.75},
+		{"center": Vector2(-17, -4), "radius": 5.75},    # west lawn, between the glade and Old Oak paths
+		{"center": Vector2(-23, 1), "radius": 2.75},
+		{"center": Vector2(3, -19), "radius": 3.75},     # north, between the ruin and mine paths
+		{"center": Vector2(4, -21), "radius": 3.5},
+		{"center": Vector2(7, 15), "radius": 3.25},      # south-east, between the meadow and pond paths
+		{"center": Vector2(12, -11), "radius": 2.25},    # north-east nook inside the fence, clear of the stream
+	]}
 
 ## Named places (shown on the map and used for zone detection). radius = zone size.
 const LANDMARKS := {

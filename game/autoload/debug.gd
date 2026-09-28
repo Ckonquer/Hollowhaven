@@ -13,6 +13,13 @@ extends Node
 ##   --no-focus-pause                                 don't auto-pause when the window loses focus
 ##   --windowed                                       ignore the fullscreen setting
 ##   --qa-telemetry=<file> [--qa-interval=0.1]        rich JSON-lines telemetry for the QA bot (src/qa/qa_telemetry.gd)
+## Second-monitor QA mode (tools/qa --second-monitor; release builds too - none of it is a cheat):
+##   --qa-input-port=<port>        virtual keyboard/mouse over TCP on 127.0.0.1 only (src/qa/qa_input.gd)
+##   --qa-no-focus                 the window never takes focus (WINDOW_FLAG_NO_FOCUS, no fullscreen), keeps running
+##                                 unfocused and never captures/hides the OS cursor (Game._update_mouse)
+##   --qa-screen=<n> | --qa-window=<x>,<y>,<w>,<h>   borderless window on that screen / desktop rect (Settings.apply_video)
+##   --qa-mute                     silence the Master bus for this session (settings untouched)
+##   --settings-file=<abs path>    read/write settings there instead of user://settings.cfg (Settings)
 ## Debug builds only (editor binary):
 ##   --area=surface|below [--spawn=<id>]              start a new game directly in an area
 ##   --load-save                                      continue from the save directly
@@ -22,9 +29,13 @@ extends Node
 ## NOTE: to get a real window size pass the user arg too:  ... --resolution 1600x900 -- --windowed ...
 ##   --preview=<res://script.gd> [--shot-dir=<dir>]   preview stage: spin a node built from a script
 
+const QA_MUTE_FX := "qa_mute"
+
 var args: Dictionary = {}
 var headless: bool = false
 var keep_running_unfocused: bool = false
+var qa_no_capture: bool = false      # --qa-no-focus: never capture/hide the OS cursor (see mouse_mode_for)
+var qa_input: Node = null            # src/qa/qa_input.gd while --qa-input-port is given
 var _t := 0.0
 var _shot_times: Array = []
 var _shot_dir := ""
@@ -37,18 +48,20 @@ var _perf_t := 0.0
 var _max_seconds := -1.0
 
 
+func _init() -> void:
+	# --qa-no-focus: make the window non-activating as early as a script can (every autoload's _init runs before
+	# any _ready). The engine has already shown its window by now; tools/qa launches packaged builds with an
+	# override.cfg (display/window/size/no_focus) next to a linked copy of the exe so it is never activated at all.
+	if OS.get_cmdline_user_args().has("--qa-no-focus") and DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	headless = DisplayServer.get_name() == "headless"
-	for a in OS.get_cmdline_user_args():
-		var s := String(a)
-		if s.begins_with("--"):
-			var eq := s.find("=")
-			if eq > 0:
-				args[s.substr(2, eq - 2)] = s.substr(eq + 1)
-			else:
-				args[s.substr(2)] = "true"
-	keep_running_unfocused = args.has("no-focus-pause") or headless or args.has("cams") or args.has("shots")
+	args = parse_user_args(OS.get_cmdline_user_args())
+	keep_running_unfocused = args.has("no-focus-pause") or args.has("qa-no-focus") or headless or args.has("cams") or args.has("shots")
+	_setup_qa_mode()
 	if args.has("save-dir"):
 		SaveSystem.set_save_dir(String(args["save-dir"]))
 	if args.has("seed"):
@@ -82,6 +95,72 @@ func _ready() -> void:
 				elif cur is int: v = int(p[1])
 				elif cur is float: v = float(p[1])
 				Settings.set_value(p[0], v)
+
+
+## "--key=value" -> {"key": "value"}, "--flag" -> {"flag": "true"}; anything not starting with "--" is ignored.
+static func parse_user_args(list: PackedStringArray) -> Dictionary:
+	var out := {}
+	for a in list:
+		var s := String(a)
+		if s.begins_with("--"):
+			var eq := s.find("=")
+			if eq > 0:
+				out[s.substr(2, eq - 2)] = s.substr(eq + 1)
+			else:
+				out[s.substr(2)] = "true"
+	return out
+
+
+## The --qa-input-port value (1..65535) or -1 when absent/invalid.
+static func qa_input_port(a: Dictionary) -> int:
+	var v := String(a.get("qa-input-port", "")).strip_edges()
+	if not v.is_valid_int():
+		return -1
+	var p := v.to_int()
+	return p if p >= 1 and p <= 65535 else -1
+
+
+## Second-monitor QA mode (AGENTS.md, tools/qa/hhbot.py). Only explicit command-line user args enable it, in debug
+## and release builds alike: it grants nothing a keyboard and mouse could not do, and the input server binds
+## 127.0.0.1 only. Window placement (--qa-window/--qa-screen) and --settings-file are handled by Settings.
+func _setup_qa_mode() -> void:
+	qa_no_capture = args.has("qa-no-focus")
+	if args.has("qa-mute"):
+		qa_mute_audio()
+	var qport := qa_input_port(args)
+	if qport > 0:
+		var qi: Node = load("res://src/qa/qa_input.gd").new()
+		qi.name = "QAInput"
+		add_child(qi)
+		qi.call("start", qport)
+		qa_input = qi
+	elif args.has("qa-input-port"):
+		push_warning("Debug: ignoring --qa-input-port=%s (expected 1..65535)" % arg("qa-input-port"))
+
+
+## Mouse mode for Game._update_mouse(): captured during play, visible in menus - and always visible in QA
+## no-capture runs (--qa-no-focus), where the owner keeps the OS cursor and src/qa/qa_input.gd turns the camera.
+func mouse_mode_for(want_captured: bool) -> Input.MouseMode:
+	if qa_no_capture or not want_captured:
+		return Input.MOUSE_MODE_VISIBLE
+	return Input.MOUSE_MODE_CAPTURED
+
+
+## --qa-mute: silences the Master bus for this session only (an Amplify effect at -80 dB after the limiter).
+## Settings - and so the saved master_volume - are never touched. Returns true when the effect is in place.
+func qa_mute_audio() -> bool:
+	var master := AudioServer.get_bus_index("Master")
+	if master < 0:
+		return false
+	for i in AudioServer.get_bus_effect_count(master):
+		var fx := AudioServer.get_bus_effect(master, i)
+		if fx != null and fx.resource_name == QA_MUTE_FX:
+			return true
+	var amp := AudioEffectAmplify.new()
+	amp.resource_name = QA_MUTE_FX
+	amp.volume_db = -80.0
+	AudioServer.add_bus_effect(master, amp)
+	return true
 
 
 func is_cheat_allowed() -> bool:

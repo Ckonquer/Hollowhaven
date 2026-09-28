@@ -11,7 +11,7 @@ const TOKEN_ACTIONS := {
 	"interact": "interact", "attack": "attack", "inventory": "inventory", "craft": "craft", "build": "build",
 	"sprint": "sprint", "jump": "jump", "dodge": "dodge", "lantern": "lantern", "journal": "journal",
 	"map": "map", "use": "use_item", "help": "help", "pause": "pause", "companion": "companion_command",
-	"rotate": "build_rotate", "dismantle": "build_dismantle",
+	"rotate": "build_rotate", "dismantle": "build_dismantle", "skill": "companion_skill",
 }
 const MOVE_ACTIONS := ["move_forward", "move_left", "move_back", "move_right"]
 

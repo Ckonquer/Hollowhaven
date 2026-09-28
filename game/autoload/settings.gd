@@ -2,8 +2,12 @@ extends Node
 ## Player settings (persisted to user://settings.cfg) and the input map (rebindable).
 ## Read: Settings.get_value("mouse_sensitivity")   Write: Settings.set_value("fov", 75.0)
 ## Every change emits Events.settings_changed(key). Call save() to persist (UI does this on close).
+## QA runs may pass the user arg --settings-file=<abs path>: that file is read AND written instead, so an automated
+## session never touches the player's real settings (settings_path).
 
 const PATH := "user://settings.cfg"
+## Used when --settings-file is given but is not an absolute path: still never the player's real file.
+const QA_FALLBACK_PATH := "user://settings_qa.cfg"
 
 const DEFAULTS := {
 	# Gameplay / camera
@@ -91,11 +95,14 @@ const RANGES := {
 }
 
 var values: Dictionary = {}
+## The file load_settings()/save() use by default: PATH, or the --settings-file override.
+var settings_path: String = PATH
 
 
 func _ready() -> void:
 	values = DEFAULTS.duplicate(true)
-	var first_run := not FileAccess.file_exists(PATH)
+	settings_path = settings_path_from_args(OS.get_cmdline_user_args())
+	var first_run := not FileAccess.file_exists(settings_path)
 	load_settings()
 	if first_run:
 		auto_quality.call_deferred()
@@ -189,10 +196,27 @@ func sanitize_bindings(b: Dictionary) -> Dictionary:
 	return out
 
 
-## Loads persisted settings (the default path is the player's settings file; tests pass a temp path).
-## Values are coerced/clamped like set_value(); unknown keys and invalid values are ignored.
-## Call setup_input_map() afterwards if the bindings should take effect immediately.
-func load_settings(path: String = PATH) -> void:
+## Settings file named by the command-line user arg --settings-file=<abs path> (read and written instead of
+## user://settings.cfg); PATH when the arg is absent, QA_FALLBACK_PATH when it is not an absolute path.
+static func settings_path_from_args(user_args: PackedStringArray) -> String:
+	for a in user_args:
+		var s := String(a)
+		if not s.begins_with("--settings-file="):
+			continue
+		var p := s.substr("--settings-file=".length()).strip_edges()
+		if p != "" and p.is_absolute_path():
+			return p
+		push_warning("Settings: --settings-file needs an absolute path ('%s'); using %s" % [p, QA_FALLBACK_PATH])
+		return QA_FALLBACK_PATH
+	return PATH
+
+
+## Loads persisted settings (default: settings_path, i.e. the player's settings file unless --settings-file was
+## given; tests pass a temp path). Values are coerced/clamped like set_value(); unknown keys and invalid values are
+## ignored. Call setup_input_map() afterwards if the bindings should take effect immediately.
+func load_settings(path: String = "") -> void:
+	if path == "":
+		path = settings_path
 	var cf := ConfigFile.new()
 	if cf.load(path) != OK:
 		return
@@ -203,7 +227,12 @@ func load_settings(path: String = PATH) -> void:
 				values[key] = v
 
 
-func save(path: String = PATH) -> void:
+## Writes the settings to `path` (default: settings_path).
+func save(path: String = "") -> void:
+	if path == "":
+		path = settings_path
+	if path != PATH:
+		DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	var cf := ConfigFile.new()
 	for key in values:
 		cf.set_value("settings", key, values[key])
@@ -229,7 +258,12 @@ func apply_video() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	var args := OS.get_cmdline_args()
-	var cli_windowed := args.has("--windowed") or args.has("-w") or args.has("--resolution") or OS.get_cmdline_user_args().has("--windowed")
+	var user_args := OS.get_cmdline_user_args()
+	# QA second-monitor runs (--qa-window / --qa-screen / --qa-no-focus) are never fullscreen.
+	var qa_rect := qa_window_rect(user_args)
+	var qa_placed := qa_rect.size.x > 0 and qa_rect.size.y > 0
+	var qa_windowed := qa_placed or user_args.has("--qa-no-focus")
+	var cli_windowed := args.has("--windowed") or args.has("-w") or args.has("--resolution") or user_args.has("--windowed") or qa_windowed
 	# The engine window starts fullscreen (project.godot display/window/size/mode, matching the default
 	# setting), so a windowed choice (setting off, or a debug/QA run with "-- --windowed") has to leave
 	# fullscreen here. A maximized/minimized window counts as windowed and is left alone.
@@ -240,6 +274,8 @@ func apply_video() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	elif not want_fs and is_fs:
 		_enter_windowed()
+	elif qa_placed:
+		_place_qa_window(qa_rect)      # already windowed (e.g. a QA launcher created it so): only move it
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if get_value("vsync") else DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = int(get_value("max_fps"))
 	var vp := get_viewport()
@@ -251,6 +287,13 @@ func apply_video() -> void:
 ## small screens so the title bar stays reachable). Needed because a window that was created
 ## fullscreen has no sensible size to restore to.
 func _enter_windowed() -> void:
+	var qa_rect := qa_window_rect(OS.get_cmdline_user_args())
+	if qa_rect.size.x > 0 and qa_rect.size.y > 0:
+		if OS.get_cmdline_user_args().has("--qa-no-focus"):
+			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		_place_qa_window(qa_rect)
+		return
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	var want := Vector2i(int(ProjectSettings.get_setting("display/window/size/window_width_override", 1600)),
 		int(ProjectSettings.get_setting("display/window/size/window_height_override", 900)))
@@ -262,6 +305,50 @@ func _enter_windowed() -> void:
 	DisplayServer.window_set_size(want)
 	if usable.size.x > 0 and usable.size.y > 0:
 		DisplayServer.window_set_position(usable.position + (usable.size - want) / 2)
+
+
+## QA window rect from the user args --qa-window=<x>,<y>,<w>,<h> (DisplayServer desktop coordinates; with the
+## primary monitor at 0,0 they equal Windows' own, e.g. 1920,0,1920,1080 = a second 1080p monitor to the right)
+## or --qa-screen=<n> (that whole screen). --qa-window wins. Empty Rect2i when neither is given or valid.
+func qa_window_rect(user_args: PackedStringArray) -> Rect2i:
+	var screen := -1
+	for a in user_args:
+		var s := String(a)
+		if s.begins_with("--qa-window="):
+			var p := s.substr("--qa-window=".length()).split(",")
+			var ok := p.size() == 4
+			for part in p:
+				ok = ok and String(part).strip_edges().is_valid_int()
+			if ok and p[2].strip_edges().to_int() >= 64 and p[3].strip_edges().to_int() >= 64:
+				return Rect2i(p[0].strip_edges().to_int(), p[1].strip_edges().to_int(), p[2].strip_edges().to_int(),
+					p[3].strip_edges().to_int())
+			push_warning("Settings: ignoring %s (expected --qa-window=<x>,<y>,<w>,<h>, size >= 64)" % s)
+		elif s.begins_with("--qa-screen="):
+			var n := s.substr("--qa-screen=".length()).strip_edges()
+			if n.is_valid_int() and n.to_int() >= 0 and n.to_int() < DisplayServer.get_screen_count():
+				screen = n.to_int()
+			else:
+				push_warning("Settings: ignoring %s (%d screen(s))" % [s, DisplayServer.get_screen_count()])
+	if screen >= 0:
+		var size := DisplayServer.screen_get_size(screen)
+		if size.x >= 64 and size.y >= 64:
+			return Rect2i(DisplayServer.screen_get_position(screen), size)
+	return Rect2i()
+
+
+## QA runs: a borderless window exactly on `rect` (never fullscreen, so never exclusive). With --qa-no-focus it is
+## made non-activating first, so neither the style change nor the move takes focus from the owner's window.
+func _place_qa_window(rect: Rect2i) -> void:
+	if OS.get_cmdline_user_args().has("--qa-no-focus"):
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
+	if not DisplayServer.window_get_flag(DisplayServer.WINDOW_FLAG_BORDERLESS):
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+	if DisplayServer.window_get_position() != rect.position:
+		DisplayServer.window_set_position(rect.position)
+	if DisplayServer.window_get_size() != rect.size:
+		DisplayServer.window_set_size(rect.size)
+	if DisplayServer.window_get_position() != rect.position:
+		DisplayServer.window_set_position(rect.position)
 
 
 ## First launch only (no settings file yet): lighter defaults on integrated / software GPUs so a laptop

@@ -250,8 +250,10 @@ func _apply_pose(delta: float) -> void:
 
 func _on_action_fire(a: String) -> void:
 	super(a)
-	if a == "glow_pulse":
+	if a == "glow_pulse" or a == "lumi_glow_spin":
 		Fx.sparkles(_fx_parent(), global_position + Vector3.UP * 0.4, 0.35, 10, Color(1.0, 0.9, 0.55))
+	elif a == "light_bolt":
+		Fx.sparkles(_fx_parent(), global_position + Vector3.UP * 0.45 + global_basis.z * 0.2, 0.12, 5, Color(1.0, 0.92, 0.6))
 
 
 func _preview_extra(a: String) -> void:

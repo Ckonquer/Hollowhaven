@@ -7,12 +7,42 @@ extends Node3D
 ##   idle, walk, run, jump, roll, axe, pickaxe, sword, hands, gather, lantern, lantern_walk,
 ##   wave, cheer, flinch, sleep, eat, hurt, death
 ## Right hand = -X side (tools), left hand = +X side (lantern).
+##
+## APPEARANCE (Chapter Two, MP 4; docs/CHAPTER_TWO_SPEC.md 4.1 / 8). The body is built from a look dictionary
+## (GameState.appearance, ids from data/appearance.gd) in slot units - skin, eyes, hair (+ brows), hat,
+## hair_acc, upper, lower, shoes, back, armor - each in its own container Node3D on the rig joints (builders in
+## src/player/avatar/). apply_look() rebuilds only the units whose inputs changed and re-bakes only the joints
+## they touch; the merged meshes are cached by CONTENT (mesh, transform, colour), so two avatars with different
+## looks never share a mesh or a material that could bleed. ItemDB.LEGACY_LOOK reproduces the Chapter One avatar
+## exactly (same parts, colours, proportions and ~82 draw calls). Appearance is cosmetic only: nothing here
+## touches the player's collision, speed or reach. Unknown ids show the safe default of their slot and are
+## reported by missing_ids() (the saved look itself is never modified).
+## Driven (the player's avatar, driven = true before add_child) and follow_game_state: reads GameState.appearance
+## + wardrobe.show_armor + equipment in _ready and on Events.appearance_changed / equipment_changed / game_loaded.
+##
+## PREVIEW API (non-driven mode; the appearance UI widget src/ui/widgets/avatar_preview.gd uses it):
+##   var av = preload("res://src/player/krystal_avatar.gd").new()
+##   av.apply_look(look)                       # before or after add_child; any look dict (partial ok)
+##                                             # (same as setting av.appearance = look)
+##   av.apply_armor(show_armor, equipment)     # optional: {"head": id, "body": id, "boots": id}
+##   av.set_show_armor(on)                     # or av.show_armor = on (GameState.equipment if none given)
+##   viewport_pivot.add_child(av)              # driven stays false: idle breathing, blinks, springs
+##   av.play_anim("idle" | "walk" | "run" | "wave" | "cheer" | ...)
+##   av.current_look() -> sanitized look shown, av.missing_ids() -> ["hair=future_curls", ...]
+## Needs a SubViewport with own_world_3d = true; the camera's cull mask must include AVATAR_LAYER (1 << 11).
 
 signal footstep(foot: int)          # 0 = left, 1 = right; emitted at each foot plant while walking
 
 const Palette := preload("res://src/art/palette.gd")
 const Mat := preload("res://src/art/mat.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
+const AKit := preload("res://src/player/avatar/avatar_kit.gd")
+const LookColors := preload("res://src/player/avatar/look_colors.gd")
+const HairBuilder := preload("res://src/player/avatar/hair_builder.gd")
+const GarmentBuilder := preload("res://src/player/avatar/garment_builder.gd")
+const AccessoryBuilder := preload("res://src/player/avatar/accessory_builder.gd")
+const ArmorBuilder := preload("res://src/player/avatar/armor_builder.gd")
+const SkirtRig := preload("res://src/player/avatar/skirt_rig.gd")
 
 const OUTLINE := 0.011
 ## Render layer (12) used by Krystal's meshes: her own lantern ignores it as a shadow caster so her body
@@ -31,6 +61,15 @@ const SCARF_DARK := Color("d9a53a")
 const BOOT_LIGHT := Color("8a5a36")
 const BRASS := Color("e0b85a")
 const LEATHER := Color("6e4a33")
+
+## Appearance units, rebuilt independently (in this order).
+const UNITS := ["skin", "eyes", "hair", "hat", "hair_acc", "upper", "lower", "shoes", "back", "armor"]
+const UNIT_BOX := {"skin": "Skin", "eyes": "Eyes", "hair": "Hair", "hat": "Hat", "hair_acc": "HairAcc", "upper": "Upper",
+	"lower": "Lower", "shoes": "Shoes", "back": "Back", "armor": "Armor"}
+const BOX_META := &"avatar_slot"
+const BAKE_CACHE_MAX := 600
+const HULL_CENTRE := Vector3(0.0, 0.03, -0.03)
+const HULL_MIN_DIST := 0.28
 
 # Pose channel indices (PackedVector3Array) -------------------------------------------------------
 const J_LEG_L := 0
@@ -80,6 +119,7 @@ const SWING_KEYS := {
 }
 
 ## Roll: points on the head + hair silhouette (HeadCenter space) that must stay above the floor.
+## Hats, buns, helms and ponytails add their own silhouette points on top of these (see _head_hull).
 const ROLL_CLEARANCE := 0.02
 const _HEAD_HULL := [Vector3(0, 0.33, -0.05), Vector3(0, -0.27, 0.0), Vector3(0, -0.3, -0.2), Vector3(0.28, 0.03, -0.03),
 	Vector3(-0.28, 0.03, -0.03), Vector3(0, 0.03, 0.26), Vector3(0, 0.0, -0.33), Vector3(0, 0.24, 0.17), Vector3(0, 0.25, -0.26),
@@ -89,6 +129,7 @@ const ACTION_TIME := {"hurt": 0.42, "flinch": 0.9, "wave": 1.8, "cheer": 1.6, "e
 
 # --- Controller inputs (set by the player every frame) -------------------------------------------------
 var driven: bool = false            # true when a controller feeds the fields below
+var follow_game_state: bool = true  # driven avatars follow GameState.appearance / equipment (the player's avatar)
 var speed: float = 0.0
 var grounded: bool = true
 var vertical_speed: float = 0.0
@@ -103,6 +144,20 @@ var lantern_energy_scale: float = 1.0   # set by the player (dimmer in surface d
 var look_target: Vector3 = Vector3.ZERO
 var has_look_target: bool = false
 
+## Duck-typed appearance API (src/ui/widgets/avatar_preview.gd): set `appearance` before add_child to build the
+## look once (after add_child it applies in place, like apply_look); `show_armor` / set_show_armor(on) show the
+## armor of apply_armor's equipment, or of GameState.equipment when none was given.
+var appearance: Dictionary:
+	get:
+		return _look_src.duplicate(true)
+	set(value):
+		apply_look(value)
+var show_armor: bool:
+	get:
+		return _armor_show
+	set(value):
+		set_show_armor(value)
+
 # --- Rig ------------------------------------------------------------------------------------------------
 var _body_root: Node3D
 var _roll: Node3D
@@ -115,14 +170,34 @@ var _eyes: Array[Node3D] = []
 var _brows: Array[Node3D] = []
 var _mouth_smile: MeshInstance3D
 var _mouth_open: MeshInstance3D
-var _scarf_ends: Array = []          # [[seg0, seg1], [seg0, seg1]]
-var _braid: Array[Node3D] = []
+var _scarf_ends: Array = []          # [[seg0, seg1], ...] (explorer scarf; empty for other garments)
+var _braid: Array[Node3D] = []       # segments of the first hair chain (the Chapter One braid)
 var _tools: Dictionary = {}           # kind -> Node3D (in the right hand)
 var _tool_anchor: Node3D
 var _lantern: Node3D
 var _lantern_belt: Node3D
 var _lantern_light: OmniLight3D
 var _food: MeshInstance3D
+
+# --- Appearance -----------------------------------------------------------------------------------------
+var _look: Dictionary = {}            # sanitized look being shown (every id valid)
+var _look_src: Dictionary = {}        # the look as given (may hold unknown ids; never modified)
+var _missing: Array = []              # ["key=id", ...] unknown ids shown as defaults
+var _reported_missing: String = ""
+var _armor_show: bool = false
+var _armor_eq: Dictionary = {}        # head / body / boots -> armor item id
+var _sigs: Dictionary = {}            # unit -> signature of its inputs (rebuild when it changes)
+var _unit_boxes: Dictionary = {}      # unit -> [container Node3D, ...]
+var _unit_res: Dictionary = {}        # unit -> builder result (chains, skirt, hull points, patch, belt)
+var _hosts: Dictionary = {}           # host key -> rig Node3D (joints, head centre, eyes, brows)
+var _host_baked: Dictionary = {}      # host instance id -> [merged MeshInstance3D]
+var _detached: Dictionary = {}        # container instance id -> [source parts merged into their host's bake]
+var _chains: Array = []               # spring chain records of every unit (avatar_kit.gd chain())
+var _skirt: SkirtRig = null
+var _skirt_pivots: Array = []
+var _head_hull: Array = []
+var _patch: Node3D
+var _connected: bool = false
 
 # --- Animation state -----------------------------------------------------------------------------------
 var _t: float = 0.0
@@ -150,10 +225,8 @@ var _action_w: float = 0.0
 var _prev_gpos := Vector3.ZERO
 var _prev_lv := Vector3.ZERO
 var _has_prev: bool = false
-var _scarf_ang: Array = [Vector2.ZERO, Vector2.ZERO]
-var _scarf_vel: Array = [Vector2.ZERO, Vector2.ZERO]
-var _braid_ang := Vector2.ZERO
-var _braid_vel := Vector2.ZERO
+var _lv := Vector3.ZERO               # last local velocity / acceleration of the secondary motion (skirt input)
+var _acc := Vector3.ZERO
 var _lant_ang := Vector2.ZERO
 var _lant_vel := Vector2.ZERO
 var _roll_blend: float = 0.0
@@ -164,20 +237,109 @@ var _mouth_amt: float = 0.0
 var _brow_worry: float = 0.0
 var _visible_body: bool = true
 var _lant_scale: float = 1.0
+var _wing_phase: float = 0.0        # accumulated flap phase (the flap rate follows the speed)
 
-static var _arc_cache: Dictionary = {}
-static var _bake_cache: Dictionary = {}     # "node path|material class" -> merged ArrayMesh (shared by all avatars)
+static var _bake_cache: Dictionary = {}     # "material class|content hash" -> merged ArrayMesh (colour-aware)
+static var _dirs: Array = []
 
 
 func _ready() -> void:
 	_pose.resize(J_COUNT)
+	if _following():
+		_read_state()
+	elif _look.is_empty():
+		_set_look(ItemDB.legacy_look())
+	_apply_debug_look()
 	_build()
 	_blink_timer = randf_range(1.5, 4.0)
+	if _following():
+		_connect_state()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		for k in _detached:
+			for mi in _detached[k]:
+				if is_instance_valid(mi):
+					(mi as Node).free()
+		_detached.clear()
 
 
 # =====================================================================================================
 # Public API
 # =====================================================================================================
+
+## Shows a look dictionary (GameState.appearance format; partial looks take the legacy value for missing keys).
+## Rebuilds only the units whose inputs changed. Returns the rebuilt unit names ([] when nothing changed).
+## Callable before add_child (the look is then built in _ready).
+func apply_look(look: Dictionary) -> Array:
+	_set_look(look)
+	if _body_root == null:
+		return []
+	return _rebuild_units(false)
+
+
+## "Show equipped armor": when `on` and an armor piece is in `equipment` (slot -> item id, like
+## GameState.equipment), tier-coloured armor is drawn over / instead of the garment of that slot.
+func apply_armor(on: bool, equipment: Dictionary = {}) -> Array:
+	_armor_show = on
+	_armor_eq = {}
+	for s in ["head", "body", "boots"]:
+		var v: Variant = equipment.get(s, "")
+		_armor_eq[s] = v if v is String else ""
+	if _body_root == null:
+		return []
+	return _rebuild_units(false)
+
+
+## Toggles "show equipped armor" keeping the armor given to apply_armor (or GameState.equipment when none).
+func set_show_armor(on: bool) -> Array:
+	var eq := _armor_eq
+	var any := false
+	for s in eq:
+		any = any or String(eq[s]) != ""
+	if not any:
+		eq = GameState.equipment
+	return apply_armor(on, eq)
+
+
+## Re-reads GameState.appearance / wardrobe.show_armor / equipment (the player's avatar does this on
+## Events.appearance_changed, equipment_changed and game_loaded). Returns the rebuilt units.
+func refresh_from_state() -> Array:
+	if not _following():
+		return []
+	_read_state()
+	if _body_root == null:
+		return []
+	return _rebuild_units(false)
+
+
+## The look being shown (sanitized: unknown ids replaced by their slot's safe default). A copy.
+func current_look() -> Dictionary:
+	return _look.duplicate(true)
+
+
+## Unknown ids of the last look ("key=id"), shown as the safe default of their slot.
+func missing_ids() -> Array:
+	return _missing.duplicate()
+
+
+## Visible mesh instances plus outline passes under the body (a draw-call estimate for tests / profiling).
+func draw_call_estimate() -> int:
+	var n := 0
+	if _body_root == null:
+		return 0
+	var stack: Array = [_body_root]
+	while not stack.is_empty():
+		var nd: Node = stack.pop_back()
+		for c in nd.get_children():
+			stack.append(c)
+		if nd is MeshInstance3D and (nd as MeshInstance3D).is_visible_in_tree():
+			n += 1
+			var m: Material = (nd as MeshInstance3D).material_override
+			if m != null and m.next_pass != null:
+				n += 1
+	return n
 
 ## Plays a one-shot or looping action: hurt, flinch, wave, cheer, eat, interact, sleep, death, tired.
 ## Also accepts "jump" / "land" (squash & stretch only).
@@ -243,11 +405,11 @@ func set_body_visible(v: bool) -> void:
 func reset_motion() -> void:
 	_has_prev = false
 	_prev_lv = Vector3.ZERO
-	for i in 2:
-		_scarf_ang[i] = Vector2.ZERO
-		_scarf_vel[i] = Vector2.ZERO
-	_braid_ang = Vector2.ZERO
-	_braid_vel = Vector2.ZERO
+	for ch in _chains:
+		ch["ang"] = Vector2.ZERO
+		ch["vel"] = Vector2.ZERO
+	if _skirt != null:
+		_skirt.reset()
 	_lant_ang = Vector2.ZERO
 	_lant_vel = Vector2.ZERO
 	_sq = 0.0
@@ -290,6 +452,7 @@ func play_anim(anim_name: String) -> void:
 			play_action(anim_name)
 
 
+
 # =====================================================================================================
 # Building the model
 # =====================================================================================================
@@ -297,30 +460,22 @@ func play_anim(anim_name: String) -> void:
 ## Toon material for Krystal. A faint self-fill (emission ~7% of the albedo) keeps her readable in the
 ## darkest places (the Below at night) without lighting the world around her.
 func _m(c: Color, outline: bool = true, thick: float = OUTLINE) -> Material:
-	var base := Mat.toon(c, {"rim": 0.42, "noise": 0.04, "emission": c, "emission_energy": FILL})
-	return Mat.outlined(base, thick) if outline else base
+	return AKit.m(c, outline, thick)
 
 
 func _flat(c: Color) -> Material:
-	return Mat.toon(c, {"rim": 0.0, "noise": 0.0, "emission": c, "emission_energy": FILL})
+	return AKit.flat(c)
 
 
 func _node(parent: Node3D, pos: Vector3, nm: String = "") -> Node3D:
-	var n := Node3D.new()
-	if nm != "":
-		n.name = nm
-	parent.add_child(n)
-	n.position = pos
-	return n
+	return AKit.node(parent, pos, nm)
 
 
 func _part(parent: Node3D, mi: MeshInstance3D, pos: Vector3, rot_deg: Vector3 = Vector3.ZERO, scl: Vector3 = Vector3.ONE, shadow: bool = true) -> MeshInstance3D:
-	Kit.add(parent, mi, pos, rot_deg, scl)
-	if not shadow:
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return mi
+	return AKit.part(parent, mi, pos, rot_deg, scl, shadow)
 
 
+## The rig (joints, face nodes, hands with tools / lantern / food, the lantern light), then every appearance unit.
 func _build() -> void:
 	_body_root = _node(self, Vector3.ZERO, "Body")
 	_roll = _node(_body_root, Vector3(0, 0.5, 0), "RollPivot")
@@ -328,23 +483,28 @@ func _build() -> void:
 	_joints.resize(J_COUNT)
 	var hips := _node(_body, Vector3(0, 0.6, 0), "Hips")
 	_joints[J_HIPS] = hips
-	# Pelvis (plum trousers)
-	_part(hips, Kit.sphere(0.155, _m(Palette.K_PANTS)), Vector3(0, 0.03, 0), Vector3.ZERO, Vector3(1.08, 0.72, 0.92))
+	_hosts["hips"] = hips
 	for side in 2:
 		var s := 1.0 if side == 0 else -1.0
-		_build_leg(hips, side, s)
+		var leg := _node(hips, Vector3(0.092 * s, -0.005, 0), "Leg%d" % side)
+		_joints[J_LEG_L + side] = leg
+		var knee := _node(leg, Vector3(0, -0.235, 0), "Knee%d" % side)
+		_joints[J_KNEE_L + side] = knee
+		_hosts["leg%d" % side] = leg
+		_hosts["knee%d" % side] = knee
 	var spine := _node(hips, Vector3(0, 0.02, 0), "Spine")
 	_joints[J_SPINE] = spine
-	_build_torso(spine)
+	_hosts["spine"] = spine
 	var chest := _node(spine, Vector3(0, 0.36, 0), "Chest")
-	_build_scarf(chest)
+	_hosts["chest"] = chest
 	for side in 2:
 		var s := 1.0 if side == 0 else -1.0
 		_build_arm(chest, side, s)
 	var head := _node(chest, Vector3(0, 0.04, 0), "Head")
 	_joints[J_HEAD] = head
 	_head_c = _node(head, Vector3(0, 0.23, 0.0), "HeadCenter")
-	_build_head(_head_c)
+	_hosts["head_c"] = _head_c
+	_build_face(_head_c)
 	# Lantern light lives outside the body so hiding the body (camera very close) keeps the light.
 	_lantern_light = OmniLight3D.new()
 	_lantern_light.name = "LanternLight"
@@ -358,25 +518,515 @@ func _build() -> void:
 	_lantern_light.shadow_caster_mask = 0xFFFFFFFF & ~AVATAR_LAYER
 	_lantern_light.visible = false
 	add_child(_lantern_light)
-	_bake_tree(_body_root, _body_root)
+	_bake_subtree(_lantern)
+	for k in _tools:
+		_bake_subtree(_tools[k])
 	_set_layers(_body_root)
+	_rebuild_units(true)
+
+
+func _build_arm(chest: Node3D, side: int, s: float) -> void:
+	var sh := _node(chest, Vector3(0.195 * s, -0.02, 0.0), "Shoulder%d" % side)
+	_joints[J_SH_L + side] = sh
+	var el := _node(sh, Vector3(0, -0.195, 0), "Elbow%d" % side)
+	_joints[J_EL_L + side] = el
+	var hand := _node(el, Vector3(0, -0.2, 0), "Hand%d" % side)
+	_joints[J_HAND_L + side] = hand
+	_hosts["sh%d" % side] = sh
+	_hosts["el%d" % side] = el
+	_hosts["hand%d" % side] = hand
+	if side == 1:
+		_tool_anchor = _node(hand, Vector3(0, -0.02, 0.0), "ToolAnchor")
+		_build_tools(_tool_anchor)
+		_food = Kit.sphere(0.035, _m(Palette.BERRY), 10, 14)
+		_part(hand, _food, Vector3(0.01, -0.03, 0.06), Vector3.ZERO, Vector3.ONE, false)
+		_food.visible = false
+	else:
+		_lantern = _node(hand, Vector3(0, -0.04, 0.0), "Lantern")
+		AKit.lantern_mesh(_lantern, true)
+		_lantern.visible = false
+
+
+func _build_tools(anchor: Node3D) -> void:
+	var handle := _m(Palette.WOOD)
+	var stone := _m(Palette.STONE)
+	var fiber := _m(Palette.MEADOW_GOLD)
+	# Stone axe: handle along +Y, lumpy stone head lashed with fiber, edge towards +Z.
+	var axe := _node(anchor, Vector3.ZERO, "Axe")
+	axe.rotation = Vector3(2.3, 0, 0)
+	_part(axe, Kit.cylinder(0.02, 0.024, 0.5, handle, 10), Vector3(0, 0.2, 0))
+	_part(axe, Kit.blob(0.07, stone, 11, 0.22, 1.0, 2), Vector3(0, 0.4, 0.055), Vector3.ZERO, Vector3(0.55, 1.05, 1.35))
+	_part(axe, Kit.torus(0.02, 0.036, fiber), Vector3(0, 0.4, 0.0), Vector3(0, 0, 0), Vector3(1, 1.6, 1))
+	# Stone pickaxe: curved head across the top, point towards +Z.
+	var pick := _node(anchor, Vector3.ZERO, "Pickaxe")
+	pick.rotation = Vector3(2.3, 0, 0)
+	_part(pick, Kit.cylinder(0.02, 0.024, 0.52, handle, 10), Vector3(0, 0.21, 0))
+	_part(pick, Kit.cone(0.035, 0.17, stone, 10), Vector3(0, 0.44, 0.08), Vector3(80, 0, 0))
+	_part(pick, Kit.cone(0.032, 0.13, stone, 10), Vector3(0, 0.44, -0.06), Vector3(-100, 0, 0))
+	_part(pick, Kit.sphere(0.045, stone), Vector3(0, 0.44, 0.0))
+	_part(pick, Kit.torus(0.02, 0.034, fiber), Vector3(0, 0.41, 0.0), Vector3.ZERO, Vector3(1, 1.4, 1))
+	# Copper sword: extends along the arm (blade -Y-ish), bright copper with a leather grip.
+	var sword := _node(anchor, Vector3.ZERO, "Sword")
+	sword.rotation = Vector3(2.75, 0, 0)
+	var copper := Mat.outlined(Mat.toon(Palette.COPPER, {"rim": 0.8, "specular": 0.6, "noise": 0.02}), OUTLINE)
+	_part(sword, Kit.cylinder(0.018, 0.018, 0.1, _m(LEATHER), 8), Vector3(0, 0.0, 0))
+	_part(sword, Kit.sphere(0.026, _m(BRASS)), Vector3(0, -0.06, 0))
+	_part(sword, Kit.box(Vector3(0.15, 0.03, 0.04), _m(BRASS)), Vector3(0, 0.06, 0))
+	_part(sword, Kit.box(Vector3(0.078, 0.46, 0.02), copper), Vector3(0, 0.3, 0))
+	_part(sword, Kit.prism(Vector3(0.078, 0.09, 0.02), copper), Vector3(0, 0.575, 0))
+	_part(sword, Kit.box(Vector3(0.016, 0.42, 0.022), _flat(Color("f7cf9c"))), Vector3(0, 0.29, 0), Vector3.ZERO, Vector3.ONE, false)
+	_tools = {"axe": axe, "pickaxe": pick, "sword": sword}
+	for k in _tools:
+		(_tools[k] as Node3D).visible = false
+
+
+## Face nodes (animated: eye blink scale, brow position / tilt) and the mouth; their meshes come from the
+## skin / eyes / hair units.
+func _build_face(hc: Node3D) -> void:
+	_eyes.clear()
+	_brows.clear()
+	for side in 2:
+		var s := 1.0 if side == 0 else -1.0
+		var eye := _node(hc, Vector3(0.087 * s, -0.022, 0.206), "Eye%d" % side)
+		eye.rotation = Vector3(0, deg_to_rad(21.0 * s), 0)
+		_eyes.append(eye)
+		_hosts["eye%d" % side] = eye
+		var brow := _node(hc, Vector3(0.088 * s, 0.062, 0.222), "Brow%d" % side)
+		brow.rotation = Vector3(-0.2, deg_to_rad(20.0 * s), 0)
+		_brows.append(brow)
+		_hosts["brow%d" % side] = brow
+	_mouth_smile = MeshInstance3D.new()
+	_mouth_smile.mesh = AKit.arc_mesh(0.03, 0.0072, 1.9)
+	_mouth_smile.material_override = _flat(MOUTH)
+	_part(hc, _mouth_smile, Vector3(0, -0.118, 0.212), Vector3(-22, 0, 0), Vector3.ONE, false)
+	_mouth_open = Kit.sphere(0.026, _flat(MOUTH), 10, 14)
+	_part(hc, _mouth_open, Vector3(0, -0.118, 0.205), Vector3(-20, 0, 0), Vector3(1.15, 0.85, 0.45), false)
+	_mouth_open.visible = false
+
+
+## Head skin (skull, nose, blush) and the hands.
+func _build_skin(col: Dictionary) -> void:
+	var hc := _box("head_c", "skin")
+	var skin_c: Color = col["skin"]
+	_part(hc, Kit.sphere(0.25, _m(skin_c, true, 0.012), 24, 32), Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.94, 0.95))
+	for side in 2:
+		var s := 1.0 if side == 0 else -1.0
+		_part(hc, Kit.sphere(0.036, _flat(col["blush"]), 10, 14), Vector3(0.138 * s, -0.085, 0.172), Vector3(0, 36 * s, 0), Vector3(1.35, 0.72, 0.4), false)
+	_part(hc, Kit.sphere(0.017, _m(skin_c, false), 8, 12), Vector3(0, -0.068, 0.233), Vector3.ZERO, Vector3(1.1, 0.9, 0.8), false)
+	for side in 2:
+		var s := 1.0 if side == 0 else -1.0
+		var hb := _box("hand%d" % side, "skin")
+		_part(hb, Kit.sphere(0.056, _m(skin_c)), Vector3(0, -0.012, 0.004), Vector3.ZERO, Vector3(0.9, 1.0, 1.0))
+		_part(hb, Kit.sphere(0.022, _m(skin_c)), Vector3(-0.045 * s, 0.0, 0.03), Vector3.ZERO, Vector3(1, 1.3, 1))   # thumb
+
+
+func _build_eyes(col: Dictionary) -> void:
+	for side in 2:
+		var s := 1.0 if side == 0 else -1.0
+		var e := _box("eye%d" % side, "eyes")
+		_part(e, Kit.sphere(0.047, _flat(col["eye_dark"]), 12, 18), Vector3.ZERO, Vector3.ZERO, Vector3(0.8, 1.13, 0.46), false)
+		_part(e, Kit.sphere(0.03, _flat(col["iris"]), 10, 14), Vector3(0, -0.02, 0.01), Vector3.ZERO, Vector3(0.85, 0.62, 0.5), false)
+		_part(e, Kit.sphere(0.0145, Mat.glow(Color.WHITE, 1.1), 8, 10), Vector3(0.012 * s, 0.02, 0.02), Vector3.ZERO, Vector3.ONE, false)
+		_part(e, Kit.sphere(0.0075, Mat.glow(Color.WHITE, 1.0), 6, 8), Vector3(-0.012 * s, -0.022, 0.019), Vector3.ZERO, Vector3.ONE, false)
+		# A single cute lash flick at the outer corner
+		_part(e, Kit.capsule(0.007, 0.042, _flat(col["eye_dark"])), Vector3(0.038 * s, 0.038, 0.0), Vector3(0, 0, -48.0 * s), Vector3.ONE, false)
+
+
+# --- Appearance units -------------------------------------------------------------------------------------
+
+func _following() -> bool:
+	return driven and follow_game_state
+
+
+func _connect_state() -> void:
+	if _connected:
+		return
+	_connected = true
+	Events.appearance_changed.connect(_on_appearance_changed)
+	Events.equipment_changed.connect(_on_equipment_changed)
+	Events.game_loaded.connect(_on_appearance_changed)
+
+
+func _on_appearance_changed() -> void:
+	refresh_from_state()
+
+
+func _on_equipment_changed(_slot: String, _item_id: String) -> void:
+	refresh_from_state()
+
+
+func _read_state() -> void:
+	var app: Variant = GameState.appearance
+	_set_look(app if app is Dictionary else {})
+	var wd: Variant = GameState.wardrobe
+	_armor_show = wd is Dictionary and bool((wd as Dictionary).get("show_armor", false))
+	_armor_eq = {}
+	for s in ["head", "body", "boots"]:
+		_armor_eq[s] = GameState.equipped(s)
+
+
+func _set_look(look: Dictionary) -> void:
+	_look_src = look.duplicate(true)
+	var res := ItemDB.sanitize_look(look)
+	_look = res["look"]
+	_missing = res["missing"]
+	var key := ", ".join(PackedStringArray(_missing))
+	if key != "" and key != _reported_missing:
+		push_warning("Krystal avatar: unknown appearance ids shown as safe defaults (kept in the save): " + key)
+	_reported_missing = key
+
+
+## Debug-only preview helper: --avatar-outfit=<outfit id> --avatar-hair=<id> --avatar-hair-color=<id>
+## --avatar-skin=<id> --avatar-eyes=<id> --avatar-hat=<id> --avatar-armor=<armor set id> (non-driven avatars).
+func _apply_debug_look() -> void:
+	if driven or not Debug.is_cheat_allowed():
+		return
+	var any := false
+	for a in ["avatar-outfit", "avatar-hair", "avatar-hair-color", "avatar-skin", "avatar-eyes", "avatar-hat", "avatar-armor"]:
+		any = any or Debug.has_arg(a)
+	if not any:
+		return
+	var look := _look.duplicate(true)
+	var o := ItemDB.outfit(Debug.arg("avatar-outfit", ""))
+	if not o.is_empty():
+		for slot in o["parts"]:
+			look[slot] = o["parts"][slot]
+		look["palette"] = (o["palette"] as Dictionary).duplicate()
+		look["hair"] = o["hair"]
+		look["hair_color"] = o["hair_color"]
+		look["outfit"] = Debug.arg("avatar-outfit")
+	for pair in [["avatar-hair", "hair"], ["avatar-hair-color", "hair_color"], ["avatar-skin", "skin"], ["avatar-eyes", "eyes"], ["avatar-hat", "hat"]]:
+		if Debug.has_arg(pair[0]):
+			look[pair[1]] = Debug.arg(pair[0])
+	_set_look(look)
+	var st := ItemDB.armor_set(Debug.arg("avatar-armor", ""))
+	if not st.is_empty():
+		_armor_show = true
+		_armor_eq = (st["pieces"] as Dictionary).duplicate()
+
+
+## An armor item shown in `slot` ("" when show_armor is off, the slot is empty or the id is not armor of that slot).
+func _armor_id(slot: String) -> String:
+	if not _armor_show:
+		return ""
+	var id := String(_armor_eq.get(slot, ""))
+	if id == "" or ItemDB.equip_slot(id) != slot:
+		return ""
+	return id
+
+
+func _hides_hair() -> bool:
+	if _armor_id("head") != "":
+		return true
+	var hat := String(_look.get("hat", ""))
+	return hat != "" and bool(ItemDB.appearance_part(hat).get("hides_hair", false))
+
+
+## What each unit is built from: a unit is rebuilt only when its signature changes.
+func _signatures(col: Dictionary) -> Dictionary:
+	var pal := String(col["palette_key"])
+	var hat := String(_look.get("hat", ""))
+	var head_armor := _armor_id("head")
+	return {
+		"skin": String(_look.get("skin", "")),
+		"eyes": String(_look.get("eyes", "")),
+		"hair": "%s|%s|%s|%s" % [_look.get("hair", ""), _look.get("hair_color", ""), _hides_hair(), pal],
+		"hat": "%s|%s|%s" % [hat, head_armor, pal],
+		"hair_acc": "%s|%s|%s|%s" % [_look.get("hair_acc", ""), pal, _look.get("hair", ""), head_armor if head_armor != "" else hat],
+		"upper": "%s|%s|%s" % [_look.get("upper", ""), pal, _look.get("skin", "")],
+		"lower": "%s|%s|%s" % [_look.get("lower", ""), pal, _look.get("skin", "")],
+		"shoes": "%s|%s|%s|%s" % [_look.get("shoes", ""), pal, _armor_id("boots"), (col["leg"] as Color).to_html(false)],
+		"back": "%s|%s" % [_look.get("back", ""), pal],
+		"armor": _armor_id("body"),
+	}
+
+
+## Rebuilds the units whose signature changed (all with `force`), re-bakes the joints they touch and refreshes
+## the secondary-motion rigs. Returns the rebuilt units.
+func _rebuild_units(force: bool) -> Array:
+	var col := LookColors.resolve(_look)
+	var sigs := _signatures(col)
+	var changed: Array = []
+	for u in UNITS:
+		if force or not _sigs.has(u) or String(_sigs[u]) != String(sigs[u]):
+			changed.append(u)
+	if changed.is_empty():
+		return changed
+	var touched: Dictionary = {}
+	for u in changed:
+		for b in _unit_boxes.get(u, []):
+			if is_instance_valid(b):
+				var host := (b as Node).get_parent()
+				touched[host.get_instance_id()] = host
+				_free_box(b)
+		_unit_boxes[u] = []
+		_unit_res[u] = _build_unit(u, col)
+		_sigs[u] = sigs[u]
+		for b in _unit_boxes[u]:
+			var host2 := (b as Node).get_parent()
+			touched[host2.get_instance_id()] = host2
+	for u in changed:
+		(_unit_res[u] as Dictionary)["hull_pts"] = _hull_points(u)
+		for b in _unit_boxes[u]:
+			for c in (b as Node).get_children():
+				if c is Node3D and not (c is MeshInstance3D):
+					_bake_subtree(c)
+	for hid in touched:
+		_rebake_host(touched[hid])
+	for u in changed:
+		for b in _unit_boxes[u]:
+			_set_layers(b)
+	_after_rebuild(changed)
+	return changed
+
+
+func _build_unit(u: String, col: Dictionary) -> Dictionary:
+	var head_armor := _armor_id("head")
+	var ctx := {"box": Callable(self, "_box").bind(u), "col": col, "look": _look, "id": "",
+		"hides_hair": _hides_hair(), "hat": head_armor if head_armor != "" else String(_look.get("hat", ""))}
+	match u:
+		"skin":
+			_build_skin(col)
+		"eyes":
+			_build_eyes(col)
+		"hair":
+			return HairBuilder.build(ctx)
+		"hat":
+			if head_armor != "":
+				ctx["id"] = head_armor
+				return ArmorBuilder.build_head(ctx)
+			ctx["id"] = String(_look.get("hat", ""))
+			if ctx["id"] != "":
+				return AccessoryBuilder.build_hat(ctx)
+		"hair_acc":
+			ctx["id"] = String(_look.get("hair_acc", ""))
+			if ctx["id"] != "":
+				return AccessoryBuilder.build_hair_acc(ctx)
+		"upper":
+			ctx["id"] = String(_look.get("upper", ""))
+			return GarmentBuilder.build_upper(ctx)
+		"lower":
+			ctx["id"] = String(_look.get("lower", ""))
+			return GarmentBuilder.build_lower(ctx)
+		"shoes":
+			var boots := _armor_id("boots")
+			if boots != "":
+				ctx["id"] = boots
+				return ArmorBuilder.build_boots(ctx)
+			ctx["id"] = String(_look.get("shoes", ""))
+			return GarmentBuilder.build_shoes(ctx)
+		"back":
+			ctx["id"] = String(_look.get("back", ""))
+			var res := AccessoryBuilder.build_back(ctx)
+			var belt: Node3D = res.get("belt")
+			if belt != null:
+				AKit.lantern_mesh(belt, false)
+				belt.scale = Vector3.ONE * 0.8
+				belt.visible = false
+			return res
+		"armor":
+			var body := _armor_id("body")
+			if body != "":
+				ctx["id"] = body
+				return ArmorBuilder.build_body(ctx)
+	return {}
+
+
+## The container of `unit` on a rig host (created on first use). Containers sit at the host origin.
+func _box(host_key: String, unit: String) -> Node3D:
+	var host: Node3D = _hosts.get(host_key)
+	if host == null:
+		push_error("Krystal avatar: unknown rig host '%s'" % host_key)
+		host = _hosts["hips"]
+	var list: Array = _unit_boxes[unit]
+	for b in list:
+		if (b as Node).get_parent() == host:
+			return b
+	var n := Node3D.new()
+	n.name = String(UNIT_BOX.get(unit, unit))
+	n.set_meta(BOX_META, unit)
+	host.add_child(n)
+	list.append(n)
+	return n
+
+
+func _free_box(b: Node) -> void:
+	var did := b.get_instance_id()
+	for mi in _detached.get(did, []):
+		if is_instance_valid(mi):
+			(mi as Node).free()
+	_detached.erase(did)
+	b.get_parent().remove_child(b)
+	b.free()
+
+
+## After a rebuild: the secondary-motion rigs (chains, skirt), the roll head hull, the back patch and the
+## belt lantern follow the new parts.
+func _after_rebuild(changed: Array) -> void:
+	_chains = []
+	for u in UNITS:
+		_chains.append_array((_unit_res.get(u, {}) as Dictionary).get("chains", []))
+	_scarf_ends = []
+	_braid.clear()
+	for ch in _chains:
+		if String(ch["kind"]) == "scarf":
+			_scarf_ends.append(ch["segs"])
+		elif String(ch["kind"]) == "braid" and _braid.is_empty():
+			for sg in ch["segs"]:
+				_braid.append(sg)
+	if changed.has("lower"):
+		var sk: Dictionary = (_unit_res["lower"] as Dictionary).get("skirt", {})
+		if sk.is_empty():
+			_skirt = null
+			_skirt_pivots = []
+		else:
+			_skirt = SkirtRig.new()
+			_skirt.setup(sk)
+			_skirt_pivots = sk["pivots"]
+	_head_hull = _HEAD_HULL.duplicate()
+	for u in ["hair", "hat", "hair_acc"]:
+		_head_hull.append_array((_unit_res.get(u, {}) as Dictionary).get("hull_pts", []))
+	if changed.has("upper"):
+		_patch = (_unit_res["upper"] as Dictionary).get("patch")
+	# A cape / shawl covers the jacket's back patch and the scarf ends (they would lie over / cut through the
+	# rigid cape panels; map player_avatar.md recipe (a) 6). The scarf wraps at the neck stay.
+	var caped := bool((_unit_res.get("back", {}) as Dictionary).get("cape", false))
+	if is_instance_valid(_patch):
+		_patch.visible = not caped
+	for ends in _scarf_ends:
+		((ends as Array)[0] as Node3D).visible = not caped
+	if changed.has("back"):
+		_lantern_belt = (_unit_res["back"] as Dictionary).get("belt")
+
+
+## Silhouette points (HeadCenter space) a unit adds to the roll hull: support points of its static parts in 26
+## directions (hats, buns, helms: "all" parts / hair: "direct" parts, never the spring chains) plus the rest
+## positions of listed chain nodes. Only points outside the base hull's reach are kept.
+func _hull_points(u: String) -> Array:
+	var res: Dictionary = _unit_res.get(u, {})
+	var mode := String(res.get("hull", ""))
+	var out: Array = []
+	if _dirs.is_empty():
+		for x in [-1, 0, 1]:
+			for y in [-1, 0, 1]:
+				for z in [-1, 0, 1]:
+					if x != 0 or y != 0 or z != 0:
+						_dirs.append(Vector3(x, y, z).normalized())
+	if mode != "":
+		var best: Array = []
+		var best_d := PackedFloat32Array()
+		best.resize(_dirs.size())
+		best_d.resize(_dirs.size())
+		best_d.fill(-INF)
+		for b in _unit_boxes.get(u, []):
+			if (b as Node).get_parent() != _head_c:
+				continue
+			var stack: Array = (b as Node).get_children()
+			while not stack.is_empty():
+				var n: Node = stack.pop_back()
+				if mode == "all":
+					for c in n.get_children():
+						stack.append(c)
+				if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
+					continue
+				var xf := _xf_to(n as Node3D, _head_c)
+				var mesh := (n as MeshInstance3D).mesh
+				for s in mesh.get_surface_count():
+					var v: PackedVector3Array = mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]
+					for k in range(0, v.size(), 3):
+						var p := xf * v[k]
+						for di in _dirs.size():
+							var d: float = p.dot(_dirs[di])
+							if d > best_d[di]:
+								best_d[di] = d
+								best[di] = p
+		for p in best:
+			if p is Vector3 and ((p as Vector3) - HULL_CENTRE).length() > HULL_MIN_DIST and not out.has(p):
+				out.append(p)
+	for nr in res.get("hull_nodes", []):
+		var nd: Node3D = nr[0]
+		var p2 := _xf_to(nd, _head_c).origin
+		var away := (p2 - HULL_CENTRE).normalized()
+		out.append(p2 + away * float(nr[1]))
+	return out
+
+
+## Transform of `n` relative to an ancestor (walks the local transforms; works outside the tree too).
+static func _xf_to(n: Node3D, ancestor: Node) -> Transform3D:
+	var xf := n.transform
+	var p := n.get_parent()
+	while p != null and p != ancestor:
+		if p is Node3D:
+			xf = (p as Node3D).transform * xf
+		p = p.get_parent()
+	return xf
 
 
 # --- Draw-call baking -------------------------------------------------------------------------------------
-# The rig is authored as ~120 primitive parts for readability. Parts that never move relative to their
-# joint are merged per joint and material class into one vertex-coloured mesh (~190 -> ~70 draw calls).
-# Animated / toggled pieces (eyes blink as a node, mouth shapes, food, glows) stay separate.
+# Parts are authored as primitives for readability. Parts that never move relative to their joint are merged
+# per joint and material class into one vertex-coloured mesh (Chapter One: ~190 -> 82 draw calls): the parts of
+# every unit container on a joint ("host") are merged together; when one unit is rebuilt, its host is re-baked
+# from the other units' kept source parts. Nodes inside a container (satchel, patch, braid / skirt / cape
+# segments, hats) are baked on their own. Animated / toggled pieces (eyes blink as a node, mouth shapes, food,
+# glows) stay separate. Merged meshes are cached by content (mesh, transform, albedo): colour-aware.
 
-func _bake_tree(n: Node, root: Node) -> void:
+func _bake_subtree(n: Node) -> void:
 	for c in n.get_children():
-		_bake_tree(c, root)
-	if n is Node3D:
-		_bake_children(n as Node3D, root)
+		if c is Node3D and not (c is MeshInstance3D):
+			_bake_subtree(c)
+	if not (n is Node3D):
+		return
+	var groups := _group_parts(n.get_children())
+	for key in groups:
+		var list: Array = groups[key]
+		if list.size() < 2:
+			continue
+		n.add_child(_merged_instance(list, key))
+		for mi in list:
+			n.remove_child(mi)
+			(mi as Node).free()
 
 
-func _bake_children(n: Node3D, root: Node) -> void:
+## Merges the parts of every unit container on `host` into one mesh per material class.
+func _rebake_host(host: Node) -> void:
+	var hid := host.get_instance_id()
+	for b in _host_baked.get(hid, []):
+		if is_instance_valid(b):
+			host.remove_child(b)
+			(b as Node).free()
+	_host_baked[hid] = []
+	var parts: Array = []
+	for box in host.get_children():
+		if not box.has_meta(BOX_META):
+			continue
+		var did := box.get_instance_id()
+		if _detached.has(did):
+			for mi in _detached[did]:
+				box.add_child(mi)
+			_detached.erase(did)
+		parts.append_array(box.get_children())
+	var groups := _group_parts(parts)
+	for key in groups:
+		var list: Array = groups[key]
+		if list.size() < 2:
+			continue
+		var merged := _merged_instance(list, key)
+		host.add_child(merged)
+		merged.layers = AVATAR_LAYER
+		(_host_baked[hid] as Array).append(merged)
+		for mi in list:
+			var box2 := (mi as Node).get_parent()
+			box2.remove_child(mi)
+			var bid := box2.get_instance_id()
+			if not _detached.has(bid):
+				_detached[bid] = []
+			(_detached[bid] as Array).append(mi)
+
+
+## Mergeable parts grouped by material class (outline thickness, rim, noise, specular, shadow casting).
+func _group_parts(nodes: Array) -> Dictionary:
 	var groups: Dictionary = {}
-	for c in n.get_children():
+	for c in nodes:
 		if not (c is MeshInstance3D) or c == _mouth_smile or c == _mouth_open or c == _food:
 			continue
 		var mi := c as MeshInstance3D
@@ -392,39 +1042,48 @@ func _bake_children(n: Node3D, root: Node) -> void:
 		var noise := float(mat.get_shader_parameter("noise_amount"))
 		var spec_v: Variant = mat.get_shader_parameter("specular_amount")
 		var spec := float(spec_v) if spec_v != null else 0.0
+		var emis_v: Variant = mat.get_shader_parameter("emission_energy")
+		if emis_v != null and float(emis_v) > FILL + 0.001:
+			continue   # glowing cloth keeps its own material (the bake uses the plain fill)
 		var key := "%.3f|%.2f|%.2f|%.2f|%d" % [thick, rim, noise, spec, mi.cast_shadow]
 		if not groups.has(key):
 			groups[key] = []
 		(groups[key] as Array).append(mi)
-	for key in groups:
-		var list: Array = groups[key]
-		if list.size() < 2:
-			continue
-		var first := list[0] as MeshInstance3D
-		var fmat := first.material_override as ShaderMaterial
-		var cache_key := "%s|%s" % [str(root.get_path_to(n)), key]
-		var mesh: ArrayMesh = _bake_cache.get(cache_key)
-		if mesh == null:
-			mesh = _merge_parts(list)
-			_bake_cache[cache_key] = mesh
-		var opts := {"rim": float(fmat.get_shader_parameter("rim_strength")), "noise": float(fmat.get_shader_parameter("noise_amount")),
-			"vertex_color": true, "emission": FILL_TINT, "emission_energy": FILL}
-		var spec_v2: Variant = fmat.get_shader_parameter("specular_amount")
-		if spec_v2 != null and float(spec_v2) > 0.0:
-			opts["specular"] = float(spec_v2)
-		var base := Mat.toon(Color.WHITE, opts)
-		var mat: Material = base
-		if fmat.next_pass is ShaderMaterial:
-			mat = Mat.outlined(base, float((fmat.next_pass as ShaderMaterial).get_shader_parameter("thickness")))
-		var merged := MeshInstance3D.new()
-		merged.name = "Baked"
-		merged.mesh = mesh
-		merged.material_override = mat
-		merged.cast_shadow = first.cast_shadow
-		n.add_child(merged)
-		for mi in list:
-			n.remove_child(mi)
-			(mi as Node).free()
+	return groups
+
+
+## One merged MeshInstance3D for a group of parts (mesh cached by content, so identical looks share it and
+## different colours never do).
+func _merged_instance(list: Array, key: String) -> MeshInstance3D:
+	var first := list[0] as MeshInstance3D
+	var fmat := first.material_override as ShaderMaterial
+	var sig := PackedStringArray()
+	for item in list:
+		var pmi := item as MeshInstance3D
+		var c: Color = (pmi.material_override as ShaderMaterial).get_shader_parameter("albedo")
+		sig.append("%d/%s/%s" % [pmi.mesh.get_instance_id(), str(pmi.transform), c.to_html()])
+	var cache_key := "%s|%s" % [key, "#".join(sig).md5_text()]
+	var mesh: ArrayMesh = _bake_cache.get(cache_key)
+	if mesh == null:
+		if _bake_cache.size() >= BAKE_CACHE_MAX:
+			_bake_cache.clear()
+		mesh = _merge_parts(list)
+		_bake_cache[cache_key] = mesh
+	var opts := {"rim": float(fmat.get_shader_parameter("rim_strength")), "noise": float(fmat.get_shader_parameter("noise_amount")),
+		"vertex_color": true, "emission": FILL_TINT, "emission_energy": FILL}
+	var spec_v2: Variant = fmat.get_shader_parameter("specular_amount")
+	if spec_v2 != null and float(spec_v2) > 0.0:
+		opts["specular"] = float(spec_v2)
+	var base := Mat.toon(Color.WHITE, opts)
+	var mat: Material = base
+	if fmat.next_pass is ShaderMaterial:
+		mat = Mat.outlined(base, float((fmat.next_pass as ShaderMaterial).get_shader_parameter("thickness")))
+	var merged := MeshInstance3D.new()
+	merged.name = "Baked"
+	merged.mesh = mesh
+	merged.material_override = mat
+	merged.cast_shadow = first.cast_shadow
+	return merged
 
 
 ## Merges parts (transforms relative to their shared parent) into one mesh; each part's albedo becomes
@@ -472,260 +1131,6 @@ func _set_layers(n: Node) -> void:
 		(n as VisualInstance3D).layers = AVATAR_LAYER
 	for c in n.get_children():
 		_set_layers(c)
-
-
-func _build_leg(hips: Node3D, side: int, s: float) -> void:
-	var leg := _node(hips, Vector3(0.092 * s, -0.005, 0), "Leg%d" % side)
-	_joints[J_LEG_L + side] = leg
-	_part(leg, Kit.capsule(0.078, 0.3, _m(Palette.K_PANTS)), Vector3(0, -0.12, 0))
-	var knee := _node(leg, Vector3(0, -0.235, 0), "Knee%d" % side)
-	_joints[J_KNEE_L + side] = knee
-	_part(knee, Kit.capsule(0.066, 0.24, _m(Palette.K_PANTS)), Vector3(0, -0.08, 0))
-	# Boot: shaft, cuff, rounded toe and a little sole
-	_part(knee, Kit.cylinder(0.078, 0.084, 0.16, _m(Palette.K_BOOTS)), Vector3(0, -0.2, 0.0))
-	_part(knee, Kit.torus(0.07, 0.094, _m(BOOT_LIGHT)), Vector3(0, -0.125, 0), Vector3.ZERO, Vector3(1, 1.3, 1))
-	_part(knee, Kit.sphere(0.088, _m(Palette.K_BOOTS)), Vector3(0, -0.29, 0.04), Vector3.ZERO, Vector3(0.98, 0.64, 1.42))
-	_part(knee, Kit.cylinder(0.082, 0.082, 0.024, _m(LEATHER, true, 0.006), 16), Vector3(0, -0.338, 0.042), Vector3.ZERO, Vector3(1.0, 1.0, 1.42), false)
-
-
-func _build_torso(spine: Node3D) -> void:
-	var jacket := _m(Palette.K_JACKET)
-	# Jacket body (slightly flattened front-to-back) and an A-line hem
-	_part(spine, Kit.capsule(0.168, 0.5, jacket), Vector3(0, 0.2, 0), Vector3.ZERO, Vector3(1.0, 1.0, 0.84))
-	_part(spine, Kit.cylinder(0.165, 0.205, 0.15, jacket), Vector3(0, 0.02, 0), Vector3.ZERO, Vector3(1.0, 1.0, 0.88))
-	# Cream shirt: a soft V showing at the open front of the jacket
-	_part(spine, Kit.prism(Vector3(0.13, 0.15, 0.03), _m(Palette.K_SHIRT, false)), Vector3(0, 0.335, 0.122), Vector3(-14, 0, 180), Vector3.ONE, false)
-	for side in 2:
-		var s := 1.0 if side == 0 else -1.0
-		# Brass buttons along the jacket edge and rounded pocket flaps on the hem
-		_part(spine, Kit.sphere(0.013, _flat(BRASS), 8, 12), Vector3(0.062 * s, 0.24, 0.139), Vector3.ZERO, Vector3.ONE, false)
-		_part(spine, Kit.sphere(0.013, _flat(BRASS), 8, 12), Vector3(0.062 * s, 0.15, 0.144), Vector3.ZERO, Vector3.ONE, false)
-		_part(spine, Kit.sphere(0.045, _m(JACKET_DARK, false)), Vector3(0.1 * s, 0.05, 0.158), Vector3(0, 22 * s, 0), Vector3(1.0, 0.42, 0.28), false)
-	# Back: an embroidered explorer patch (cream disc with a little green sprout) - seen from the camera
-	var patch := _node(spine, Vector3(0, 0.25, -0.142), "Patch")
-	patch.rotation_degrees = Vector3(-8, 180, 0)
-	_part(patch, Kit.cylinder(0.052, 0.052, 0.012, _m(Palette.K_SHIRT, true, 0.005), 20), Vector3.ZERO, Vector3(90, 0, 0), Vector3.ONE, false)
-	_part(patch, Kit.capsule(0.006, 0.05, _flat(Palette.FOLIAGE_DARK)), Vector3(0, -0.008, 0.009), Vector3.ZERO, Vector3.ONE, false)
-	_part(patch, Kit.sphere(0.017, _flat(Palette.FOLIAGE), 8, 10), Vector3(-0.014, 0.014, 0.01), Vector3(0, 0, 35), Vector3(1.4, 0.7, 0.4), false)
-	_part(patch, Kit.sphere(0.015, _flat(Palette.FOLIAGE_LIGHT), 8, 10), Vector3(0.013, 0.02, 0.01), Vector3(0, 0, -35), Vector3(1.4, 0.7, 0.4), false)
-	# Satchel strap across the chest (right shoulder -> left hip) and the satchel on the left hip
-	_part(spine, Kit.torus(0.17, 0.2, _m(Palette.K_BAG)), Vector3(0.03, 0.2, 0), Vector3(0, 0, -57), Vector3(1.42, 0.9, 0.78))
-	var bag := _node(spine, Vector3(0.2, 0.0, -0.07), "Satchel")
-	bag.rotation_degrees = Vector3(0, 115, -5)
-	_part(bag, Kit.capsule(0.07, 0.21, _m(Palette.K_BAG)), Vector3.ZERO, Vector3(0, 0, 90), Vector3(1.05, 1.0, 0.62))
-	_part(bag, Kit.sphere(0.1, _m(LEATHER)), Vector3(0, 0.03, 0.02), Vector3.ZERO, Vector3(1.05, 0.55, 0.52))
-	_part(bag, Kit.sphere(0.017, _flat(BRASS), 8, 12), Vector3(0, 0.0, 0.07), Vector3.ZERO, Vector3.ONE, false)
-	# Lantern clipped to the satchel strap while it is not raised
-	_lantern_belt = _node(bag, Vector3(0.07, 0.04, 0.07), "BeltLantern")
-	_build_lantern_mesh(_lantern_belt, false)
-	_lantern_belt.scale = Vector3.ONE * 0.8
-	_lantern_belt.visible = false
-
-
-func _build_scarf(chest: Node3D) -> void:
-	var scarf := _m(Palette.K_SCARF)
-	_part(chest, Kit.torus(0.085, 0.16, scarf), Vector3(0, 0.02, 0), Vector3(4, 0, 0), Vector3(1.0, 1.55, 0.94))
-	_part(chest, Kit.torus(0.08, 0.14, scarf), Vector3(0, 0.075, -0.01), Vector3(-6, 0, 0), Vector3(0.96, 1.3, 0.9))
-	# Knot at the back-left and two ends that flutter
-	_part(chest, Kit.sphere(0.05, scarf), Vector3(0.075, 0.03, -0.128), Vector3.ZERO, Vector3(1.1, 0.85, 0.8))
-	_scarf_ends.clear()
-	for i in 2:
-		var root := _node(chest, Vector3(0.06 + 0.035 * i, 0.02, -0.15), "ScarfEnd%d" % i)
-		root.rotation = Vector3(0.25, 0, 0.22 - 0.4 * i)
-		_part(root, Kit.capsule(0.03, 0.16, scarf), Vector3(0, -0.07, 0), Vector3.ZERO, Vector3(1.2, 1.0, 0.55))
-		var seg := _node(root, Vector3(0, -0.13, 0), "Tip")
-		_part(seg, Kit.capsule(0.03, 0.15 - 0.035 * i, scarf), Vector3(0, -0.055, 0), Vector3(0, 0, 6 - 12 * i), Vector3(1.3, 1.0, 0.5))
-		_part(seg, Kit.box(Vector3(0.074, 0.016, 0.034), _m(SCARF_DARK, false)), Vector3(0, -0.09 + 0.02 * i, 0), Vector3(0, 0, 6 - 12 * i), Vector3.ONE, false)
-		_scarf_ends.append([root, seg])
-
-
-func _build_arm(chest: Node3D, side: int, s: float) -> void:
-	var sh := _node(chest, Vector3(0.195 * s, -0.02, 0.0), "Shoulder%d" % side)
-	_joints[J_SH_L + side] = sh
-	var jacket := _m(Palette.K_JACKET)
-	_part(sh, Kit.sphere(0.072, jacket), Vector3(0, -0.01, 0))
-	_part(sh, Kit.capsule(0.06, 0.23, jacket), Vector3(0, -0.1, 0))
-	var el := _node(sh, Vector3(0, -0.195, 0), "Elbow%d" % side)
-	_joints[J_EL_L + side] = el
-	_part(el, Kit.capsule(0.054, 0.2, jacket), Vector3(0, -0.075, 0))
-	_part(el, Kit.torus(0.042, 0.066, _m(JACKET_DARK)), Vector3(0, -0.16, 0), Vector3.ZERO, Vector3(1, 1.4, 1))
-	var hand := _node(el, Vector3(0, -0.2, 0), "Hand%d" % side)
-	_joints[J_HAND_L + side] = hand
-	_part(hand, Kit.sphere(0.056, _m(Palette.K_SKIN)), Vector3(0, -0.012, 0.004), Vector3.ZERO, Vector3(0.9, 1.0, 1.0))
-	_part(hand, Kit.sphere(0.022, _m(Palette.K_SKIN)), Vector3(-0.045 * s, 0.0, 0.03), Vector3.ZERO, Vector3(1, 1.3, 1))   # thumb
-	if side == 1:
-		_tool_anchor = _node(hand, Vector3(0, -0.02, 0.0), "ToolAnchor")
-		_build_tools(_tool_anchor)
-		_food = Kit.sphere(0.035, _m(Palette.BERRY), 10, 14)
-		_part(hand, _food, Vector3(0.01, -0.03, 0.06), Vector3.ZERO, Vector3.ONE, false)
-		_food.visible = false
-	else:
-		_lantern = _node(hand, Vector3(0, -0.04, 0.0), "Lantern")
-		_build_lantern_mesh(_lantern, true)
-		_lantern.visible = false
-
-
-func _build_tools(anchor: Node3D) -> void:
-	var handle := _m(Palette.WOOD)
-	var stone := _m(Palette.STONE)
-	var fiber := _m(Palette.MEADOW_GOLD)
-	# Stone axe: handle along +Y, lumpy stone head lashed with fiber, edge towards +Z.
-	var axe := _node(anchor, Vector3.ZERO, "Axe")
-	axe.rotation = Vector3(2.3, 0, 0)
-	_part(axe, Kit.cylinder(0.02, 0.024, 0.5, handle, 10), Vector3(0, 0.2, 0))
-	_part(axe, Kit.blob(0.07, stone, 11, 0.22, 1.0, 2), Vector3(0, 0.4, 0.055), Vector3.ZERO, Vector3(0.55, 1.05, 1.35))
-	_part(axe, Kit.torus(0.02, 0.036, fiber), Vector3(0, 0.4, 0.0), Vector3(0, 0, 0), Vector3(1, 1.6, 1))
-	# Stone pickaxe: curved head across the top, point towards +Z.
-	var pick := _node(anchor, Vector3.ZERO, "Pickaxe")
-	pick.rotation = Vector3(2.3, 0, 0)
-	_part(pick, Kit.cylinder(0.02, 0.024, 0.52, handle, 10), Vector3(0, 0.21, 0))
-	_part(pick, Kit.cone(0.035, 0.17, stone, 10), Vector3(0, 0.44, 0.08), Vector3(80, 0, 0))
-	_part(pick, Kit.cone(0.032, 0.13, stone, 10), Vector3(0, 0.44, -0.06), Vector3(-100, 0, 0))
-	_part(pick, Kit.sphere(0.045, stone), Vector3(0, 0.44, 0.0))
-	_part(pick, Kit.torus(0.02, 0.034, fiber), Vector3(0, 0.41, 0.0), Vector3.ZERO, Vector3(1, 1.4, 1))
-	# Copper sword: extends along the arm (blade -Y-ish), bright copper with a leather grip.
-	var sword := _node(anchor, Vector3.ZERO, "Sword")
-	sword.rotation = Vector3(2.75, 0, 0)
-	var copper := Mat.outlined(Mat.toon(Palette.COPPER, {"rim": 0.8, "specular": 0.6, "noise": 0.02}), OUTLINE)
-	_part(sword, Kit.cylinder(0.018, 0.018, 0.1, _m(LEATHER), 8), Vector3(0, 0.0, 0))
-	_part(sword, Kit.sphere(0.026, _m(BRASS)), Vector3(0, -0.06, 0))
-	_part(sword, Kit.box(Vector3(0.15, 0.03, 0.04), _m(BRASS)), Vector3(0, 0.06, 0))
-	_part(sword, Kit.box(Vector3(0.078, 0.46, 0.02), copper), Vector3(0, 0.3, 0))
-	_part(sword, Kit.prism(Vector3(0.078, 0.09, 0.02), copper), Vector3(0, 0.575, 0))
-	_part(sword, Kit.box(Vector3(0.016, 0.42, 0.022), _flat(Color("f7cf9c"))), Vector3(0, 0.29, 0), Vector3.ZERO, Vector3.ONE, false)
-	_tools = {"axe": axe, "pickaxe": pick, "sword": sword}
-	for k in _tools:
-		(_tools[k] as Node3D).visible = false
-
-
-func _build_lantern_mesh(root: Node3D, lit: bool) -> void:
-	var frame := _m(Palette.MINE_TIMBER, true, 0.008)
-	var brass := _m(BRASS, true, 0.008)
-	var glass: Material = Mat.glow(Palette.LANTERN_GLOW, 2.2) if lit else _m(Color("e8d9b0"), true, 0.008)
-	# Hangs below the hand: handle ring at the top, roof, glass, base.
-	var parts: Array[MeshInstance3D] = []
-	parts.append(_part(root, Kit.torus(0.022, 0.034, brass), Vector3(0, 0.0, 0), Vector3(90, 0, 0)))
-	parts.append(_part(root, Kit.cone(0.07, 0.06, frame, 12), Vector3(0, -0.055, 0)))
-	parts.append(_part(root, Kit.cylinder(0.05, 0.055, 0.1, glass, 12), Vector3(0, -0.13, 0)))
-	parts.append(_part(root, Kit.cylinder(0.066, 0.066, 0.025, frame, 12), Vector3(0, -0.19, 0)))
-	parts.append(_part(root, Kit.sphere(0.018, brass, 8, 10), Vector3(0, -0.02, 0)))
-	for p in parts:
-		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
-
-func _build_head(hc: Node3D) -> void:
-	var skin := _m(Palette.K_SKIN, true, 0.012)
-	var hair := _m(Palette.K_HAIR, true, 0.012)
-	_part(hc, Kit.sphere(0.25, skin, 24, 32), Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.94, 0.95))
-	# --- Face (front = +Z) ---
-	_eyes.clear()
-	_brows.clear()
-	for side in 2:
-		var s := 1.0 if side == 0 else -1.0
-		var eye := _node(hc, Vector3(0.087 * s, -0.022, 0.206), "Eye%d" % side)
-		eye.rotation = Vector3(0, deg_to_rad(21.0 * s), 0)
-		_part(eye, Kit.sphere(0.047, _flat(EYE_DARK), 12, 18), Vector3.ZERO, Vector3.ZERO, Vector3(0.8, 1.13, 0.46), false)
-		_part(eye, Kit.sphere(0.03, _flat(EYE_WARM), 10, 14), Vector3(0, -0.02, 0.01), Vector3.ZERO, Vector3(0.85, 0.62, 0.5), false)
-		_part(eye, Kit.sphere(0.0145, Mat.glow(Color.WHITE, 1.1), 8, 10), Vector3(0.012 * s, 0.02, 0.02), Vector3.ZERO, Vector3.ONE, false)
-		_part(eye, Kit.sphere(0.0075, Mat.glow(Color.WHITE, 1.0), 6, 8), Vector3(-0.012 * s, -0.022, 0.019), Vector3.ZERO, Vector3.ONE, false)
-		# A single cute lash flick at the outer corner
-		_part(eye, Kit.capsule(0.007, 0.042, _flat(EYE_DARK)), Vector3(0.038 * s, 0.038, 0.0), Vector3(0, 0, -48.0 * s), Vector3.ONE, false)
-		_eyes.append(eye)
-		var brow := _node(hc, Vector3(0.088 * s, 0.062, 0.222), "Brow%d" % side)
-		brow.rotation = Vector3(-0.2, deg_to_rad(20.0 * s), 0)
-		_part(brow, Kit.capsule(0.0105, 0.068, _flat(HAIR_DARK)), Vector3.ZERO, Vector3(0, 0, 90 - 8 * s), Vector3.ONE, false)
-		_brows.append(brow)
-		_part(hc, Kit.sphere(0.036, _flat(BLUSH), 10, 14), Vector3(0.138 * s, -0.085, 0.172), Vector3(0, 36 * s, 0), Vector3(1.35, 0.72, 0.4), false)
-	_part(hc, Kit.sphere(0.017, _m(Palette.K_SKIN, false), 8, 12), Vector3(0, -0.068, 0.233), Vector3.ZERO, Vector3(1.1, 0.9, 0.8), false)
-	_mouth_smile = MeshInstance3D.new()
-	_mouth_smile.mesh = _arc_mesh(0.03, 0.0072, 1.9)
-	_mouth_smile.material_override = _flat(MOUTH)
-	_part(hc, _mouth_smile, Vector3(0, -0.118, 0.212), Vector3(-22, 0, 0), Vector3.ONE, false)
-	_mouth_open = Kit.sphere(0.026, _flat(MOUTH), 10, 14)
-	_part(hc, _mouth_open, Vector3(0, -0.118, 0.205), Vector3(-20, 0, 0), Vector3(1.15, 0.85, 0.45), false)
-	_mouth_open.visible = false
-	# --- Hair: cap, back volume, side-swept fringe, face-framing locks, braid and a flower clip ---
-	_part(hc, Kit.sphere(0.268, hair, 20, 28), Vector3(0, 0.052, -0.057), Vector3.ZERO, Vector3(1.05, 1.0, 1.0))
-	_part(hc, Kit.sphere(0.21, hair, 16, 22), Vector3(0, -0.085, -0.12), Vector3.ZERO, Vector3(1.12, 1.0, 0.92))
-	var fringe := [
-		[Vector3(-0.125, 0.1, 0.188), Vector3(-12, -32, -18), Vector3(0.62, 1.35, 0.5), 0.07],
-		[Vector3(-0.055, 0.118, 0.212), Vector3(-14, -12, -30), Vector3(0.7, 1.4, 0.48), 0.072],
-		[Vector3(0.02, 0.13, 0.22), Vector3(-14, 6, -42), Vector3(0.72, 1.45, 0.46), 0.072],
-		[Vector3(0.1, 0.13, 0.2), Vector3(-12, 28, -52), Vector3(0.7, 1.35, 0.48), 0.068],
-		[Vector3(0.17, 0.09, 0.15), Vector3(-6, 48, -24), Vector3(0.62, 1.3, 0.55), 0.066],
-	]
-	for f in fringe:
-		_part(hc, Kit.sphere(float(f[3]), hair, 12, 16), f[0], f[1], f[2])
-	for side in 2:
-		var s := 1.0 if side == 0 else -1.0
-		_part(hc, Kit.capsule(0.056, 0.25, hair), Vector3(0.212 * s, -0.08, 0.075), Vector3(10, 0, 7 * s), Vector3(0.72, 1.0, 0.95))
-		_part(hc, Kit.sphere(0.1, hair, 12, 16), Vector3(0.19 * s, -0.04, -0.03), Vector3.ZERO, Vector3(0.62, 1.15, 1.1))
-	# Soft layered locks along the nape so the back of the head (the usual camera view) has shape
-	for i in 5:
-		var x := -0.13 + 0.065 * float(i)
-		_part(hc, Kit.sphere(0.056, hair, 10, 14), Vector3(x, -0.255 + absf(x) * 0.3, -0.212 + absf(x) * 0.22), Vector3(-22, x * 110.0, x * 80.0), Vector3(0.95, 1.55, 0.72))
-	# A single springy strand on top of the head
-	var curl := MeshInstance3D.new()
-	curl.mesh = _arc_mesh(0.045, 0.011, 3.6)
-	curl.material_override = _m(Palette.K_HAIR, true, 0.006)
-	_part(hc, curl, Vector3(0.025, 0.338, -0.03), Vector3(0, 60, 90), Vector3(1, 1.15, 1))
-	# Side braid from behind the right ear, hanging over the back of the right shoulder.
-	_braid.clear()
-	var parent: Node3D = _node(hc, Vector3(-0.17, -0.1, -0.13), "Braid")
-	parent.rotation = Vector3(0.35, 0.0, -0.18)
-	var radii := [0.058, 0.054, 0.05, 0.046, 0.042, 0.038]
-	for i in radii.size():
-		var seg := _node(parent, Vector3(0, -0.065 if i > 0 else 0.0, 0), "B%d" % i)
-		var r: float = radii[i]
-		var off := 0.012 if i % 2 == 0 else -0.012
-		_part(seg, Kit.sphere(r, hair, 10, 14), Vector3(off, -0.03, 0), Vector3(0, 0, 25.0 if i % 2 == 0 else -25.0), Vector3(0.9, 1.15, 0.9))
-		_braid.append(seg)
-		parent = seg
-	var tie := _node(parent, Vector3(0, -0.075, 0), "Tie")
-	_part(tie, Kit.torus(0.018, 0.034, _m(Palette.K_SCARF, true, 0.006)), Vector3.ZERO, Vector3.ZERO, Vector3(1, 1.6, 1))
-	_part(tie, Kit.sphere(0.042, hair, 10, 14), Vector3(0, -0.05, 0), Vector3.ZERO, Vector3(1.0, 1.3, 0.85))
-	_part(tie, Kit.sphere(0.03, hair, 8, 12), Vector3(0.012, -0.095, 0), Vector3(0, 0, 20), Vector3(0.8, 1.3, 0.75))
-	# Flower clip on the left side of the head (five petals + honey centre)
-	var clip := _node(hc, Vector3(0.2, 0.13, 0.1), "FlowerClip")
-	clip.rotation_degrees = Vector3(-10, 55, 10)
-	for i in 5:
-		var a := TAU * float(i) / 5.0
-		_part(clip, Kit.sphere(0.024, _m(Palette.FLOWER_WHITE, true, 0.005), 8, 10), Vector3(cos(a) * 0.026, sin(a) * 0.026, 0), Vector3.ZERO, Vector3(1.0, 1.0, 0.45), false)
-	_part(clip, Kit.sphere(0.016, _m(Palette.FLOWER_YELLOW, false), 8, 10), Vector3(0, 0, 0.01), Vector3.ZERO, Vector3.ONE, false)
-
-
-## Small smile: a tube bent into a U (cached ArrayMesh).
-static func _arc_mesh(radius: float, tube: float, angle: float) -> ArrayMesh:
-	var key := "%.4f|%.4f|%.3f" % [radius, tube, angle]
-	if _arc_cache.has(key):
-		return _arc_cache[key]
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var rings := 12
-	var segs := 8
-	var pts := PackedVector3Array()
-	var norms := PackedVector3Array()
-	for i in rings + 1:
-		var a := -angle * 0.5 + angle * float(i) / float(rings)
-		var c := Vector3(sin(a) * radius, radius - cos(a) * radius, 0.0)
-		var n_in := Vector3(-sin(a), cos(a), 0.0)       # toward the arc centre
-		for j in segs:
-			var b := TAU * float(j) / float(segs)
-			var n := n_in * cos(b) + Vector3(0, 0, 1) * sin(b)
-			pts.append(c + n * tube)
-			norms.append(n)
-	for i in rings:
-		for j in segs:
-			var a0 := i * segs + j
-			var a1 := i * segs + (j + 1) % segs
-			var b0 := (i + 1) * segs + j
-			var b1 := (i + 1) * segs + (j + 1) % segs
-			for idx in [a0, b0, a1, a1, b0, b1]:
-				st.set_normal(norms[idx])
-				st.add_vertex(pts[idx])
-	var mesh := st.commit()
-	_arc_cache[key] = mesh
-	return mesh
 
 
 # =====================================================================================================
@@ -1080,7 +1485,7 @@ func _keep_roll_above_ground() -> void:
 		return
 	var xf := global_transform.affine_inverse() * _head_c.global_transform
 	var low := INF
-	for p in _HEAD_HULL:
+	for p in _head_hull:
 		low = minf(low, (xf * p).y)
 	if low < ROLL_CLEARANCE:
 		_roll.position.y += ROLL_CLEARANCE - low
@@ -1139,38 +1544,109 @@ func _update_secondary(dt: float) -> void:
 	var acc := (lv - _prev_lv) / maxf(dt, 0.001)
 	acc = acc.limit_length(40.0)
 	_prev_lv = lv
+	_lv = lv
+	_acc = acc
 	var flutter := sin(_t * 17.0) * 0.1 * _run_w
 	var fall := maxf(0.0, -lv.y) * 0.06
-	# Scarf ends: trail behind when moving, lag on acceleration, flutter when running.
-	for i in 2:
-		var target := Vector2(clampf(lv.z * 0.13 + acc.z * 0.012 + fall, -0.5, 1.35), clampf(-lv.x * 0.1 - acc.x * 0.01, -0.7, 0.7))
-		target.x += flutter * (1.0 if i == 0 else -0.7)
-		var a: Vector2 = _scarf_ang[i]
-		var v2: Vector2 = _scarf_vel[i]
-		v2 += ((target - a) * 70.0 - v2 * 7.5) * dt
-		a += v2 * dt
-		_scarf_ang[i] = a
-		_scarf_vel[i] = v2
-		var pair: Array = _scarf_ends[i]
-		(pair[0] as Node3D).rotation = Vector3(0.25 + a.x * 0.7, 0.0, (0.22 - 0.4 * i) + a.y * 0.7)
-		(pair[1] as Node3D).rotation = Vector3(a.x * 0.45 + sin(_t * 9.0 + i) * 0.05 * _move_w, 0.0, a.y * 0.4)
-	# Braid: heavier and slower; swings with the bob and lags behind turns.
+	# Wings flap faster with speed: integrate the phase (sin(_t * rate) would jump when the rate changes).
+	_wing_phase = fmod(_wing_phase + dt * (3.0 + 4.0 * _move_w), TAU)
+	# Hair chains (the Chapter One braid spring): heavier and slower; swing with the bob and lag behind turns.
 	var bt := Vector2(clampf(lv.z * 0.08 + acc.z * 0.01 + fall * 0.8, -0.4, 0.9), clampf(-lv.x * 0.07 - acc.x * 0.008 + turn_rate * 0.03, -0.6, 0.6))
 	bt.x -= _pose[J_SPINE].x * 0.8 + _pose[J_HEAD].x * 0.6
-	_braid_vel += ((bt - _braid_ang) * 38.0 - _braid_vel * 5.0) * dt
-	_braid_ang += _braid_vel * dt
-	for i in _braid.size():
-		var seg := _braid[i]
-		var k := 0.22 + 0.06 * i
-		var wave := sin(_t * 5.5 - float(i) * 0.8) * 0.04 * _move_w
-		if i == 0:
-			seg.rotation = Vector3(_braid_ang.x * 0.5, 0.0, _braid_ang.y * 0.5 + wave)
-		else:
-			seg.rotation = Vector3(_braid_ang.x * k * 0.5, 0.0, _braid_ang.y * k * 0.5 + wave)
+	for ch in _chains:
+		match String(ch["kind"]):
+			"scarf":
+				_chain_scarf(ch, dt, lv, acc, fall, flutter)
+			"braid":
+				_chain_braid(ch, dt, bt)
+			"cape":
+				_chain_cape(ch, dt, lv, acc, fall, flutter)
+			"wing":
+				_chain_wing(ch)
 	# Lantern: kept upright with a little pendulum lag.
 	var lt := Vector2(clampf(lv.z * 0.05 + acc.z * 0.015, -0.6, 0.6), clampf(-lv.x * 0.05 - acc.x * 0.015, -0.6, 0.6))
 	_lant_vel += ((lt - _lant_ang) * 55.0 - _lant_vel * 4.0) * dt
 	_lant_ang += _lant_vel * dt
+	_update_skirt(dt)
+
+
+## Scarf ends: trail behind when moving, lag on acceleration, flutter when running (Chapter One formula).
+func _chain_scarf(ch: Dictionary, dt: float, lv: Vector3, acc: Vector3, fall: float, flutter: float) -> void:
+	var i := int(ch["i"])
+	var target := Vector2(clampf(lv.z * 0.13 + acc.z * 0.012 + fall, -0.5, 1.35), clampf(-lv.x * 0.1 - acc.x * 0.01, -0.7, 0.7))
+	target.x += flutter * (1.0 if i == 0 else -0.7)
+	var a: Vector2 = ch["ang"]
+	var v2: Vector2 = ch["vel"]
+	v2 += ((target - a) * float(ch["k"]) - v2 * float(ch["d"])) * dt
+	a += v2 * dt
+	ch["ang"] = a
+	ch["vel"] = v2
+	var segs: Array = ch["segs"]
+	var rest: Vector3 = (ch["rest"] as Array)[0]
+	(segs[0] as Node3D).rotation = Vector3(rest.x + a.x * 0.7, rest.y, rest.z + a.y * 0.7)
+	(segs[1] as Node3D).rotation = Vector3(a.x * 0.45 + sin(_t * 9.0 + i) * 0.05 * _move_w, 0.0, a.y * 0.4)
+
+
+## Braids, ponytails, hair curtains, ribbon tails (the Chapter One braid formula around each segment's rest).
+func _chain_braid(ch: Dictionary, dt: float, bt: Vector2) -> void:
+	var ang: Vector2 = ch["ang"]
+	var vel: Vector2 = ch["vel"]
+	vel += ((bt - ang) * float(ch["k"]) - vel * float(ch["d"])) * dt
+	ang += vel * dt
+	ch["ang"] = ang
+	ch["vel"] = vel
+	var amp := float(ch["amp"])
+	var sd := float(ch["side"])
+	var segs: Array = ch["segs"]
+	var rest: Array = ch["rest"]
+	for i in segs.size():
+		var f := 0.5 if i == 0 else (0.22 + 0.06 * i) * 0.5
+		var wave := sin(_t * 5.5 - float(i) * 0.8) * 0.04 * _move_w
+		var r: Vector3 = rest[i]
+		(segs[i] as Node3D).rotation = Vector3(r.x + ang.x * f * amp, r.y, r.z + ang.y * f * amp * sd + wave)
+
+
+## Capes and shawls: lift away from the back with speed, falls and running flutter; never swing into the back.
+func _chain_cape(ch: Dictionary, dt: float, lv: Vector3, acc: Vector3, fall: float, flutter: float) -> void:
+	var target := Vector2(clampf(lv.z * 0.1 + acc.z * 0.012 + fall * 1.2 + flutter * 0.5 - _pose[J_SPINE].x * 0.6, 0.0, 1.1),
+		clampf(-lv.x * 0.08 - acc.x * 0.008 + turn_rate * 0.03, -0.45, 0.45))
+	var a: Vector2 = ch["ang"]
+	var v2: Vector2 = ch["vel"]
+	v2 += ((target - a) * float(ch["k"]) - v2 * float(ch["d"])) * dt
+	a += v2 * dt
+	a.x = clampf(a.x, -0.02, 1.2)
+	a.y = clampf(a.y, -0.5, 0.5)
+	ch["ang"] = a
+	ch["vel"] = v2
+	var segs: Array = ch["segs"]
+	var rest: Array = ch["rest"]
+	var r0: Vector3 = rest[0]
+	var r1: Vector3 = rest[1]
+	(segs[0] as Node3D).rotation = Vector3(r0.x - a.x, r0.y, r0.z + a.y)
+	(segs[1] as Node3D).rotation = Vector3(r1.x - a.x * 0.5 - flutter * 0.3, r1.y, r1.z + a.y * 0.5)
+
+
+## Wings: a slow flap that quickens with speed (phase integrated in _update_secondary).
+func _chain_wing(ch: Dictionary) -> void:
+	var flap := sin(_wing_phase) * (0.12 + 0.1 * _run_w)
+	var segs: Array = ch["segs"]
+	var rest: Array = ch["rest"]
+	for i in segs.size():
+		var r: Vector3 = rest[i]
+		(segs[i] as Node3D).rotation = Vector3(r.x, r.y + flap * (1.0 if i == 0 else -1.0), r.z)
+
+
+## Skirt / dress panels (skirt_rig.gd): sway with the motion, pushed out by the legs, clamped.
+func _update_skirt(dt: float) -> void:
+	if _skirt == null:
+		return
+	# The trail / billow come from the travel velocity in the upright frame; while the body tumbles through a roll
+	# that frame spins, so a "trailing" hem would swing into the ground (the back panels point down at 3/4 turn).
+	# Fade the motion drive out while rolling: the panels keep their base flare and the leg push.
+	var drive := 1.0 - _roll_blend
+	_skirt.update(dt, _lv * drive, _acc * drive, _pose[J_LEG_L], _pose[J_LEG_R], _pose[J_KNEE_L], _pose[J_KNEE_R], _t, _run_w * drive, turn_rate * drive)
+	for i in _skirt_pivots.size():
+		(_skirt_pivots[i] as Node3D).rotation = Vector3(-_skirt.flare[i], _skirt.theta[i], _skirt.side[i])
 
 
 func _update_props(dt: float) -> void:

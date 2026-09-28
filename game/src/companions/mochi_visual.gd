@@ -143,5 +143,7 @@ func _apply_pose(delta: float) -> void:
 
 
 func _on_action_started(a: String) -> void:
-	if a == "happy" or a == "celebrate":
+	if a == "happy" or a == "celebrate" or a == "mochi_twirl":
 		_cap_vel -= 3.0
+	elif a == "spore_puff" or a == "cast":
+		_cap_vel -= 2.2

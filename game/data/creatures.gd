@@ -17,6 +17,10 @@ const CREATURES := {
 		"enters_below": false,           # waits at the mine threshold (intentional, readable)
 		"brave": 0.1,
 		"voice": "mochi",               # sound prefix: mochi_chirp, mochi_happy, mochi_scared ...
+		# Chapter Two (additive): Brave Little Steps (MP 6.4) and home life (MP 6.5).
+		"courage_flag": "c1x_mochi_courage",   # once set, Mochi dares the underground areas
+		"ribbon_item": "comfort_ribbon",       # given from the Friends panel; the courage lantern checks it
+		"home_life": "napper",                 # naps now and then and tends crops near its home spot
 		"colors": {"cap": Color("e4665c"), "spots": Color("fff4e0"), "body": Color("f6e7cf")},
 	},
 	"pebble": {
@@ -30,6 +34,7 @@ const CREATURES := {
 		"enters_below": true,
 		"brave": 1.0,
 		"voice": "pebble",
+		"home_life": "cairn",                  # carries a small stone to its cairn (a few per day)
 		"colors": {"body": Color("9a948a"), "moss": Color("7dbb5b"), "eyes": Color("2b2a3f")},
 	},
 	"lumi": {
@@ -43,6 +48,7 @@ const CREATURES := {
 		"enters_below": true,
 		"brave": 0.4,
 		"voice": "lumi",
+		"home_life": "perch",                  # visits its perch and pulses with the Haven's lamps at night
 		"light": {"color": Color("ffd98a"), "energy": 1.2, "range": 6.5},
 		"colors": {"body": Color("fff1c9"), "glow": Color("ffd98a"), "ears": Color("f7c35c")},
 	},
@@ -65,6 +71,17 @@ const LINES := {
 		"celebrate": ["Mochi spins in circles, spores sparkling!"],
 		"idle": ["Mochi sniffs a flower.", "Mochi hums a little mushroom tune."],
 		"idle_below": ["Mochi stays very close to you."],
+		# Chapter Two (additive)
+		"skill": ["Mochi puffs a soft cloud of healing spores around you.", "Mochi squeaks and showers you in warm, sparkly spores."],
+		"ribbon": ["Mochi holds very still while you tie the ribbon, then keeps peeking at it."],
+		"courage": ["Mochi checks its ribbon. Then it takes one very brave little step."],
+		"tremble": ["Mochi trembles, but stays right beside you.", "Mochi clutches its ribbon and keeps going."],
+		"refuse_deep": ["Mochi stops at the top of the old stair and trembles. It will wait for you here."],
+		"assist": ["Mochi puffs up its cap, ready to help."],
+		"close": ["Mochi scoots in close beside you."],
+		"nap": ["Mochi curls up for a little nap in the sun."],
+		"notice_home": ["Mochi circles the new {thing}, sniffing politely.", "Mochi pats the new {thing} approvingly."],
+		"affection": ["Mochi twirls around you, spores sparkling, and bumps your boot with its cap."],
 	},
 	"pebble": {
 		"befriend": ["The boulder cracks apart and a little stone creature tumbles out. It salutes you with great seriousness. Pebble has joined you!"],
@@ -79,6 +96,13 @@ const LINES := {
 		"celebrate": ["Pebble does a very dignified victory stomp."],
 		"idle": ["Pebble inspects a rock with deep respect.", "Pebble is polishing itself."],
 		"idle_below": ["Pebble taps the tunnel wall approvingly. Good rock.", "Pebble marches on, pretending not to be nervous."],
+		# Chapter Two (additive)
+		"skill": ["Pebble plants its feet and a warm stone shell settles over you.", "Pebble thumps the ground. Nothing gets past Pebble."],
+		"assist": ["Pebble cracks its knuckles. It doesn't have knuckles, but it tries."],
+		"close": ["Pebble takes up guard right beside you."],
+		"cairn": ["Pebble adds a stone to its cairn with great ceremony.", "Pebble steps back to admire its cairn."],
+		"notice_home": ["Pebble inspects the new {thing}. It approves of the craftsmanship.", "Pebble knocks on the new {thing}. Solid."],
+		"affection": ["Pebble wraps its stubby arms around your boot and refuses to let go. Briefly."],
 	},
 	"lumi": {
 		"befriend": ["The little light creeps out of the ruin and settles beside you, glowing warmly. Lumi trusts you now."],
@@ -92,5 +116,13 @@ const LINES := {
 		"celebrate": ["Lumi sparkles like a tiny festival of lights!"],
 		"idle": ["Lumi chases a firefly.", "Lumi watches the leaves with great interest."],
 		"idle_below": ["Lumi's glow brushes the old stone walls.", "Lumi hums softly to keep the dark at bay."],
+		# Chapter Two (additive)
+		"skill": ["Lumi flares bright and the path ahead feels lighter.", "Lumi chimes and a ripple of light rolls out around you."],
+		"assist": ["Lumi's glow sharpens. It's watching the dark for you."],
+		"close": ["Lumi drifts in right at your shoulder."],
+		"perch": ["Lumi settles on its perch, glowing softly."],
+		"house_lights": ["Lumi's glow pulses in time with the Haven's lanterns."],
+		"notice_home": ["Lumi circles the new {thing}, lighting it up from every side.", "Lumi chimes at the new {thing}."],
+		"affection": ["Lumi spins a slow, glowing loop around you and curls its tail round your wrist."],
 	},
 }

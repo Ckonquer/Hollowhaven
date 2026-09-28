@@ -3,6 +3,8 @@ extends Node
 ##   health = preload("res://src/combat/health.gd").new(); health.name = "Health"; health.max_hp = 30.0
 ##   add_child(health)
 ## Damage multipliers/invulnerability are handled here so every damage source behaves the same.
+## Krystal uses the subclass src/player/player_health.gd (spec section 9: i-frames -> Stats reduction ->
+## shield -> hp, heal x Stats.heal_mult); `apply_damage` returning 0 is the "blocked" signal everywhere.
 
 signal damaged(amount: float, source: Node, dir: Vector3)
 signal healed(amount: float)
