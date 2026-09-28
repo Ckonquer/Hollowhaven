@@ -269,13 +269,15 @@ func test_skips_prevent_a_stall_after_a_sequence_break() -> void:
 	assert_eq(_held("thread_veil"), 1)
 
 
+## The log itself never emits Events.chapter2_completed: Game.complete_chapter_two() (the ending flow) is the
+## single emitter (lead integration decision). The final step still latches once and sets its flag.
 func test_final_step_emits_chapter2_completed_once() -> void:
 	var done := record(Events.chapter2_completed, 0)
 	_activate()
 	for id in MP_IDS:
 		_finish(id)
 	log.evaluate()
-	assert_eq(done.size(), 1)
+	assert_eq(done.size(), 0, "the ending flow, not the log, announces the chapter")
 	assert_true(log.is_finished())
 	assert_eq(log.done, MP_IDS)
 	assert_eq(log.current_steps(), [])
@@ -283,7 +285,7 @@ func test_final_step_emits_chapter2_completed_once() -> void:
 	log.evaluate()
 	log.from_dict(log.to_dict())
 	log.evaluate()
-	assert_eq(done.size(), 1, "only once")
+	assert_eq(done.size(), 0, "never from the log, also after reload")
 	assert_eq(GameState.current_objective()["source"], "legacy", "a finished chapter hands the tracker back")
 
 

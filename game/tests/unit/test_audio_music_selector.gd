@@ -12,11 +12,27 @@ const NEW_CUES := ["m03", "m04", "m06", "m07", "m08", "m09", "m10", "m11", "m12"
 const LAYERS := ["m13_layer2", "m13_layer3", "m26_borrowed_welcome_l2", "m26_borrowed_welcome_l3"]
 
 
-func _sel(seed_value: int = 1, tuning: Dictionary = {}, avail: Dictionary = {}) -> RefCounted:
+func _sel(seed_value: int = 1, tuning: Dictionary = {}, avail: Dictionary = {}, untimed: Array = []) -> RefCounted:
 	var s: RefCounted = Selector.new()
-	s.setup(MusicData.catalogue(), seed_value, tuning)
+	s.setup(_catalogue(untimed), seed_value, tuning)
 	s.set_available(avail)
 	return s
+
+
+## The real catalogue, optionally with some cues' tempo removed (bpm 0 = unknown tempo) so the
+## unknown-tempo paths stay covered now that every new cue carries tempo metadata.
+func _catalogue(untimed: Array = []) -> Dictionary:
+	var cat: Dictionary = MusicData.catalogue()
+	if untimed.is_empty():
+		return cat
+	cat = cat.duplicate()
+	var cues: Dictionary = (cat["cues"] as Dictionary).duplicate(true)
+	for id in untimed:
+		if cues.has(id):
+			cues[id]["bpm"] = 0.0
+			cues[id]["bars"] = 0
+	cat["cues"] = cues
+	return cat
 
 
 func _ctx(area: String, zone: String, extra: Dictionary = {}) -> Dictionary:
@@ -210,7 +226,8 @@ func test_base_context_per_area_zone_and_time() -> void:
 # --- combat --------------------------------------------------------------------------------------------
 
 func test_combat_hysteresis_enter_and_release() -> void:
-	var s := _sel(21)
+	# Woods pieces without tempo: combat enters immediately (bar alignment is covered below).
+	var s := _sel(21, {}, {}, ["m07", "m08"])
 	var c := _ctx("surface", "")
 	assert_eq(String(s.update(c, 0.25)["context"]), "woods")
 	# a 0.5 s blip is ignored
@@ -493,10 +510,12 @@ func test_phrase_math() -> void:
 	assert_almost(Selector.beat_wait(m05, "phrase", 70.0), 10.0, 0.001, "short last phrase ends at the loop point")
 	var m13: Dictionary = MusicData.CUES["m13"]      # 2+8+8+8+4
 	assert_almost(Selector.beat_wait(m13, "phrase", 3.0), 1.0, 0.001, "irregular phrase starts")
-	var m03: Dictionary = MusicData.CUES["m03"]
-	assert_eq(Selector.beat_wait(m03, "phrase", 5.0), -1.0, "unknown tempo")
-	assert_almost(Selector.beat_wait(m03, "phrase", 5.0, 0.0, 120.0, 4), 11.0, 0.001, "stream bpm metadata")
-	assert_almost(Selector.beat_wait(m03, "phrase", 99.0, 100.0, 120.0, 4), 1.0, 0.001, "end of the piece is a boundary")
+	var m25: Dictionary = MusicData.CUES["m25"]      # 7/8 + 4/4: deliberately no tempo metadata
+	assert_eq(Selector.beat_wait(m25, "phrase", 5.0), -1.0, "unknown tempo")
+	assert_almost(Selector.beat_wait(m25, "phrase", 5.0, 0.0, 120.0, 4), 11.0, 0.001, "stream bpm metadata")
+	assert_almost(Selector.beat_wait(m25, "phrase", 99.0, 100.0, 120.0, 4), 1.0, 0.001, "end of the piece is a boundary")
+	var m03: Dictionary = MusicData.CUES["m03"]      # 96 bpm 4/4, 8-bar phrases = 20 s
+	assert_almost(Selector.beat_wait(m03, "phrase", 5.0), 15.0, 0.001, "new cue tempo metadata")
 
 
 func test_day_night_switch_waits_for_the_phrase() -> void:
@@ -516,7 +535,7 @@ func test_day_night_switch_waits_for_the_phrase() -> void:
 
 
 func test_day_night_switch_waits_for_the_end_when_tempo_unknown() -> void:
-	var s := _sel(15, {"rest_scale": 0.1}, {"m02": false, "m04": false})
+	var s := _sel(15, {"rest_scale": 0.1}, {"m02": false, "m04": false}, ["m03"])
 	var c := _ctx("surface", "haven")
 	var d: Dictionary = s.update(c, 0.2)
 	assert_eq(String(d["cue"]), "m03", "Wood, Wool & Windows (tempo unknown)")
@@ -826,3 +845,28 @@ func test_debug_log_keeps_the_last_50_decisions() -> void:
 			assert_true((e as Dictionary).has(k), "entry has %s" % k)
 	entries.clear()
 	assert_true(s.get_debug_log().size() > 10, "callers get a copy")
+
+
+## With tempo metadata (all new cues have it), combat enters on the next bar of the exploration piece:
+## after the 1 s threat hysteresis and within one bar of it.
+func test_combat_entry_lands_on_a_bar_with_known_tempo() -> void:
+	var s := _sel(22)
+	var c := _ctx("surface", "", {"pos_s": 0.0})
+	var d0: Dictionary = s.update(c, 0.25)
+	assert_eq(String(d0["context"]), "woods")
+	var cue: Dictionary = MusicData.CUES.get(String(d0["cue"]), {})
+	var bpm := float(cue.get("bpm", 0.0))
+	assert_true(bpm > 0.0, "woods piece %s carries tempo metadata" % String(d0["cue"]))
+	var bar_s := 60.0 / maxf(bpm, 1.0) * float(cue.get("bpb", 4))
+	c["threat"] = true
+	var t := 0.25
+	var entered := -1.0
+	while t < 1.0 + bar_s + 0.5:
+		c["pos_s"] = t
+		var d: Dictionary = s.update(c, 0.1)
+		t += 0.1
+		if String(d["action"]) == "play" and String(d["context"]) == "combat1":
+			entered = t + float(d["wait_s"])
+			break
+	assert_true(entered >= 1.0 - 0.11, "not before the 1 s hysteresis (%.2f)" % entered)
+	assert_true(entered <= 1.25 + bar_s + 0.11, "within one bar after it (%.2f, bar %.2f s)" % [entered, bar_s])
