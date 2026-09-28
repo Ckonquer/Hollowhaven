@@ -976,17 +976,28 @@ def build_steps(p: Play, args):
                 p.face(e["pos"], tol=8, turn_body=True)
                 time.sleep(0.2)
                 if p.prompt_matches(["Talk to Mochi"]):
+                    # the game re-picks the focus when E lands (player.gd _interact -> probe.refresh()), a telemetry
+                    # frame or two after the prompt we read; Lumi follows ~2 m away and can win that re-pick while
+                    # Mochi runs off (final_201_fresh): check whose panel opened and retry if it is not Mochi's
                     b.tap("E")
                     if p.wait(lambda st: "companion" in st.get("ui_stack", []), 3.0):
-                        opened = True
+                        time.sleep(0.4)
+                        btns = [x["text"] for x in b.buttons()]
+                        if any(t.startswith("Use Glimmerstep") for t in btns):
+                            p.log(f"E opened Lumi's panel instead of Mochi's ({btns[:8]}); retrying")
+                            p.close_panels()
+                            time.sleep(0.3)
+                        else:
+                            opened = True
                 else:
                     time.sleep(0.3)
             if not opened:
                 raise StepFailed(f"could not open Mochi's Friends panel (prompt {p.prompt()})")
             time.sleep(0.5)
             if not p.click("Tie the Comfort Ribbon", exact=True):
+                btns = [x["text"] for x in b.buttons()][:30]
                 p.close_panels()
-                raise StepFailed(f"'Tie the Comfort Ribbon' not available (buttons {[x['text'] for x in b.buttons()][:30]})")
+                raise StepFailed(f"'Tie the Comfort Ribbon' not available (buttons {btns})")
             time.sleep(0.5)
             p.click("Follow me", exact=True, timeout=2.0)
             time.sleep(0.4)
