@@ -343,7 +343,9 @@ func _ledge_floor() -> void:
 func test_a_charge_baited_off_the_ledge_bonks_at_the_edge() -> void:
 	_ledge_floor()
 	var far := _pillar(Vector3(12, 0, 12))
-	var d := _dummy(Vector3(0, -1.4, -6.5))          # she stands down on L1, just past the edge
+	# She baits it at the very edge of L2 and side-steps: the 12 m lane runs on past the edge (QA CHAIN-001: it never
+	# starts an attack at her while she stands down on L1 itself, so the bait is on its own level).
+	var d := _dummy(Vector3(0, 0, -2.6))
 	var e := _warden(d, Vector3.ZERO, [far])
 	await wait_physics(3)
 	assert_true(bool(e.floor_ahead(Vector3(0, 0, -1), 0.1)), "floor ahead where it stands")
@@ -364,7 +366,7 @@ func test_with_no_intact_pillar_the_ledge_exposes_it() -> void:
 	_ledge_floor()
 	var gone := _pillar(Vector3(12, 0, 12))
 	gone.crack()
-	var d := _dummy(Vector3(0, -1.4, -6.5))
+	var d := _dummy(Vector3(0, 0, -2.6))              # baited at the L2 edge (see above)
 	var e := _warden(d, Vector3.ZERO, [gone])
 	await wait_physics(3)
 	_baited_charge(e, d)
@@ -780,6 +782,10 @@ func test_arena_hands_over_pillars_and_defeat_commits_first() -> void:
 	assert_true((w.arena_center as Vector3).is_equal_approx(a.global_position), "arena centre")
 	assert_eq(w.arena, a, "arena node")
 	a.pillars[0].crack()
+	# QA CHAIN-002: no defeat before its shell was cracked open once - the pillar exposure (the charge into pillar 0
+	# above) opens it, then the finishing blow may land.
+	w._expose()
+	w._end_exposure(false)
 	var captions: Array = []
 	var cb := func(text: String) -> void: captions.append([text, bool(GameState.get_flag(Q.FLAG_WARDEN))])
 	Events.caption.connect(cb)

@@ -28,6 +28,12 @@ extends "res://src/enemies/enemy_base.gd"
 ## blows never take it below PULSE_FLOOR_RATIO of its health (the excess glances off, a hint explains). The first
 ## full pulse cycle pays the debt; after that phase 2 picks its attacks as before. Never a softlock: the pulses are
 ## an ordinary committed attack it starts as soon as Krystal is within reach.
+## The pillar bait is the fight's key (QA CHAIN-002: slam punishes and poise stuns alone used to finish it with no
+## exposure at all): until its shell has been cracked open ONCE in this attempt, blows never take it below
+## SHELL_FLOOR_RATIO of its health (the excess glances off; a one-time hint points at the pillars), and from the first
+## blow the floor stops it prefers the charge at any range (after the slam lesson; owed pulses still come first), so
+## a player who stays close meets the bait too. The first exposure lifts the floor for the rest of the attempt; a retry
+## restores it. The floor only holds while an intact pillar stands, so it never makes the fight unwinnable.
 ## Never unwinnable: pillars come from the arena (3, re-knitting by themselves) or group "quarry_pillar" near the
 ## arena; when NO intact pillar is left (or none exists) a charge into any wall exposes it too.
 ## Companions (spec 9) may only hit it while exposed or recovering (can_be_hit_by). Ordinary hits never stagger it;
@@ -42,6 +48,14 @@ extends "res://src/enemies/enemy_base.gd"
 ## to the arena (ring + ARENA_LEASH_MARGIN, same level within ARENA_LEASH_DY), so it never stays engaged below the
 ## crystal shelf. The arena additionally despawns a living Warden on her defeat. Permanent progress
 ## (hr_warden_defeated, the winch) is never touched here.
+## It fights only on its own ARENA FLOOR (player_on_arena_floor(): within the leash ring and within ARENA_FLOOR_DY of
+## the arena's height - a jump stays on it, the L1 terrace 1.4 m below the bench does not; QA CHAIN-001, where it
+## stood in "chase" for minutes above Krystal on that terrace): it only engages her there and never starts an attack at
+## her off it (no attacks across levels or through the step); it follows her no further than its arena ring, never walks
+## off its level (a ledge ahead stops any chase step, like its charge), and after UNREACHABLE_GIVE_UP s of chase with
+## her off the floor it gives up - hint, the walk home and the clean reset above - and waits until she stands on its
+## floor again. On the floor it never gives up (hiding behind a pillar never heals it): with no clear line it closes in
+## and comes round instead of holding its charge stand-off.
 ## Intensity (enemy_base intensity_* / overlap_blocked): Gentle = longer wind-ups / rests / pulse spacing; Intense =
 ## shorter rests only (no feint; the 1.6 s pulse / charge wind-ups stay above the 1.0-1.4 s guideline on purpose:
 ## longer tells are fairer, never shorter - integration pass 2, P11). Settings timing_assist (elites count as boss
@@ -80,6 +94,9 @@ const EXPOSED_MULT := 1.6
 const EXPOSE_CAP := 0.35             # of max health: the most one exposure can take (then the shell grinds shut)
 const PHASE2_RATIO := 0.66
 const PULSE_FLOOR_RATIO := 0.3       # of max health: blows stop here while the phase-2 pulses are still owed
+const SHELL_FLOOR_RATIO := 0.5       # of max health: blows stop here until its shell was cracked open once (CHAIN-002)
+const ARENA_FLOOR_DY := 1.2          # her arena floor band: +/- this of its height (a jump ~1 m; L1 is 1.4 m lower)
+const UNREACHABLE_GIVE_UP := 5.0     # s of chase with her off its arena floor before it gives up and goes home (CHAIN-001)
 const SLAMS_BEFORE_CHARGE := 1
 const POISE := 45.0
 const POISE_WINDOW := 5.0
@@ -106,6 +123,8 @@ var exposure_damage: float = 0.0     # health taken in the current / last exposu
 var pillars_cracked: int = 0
 var last_charge_result: String = ""  # "hit" | "missed" | "pillar" | "wall" | "wall_exposed"
 var ledge_stops: int = 0             # charges stopped by a ledge (no floor ahead) - they bonk like a wall
+var edge_holds: int = 0              # chase steps it refused because its own level ends there (the bench edge)
+var give_ups: int = 0                # encounters it ended because Krystal stayed off its arena floor (CHAIN-001)
 var _arena_set := false
 var _radius_set := false
 var _def: Dictionary = {}
@@ -119,6 +138,10 @@ var _lane_clip_t: float = 0.0
 var _poise_dmg: float = 0.0
 var _poise_t: float = 0.0
 var _poise_immune: float = 0.0
+var _shell_cracked := false          # this attempt has had an exposure: the shell floor is lifted (CHAIN-002)
+var _shell_held := false             # the shell floor stopped a blow in this attempt: it now charges to show the way
+var _off_floor_t: float = 0.0        # chase time with Krystal off its arena floor (CHAIN-001)
+var _gave_up := false                # it went home because of that; cleared once she stands on its floor again
 
 
 func _init() -> void:
@@ -264,6 +287,9 @@ func reset_encounter() -> void:
 	slams_done = 0
 	_since_pulses = 2
 	_pulses_owed = false
+	_shell_cracked = false                            # a fresh attempt needs its pillar exposure again (CHAIN-002)
+	_shell_held = false
+	_off_floor_t = 0.0                                # (_gave_up stays until she stands on its floor again)
 	exposure_damage = 0.0
 	_poise_dmg = 0.0
 	_poise_t = 0.0
@@ -384,14 +410,91 @@ func pulse_floor() -> float:
 	return float(health.max_hp) * PULSE_FLOOR_RATIO
 
 
+## True until its shell has been cracked open once in this attempt (any exposure), while an intact pillar stands to
+## crack it on (QA CHAIN-002). With no intact pillar left - or none at all - nothing is owed: never unwinnable.
+func exposure_owed() -> bool:
+	if _shell_cracked or health == null or health.dead:
+		return false
+	return intact_pillars() > 0
+
+
+## Blows never take it below this now: SHELL_FLOOR_RATIO of max health while an exposure is owed, else 0.
+func shell_floor() -> float:
+	return float(health.max_hp) * SHELL_FLOOR_RATIO if exposure_owed() else 0.0
+
+
+## The shell floor has stopped a blow in this attempt and still holds: it charges (at any range) to show the way.
+func shell_holds() -> bool:
+	return _shell_held and exposure_owed()
+
+
+## Is Krystal on its arena floor: within the leash ring (arena_radius + ARENA_LEASH_MARGIN) and within ARENA_FLOOR_DY
+## of the arena's height? It engages and attacks her only there (QA CHAIN-001).
+func player_on_arena_floor() -> bool:
+	if _player == null or not is_instance_valid(_player):
+		return false
+	var p := _player.global_position
+	if absf(p.y - arena_center.y) > ARENA_FLOOR_DY:
+		return false
+	return Vector2(p.x - arena_center.x, p.z - arena_center.z).length() <= arena_radius + ARENA_LEASH_MARGIN
+
+
+## Seconds of the current chase with Krystal off its arena floor (it gives up at UNREACHABLE_GIVE_UP).
+func off_floor_time() -> float:
+	return _off_floor_t
+
+
+## It went home because Krystal stayed off its arena floor; true until she stands on its floor again.
+func has_given_up() -> bool:
+	return _gave_up
+
+
 func _can_start_attack() -> bool:
-	return _shot_clear and not overlap_blocked()
+	return _shot_clear and not overlap_blocked() and player_on_arena_floor()
+
+
+func _should_aggro() -> bool:
+	return super._should_aggro() and player_on_arena_floor()
+
+
+func _chase_valid() -> bool:
+	return super._chase_valid() and not _gave_up
+
+
+## QA CHAIN-001. On its floor with no clear line to her (a pillar / a rock in between) - or with her off its floor - it
+## closes in instead of holding its charge stand-off distance, so it never stands frozen. It never walks off its own
+## level: a ledge ahead (the bench edge) stops it there, as it stops its charge (D06); and while she is off its floor
+## it follows her only as far as its arena ring (never down a ramp after her), where it waits until it gives up.
+func _st_chase(delta: float) -> void:
+	super._st_chase(delta)
+	if state != "chase" or _player == null or not is_instance_valid(_player):
+		return
+	var on_floor := player_on_arena_floor()
+	if _desired_vel.length_squared() < 0.01 and (not _shot_clear or not on_floor):
+		var to := _player.global_position - global_position
+		to.y = 0.0
+		if to.length() > _body_radius() + 0.8:
+			_steer(to.normalized(), float(data.get("chase_speed", 4.0)) * _speed_scale(), delta)
+	if _desired_vel.length_squared() < 0.01:
+		return
+	if not on_floor:
+		var g := global_position
+		var nxt := g + _desired_vel * delta
+		var r_next := Vector2(nxt.x - arena_center.x, nxt.z - arena_center.z).length()
+		if r_next > arena_radius and r_next > Vector2(g.x - arena_center.x, g.z - arena_center.z).length():
+			_desired_vel = Vector3.ZERO
+			return
+	if not floor_ahead(_desired_vel, _desired_vel.length() * delta):
+		_desired_vel = Vector3.ZERO
+		edge_holds += 1
 
 
 func _choose_attack() -> void:
 	var kind := next_attack
 	if kind == "" and _pulses_owed:
 		kind = "pulses"
+	if kind == "" and charge_unlocked() and shell_holds():
+		kind = "charge"                                 # CHAIN-002: blows stopped working - it shows the pillar bait
 	if kind == "":
 		var dist := _flat_dist_to_player()
 		var pulses_ok := phase >= 2 and _since_pulses >= 2
@@ -458,6 +561,18 @@ func _tick_extra(delta: float) -> void:
 	if state == "telegraph":
 		_lane_clip_t -= delta
 		_update_mark(_lane_clip_t <= 0.0 and state_time <= _state_len * TELEGRAPH_TRACK)
+	# QA CHAIN-001: off its arena floor she is out of its reach; a chase that stays that way ends (this tick's chase
+	# step sees _chase_valid() fail and walks home: the clean leash reset). Her stepping onto its floor clears it all.
+	if player_on_arena_floor():
+		_off_floor_t = 0.0
+		_gave_up = false
+	elif state == "chase" and not _gave_up:
+		_off_floor_t += delta
+		if _off_floor_t >= UNREACHABLE_GIVE_UP:
+			_off_floor_t = 0.0
+			_gave_up = true
+			give_ups += 1
+			Events.hint.emit("hint_quarry_warden_bench", "The Warden won't leave its bench - it goes back to rest and mends. Step onto its arena floor to face it again.")
 
 
 func _update_mark(reclip: bool) -> void:
@@ -613,6 +728,8 @@ func _pillar_ahead() -> Node3D:
 
 func _expose() -> void:
 	exposures += 1
+	_shell_cracked = true                               # CHAIN-002: the shell floor lifts for the rest of the attempt
+	_shell_held = false
 	exposure_damage = 0.0
 	_enter("exposed", expose_time())
 	Audio.play_3d("heartseed_pulse", global_position + Vector3.UP * 1.6, 0.0, 0.05)
@@ -689,6 +806,8 @@ func is_threatening() -> bool:
 
 
 func _is_uninterruptible() -> bool:
+	if _gave_up and state in ["idle", "wander", "return"]:
+		return true                                     # CHAIN-001: a blow from off its floor never restarts the chase
 	return super._is_uninterruptible() or state == "exposed"
 
 
@@ -738,19 +857,25 @@ func _on_damaged(amount: float, source: Node, dir: Vector3) -> void:
 
 
 ## The share of a blow (`amount`, already taken from health) it may keep: at most what is left of expose_cap() in
-## an exposure, and never below pulse_floor(). The rest goes back to health.
+## an exposure, and never below pulse_floor() or shell_floor() (the higher one; its hint explains). The rest goes
+## back to health.
 func _limit_damage(amount: float) -> float:
 	if health == null or amount <= 0.0:
 		return amount
 	var allowed := amount
 	if state == "exposed":
 		allowed = minf(allowed, maxf(expose_cap() - exposure_damage, 0.0))
-	var fl := pulse_floor()
+	var pf := pulse_floor()
+	var sf := shell_floor()
+	var fl := maxf(pf, sf)
 	if fl > 0.0:
 		var floored := maxf(float(health.hp) + amount - fl, 0.0)
 		if floored < allowed:
 			allowed = floored
-			_floor_hint()
+			if sf >= pf:
+				_shell_hint()
+			else:
+				_floor_hint()
 	if allowed < amount:
 		health.hp += amount - allowed
 	if state == "exposed":
@@ -760,6 +885,14 @@ func _limit_damage(amount: float) -> float:
 
 func _floor_hint() -> void:
 	Events.hint.emit("hint_quarry_warden_pulses", "The cracked bell is humming - the Warden won't give way until it has rung its three pulses. Step out of the red ring, or roll on each beat!")
+
+
+## CHAIN-002: the first blow the shell floor stops (once per attempt; the HUD also keeps a hint once per save).
+func _shell_hint() -> void:
+	if _shell_held:
+		return
+	_shell_held = true
+	Events.hint.emit("hint_quarry_warden_pillars", "Blows only glance off its shell now! Stand with a mineral pillar behind you, then side-step its charge so it crashes into the pillar.")
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

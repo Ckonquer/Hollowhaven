@@ -364,7 +364,9 @@ after bug-fix round 1 CH2-001..017 and the visual fixes; its evidence is `QA_REP
   Wisp (forced reveal) - never on bosses. Setup keys: `pumpkin_mimic` `dormant` (never passed by spawners) / `seed`; `quarry_warden`
   `arena`, `arena_center`, `arena_radius`, `pillars` (leash = arena radius + 6 m within a 3 m height band; timing assist ×1.5; the
   charge lane is clipped 1 m inside the arena and a ledge bonks; one exposure takes at most `EXPOSE_CAP` 35 % and phase 2 owes its
-  three pulses, `PULSE_FLOOR_RATIO` 30 % floor until they played - pass 3). Bosses take `"mode": "story" | "trial"` (trial: no
+  three pulses, `PULSE_FLOOR_RATIO` 30 % floor until they played - pass 3; after 2.0.0, CHAIN-001 / 002: a `SHELL_FLOOR_RATIO`
+  50 % floor until its first exposure of the attempt while an intact pillar stands, and it fights only on its arena floor -
+  `ARENA_FLOOR_DY` 1.2 m band, no attacks across levels, gives up after 5 s with her off it). Bosses take `"mode": "story" | "trial"` (trial: no
   flags, no `boss_defeated`): `count_velour` (in group "enemy" only while fighting; one clean reset rule; one window ≤ `WINDOW_CAP`
   16 % through `velour_health.window_room`, checked before the blow lands, a finishing blow never trimmed), `crossing_matron` (arena
   `boss_params()` incl. `rail`; with a Lantern the HP floor `Rules.HP_FLOOR` is 60 / 35 / 20 % before exposures 1 / 2 / 3 and the

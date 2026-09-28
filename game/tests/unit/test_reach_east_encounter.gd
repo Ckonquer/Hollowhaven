@@ -204,6 +204,10 @@ func test_real_warden_gets_the_arena_and_its_defeat_clears_it() -> void:
 	var cleared: Array = []
 	a.encounter_cleared.connect(func() -> void: cleared.append(1))
 	a.pillars[0].crack()
+	# QA CHAIN-002: the Warden can't fall before its shell was cracked open once (the pillar exposure its charge into
+	# pillar 0 would start); after that the finishing blow lands.
+	w.call("_expose")
+	w.call("_end_exposure", false)
 	(w.get("health") as Node).call("apply_damage", 1.0e6)
 	await wait_frames(3)
 	assert_true(bool(GameState.get_flag(Q.FLAG_WARDEN)), "hr_warden_defeated")
