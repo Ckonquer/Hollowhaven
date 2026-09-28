@@ -569,3 +569,45 @@ func test_follower_does_not_steal_focus_from_gatherables() -> void:
 	assert_eq(player.get_focus_target(), pal, "a WILD creature (befriending) is not deprioritised")
 	grass2.queue_free()
 	pal.queue_free()
+
+
+class FakeWallItem extends FakeNode:
+	# Like the Foreman's Key: an interaction volume standing behind a desk, reaching up to a wall board.
+	func _ready() -> void:
+		var body := StaticBody3D.new()
+		body.collision_layer = 16
+		body.collision_mask = 0
+		var cs := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(0.75, 1.9, 0.6)
+		cs.shape = box
+		cs.position = Vector3(0, 0.95, 0)
+		body.add_child(cs)
+		add_child(body)
+
+
+func test_item_behind_a_desk_edge_is_still_targetable() -> void:
+	# Found in the real-input playthrough: the Foreman's Key (hanging above the far side of the desk)
+	# could never be focused because the line-of-sight ray aimed at the floor behind the desk.
+	_allow_input()
+	var desk := StaticBody3D.new()
+	desk.collision_layer = 1
+	var dcs := CollisionShape3D.new()
+	var dbox := BoxShape3D.new()
+	dbox.size = Vector3(1.9, 0.9, 0.9)
+	dcs.shape = dbox
+	desk.add_child(dcs)
+	add_child(desk)
+	desk.global_position = SPOT + Vector3(0, 0.45, -0.77)          # desk front edge 0.32 m in front of Krystal
+	var key := FakeWallItem.new()
+	key.info = {}
+	key.interaction = {"text": "Take the Foreman's Key", "enabled": true}
+	if player.global_position.distance_to(SPOT) > 1.0:
+		player.teleport(Transform3D(Basis.IDENTITY, SPOT + Vector3(0, 0.05, 0)))
+	add_child(key)
+	key.global_position = SPOT + Vector3(0, 0, -1.02)
+	await wait_physics(4)
+	player.probe.refresh()
+	assert_eq(player.get_focus_target(), key, "the key above the far side of the desk can be focused")
+	key.queue_free()
+	desk.queue_free()

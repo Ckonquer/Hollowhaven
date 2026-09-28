@@ -677,9 +677,16 @@ def build_steps(p: Play, args):
         if p.inv("lantern") < 1:
             p.craft("Lantern", station_tab="Workbench")
         if p.inv("berry_snack") + p.inv("hearty_stew") < 2:
-            if p.inv("berries") < 8:
-                raise StepFailed("not enough berries for snacks")
-            p.craft("Berry Snack", times=2)
+            need = 4 * (2 - p.inv("berry_snack") - p.inv("hearty_stew"))
+            if p.inv("berries") < need:
+                # go pick more: bushes around the Haven first, then the Berry Glade
+                try:
+                    p.gather_hand(["Berr"], "berries", need + 2, maxd=45)
+                except StepFailed:
+                    p.travel("glade")
+                    p.gather_hand(["Berr"], "berries", need + 2, maxd=45)
+                    p.travel_home()
+            p.craft("Berry Snack", times=max(1, need // 4))
         return p.wait(lambda s: s.get("step") == "descend", 8) is not None
 
     def descend():

@@ -147,7 +147,7 @@ func _consider(space: PhysicsDirectSpaceState3D, collider: Object, ppos: Vector3
 
 func _line_of_sight(space: PhysicsDirectSpaceState3D, ppos: Vector3, col: Node3D, owner_node: Node, surf: float) -> bool:
 	var from := ppos + Vector3.UP * 1.0
-	var to := col.global_position + Vector3.UP * 0.3
+	var to := los_target(col)
 	if from.distance_to(to) < 0.3:
 		return true
 	_los_q.from = from
@@ -226,6 +226,23 @@ static func resolve_owner(n: Node) -> Node:
 
 
 ## Horizontal distance from `from` to the collision surface of `col` (approximated per shape type).
+## Point the line-of-sight ray aims at: the centre of the collider's first shape (so things on a wall
+## board or behind a desk edge are "seen" where they actually are), never lower than 0.3 m above the
+## collider's origin (small things lying on the ground).
+static func los_target(col: Node3D) -> Vector3:
+	var base := col.global_position + Vector3.UP * 0.3
+	if col is CollisionObject3D:
+		var co := col as CollisionObject3D
+		for owner_id in co.get_shape_owners():
+			if co.is_shape_owner_disabled(owner_id):
+				continue
+			var c: Vector3 = (co.global_transform * co.shape_owner_get_transform(owner_id)).origin
+			if c.y < base.y:
+				c.y = base.y
+			return c
+	return base
+
+
 static func surface_distance(col: Node3D, from: Vector3) -> float:
 	var best := INF
 	if col is CollisionObject3D:
