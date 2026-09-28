@@ -203,13 +203,46 @@ def foreground_pid() -> int:
 
 
 LSFW_LOCK, LSFW_UNLOCK = 1, 2
+_HOLD_LOCK = ("import ctypes,sys;u=ctypes.WinDLL('user32',use_last_error=True);"
+              "print(int(u.LockSetForegroundWindow(1)),ctypes.get_last_error(),flush=True);sys.stdin.read();"
+              "print(int(u.LockSetForegroundWindow(2)),ctypes.get_last_error(),flush=True)")
 
 
-def lock_foreground(lock: bool) -> bool:
-    """LockSetForegroundWindow: while locked, no process can take the foreground by itself (user clicks / Alt still
-    switch windows as usual). Measured on this PC: without it the packaged build's first window becomes the OS
-    foreground window ~0.6 s after launch despite display/window/size/no_focus; with it, never."""
-    return bool(user32.LockSetForegroundWindow(LSFW_LOCK if lock else LSFW_UNLOCK))
+class ForegroundLock:
+    """Holds LockSetForegroundWindow(LSFW_LOCK) for the life of one game process, from a FRESH helper process.
+
+    Measured on this PC (qa/tmp/perf notes, 2026-09-28): the packaged build's first window becomes the OS foreground
+    window ~0.6 s after launch despite override.cfg display/window/size/no_focus (a new process gets a startup
+    activation right). LockSetForegroundWindow blocks that, but only a process that itself still has foreground
+    rights may call it - a new process has them for its first ~20-45 s, a long-running script loses them (this
+    script's own calls failed with ERROR_ACCESS_DENIED after the first launch, and the game then took the focus in
+    29 of 30 sessions of the first profile run) - and the lock ends when the locking process exits. So every launch
+    starts a new helper that locks, stays alive until the game has been stopped, then unlocks and exits. While
+    locked, the owner's own clicks / Alt+Tab still switch windows as usual (Windows lifts the lock on user action)."""
+
+    def __init__(self):
+        self.proc: subprocess.Popen | None = None
+        self.locked = False
+        self.unlocked: bool | None = None
+
+    def __enter__(self):
+        self.proc = subprocess.Popen([sys.executable, "-c", _HOLD_LOCK], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.locked = self.proc.stdout.readline().strip().startswith("1")
+        return self
+
+    def release(self):
+        if self.proc is None:
+            return
+        try:
+            out, _ = self.proc.communicate("", timeout=15)
+            self.unlocked = out.strip().startswith("1")
+        except Exception:  # noqa: BLE001
+            self.proc.kill()
+        self.proc = None
+
+    def __exit__(self, *exc):
+        self.release()
 
 
 def give_back_foreground(hwnd: int) -> bool:
@@ -496,7 +529,13 @@ class Runner:
         write_settings(run_dir / "qa_settings.cfg", preset, self.a.vsync == "on")
         extra = ["--qa-perf", "--qa-interval=0.2", "--no-wardrobe-notice", f"--perf-log={(run_dir / 'perf_log.jsonl').as_posix()}"]
         self.prev_fg = user32.GetForegroundWindow()
-        self.fg_locked = lock_foreground(True) if not self.a.headless else False
+        self.fg_lock = None
+        self.fg_locked = False
+        if not self.a.headless:
+            self.fg_lock = ForegroundLock().__enter__()
+            self.fg_locked = self.fg_lock.locked
+            if not self.fg_locked:
+                self.log("WARNING: the foreground lock helper could not lock - the game may take the OS focus")
         if self.a.headless:
             sess = headless_session(run_dir, name=name, save_dir=save_dir, extra=extra, max_seconds=self.a.watchdog)
             sess.mute = bool(self.a.mute)
@@ -519,8 +558,10 @@ class Runner:
             self.log(f"stop: {e}")
         if pid and self.a.headless:
             kill_tree(pid)      # the console wrapper's child
-        if not self.a.headless:
-            lock_foreground(False)
+        if getattr(self, "fg_lock", None) is not None:
+            self.fg_lock.release()
+            self.fg_unlocked = self.fg_lock.unlocked
+            self.fg_lock = None
         time.sleep(1.0)
 
     # ---------------------------------------------------------------- helpers on the bot
@@ -877,7 +918,9 @@ LEAK_KEYS = ["nodes", "objects", "resources", "orphans", "static_mb", "video_mb"
 
 def leak_check(cps: list[dict]) -> dict:
     """Compares arrivals of the same place across cycles (the first visit of each place warms caches up, so the
-    trend is taken from visit 1 to the last). 'growing' = rises on every revisit by more than the tolerance."""
+    trend is taken from visit 1 to the last). 'GROWING' = rises on every revisit by more than the tolerance per
+    cycle; 'slow growth' = the least-squares trend over >= 4 revisits exceeds a third of the tolerance per cycle and
+    the total rise exceeds the tolerance (a steady creep that single noisy steps would hide)."""
     out = {}
     for place in ("reach", "haven"):
         seq = [c for c in cps if str(c.get("label", "")).startswith(place + "_") and c.get("label") != "reach_0"]
@@ -895,11 +938,18 @@ def leak_check(cps: list[dict]) -> dict:
                    "resources": max(10.0, 0.01 * vals[0]), "orphans": 5.0, "static_mb": 8.0, "video_mb": 16.0,
                    "private_mb": 24.0, "audio_players": 2.0, "enemies": 2.0}.get(k, 0.0)
             growing = all(d > 0 for d in diffs) and per_cycle > tol
-            res[k] = {"values": vals, "per_cycle": round(per_cycle, 1), "tolerance": round(tol, 1),
-                      "verdict": "GROWING" if growing else "stable"}
+            n = len(vals)
+            xm = (n - 1) / 2.0
+            ym = sum(vals) / n
+            den = sum((i - xm) ** 2 for i in range(n))
+            slope = sum((i - xm) * (v - ym) for i, v in enumerate(vals)) / den if den else 0.0
+            creep = n >= 4 and slope > tol / 3.0 and (vals[-1] - vals[0]) > tol
+            res[k] = {"values": vals, "per_cycle": round(per_cycle, 1), "slope": round(slope, 2), "tolerance": round(tol, 1),
+                      "verdict": "GROWING" if growing else ("slow growth" if creep else "stable")}
         out[place] = res
     verdicts = [v["verdict"] for pl in out.values() for v in pl.values()]
-    out["overall"] = "GROWTH SUSPECTED" if "GROWING" in verdicts else ("stable" if verdicts else "n/a")
+    out["overall"] = ("GROWTH SUSPECTED" if "GROWING" in verdicts else
+                      "slow growth (see per-metric)" if "slow growth" in verdicts else ("stable" if verdicts else "n/a"))
     return out
 
 
@@ -961,9 +1011,10 @@ def write_reports(out: Path, res: dict) -> None:
     fgc = sum((r.get("os_foreground") or {}).get("checks", 0) for r in runs + res.get("roundtrips", []))
     fgg = sum((r.get("os_foreground") or {}).get("game_in_foreground", 0) for r in runs + res.get("roundtrips", []))
     L.append(f"* Focus: the OS foreground window (GetForegroundWindow, every 0.5 s) belonged to the game in {fgg} of {fgc} checks. "
-             "The harness holds LockSetForegroundWindow while a game process runs: without it the packaged build's first window "
-             "became the OS foreground window ~0.6 s after launch despite override.cfg no_focus (measured before this run); "
-             "a check that still finds the game in front hands the foreground back to the owner's previous window. "
+             "A fresh helper process holds LockSetForegroundWindow for the life of each game process (ForegroundLock): without it "
+             "the packaged build's first window became the OS foreground window ~0.6 s after launch despite override.cfg no_focus. "
+             f"Lock taken in {sum(1 for r in runs + res.get('roundtrips', []) if (r.get('os_foreground') or {}).get('foreground_lock'))} "
+             f"of {len(runs) + len(res.get('roundtrips', []))} game sessions. "
              "(The telemetry's window_focused is Godot's own flag and stayed true even while the game was not in front.)")
     L.append(f"* Shader caches in %APPDATA%\\Hollowhaven before the run: {env.get('user_shader_cache', '-')} / vulkan {env.get('user_vulkan', '-')}.")
     L.append(f"* Sample per state: settle {res['args'].get('settle_seconds')} s after the load, 360-degree pan "
@@ -1091,6 +1142,9 @@ def main():
     a = ap.parse_args()
     if a.report_only:
         res = json.loads((Path(a.out) / "results.json").read_text(encoding="utf-8"))
+        for rt in res.get("roundtrips", []):
+            rt["leak_check"] = leak_check(rt.get("checkpoints", []))
+        (Path(a.out) / "results.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
         write_reports(Path(a.out), res)
         print(Path(a.out) / "summary.md")
         return
