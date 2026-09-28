@@ -1,0 +1,206 @@
+{
+  "results": [
+    {
+      "step": "title_new_game",
+      "ok": true,
+      "seconds": 9.2,
+      "quest": "wake",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_001_title_new_game.png"
+    },
+    {
+      "step": "read_ward",
+      "ok": true,
+      "seconds": 6.1,
+      "quest": "gather_basics",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_002_read_ward.png"
+    },
+    {
+      "step": "gather_basics",
+      "ok": true,
+      "seconds": 95.1,
+      "quest": "craft_axe",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_003_gather_basics.png"
+    },
+    {
+      "step": "craft_axe",
+      "ok": true,
+      "seconds": 2.6,
+      "quest": "chop",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_005_craft_axe.png"
+    },
+    {
+      "step": "chop",
+      "ok": true,
+      "seconds": 31.8,
+      "quest": "workbench",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_006_chop.png"
+    },
+    {
+      "step": "workbench",
+      "ok": true,
+      "seconds": 13.8,
+      "quest": "mochi",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_009_workbench.png"
+    },
+    {
+      "step": "mochi",
+      "ok": true,
+      "seconds": 56.5,
+      "quest": "pebble",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_010_mochi.png"
+    },
+    {
+      "step": "pebble",
+      "ok": true,
+      "seconds": 51.1,
+      "quest": "home",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_012_pebble.png"
+    },
+    {
+      "step": "home",
+      "ok": true,
+      "seconds": 107.3,
+      "quest": "lumi",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_017_home.png"
+    },
+    {
+      "step": "lumi",
+      "ok": true,
+      "seconds": 45.7,
+      "quest": "prepare",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_021_lumi.png"
+    },
+    {
+      "step": "prepare",
+      "ok": true,
+      "seconds": 18.6,
+      "quest": "descend",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_022_prepare.png"
+    },
+    {
+      "step": "descend",
+      "ok": true,
+      "seconds": 24.7,
+      "quest": "old_mine",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_023_descend.png"
+    },
+    {
+      "step": "old_mine",
+      "ok": true,
+      "seconds": 35.5,
+      "quest": "deeper",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_024_old_mine.png"
+    },
+    {
+      "step": "deeper",
+      "ok": true,
+      "seconds": 48.2,
+      "quest": "silk",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_025_deeper.png"
+    },
+    {
+      "step": "silk_and_boss",
+      "ok": true,
+      "seconds": 119.1,
+      "quest": "return",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_026_silk_and_boss.png"
+    },
+    {
+      "step": "return_home",
+      "ok": true,
+      "seconds": 27.1,
+      "quest": "free_play",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_027_return_home.png"
+    },
+    {
+      "step": "ending",
+      "ok": true,
+      "seconds": 57.7,
+      "quest": "free_play",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_030_ending.png"
+    },
+    {
+      "step": "free_play_save",
+      "ok": true,
+      "seconds": 6.6,
+      "quest": "free_play",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\release4\\release4_031_free_play_save.png"
+    }
+  ],
+  "final_state": {
+    "step": "free_play",
+    "area": "surface",
+    "inv": {
+      "berries": 7,
+      "copper_ore": 4,
+      "copper_sword": 1,
+      "echo_shard": 1,
+      "fiber": 6,
+      "haven_banner": 1,
+      "lantern": 1,
+      "shiny_pebble": 1,
+      "stone": 10,
+      "stone_axe": 1,
+      "stone_pickaxe": 1,
+      "sweetroot_seeds": 3,
+      "wood": 8
+    },
+    "keys": {
+      "foreman_key": 1
+    },
+    "flags": [
+      "hint_quest_wake",
+      "hint_intro_move",
+      "read_ward_intro",
+      "hint_quest_gather_basics",
+      "hint_quest_craft_axe",
+      "hint_quest_chop",
+      "hint_quest_workbench",
+      "hint_build_controls",
+      "hint_quest_mochi",
+      "hint_quest_pebble",
+      "hint_quest_home",
+      "hint_farming_growth",
+      "hint_quest_lumi",
+      "spawner_cleared_ruin_bramblings",
+      "ruin_cleared",
+      "hint_quest_prepare",
+      "read_ward_warning",
+      "hint_quest_descend",
+      "mine_opened",
+      "mine_comfort_seen",
+      "entered_below",
+      "hint_quest_old_mine",
+      "hint_below_lantern",
+      "cp_lit_landing",
+      "moment_threshold",
+      "spawner_cleared_gallery_gloom",
+      "gallery_cleared",
+      "cp_lit_office",
+      "foreman_key_taken",
+      "lower_gate_open",
+      "moment_crossing",
+      "spawner_cleared_hall_gloom",
+      "imitation_seen",
+      "cp_lit_shrine",
+      "reached_silk_hollows",
+      "hint_quest_silk",
+      "moment_silk_intro",
+      "hint_silk_light",
+      "cp_lit_arena",
+      "hint_boss_braziers",
+      "hint_boss_scorched",
+      "hint_boss_glance",
+      "hint_boss_stuck",
+      "weaver_defeated",
+      "moment_return",
+      "ward_restored",
+      "chapter_one_complete"
+    ],
+    "companions": {
+      "lumi": "follow",
+      "mochi": "home",
+      "pebble": "home"
+    }
+  }
+}

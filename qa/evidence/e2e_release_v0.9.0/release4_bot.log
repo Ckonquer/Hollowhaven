@@ -1,0 +1,172 @@
+[20:11:11] launched C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\Release Test Folder\Hollowhaven\Hollowhaven.exe pid=59580 args=['--windowed', '--resolution', '1600x900', '--position', '80,60', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/e2e/release4/release4_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/e2e/release4/saves', '--no-focus-pause', '--windowed']
+[20:11:12] === STEP title_new_game (quest step wake) ===
+[20:11:16] button not found: 'Start a new journey'; visible: ['New Game', 'Settings', 'Credits', 'Quit', 'Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.', 'Standard | recommended | The intended experience: tense and unsettling, with a few real scares.', 'Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.', 'Play a test sound', 'Play a test sound', 'Play a test sound', 'Off', 'Off', 'Off', 'On', 'Begin the journey', 'Close']
+[20:11:21] calibrated look: 6.47 px/deg (dyaw=-30.9) invert=1.0
+[20:11:22] RESULT PASS: playthrough:title_new_game - quest step now wake; ok=True; 9s
+[20:11:22] === STEP read_ward (quest step wake) ===
+[20:11:28] RESULT PASS: playthrough:read_ward - quest step now gather_basics; ok=True; 6s
+[20:11:28] === STEP gather_basics (quest step gather_basics) ===
+[20:11:30] walk_to stuck at [1.91, 0.0, -7.3] (dist 13.0); unstick #1
+[20:11:35] interact attempt 1 on @Node3D@1170 prompt={}
+[20:11:36] interact attempt 2 on @Node3D@1170 prompt={}
+[20:11:38] interact attempt 3 on @Node3D@1170 prompt={}
+[20:11:39] interact attempt 4 on @Node3D@1170 prompt={}
+[20:11:39] could not gather {'dist': 0.8, 'enabled': True, 'g': 'harvestable', 'id': 'stick_8', 'label': 'Stick', 'name': '@Node3D@1170', 'pos': [8.1, 0.11, -20.15], 'text': 'Pick up Stick', 'tool': 'hand'}
+[20:11:42] interact attempt 1 on @Node3D@1186 prompt={}
+[20:11:43] interact attempt 2 on @Node3D@1186 prompt={}
+[20:11:44] interact attempt 3 on @Node3D@1186 prompt={}
+[20:11:45] interact attempt 4 on @Node3D@1186 prompt={}
+[20:11:45] could not gather {'dist': 1.5, 'enabled': True, 'g': 'harvestable', 'id': 'stick_16', 'label': 'Stick', 'name': '@Node3D@1186', 'pos': [10.16, 0.5, -23.45], 'text': 'Pick up Stick', 'tool': 'hand'}
+[20:11:52] interact attempt 1 on @Node3D@1248 prompt={}
+[20:11:53] interact attempt 2 on @Node3D@1248 prompt={}
+[20:11:54] interact attempt 3 on @Node3D@1248 prompt={}
+[20:11:55] interact attempt 4 on @Node3D@1248 prompt={}
+[20:11:55] could not gather {'dist': 0.7, 'enabled': True, 'g': 'harvestable', 'id': 'stone_1', 'label': 'Stone', 'name': '@Node3D@1248', 'pos': [10.89, 0.84, -27.18], 'text': 'Pick up Stone', 'tool': 'hand'}
+[20:11:58] interact attempt 1 on @Node3D@1276 prompt={}
+[20:11:59] interact attempt 2 on @Node3D@1276 prompt={}
+[20:12:00] interact attempt 3 on @Node3D@1276 prompt={}
+[20:12:01] interact attempt 4 on @Node3D@1276 prompt={}
+[20:12:01] could not gather {'dist': 1.7, 'enabled': True, 'g': 'harvestable', 'id': 'stone_15', 'label': 'Stone', 'name': '@Node3D@1276', 'pos': [11.81, 0.0, -14.17], 'text': 'Pick up Stone', 'tool': 'hand'}
+[20:12:06] interact attempt 1 on @Node3D@1282 prompt={}
+[20:12:07] interact attempt 2 on @Node3D@1282 prompt={}
+[20:12:08] interact attempt 3 on @Node3D@1282 prompt={}
+[20:12:09] interact attempt 4 on @Node3D@1282 prompt={}
+[20:12:09] could not gather {'dist': 0.4, 'enabled': True, 'g': 'harvestable', 'id': 'stone_18', 'label': 'Stone', 'name': '@Node3D@1282', 'pos': [16.43, -0.38, 0.05], 'text': 'Pick up Stone', 'tool': 'hand'}
+[20:12:12] interact attempt 1 on @Node3D@1278 prompt={}
+[20:12:13] interact attempt 2 on @Node3D@1278 prompt={}
+[20:12:14] interact attempt 3 on @Node3D@1278 prompt={}
+[20:12:15] interact attempt 4 on @Node3D@1278 prompt={}
+[20:12:15] could not gather {'dist': 1.7, 'enabled': True, 'g': 'harvestable', 'id': 'stone_16', 'label': 'Stone', 'name': '@Node3D@1278', 'pos': [17.43, -0.59, 4.54], 'text': 'Pick up Stone', 'tool': 'hand'}
+[20:12:18] interact attempt 1 on @Node3D@1254 prompt={}
+[20:12:19] interact attempt 2 on @Node3D@1254 prompt={}
+[20:12:21] interact attempt 3 on @Node3D@1254 prompt={}
+[20:12:22] interact attempt 4 on @Node3D@1254 prompt={}
+[20:12:22] could not gather {'dist': 1.2, 'enabled': True, 'g': 'harvestable', 'id': 'stone_4', 'label': 'Stone', 'name': '@Node3D@1254', 'pos': [17.81, -0.25, 9.56], 'text': 'Pick up Stone', 'tool': 'hand'}
+[20:12:25] interact attempt 1 on @Node3D@1272 prompt={}
+[20:12:26] interact attempt 2 on @Node3D@1272 prompt={}
+[20:12:27] interact attempt 3 on @Node3D@1272 prompt={}
+[20:12:28] interact attempt 4 on @Node3D@1272 prompt={}
+[20:12:28] could not gather {'dist': 1.4, 'enabled': True, 'g': 'harvestable', 'id': 'stone_13', 'label': 'Stone', 'name': '@Node3D@1272', 'pos': [14.88, 0.0, 9.58], 'text': 'Pick up Stone', 'tool': 'hand'}
+[20:12:32] interact attempt 1 on @Node3D@1344 prompt={}
+[20:12:33] interact attempt 2 on @Node3D@1344 prompt={}
+[20:12:34] interact attempt 3 on @Node3D@1344 prompt={}
+[20:12:35] interact attempt 4 on @Node3D@1344 prompt={}
+[20:12:35] could not gather {'dist': 1.4, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_3', 'label': 'Tall Grass', 'name': '@Node3D@1344', 'pos': [21.19, -0.26, 22.13], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:12:38] interact attempt 1 on @Node3D@1348 prompt={}
+[20:12:39] interact attempt 2 on @Node3D@1348 prompt={}
+[20:12:41] interact attempt 3 on @Node3D@1348 prompt={}
+[20:12:42] interact attempt 4 on @Node3D@1348 prompt={}
+[20:12:42] could not gather {'dist': 1.3, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_5', 'label': 'Tall Grass', 'name': '@Node3D@1348', 'pos': [16.51, -0.85, 25.96], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:12:46] interact attempt 1 on @Node3D@1340 prompt={}
+[20:12:48] interact attempt 2 on @Node3D@1340 prompt={'action': 'interact', 'enabled': True, 'text': 'Pick up Stone'}
+[20:12:50] interact attempt 3 on @Node3D@1340 prompt={}
+[20:12:52] interact attempt 4 on @Node3D@1340 prompt={'action': 'interact', 'enabled': True, 'text': 'Pick up Stone'}
+[20:12:52] could not gather {'dist': 1.5, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_1', 'label': 'Tall Grass', 'name': '@Node3D@1340', 'pos': [14.08, -1.45, 29.85], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:12:56] interact attempt 1 on @Node3D@1402 prompt={'action': 'attack', 'enabled': False, 'text': 'Needs a Pickaxe'}
+[20:12:57] interact attempt 2 on @Node3D@1402 prompt={}
+[20:12:58] interact attempt 3 on @Node3D@1402 prompt={'action': 'attack', 'enabled': False, 'text': 'Needs a Pickaxe'}
+[20:12:59] interact attempt 4 on @Node3D@1402 prompt={}
+[20:12:59] could not gather {'dist': 0.6, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_32', 'label': 'Tall Grass', 'name': '@Node3D@1402', 'pos': [12.71, -1.5, 41.18], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:13:03] RESULT PASS: playthrough:gather_basics - quest step now craft_axe; ok=True; 95s
+[20:13:03] === STEP craft_axe (quest step craft_axe) ===
+[20:13:03] craft Stone Axe x1
+[20:13:05] RESULT PASS: playthrough:craft_axe - quest step now chop; ok=True; 3s
+[20:13:05] === STEP chop (quest step chop) ===
+[20:13:37] RESULT PASS: playthrough:chop - quest step now workbench; ok=True; 32s
+[20:13:37] === STEP workbench (quest step workbench) ===
+[20:13:46] craft Workbench x1
+[20:13:49] place workbench
+[20:13:51] RESULT PASS: playthrough:workbench - quest step now mochi; ok=True; 14s
+[20:13:51] === STEP mochi (quest step mochi) ===
+[20:13:51] travel to glade
+[20:13:53] walk_to stuck at [-8.72, 0.0, 2.62] (dist 10.6); unstick #1
+[20:14:04] interact attempt 1 on @Node3D@1128 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:06] interact attempt 2 on @Node3D@1128 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:08] interact attempt 3 on @Node3D@1128 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:10] interact attempt 4 on @Node3D@1128 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:10] could not gather {'dist': 1.3, 'enabled': True, 'g': 'harvestable', 'id': 'bush_7', 'label': 'Berry Bush', 'name': '@Node3D@1128', 'pos': [-50.14, -1.23, 18.92], 'text': 'Pick Berry Bush', 'tool': 'hand'}
+[20:14:14] interact attempt 1 on @Node3D@1118 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:15] interact attempt 2 on @Node3D@1118 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:17] interact attempt 3 on @Node3D@1118 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:19] interact attempt 4 on @Node3D@1118 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:19] could not gather {'dist': 1.5, 'enabled': True, 'g': 'harvestable', 'id': 'bush_2', 'label': 'Berry Bush', 'name': '@Node3D@1118', 'pos': [-46.75, -1.03, 21.9], 'text': 'Pick Berry Bush', 'tool': 'hand'}
+[20:14:22] interact attempt 1 on @Node3D@1114 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:24] interact attempt 2 on @Node3D@1114 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:26] interact attempt 3 on @Node3D@1114 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:28] interact attempt 4 on @Node3D@1114 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:28] could not gather {'dist': 1.4, 'enabled': True, 'g': 'harvestable', 'id': 'bush_0', 'label': 'Berry Bush', 'name': '@Node3D@1114', 'pos': [-43.51, -0.46, 24.38], 'text': 'Pick Berry Bush', 'tool': 'hand'}
+[20:14:32] interact attempt 1 on @Node3D@1126 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:33] interact attempt 2 on @Node3D@1126 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:36] interact attempt 3 on @Node3D@1126 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:37] interact attempt 4 on @Node3D@1126 prompt={'action': 'interact', 'enabled': False, 'text': 'Berry Bush (regrowing)'}
+[20:14:37] could not gather {'dist': 1.6, 'enabled': True, 'g': 'harvestable', 'id': 'bush_6', 'label': 'Berry Bush', 'name': '@Node3D@1126', 'pos': [-52.25, -0.55, 27.6], 'text': 'Pick Berry Bush', 'tool': 'hand'}
+[20:14:42] befriend mochi: prompt={}
+[20:14:48] RESULT PASS: playthrough:mochi - quest step now pebble; ok=True; 56s
+[20:14:48] === STEP pebble (quest step pebble) ===
+[20:14:59] craft Stone Pickaxe x1
+[20:15:01] travel to quarry
+[20:15:03] walk_to stuck at [1.06, 0.0, 2.9] (dist 11.6); unstick #1
+[20:15:39] RESULT PASS: playthrough:pebble - quest step now home; ok=True; 51s
+[20:15:39] === STEP home (quest step home) ===
+[20:15:51] walk_to stuck at [5.87, 0.0, 0.69] (dist 6.7); unstick #1
+[20:16:12] walk_to stuck at [7.8, 0.0, 18.02] (dist 16.0); unstick #1
+[20:16:20] interact attempt 1 on @Node3D@1364 prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Pebble'}
+[20:16:21] interact attempt 2 on @Node3D@1364 prompt={}
+[20:16:22] interact attempt 3 on @Node3D@1364 prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Pebble'}
+[20:16:24] interact attempt 4 on @Node3D@1364 prompt={}
+[20:16:24] could not gather {'dist': 1.0, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_13', 'label': 'Tall Grass', 'name': '@Node3D@1364', 'pos': [-6.89, -0.06, 20.09], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:16:27] interact attempt 1 on @Node3D@1360 prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Pebble'}
+[20:16:28] interact attempt 2 on @Node3D@1360 prompt={}
+[20:16:29] interact attempt 3 on @Node3D@1360 prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Pebble'}
+[20:16:30] interact attempt 4 on @Node3D@1360 prompt={}
+[20:16:30] could not gather {'dist': 0.9, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_11', 'label': 'Tall Grass', 'name': '@Node3D@1360', 'pos': [-13.07, -0.14, 18.47], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:16:34] interact attempt 1 on @Node3D@1346 prompt={'action': 'interact', 'enabled': True, 'text': 'Pick Berry Bush'}
+[20:16:36] interact attempt 2 on @Node3D@1346 prompt={}
+[20:16:37] interact attempt 3 on @Node3D@1346 prompt={'action': 'interact', 'enabled': True, 'text': 'Pick Berry Bush'}
+[20:16:39] interact attempt 4 on @Node3D@1346 prompt={}
+[20:16:39] could not gather {'dist': 0.8, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_4', 'label': 'Tall Grass', 'name': '@Node3D@1346', 'pos': [-22.97, -0.27, 17.7], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:16:42] interact attempt 1 on @Node3D@1356 prompt={'action': 'interact', 'enabled': True, 'text': 'Pick up Stone'}
+[20:16:44] interact attempt 2 on @Node3D@1356 prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Pebble'}
+[20:16:46] interact attempt 3 on @Node3D@1356 prompt={'action': 'interact', 'enabled': True, 'text': 'Pick up Stone'}
+[20:16:48] interact attempt 4 on @Node3D@1356 prompt={'action': 'interact', 'enabled': True, 'text': 'Pick up Stone'}
+[20:16:48] could not gather {'dist': 1.5, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_9', 'label': 'Tall Grass', 'name': '@Node3D@1356', 'pos': [-22.13, -0.45, 24.02], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:16:51] interact attempt 1 on @Node3D@1398 prompt={}
+[20:16:52] interact attempt 2 on @Node3D@1398 prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Pebble'}
+[20:16:54] interact attempt 3 on @Node3D@1398 prompt={}
+[20:16:55] interact attempt 4 on @Node3D@1398 prompt={'action': 'interact', 'enabled': True, 'text': 'Talk to Pebble'}
+[20:16:55] could not gather {'dist': 1.5, 'enabled': True, 'g': 'harvestable', 'id': 'tuft_30', 'label': 'Tall Grass', 'name': '@Node3D@1398', 'pos': [-27.08, 0.01, 25.73], 'text': 'Pull Tall Grass', 'tool': 'hand'}
+[20:17:01] craft Cozy Bed x1
+[20:17:17] craft Crop Plot x1
+[20:17:19] place bed
+[20:17:21] place crop_plot
+[20:17:26] RESULT PASS: playthrough:home - quest step now lumi; ok=True; 107s
+[20:17:26] === STEP lumi (quest step lumi) ===
+[20:17:26] craft Copper Sword x1
+[20:17:31] craft Lantern x1
+[20:17:34] craft Berry Snack x2
+[20:17:37] travel to ruin
+[20:18:12] RESULT PASS: playthrough:lumi - quest step now prepare; ok=True; 46s
+[20:18:12] === STEP prepare (quest step prepare) ===
+[20:18:30] RESULT PASS: playthrough:prepare - quest step now descend; ok=True; 19s
+[20:18:30] === STEP descend (quest step descend) ===
+[20:18:30] travel to mine
+[20:18:55] RESULT PASS: playthrough:descend - quest step now old_mine; ok=True; 25s
+[20:18:55] === STEP old_mine (quest step old_mine) ===
+[20:19:30] RESULT PASS: playthrough:old_mine - quest step now deeper; ok=True; 36s
+[20:19:30] === STEP deeper (quest step deeper) ===
+[20:20:00] walk_to stuck at [30.03, -6.0, -62.84] (dist 11.5); unstick #1
+[20:20:04] walk_to stuck at [35.17, -6.0, -63.31] (dist 7.1); unstick #2
+[20:20:19] RESULT PASS: playthrough:deeper - quest step now silk; ok=True; 48s
+[20:20:19] === STEP silk_and_boss (quest step silk) ===
+[20:20:33] ate berry_snack; hp now 76.0
+[20:21:18] re-entering the Heartseed Chamber
+[20:22:02] ate berry_snack; hp now 66.0
+[20:22:18] RESULT PASS: playthrough:silk_and_boss - quest step now return; ok=True; 119s
+[20:22:18] === STEP return_home (quest step return) ===
+[20:22:45] RESULT PASS: playthrough:return_home - quest step now free_play; ok=True; 27s
+[20:22:45] === STEP ending (quest step free_play) ===
+[20:23:39] button not found: 'Continue exploring'; visible: ['  Continue  ']
+[20:23:43] RESULT PASS: playthrough:ending - quest step now free_play; ok=True; 58s
+[20:23:43] === STEP free_play_save (quest step free_play) ===
+[20:23:47] button not found: 'Save Game'; visible: []
+[20:23:49] RESULT PASS: playthrough:free_play_save - quest step now free_play; ok=True; 7s

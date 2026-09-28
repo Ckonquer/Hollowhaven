@@ -1,0 +1,67 @@
+    10.7s [surface] say: Ward Stone: Light kept, home kept. The seed sleeps below; the stone remembers.
+    10.7s [surface] quest: completed wake
+    16.2s [surface] say: Ward Stone: Welcome, Krystal. This haven has waited a long time for someone to love it.
+    84.8s [surface] quest: completed gather_basics
+   111.1s [surface] quest: completed craft_axe
+   128.1s [surface] quest: completed chop
+   157.6s [surface] quest: completed workbench
+   211.6s [surface] quest: completed mochi
+   213.1s [surface] say: Mochi: Mochi nibbles a berry, then bumps its cap against your boot. You've made a friend!
+   244.8s [surface] caption: [the boulder grumbles]
+   247.2s [surface] quest: completed pebble
+   248.8s [surface] say: Pebble: The boulder cracks apart and a little stone creature tumbles out. It salutes you with great seriousness. Pebble has joined you!
+   256.5s [surface] say: Pebble: Pebble headbutts the rock! Extra stone!
+   298.7s [surface] say: Pebble: Pebble found a shiny pebble just for you.
+   373.0s [surface] quest: completed home
+   394.9s [surface] say: Pebble: Pebble charges at the enemy! ...and bounces off. It is undeterred.
+   415.4s [surface] quest: completed lumi
+   416.7s [surface] say: Lumi: The little light creeps out of the ruin and settles beside you, glowing warmly. Lumi trusts you now.
+   432.0s [surface] say: Ward Stone: Its heart was taken to the deep. What took it still weaves in the dark.
+   432.0s [surface] quest: completed prepare
+   437.5s [surface] say: Ward Stone: Carry light. Carry friends. Come home.
+   459.3s [surface] quest: completed descend
+   460.5s [below] saved: journey saved
+   463.2s [below] saved: journey saved
+   468.9s [below] say: Lumi: Lumi stops, staring into the dark.
+   468.9s [below] caption: [timbers creak, somewhere down the dark passage]
+   491.9s [below] saved: journey saved
+   496.1s [below] say: : A heavy iron key, stamped with a pickaxe. It's still warm from the lamp.
+   496.1s [below] quest: completed old_mine
+   496.8s [below] say: The Foreman's Order: The lower gate stays LOCKED. Nobody goes below after the bell. Something down there has learned our voices. If you hear
+   501.7s [below] caption: [the lock turns with a heavy clunk]
+   509.5s [below] caption: [something skitters past the far doorway]
+   536.3s [below] caption: [a familiar chime... played backwards]
+   537.1s [below] caption: [Lumi whimpers]
+   539.8s [below] saved: journey saved
+   544.1s [below] caption: [something shifts in the silk]
+   544.1s [below] quest: completed deeper
+   546.4s [below] caption: [it slips away into the dark above]
+   555.8s [below] saved: journey saved
+   561.3s [below] caption: [a piercing shriek echoes through the chamber]
+   561.3s [below] say: Lumi: Lumi goes very still.
+   565.3s [below] caption: [the brazier roars to life]
+   565.3s [below] caption: [it shrieks as the light scorches it]
+   569.5s [below] caption: [the brazier roars to life]
+   569.5s [below] caption: [it shrieks as the light scorches it]
+   578.1s [below] caption: [the brazier roars to life]
+   578.1s [below] caption: [it shrieks as the light scorches it]
+   586.0s [below] caption: [a dry rattle overhead]
+   594.6s [below] caption: [a dry rattle overhead]
+   605.7s [below] caption: [a piercing shriek echoes through the chamber]
+   611.1s [below] caption: [a dry rattle overhead]
+   619.1s [below] caption: [a dry rattle overhead]
+   626.9s [below] caption: [a dry rattle overhead]
+   634.9s [below] caption: [a dry rattle overhead]
+   638.6s [below] say: Lumi: Lumi stops, staring into the dark.
+   643.5s [below] caption: [a dry rattle overhead]
+   651.4s [below] caption: [a dry rattle overhead]
+   654.7s [below] caption: [the Weaver shrieks and flees into the deep]
+   662.1s [below] caption: [a warm heartbeat]
+   662.1s [below] quest: completed silk
+   665.2s [below] caption: [the old lift groans and begins to rise]
+   669.3s [below] say: : Warm air drifts down from the surface. The way home is open.
+   671.9s [surface] saved: journey saved
+   690.2s [surface] caption: [The Ward Stone hums, warm and bright]
+   690.2s [surface] quest: completed return
+   700.2s [surface] say: Mochi: Mochi spins in circles, spores sparkling!
+   746.4s [surface] saved: journey saved
