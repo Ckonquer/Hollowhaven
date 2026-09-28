@@ -91,6 +91,7 @@ for _p in (str(HERE), str(QA_DIR)):
 import s1_common as C  # noqa: E402
 from hhbot import Telemetry, angle_diff  # noqa: E402
 from session import SECOND_MONITOR_RECT, parse_rect, prepare_qa_exe, port_free  # noqa: E402
+from fglock import FocusWatchdog, ForegroundLock  # noqa: E402  (never take the owner's focus)
 
 GODOT_DIR = ROOT / ".tools" / "godot"
 CONSOLE_EXE = GODOT_DIR / "Godot_v4.7.2-stable_win64_console.exe"
@@ -317,8 +318,14 @@ class ChainGame:
             si = subprocess.STARTUPINFO()
             si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             si.wShowWindow = SW_SHOWNOACTIVATE      # the process's first ShowWindow must not activate it
+            # tools/qa/fglock.py: a fresh helper holds the foreground lock for the game's life, and a watchdog hands
+            # the foreground straight back to the owner if the game ever gets it (the packaged build activates itself
+            # ~0.6 s after launch otherwise - measured 2026-09-28).
+            self.fg_lock = ForegroundLock().__enter__()
             self.proc = subprocess.Popen(self.cmd, cwd=str(ROOT), stdout=self._fh, stderr=subprocess.STDOUT,
                                          stdin=subprocess.DEVNULL, startupinfo=si)
+            _proc = self.proc
+            self.fg_watch = FocusWatchdog(lambda: _proc.pid if _proc.poll() is None else 0).start()
         tele = Telemetry(self.tele_path)
         try:
             self.vin = C.FloatVI(self.port, proc=self.proc, tele=tele, connect_timeout=connect_timeout)
@@ -348,6 +355,20 @@ class ChainGame:
             return False
 
     def stop(self) -> None:
+        watch = getattr(self, "fg_watch", None)
+        if watch is not None:
+            rep = watch.stop()
+            self.fg_watch = None
+            try:
+                (self.out / f"{self.name}_focus_watchdog.json").write_text(json.dumps(rep), encoding="utf-8")
+                if self.bot is not None:
+                    self.bot.log(f"foreground watchdog: {rep}")
+            except Exception:  # noqa: BLE001
+                pass
+        lock = getattr(self, "fg_lock", None)
+        if lock is not None:
+            lock.release()
+            self.fg_lock = None
         if self.vin is not None:
             try:
                 self.vin.close()
