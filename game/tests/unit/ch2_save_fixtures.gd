@@ -330,6 +330,9 @@ static func v1_state() -> Dictionary:
 	var s := {}
 	for k in LEGACY_STATS_KEYS:
 		s[k] = st["stats"][k]
+	# The fixtures stand for saves begun on the shipped v0.9.1 build; new_game() stamps the CURRENT project
+	# version, so pin it like game_version (a release version bump must not make every fixture stale).
+	s["started_version"] = GAME_VERSION
 	out["stats"] = s
 	return out
 
@@ -367,6 +370,7 @@ static func v2_file() -> Dictionary:
 		for k in section[1]:
 			trimmed[k] = src[k]
 		st[section[0]] = trimmed
+	st["stats"]["started_version"] = GAME_VERSION
 	return d
 
 

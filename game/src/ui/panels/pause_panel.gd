@@ -1,8 +1,9 @@
 extends "res://src/ui/panels/panel_base.gd"
 ## Pause menu: Resume, Save Game (with feedback), Settings, Controls, Wardrobe (always available: styling
 ## is free and cosmetic), Comfort, an "unstuck" option (Return to the Haven on the surface / Return to
-## last lantern below / Return to safety in the Chapter Two areas, using Game.return_point(); "Leave the
-## trial" in an Echo Trial), Quit to Title (confirm, offers to save when allowed) and Quit Game.
+## last lantern below / Return to safety in the Chapter Two areas, using Game.return_point() - in the indoor
+## ones a safe point in Krystal's own room comes first, COV-001; "Leave the trial" in an Echo Trial), Quit to
+## Title (confirm, offers to save when allowed) and Quit Game.
 ## Echo Trial (lead decision, MP section 15): the option leaves THROUGH the trial - Game.area.leave() when the
 ## trial offers it, else the saved respawn point (the origin checkpoint the trial was entered from) - so
 ## Krystal is back at the checkpoint with her progress intact, never sent to the trial's own entry pad.
@@ -171,7 +172,9 @@ static func unstuck_spawn(area_id: String, player_state: Dictionary, defaults: D
 
 ## Where "unstuck" takes Krystal in the current area: the surface keeps its legacy rule; every other area
 ## asks Game.return_point() (the Below's last lantern, a lit arch / checkpoint in Chapter Two areas) and
-## only uses a spawn the loaded area really registers.
+## only uses a spawn the loaded area really registers. COV-001: in an indoor Chapter Two area a safe point in
+## the room she stands in comes first (nearby_target), so she is never carried out of a safe room (the Works
+## refuge, the manor cloakroom) to a rest point far away. A defeat still wakes her at the return point.
 static func unstuck_target() -> String:
 	var a := Game.area_id
 	if a == "surface" or a == "":
@@ -185,10 +188,95 @@ static func unstuck_target() -> String:
 	var spawns: Variant = Game.area.get("spawns") if Game.area != null and is_instance_valid(Game.area) else null
 	if spawns is Dictionary and not (spawns as Dictionary).is_empty() and not (spawns as Dictionary).has(target):
 		if (spawns as Dictionary).has(fallback):
-			return fallback
-		for id in (spawns as Dictionary):
-			return String(id)
-	return target
+			target = fallback
+		else:
+			for id in (spawns as Dictionary):
+				target = String(id)
+				break
+	var near := nearby_target(a, target)
+	return near if near != "" else target
+
+
+## Areas whose "Return to safety" looks for a safe point in Krystal's room first: the indoor Chapter Two areas.
+## Not the legacy surface / Below, not a trial, and not an outdoor area (the lit arches are the Reach's safe
+## points, and Continue resumes there at the saved spot, not at a spawn).
+static func uses_nearby_rule(area_id: String) -> bool:
+	return not _legacy_area(area_id) and not is_trial_area(area_id) and not Game.OUTDOOR_AREAS.has(area_id)
+
+
+## The spawns "Return to safety" may pick nearby in area node `a`, registered ones only, no duplicates: every
+## checkpoint's spawn (a lantern / candle, lit or not: each keeps a safe nook where she wakes), `arrival` (where
+## she came in or last rested this visit, GameState.player.spawn, where Continue resumes) and `area_default`
+## (the area's own entrance, Game.AREA_DEFAULT_RESPAWN). Pure over the area node; see tests.
+static func nearby_candidates(a: Node, arrival: String, area_default: String) -> Array:
+	var out: Array = []
+	if a == null or not is_instance_valid(a) or not (a.get("spawns") is Dictionary):
+		return out
+	var spawns: Dictionary = a.get("spawns")
+	var ids: Array = Game.checkpoint_spawns(a).keys()
+	ids.append(arrival)
+	ids.append(area_default)
+	for id in ids:
+		var s := String(id)
+		if s != "" and spawns.has(s) and not out.has(s):
+			out.append(s)
+	return out
+
+
+## COV-001: the candidate nearest to `pos` in the zone Krystal stands in, "" when her zone has none. When she
+## stands in a safe zone (`safe`) whose zone has no candidate, the nearest candidate that itself stands in a safe
+## zone, if it is closer than `max_dist` (the remembered point); else "". Pure over the area node; see tests.
+static func nearby_spawn(a: Node, candidates: Array, pos: Vector3, safe: bool, max_dist: float = INF) -> String:
+	if a == null or not is_instance_valid(a) or not (a.get("spawns") is Dictionary) or not a.has_method("get_zone_at"):
+		return ""
+	var spawns: Dictionary = a.get("spawns")
+	var zone := String(a.get_zone_at(pos))
+	var best := ""
+	var best_d := INF
+	if zone != "":
+		for id in candidates:
+			var o: Vector3 = (spawns[id] as Transform3D).origin
+			var d := o.distance_to(pos)
+			if String(a.get_zone_at(o)) == zone and d < best_d:
+				best = String(id)
+				best_d = d
+	if best != "" or not safe or not a.has_method("is_safe_zone"):
+		return best
+	best_d = max_dist
+	for id in candidates:
+		var o: Vector3 = (spawns[id] as Transform3D).origin
+		var d := o.distance_to(pos)
+		if d < best_d and bool(a.is_safe_zone(o)):
+			best = String(id)
+			best_d = d
+	return best
+
+
+## The nearby safe point for the live game ("" = none; the caller keeps `remembered`): Krystal's position (the
+## player node, else the saved one) in the loaded area, which must be area `area_id` and use the nearby rule.
+static func nearby_target(area_id: String, remembered: String) -> String:
+	if not uses_nearby_rule(area_id) or not is_instance_valid(Game.area):
+		return ""
+	var a: Node = Game.area
+	var pos: Variant = null
+	if is_instance_valid(Game.player) and Game.player.is_inside_tree():
+		pos = Game.player.global_position
+	else:
+		var saved: Variant = GameState.player.get("pos")
+		if saved is Array and (saved as Array).size() == 3:
+			pos = Vector3(float(saved[0]), float(saved[1]), float(saved[2]))
+	if not (pos is Vector3) or not (a.get("spawns") is Dictionary):
+		return ""
+	var here: Vector3 = pos
+	var safe: bool = Game.in_safe_zone
+	if a.has_method("is_safe_zone"):
+		safe = bool(a.is_safe_zone(here))       # what Game.player_in_safe_zone() answers for the live player
+	var cands := nearby_candidates(a, String(GameState.player.get("spawn", "")), String(Game.AREA_DEFAULT_RESPAWN.get(area_id, "")))
+	var spawns: Dictionary = a.get("spawns")
+	var max_dist := INF
+	if spawns.has(remembered):
+		max_dist = (spawns[remembered] as Transform3D).origin.distance_to(here)
+	return nearby_spawn(a, cands, here, safe, max_dist)
 
 
 func _unstuck() -> void:

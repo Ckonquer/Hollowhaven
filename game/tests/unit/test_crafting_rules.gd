@@ -157,6 +157,31 @@ func test_max_craftable_and_describe() -> void:
 	assert_eq(Crafting.describe_items({"wood": 2, "stone": 1}), "2 Wood, 1 Stone")
 
 
+## COV-006: counts above 1 use the plural name (countable items), mass nouns and names already plural stay, one
+## stays singular; the arachnophobia alt names follow the same rules.
+func test_describe_items_uses_plurals_for_counts_above_one() -> void:
+	assert_eq(Crafting.describe_items({"copper_bar": 3}), "3 Copper Bars")
+	assert_eq(Crafting.describe_items({"copper_bar": 1}), "1 Copper Bar")
+	assert_eq(Crafting.describe_items({"copper_ore": 2, "wood": 6, "fiber": 3}), "2 Copper Ore, 6 Wood, 3 Plant Fiber")
+	assert_eq(Crafting.describe_items({"moon_crystal": 2, "berries": 4, "wood_stairs": 2}), "2 Moon Crystals, 4 Berries, 2 Wooden Stairs")
+	var cases := {"Copper Bar": "Copper Bars", "Music Box": "Music Boxes", "Cottage Bench": "Cottage Benches",
+		"Stone Pickaxe": "Stone Pickaxes", "Bookshelf": "Bookshelves", "Doorway": "Doorways", "Echo Shard": "Echo Shards",
+		"Padded Boots": "Padded Boots", "Iron Ore": "Iron Ore", "Weaver Silk": "Weaver Silk", "Lanternwake Candy": "Lanternwake Candy",
+		"The Heartseed": "The Heartseed", "Foreman's Key": "Foreman's Keys", "Pumpkin": "Pumpkins", "Pale Thread": "Pale Thread"}
+	for k in cases:
+		assert_eq(ItemDB.plural_of(String(k)), String(cases[k]), String(k))
+	var was: Variant = Settings.get_value("arachnophobia")
+	Settings.set_value("arachnophobia", true)
+	assert_eq(Crafting.describe_items({"silk": 2}), "2 Pale Thread", "the alt name, a mass noun")
+	Settings.set_value("arachnophobia", false)
+	assert_eq(Crafting.describe_items({"silk": 2}), "2 Weaver Silk")
+	Settings.set_value("arachnophobia", was)
+	# Every item has a readable plural (never empty, never a doubled s).
+	for id in ItemDB.all_item_ids():
+		var pl := ItemDB.display_name_count(String(id), 2)
+		assert_true(pl != "" and not pl.ends_with("ss"), "%s -> %s" % [id, pl])
+
+
 func test_stations_near_always_has_hand_and_respects_distance() -> void:
 	var s := GDScript.new()
 	s.source_code = "extends Node3D\nvar station_id: String = \"campfire\"\n"

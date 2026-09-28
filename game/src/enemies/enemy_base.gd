@@ -13,6 +13,8 @@ extends CharacterBody3D
 ##   attack_reach() / _choose_attack() / _telegraph_finished()   hooks around the chase -> telegraph -> attack step
 ##   attack_def(id), attack_telegraph(def), attack_recover(def), attack_damage_for(def)   data/enemies.gd "attacks"
 ##   can_be_hit_by(source), can_stagger(amount, source), _is_uninterruptible(), _stagger(...)
+##   holds_tell_against(source) / is_companion_source(source) (static)   COV-002: a companion's hit never
+##                             flinches an ordinary enemy out of its telegraph (Krystal's hits still do)
 ##   mark() / hide_mark()      this enemy's ground telegraph (src/enemies/telegraph_fx.gd)
 ##   charge_begin/charge_step, leap_begin/leap_step/leap_land_hit, lane_clip, lane_hits, pulse_hits,
 ##   deal_damage_to, fire_projectile (params dir / on_hit / kind pass through), apply_slow (static), announce_tell
@@ -699,6 +701,8 @@ func _on_damaged(amount: float, source: Node, _dir: Vector3) -> void:
 		_alert_boost = maxf(_alert_boost, 6.0)
 	if _is_uninterruptible():
 		return
+	if holds_tell_against(source):
+		return                          # COV-002: a companion's hit never cancels the wind-up (the damage counts)
 	if can_stagger(amount, source):
 		_stagger(amount, source)
 	elif state in ["idle", "wander", "return"]:
@@ -782,6 +786,24 @@ func can_be_hit_by(source: Node) -> bool:
 ## flinch? Default = the legacy rule (not within FLINCH_IMMUNITY of the previous flinch).
 func can_stagger(_amount: float, _source: Node) -> bool:
 	return _flinch_immune <= 0.0
+
+
+## COV-002: true when `source` is a companion (a pet's headbutt credits the companion node, its bolt / puff the
+## projectile's shooter, i.e. the companion too). Krystal herself (group "player") never counts.
+static func is_companion_source(source: Node) -> bool:
+	return source != null and is_instance_valid(source) and source.is_in_group("companion") \
+		and not source.is_in_group("player")
+
+
+## COV-002: a companion's hit never flinches an ORDINARY enemy out of its wind-up ("telegraph"), so the taught
+## tells always play out; only Krystal's own hits (and hits without a companion source) interrupt one. The hit
+## still deals its damage and the chase / alert rules are unchanged. Elites and bosses (data "elite" / "boss")
+## keep their own poise / stagger rules. Pebble's Stoneheart is a skill, not a hit: its stun
+## (companion_combat.stagger_near -> can_stagger + stun) never goes through here and is unaffected.
+func holds_tell_against(source: Node) -> bool:
+	if state != "telegraph" or not is_companion_source(source):
+		return false
+	return not (bool(data.get("elite", false)) or bool(data.get("boss", false)))
 
 
 ## The node this enemy hunts right now (Game.player or target_override), or null.

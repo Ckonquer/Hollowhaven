@@ -169,6 +169,47 @@ func test_at_most_three_sparks_in_flight() -> void:
 	assert_false(bool(player.call("_start_cast", "sparkseed_wand", Vector3.ZERO)), "and no cast starts while three fly")
 
 
+## COV-007: a hit taken during the wind-up (before the spark leaves at Logic.CAST_RELEASE) still interrupts the
+## cast, but the cast costs nothing: the 8 stamina come back and the wand's cooldown is cleared, so she can cast
+## again at once.
+func test_hit_during_the_wind_up_refunds_the_cast() -> void:
+	_hold_wand()
+	var foe := _dummy(Vector3(0, 0, -6))
+	player.call("_on_attack_pressed")
+	assert_almost(float(player.stamina), 100.0 - 8.0, 0.01, "the click pays for the cast")
+	await wait_physics(3)                        # 0.05 s: still winding up (the spark leaves at 0.16 s)
+	assert_true(bool(player.get("_swing_ranged")), "still winding up")
+	player.health.apply_damage(5.0, null, Vector3.ZERO)
+	assert_false(bool(player.get("_swing_ranged")), "the hit interrupts the cast (unchanged rule)")
+	assert_almost(float(player.stamina), 100.0, 0.01, "the interrupted cast's stamina is refunded")
+	assert_almost(float(player.wand_cooldown_left()), 0.0, 0.001, "and its cooldown cleared")
+	await wait_physics(12)                       # past the 0.16 s release of the interrupted cast
+	assert_null(player.last_bolt, "no spark left the wand")
+	assert_almost(float(foe.get("health").hp), 30.0, 0.01, "the foe is untouched")
+	# she can cast again right away (with the old code about 0.55 s of cooldown was left here, too long to queue)
+	player.call("_on_attack_pressed")
+	assert_true(bool(player.get("_swing_ranged")), "a new cast starts at once")
+	assert_almost(float(player.stamina), 100.0 - 8.0, 0.01, "a fresh cast pays once")
+	await wait_physics(45)
+	assert_not_null(player.last_bolt, "the new spark flies")
+	assert_almost(float(foe.get("health").hp), 30.0 - 9.0, 0.01, "and lands")
+
+
+## COV-007 guard (no free spam): a hit AFTER the spark has left refunds nothing - the stamina and the cooldown
+## stay spent, and the spark still lands.
+func test_hit_after_the_release_refunds_nothing() -> void:
+	_hold_wand()
+	var foe := _dummy(Vector3(0, 0, -6))
+	player.call("_on_attack_pressed")
+	await wait_physics(15)                       # 0.25 s: the spark is out (regen delay 0.6 s: no regen yet)
+	assert_not_null(player.last_bolt, "the spark was released")
+	player.health.apply_damage(5.0, null, Vector3.ZERO)
+	assert_almost(float(player.stamina), 100.0 - 8.0, 0.01, "no refund once the spark is out")
+	assert_true(float(player.wand_cooldown_left()) > 0.4, "the cooldown keeps running")
+	await wait_physics(45)
+	assert_almost(float(foe.get("health").hp), 30.0 - 9.0, 0.01, "the released spark lands")
+
+
 ## Review fix: the use key follows the attack button's gate - no spark mid-bite.
 func test_use_key_casts_but_never_while_eating() -> void:
 	_hold_wand()

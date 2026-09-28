@@ -41,10 +41,16 @@ const MSG_UPPER_ON_UPPER := "Take down the upper floor tile leaning on this one 
 const MSG_UPPER_CARRIES := "Clear what stands on this upper floor first."
 const MSG_DECOR_ON_WALL := "Take down the %s hanging on this wall first."
 const MSG_NOTHING_TO_UNDO := "Nothing to undo."
-## Set (once, never cleared) when stairs lead onto an upper floor she can step onto: the optional goal "A House
-## With an Upstairs" (data/optional_goals.gd opt_upstairs, set by building). Checked after every place and
-## dismantle while unset, and repaired on load (BuildingSystem.attach).
+## Set (once, never cleared) the first time Krystal WALKS UP: she stands on an upper floor tile while stairs lead
+## onto an upper floor she can step onto - the optional goal "A House With an Upstairs" (data/optional_goals.gd
+## opt_upstairs, objective "Walk up your stairs onto the upper floor"). Placing or taking down pieces never sets it
+## (COV-005: the placement that completed the house used to, before she had walked up): BuildingSystem.attach adds a
+## watcher that hands her position to check_upstairs_walk() every half second while the flag is unset.
 const FLAG_UPSTAIRS := "c1x_upstairs_reachable"
+## Her feet count as standing on an upper floor tile from this far below its walkable top (the last small step off
+## the ramp) to this far above it (a jump up there), inside the tile's 2 x 2 m square.
+const UPSTAIRS_FEET_BELOW := 0.35
+const UPSTAIRS_FEET_ABOVE := 1.6
 const MSG_NO_TINT := "This piece can't be recoloured."
 const MSG_TINT_LOCKED := "Make that dye at the Loom first."
 
@@ -143,23 +149,47 @@ static func place_structure(area: Node, item_id: String, pos: Vector3, rot_deg: 
 		reseat_objects(area, Placement.footprint(def, pos, rot_deg)["cells"])
 	GameState.add_counter("structures_built")
 	notify_area(area)
-	update_upstairs_flag(area_id_of(area))
 	Events.structure_placed.emit(uid, sid)
 	Audio.play_3d("build_place", pos + Vector3.UP * 0.4)
 	return uid
 
 
-## Sets FLAG_UPSTAIRS the first time `area_id` has stairs leading onto a reachable upper floor. Cheap while
-## there are no stairs; never clears the flag (the goal latches). Returns the flag's value.
-static func update_upstairs_flag(area_id: String) -> bool:
+## Sets FLAG_UPSTAIRS the first time Krystal, feet at `feet`, stands on an upper floor tile of `area_id`
+## (upper_floor_under) while stairs there lead onto a reachable upper floor (Placement.has_reachable_upstairs).
+## Cheap while she is downstairs (one pass over the saved pieces, no occupancy); never clears the flag (the goal
+## latches). Returns the flag's value. Called by BuildingSystem's upstairs watcher (COV-005).
+static func check_upstairs_walk(area_id: String, feet: Vector3) -> bool:
 	if bool(GameState.get_flag(FLAG_UPSTAIRS)):
 		return true
-	if GameState.count_structures("wood_stairs") == 0:
+	if upper_floor_under(area_id, feet) == "":
 		return false
 	if Placement.has_reachable_upstairs({"structures": GameState.structures, "area_id": area_id}):
 		GameState.set_flag(FLAG_UPSTAIRS)
 		return true
 	return false
+
+
+## uid of the upper floor tile of `area_id` that feet at `feet` stand on ("" if none): the tile's square holds her
+## x/z and her feet are within UPSTAIRS_FEET_BELOW / UPSTAIRS_FEET_ABOVE of its walkable top (so the ground floor
+## under it, or the stairs beside it, never count).
+static func upper_floor_under(area_id: String, feet: Vector3) -> String:
+	for uid in GameState.structures:
+		var rv: Variant = GameState.structures[uid]
+		if not (rv is Dictionary):
+			continue
+		var rec: Dictionary = rv
+		if Placement.level_of(rec) < 1 or String(rec.get("area", "surface")) != area_id:
+			continue
+		var def := Placement.def_of(String(rec.get("id", "")))
+		if not bool(def.get("upper", false)):
+			continue
+		var top := Placement.vec_from(rec.get("pos")).y + Placement.UPPER_TOP
+		if feet.y < top - UPSTAIRS_FEET_BELOW or feet.y > top + UPSTAIRS_FEET_ABOVE:
+			continue
+		var rect: Rect2 = Placement.record_footprint(rec)["rect"]
+		if rect.has_point(Vector2(feet.x, feet.z)):
+			return String(uid)
+	return ""
 
 
 # --- Dismantling ------------------------------------------------------------------------------------
@@ -281,7 +311,6 @@ static func dismantle(area: Node, uid: String) -> Dictionary:
 	if was_bed_spawn:
 		_forget_bed_spawn(area)
 	notify_area(area)
-	update_upstairs_flag(String(rec.get("area", "surface")))     # e.g. a wall taken down at the top of the stairs
 	Events.structure_removed.emit(uid, sid)
 	Audio.play_3d("build_remove", drop)
 	return {"ok": true, "reason": "", "refund": refund}

@@ -12,7 +12,8 @@ extends CharacterBody3D
 ##     Events.stats_changed); stamina costs x Stats.stamina_cost_mult(action); melee = Stats.melee_damage.
 ##   * Tools: the best owned tool (Stats.best_tool) that meets the node's min_tier; the wand is never auto-picked.
 ##   * Wand: with a wand selected on the hotbar, attack casts a spark (src/combat/projectile.gd): finite range,
-##     shared stamina, cooldown, LOS, at most WAND_RULES.max_projectiles_alive in flight.
+##     shared stamina, cooldown, LOS, at most WAND_RULES.max_projectiles_alive in flight. A hit during the
+##     wind-up (before Logic.CAST_RELEASE) interrupts the cast and refunds its stamina and cooldown (COV-007).
 ##   * Support API for other modules: add_shield(), apply_slow() / clear_slow(), resist_knockback().
 ##   * Area-aware recovery (outdoor bounds + under-terrain for surface and the Reach) and lantern look.
 ## Chapter Two integration (lead decisions):
@@ -124,6 +125,7 @@ var _cast_pending: bool = false
 var _swing_ranged: bool = false
 var _cast_target: Node3D = null
 var _cast_dir := Vector3.FORWARD
+var _cast_cost: float = 0.0             # stamina the cast winding up now paid (refunded if a hit cancels it)
 var _projectile: Script = null
 var _projectile_checked: bool = false
 var _slow_immune_until_ms: int = 0
@@ -1026,6 +1028,7 @@ func _start_cast(wand_id: String, foe_dir: Vector3 = Vector3.ZERO) -> bool:
 	_cast_pending = false
 	_wand_cd = maxf(float(w.get("cooldown", 0.8)), Logic.CAST_TIME)
 	_swing_ranged = true
+	_cast_cost = cost
 	_swing_tool = wand_id
 	var aim := foe_dir if foe_dir.length() > 0.1 else _aim_forward()
 	_cast_target = _ranged_target(float(w.get("range", 14.0)), aim)
@@ -1080,6 +1083,20 @@ func _fire_bolt() -> Node3D:
 func _clear_cast() -> void:
 	_swing_ranged = false
 	_cast_target = null
+	_cast_cost = 0.0
+
+
+## COV-007: a hit (or death) that cancels the wand's wind-up before the spark leaves still interrupts the cast,
+## but the cast costs nothing: its stamina comes back and its cooldown is cleared (_start_cast only runs with the
+## cooldown at 0). Only an unreleased cast qualifies - _fire_bolt clears the cast when the spark leaves and a
+## struck swing cannot be cancelled - so a hit never makes a released spark free. Call BEFORE _swing.cancel().
+func _refund_interrupted_cast() -> void:
+	if not _swing_ranged or not _swing.can_cancel():
+		return
+	if _cast_cost > 0.0:
+		stamina = stamina + _cast_cost      # the setter clamps to the max and syncs GameState.player
+	_cast_cost = 0.0
+	_wand_cd = 0.0
 
 
 ## Where the spark leaves the wand (right hand height, a little in front).
@@ -1450,6 +1467,7 @@ func _on_damaged(amount: float, source: Node, dir: Vector3) -> void:
 		if d.length() > 0.01:
 			knockback(d, HURT_KNOCKBACK)
 		if _swing.can_cancel():
+			_refund_interrupted_cast()
 			_swing.cancel()
 			_swing_target = null
 			_clear_cast()
@@ -1479,6 +1497,7 @@ func _on_died() -> void:
 	_dead = true
 	_death_wait = 0.0
 	_sprinting = false
+	_refund_interrupted_cast()
 	_swing.cancel()
 	_swing_target = null
 	_clear_cast()

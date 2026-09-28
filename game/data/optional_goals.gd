@@ -22,9 +22,11 @@ extends RefCounted
 ## | opt_gardeners_afternoon | c1x_found_new_crops (wild sunflax/roseberries), c1x_grew_new_crop          | farming / world          |
 ## | opt_tobins_shift        | c1x_annex_entered, c1x_drudge_defeated, c1x_tobin_shift (note read; the     | Tobin's annex            |
 ## |                         | Miner's Lamp unlock flag), ta_hatch_open                                  |                          |
-## | opt_upstairs            | placed wood_stairs, placed upper_floor, c1x_upstairs_reachable (stairs    | building                 |
-## |                         | that really lead onto a reachable upper floor: set / repaired on load by  | (build_ops.gd            |
-## |                         | build_ops.update_upstairs_flag; never cleared)                            | update_upstairs_flag)    |
+## | opt_upstairs            | placed wood_stairs, placed upper_floor, c1x_upstairs_reachable (set the   | building                 |
+## |                         | first time Krystal STANDS on an upper floor tile while stairs lead onto   | (build_ops.gd            |
+## |                         | a reachable upper floor; placing pieces never sets it, COV-005; polled    | check_upstairs_walk,     |
+## |                         | by the BuildingSystem upstairs watcher, also for older saves; never       | UpstairsWatch)           |
+## |                         | cleared)                                                                  |                          |
 ## | opt_pumpkin_face        | ch2_pumpkin_harvested (a pumpkin CROP harvested; also derived by the      | farming / story tracker  |
 ## |                         | story tracker from Events.crop_harvested), placed pumpkin_lantern (a      | building                 |
 ## |                         | carved pumpkin always has a face: data.face, default the first face)      |                          |

@@ -221,8 +221,9 @@ func test_records_round_trip_and_unknown_goals_are_kept() -> void:
 	assert_true(GameState.optional_goals.records.has("opt_from_the_future"))
 
 
-## "A House With an Upstairs" needs stairs that really lead up (c1x_upstairs_reachable, set / repaired by
-## build_ops.update_upstairs_flag), not just a staircase and a floor piece somewhere; a latched goal stays done.
+## "A House With an Upstairs" needs stairs that really lead up and Krystal walking up them (c1x_upstairs_reachable,
+## set by build_ops.check_upstairs_walk, COV-005), not just a staircase and a floor piece somewhere; a latched goal
+## stays done.
 func test_upstairs_needs_a_reachable_upper_floor() -> void:
 	GameState.add_structure("workbench", Vector3(9, 0, 9), 0.0)
 	var g: Dictionary = opt.goal("opt_upstairs")

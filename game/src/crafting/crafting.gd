@@ -527,11 +527,12 @@ static func seasonal_dishes_cooked() -> int:
 
 # --- Descriptions ------------------------------------------------------------------------------------------
 
-## "2 Wood, 1 Stone" (display names respect the arachnophobia option).
+## "2 Wood, 1 Stone", "3 Copper Bars" (plural names for counts above 1, COV-006: ItemDB.display_count; display
+## names respect the arachnophobia option). Recipe costs, the furnace's prompt and toast, chest contents...
 static func describe_items(items: Dictionary) -> String:
 	var parts: PackedStringArray = []
 	for id in items:
-		parts.append("%d %s" % [int(items[id]), ItemDB.display_name(String(id))])
+		parts.append(ItemDB.display_count(String(id), int(items[id])))
 	return ", ".join(parts)
 
 

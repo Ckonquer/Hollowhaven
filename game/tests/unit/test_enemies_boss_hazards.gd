@@ -382,6 +382,39 @@ func test_arachnophobia_swaps_every_hazard_live() -> void:
 	assert_false(bool(fan.alt), "and back")
 
 
+## COV-004: the snag's "boss_tripline" hint follows arachnophobia like its caption does, live both ways (the field is
+## built in spider mode and switched mid-fight): pale root lines in the comfort mode, never "Trip-lines".
+func test_snag_hint_follows_arachnophobia_live() -> void:
+	var texts: Array = []
+	var cb := func(id: String, text: String) -> void:
+		if id == "boss_tripline":
+			texts.append(text)
+	Events.hint.connect(cb)
+	var f := _field()
+	var d := _dummy(Vector3(0, 0, 9))
+	Settings.set_value("arachnophobia", true)
+	await wait_frames(1)
+	var line: Node = (f.begin_trips(1, 0.0, d.global_position) as Array)[0]
+	d.global_position = line.nearest_point(d.global_position)
+	_run(f, d, DT)
+	Settings.set_value("arachnophobia", false)
+	await wait_frames(1)
+	d.global_position = Vector3(0, 0, 9)
+	var line2: Node = (f.begin_trips(1, 0.0, d.global_position) as Array)[0]
+	d.global_position = line2.nearest_point(d.global_position)
+	_run(f, d, DT)
+	Events.hint.disconnect(cb)
+	assert_eq(int(f.snags), 2, "precondition: two snags")
+	assert_eq(texts.size(), 2, "one hint per snag (%s)" % str(texts))
+	if texts.size() == 2:
+		assert_eq(String(texts[0]), "Root lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over.",
+			"comfort wording, like the '[a pale root snags her ankle]' caption")
+		assert_false(String(texts[0]).to_lower().contains("trip-line"), "no spider-mode word")
+		assert_eq(String(texts[1]), "Trip-lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over.",
+			"the original wording once switched back")
+	assert_true(_captions.has("[a pale root snags her ankle]") and _captions.has("[a thread snags her ankle]"), "captions agree")
+
+
 ## Settings "high_visibility_cues" (comfort): every live hazard shows a bold cream outline at once (fan wedge
 ## edges + arc, the trip-line, the sac's outer ring, the knot's collar), new ones are built with it, an ended
 ## hazard drops it, and the arachnophobia rebuild keeps it.

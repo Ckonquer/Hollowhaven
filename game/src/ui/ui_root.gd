@@ -16,7 +16,8 @@ extends CanvasLayer
 ## screen is up, the chatter waits: toasts and quest banners hold in their queues with their timers paused (the top
 ## layer fades out, so nothing lands on the card / ending text or peeks past a menu's edge), the tip card holds
 ## and re-checks that its tip still applies before it comes back, and during a chapter card the gameplay HUD steps
-## aside like a cutscene. hush_reason() / is_hushed(); _sync_hush() applies it (on every change and polled).
+## aside like a cutscene. hush_reason() / is_hushed(); _sync_hush() applies it (on every change and polled). While an
+## area loads behind Game's loading card (src/ui/screens/loading_card.gd, a layer above this one) the hush is "loading".
 ## Toasts also climb above the dialogue box whenever it would share their corner (_layout_toasts, IN-09).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
@@ -546,6 +547,7 @@ func _on_settings_changed(key: String) -> void:
 
 func _on_area_loaded(_area_id: String) -> void:
 	close_all()
+	_sync_hush()   # Game is "playing" again: the loading hush lifts before the quest hint below is re-shown
 	# Re-show the current quest hint if it was emitted before the UI existed (new game start).
 	var step: Dictionary = GameState.quests.current_step()
 	var hint := String(GameState.quests.step_string(step, "hint")) if not step.is_empty() else ""
@@ -573,10 +575,13 @@ func _process(delta: float) -> void:
 
 # --- HUD hush (visual QA T4) -----------------------------------------------------------------------------
 
-## Why the HUD's chatter is held right now ("" = free): "ending", "death", "card" (a chapter card) or "panel" (a
-## full-screen menu or a modal confirm card, FULLSCREEN). Non-full-screen panels (companion menu, Music Box) keep
-## the world, and the toasts, running.
+## Why the HUD's chatter is held right now ("" = free): "loading" (Game's loading card is up while an area loads - the
+## area builds in one frozen frame behind it, so nothing may time out there), "ending", "death", "card" (a chapter card)
+## or "panel" (a full-screen menu or a modal confirm card, FULLSCREEN). Non-full-screen panels (companion menu, Music
+## Box) keep the world, and the toasts, running.
 func hush_reason() -> String:
+	if Game.mode == "loading" and Game.has_method("loading_card_showing") and bool(Game.loading_card_showing()):
+		return "loading"
 	if _ending != null and is_instance_valid(_ending):
 		return "ending"
 	if _death != null and is_instance_valid(_death):

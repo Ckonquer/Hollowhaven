@@ -26,6 +26,13 @@ const WAND_DEFAULTS := {"damage": 0.0, "range": 10.0, "stamina": 8.0, "cooldown"
 ## this autoload never depends on those files parsing).
 const QUESTS_CH2_DATA := "res://data/quests_ch2.gd"
 const OPTIONAL_GOALS_DATA := "res://data/optional_goals.gd"
+## Plurals (display_count, COV-006): last words of item names that read the same for any count - mass nouns
+## ("3 Wood", "2 Iron Ore", "4 Weaver Silk", "2 Hearty Stew"). Names already plural ("Berries", "Wooden Stairs",
+## "Padded Boots") and "The ..." names never change either; an item may also give "plural" / "alt_plural" in its data.
+const MASS_WORDS := ["wood", "stone", "fiber", "ore", "silk", "resin", "cloth", "wax", "candy", "stew", "soup", "tea",
+	"sunflax", "mail", "trim", "bunting", "thread"]
+## Last words with an irregular plural.
+const IRREGULAR_PLURALS := {"shelf": "shelves", "bookshelf": "bookshelves"}
 
 var _items: Dictionary = {}
 var _log_rewards: Dictionary = {}
@@ -65,6 +72,46 @@ func display_name(id: String) -> String:
 	if _arachno() and d.has("alt_name"):
 		return d["alt_name"]
 	return d["name"]
+
+
+## "3 Copper Bars", "1 Copper Bar", "2 Wood": a count and the item's name for it (display_name_count).
+func display_count(id: String, n: int) -> String:
+	return "%d %s" % [n, display_name_count(id, n)]
+
+
+## Name shown for `n` of item `id` (respects the arachnophobia option): display_name for 1, else the plural - the
+## item's own "plural" / "alt_plural" when its data gives one, else plural_of(display name).
+func display_name_count(id: String, n: int) -> String:
+	var nm := display_name(id)
+	if n == 1:
+		return nm
+	var d := item(id)
+	var key := "alt_plural" if _arachno() and d.has("alt_name") else "plural"
+	if d.has(key):
+		return String(d[key])
+	return plural_of(nm)
+
+
+## English plural of an item name, on its last word: "Copper Bar" -> "Copper Bars", "Music Box" -> "Music Boxes",
+## "Cottage Bench" -> "Cottage Benches", "Bookshelf" -> "Bookshelves"; mass nouns (MASS_WORDS), names already
+## ending in s and "The ..." names stay as they are.
+static func plural_of(item_name: String) -> String:
+	if item_name == "" or item_name.begins_with("The "):
+		return item_name
+	var sp := item_name.rfind(" ")
+	var head := item_name.substr(0, sp + 1)
+	var last := item_name.substr(sp + 1)
+	var low := last.to_lower()
+	if low == "" or MASS_WORDS.has(low) or low.ends_with("s"):
+		return item_name
+	if IRREGULAR_PLURALS.has(low):
+		var irr := String(IRREGULAR_PLURALS[low])
+		return head + last.substr(0, 1) + irr.substr(1)
+	if low.ends_with("x") or low.ends_with("z") or low.ends_with("ch") or low.ends_with("sh"):
+		return head + last + "es"
+	if low.length() > 1 and low.ends_with("y") and not "aeiou".contains(low.substr(low.length() - 2, 1)):
+		return head + last.substr(0, last.length() - 1) + "ies"
+	return head + last + "s"
 
 
 func display_desc(id: String) -> String:

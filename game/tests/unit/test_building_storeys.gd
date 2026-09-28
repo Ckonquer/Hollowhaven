@@ -11,6 +11,8 @@ const Storey := preload("res://src/building/models_storey.gd")
 
 const BA := {"center": Vector2(0, 0), "radius": 30.0, "blocked": []}
 
+var _game_saved: Dictionary = {}
+
 
 func before_each() -> void:
 	fresh_state()
@@ -391,7 +393,8 @@ func test_preview_cottage_is_a_legal_build() -> void:
 
 
 ## "A House With an Upstairs" (data/optional_goals.gd opt_upstairs, set by building): its objectives read the
-## placed stairs and upper floor; built the real way (support, reachable landing) the goal latches once.
+## placed stairs and upper floor; built the real way (support, reachable landing) the goal latches once Krystal has
+## walked up onto it (COV-005: placing the landing alone is not "Walk up your stairs onto the upper floor").
 func test_a_house_with_an_upstairs_goal_completes_from_a_real_build() -> void:
 	var area_ctx := func() -> Dictionary:
 		return {"structures": GameState.structures, "area_id": "surface", "build_area": Ops.build_area_for("surface"), "height_fn": _flat}
@@ -410,6 +413,9 @@ func test_a_house_with_an_upstairs_goal_completes_from_a_real_build() -> void:
 	assert_false(GameState.optional_goals.is_done("opt_upstairs"), "stairs alone are not an upstairs")
 	place.call("upper_floor", Vector3(-5, 0, 1), 0)
 	assert_true(P.has_reachable_upstairs(area_ctx.call()), "the landing is reachable")
+	GameState.optional_goals.evaluate()
+	assert_false(GameState.optional_goals.is_done("opt_upstairs"), "built, but she has not walked up yet")
+	assert_true(Ops.check_upstairs_walk("surface", Vector3(-5, P.LEVEL_HEIGHT + P.UPPER_TOP, 1)), "she walks up onto the landing")
 	GameState.optional_goals.evaluate()
 	assert_true(GameState.optional_goals.is_done("opt_upstairs"), "the goal latches")
 	var railings := GameState.count_item("wood_railing")
@@ -459,17 +465,25 @@ func _place_real(sid: String, pos: Vector3, rot: float, level: int = 0) -> Strin
 	return Ops.place_structure(null, sid, Vector3(pos.x, float(res["y"]), pos.z), rot, int(res["level"]))
 
 
-## Set by the placement that makes the landing reachable (not by stairs alone, not by a floor the stairs can't
-## reach), opened up by taking down a wall across the top of the stairs, repaired on load, never cleared.
-func test_upstairs_flag_needs_stairs_onto_a_reachable_landing() -> void:
+## COV-005: set only when Krystal stands on an upper floor tile while stairs lead onto a reachable upper floor: not
+## by stairs alone, not by the placement that completes the house, not by a landing walled off at the top of the
+## stairs (the way up opens when that wall comes down and she walks up), never cleared.
+func test_upstairs_flag_needs_krystal_on_a_reachable_upper_floor() -> void:
+	var up := Vector3(-5, P.LEVEL_HEIGHT + P.UPPER_TOP, 1)      # her feet on the landing tile's walkable top
 	assert_false(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)))
 	_place_real("wood_wall", Vector3(-5, 0, 0), 0)
 	_place_real("wood_wall", Vector3(-6, 0, 1), 90)
 	_place_real("wood_stairs", Vector3(-5, 0, 4), 0)
-	assert_false(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "stairs alone are not an upstairs")
+	assert_false(Ops.check_upstairs_walk(Ops.area_id_of(null), Vector3(-5, 0, 6.5)), "stairs alone are not an upstairs")
 	var land := _place_real("upper_floor", Vector3(-5, 0, 1), 0)
 	assert_ne(land, "")
-	assert_true(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "stairs onto a supported landing")
+	assert_false(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "placing the landing is not walking up")
+	assert_eq(Ops.upper_floor_under(Ops.area_id_of(null), up), land, "her feet on the landing")
+	assert_eq(Ops.upper_floor_under(Ops.area_id_of(null), Vector3(-5, 0, 1)), "", "the ground floor under it is not upstairs")
+	assert_eq(Ops.upper_floor_under(Ops.area_id_of(null), Vector3(-5, 2.6, 2.5)), "", "nor is the top of the ramp")
+	assert_eq(Ops.upper_floor_under("hallowmere_reach", up), "", "nor a tile of another area")
+	assert_true(Ops.check_upstairs_walk(Ops.area_id_of(null), up), "she walks up onto the landing")
+	assert_true(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)))
 	# A top wall taken down opens the way up (records made directly: validation would refuse that wall).
 	fresh_state()
 	var aid := Ops.area_id_of(null)
@@ -479,22 +493,97 @@ func test_upstairs_flag_needs_stairs_onto_a_reachable_landing() -> void:
 	GameState.add_structure("wood_stairs", Vector3(-5, 0, 4), 0, aid)
 	var top := GameState.add_structure("wood_wall", Vector3(-5, 3, 2), 0, aid)
 	GameState.structures[top]["data"]["level"] = 1
-	assert_false(Ops.update_upstairs_flag(aid), "a wall across the top of the stairs")
+	assert_false(Ops.check_upstairs_walk(aid, up), "a wall across the top of the stairs: no way up to that floor")
 	assert_true(bool(Ops.dismantle(null, top)["ok"]))
-	assert_true(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "the way up is open now")
+	assert_false(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "the way up is open, but she has not walked up yet")
+	assert_true(Ops.check_upstairs_walk(aid, up), "the way up is open and she walks up")
 	assert_true(bool(Ops.dismantle(null, tile)["ok"]), "the landing still comes apart")
 	assert_true(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "the flag stays (the goal latches)")
 
 
-func test_upstairs_flag_is_repaired_when_the_haven_loads() -> void:
-	GameState.add_structure("wood_wall", Vector3(-5, 0, 0), 0)
-	var tile := GameState.add_structure("upper_floor", Vector3(-5, 3, 1), 0)
-	GameState.structures[tile]["data"]["level"] = 1
-	GameState.add_structure("wood_stairs", Vector3(-5, 0, 4), 0)
-	assert_false(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)))
+## A Haven area with the building system attached, Krystal (a stand-in node, feet at its origin) in it as the current
+## area's player. Returns [area, krystal]; _end_haven() puts Game back.
+func _haven() -> Array:
 	var area: Node3D = preload("res://src/world/area_base.gd").new()
 	area.area_id = "surface"
 	add_child(area)
 	preload("res://src/building/building_system.gd").attach(area)
-	assert_true(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "attach repairs the flag from the saved house")
-	area.free()
+	var k := Node3D.new()
+	add_child(k)
+	_game_saved = {"area": Game.area, "player": Game.player, "area_id": Game.area_id}
+	Game.area = area
+	Game.player = k
+	Game.area_id = "surface"
+	return [area, k]
+
+
+func _end_haven(h: Array) -> void:
+	Game.area = _game_saved.get("area")
+	Game.player = _game_saved.get("player")
+	Game.area_id = String(_game_saved.get("area_id", ""))
+	for n in h:
+		if is_instance_valid(n):
+			(n as Node).free()
+
+
+## The Haven's upstairs watcher (BuildingSystem.attach) polled with Krystal's feet at `feet`.
+func _poll_watch(area: Node, k: Node3D, feet: Vector3) -> void:
+	k.position = feet
+	var w: Node = area.get_node_or_null("UpstairsWatch")
+	if w != null and not w.is_queued_for_deletion():
+		w._process(0.6)
+
+
+## COV-005 (QA bot, lamp_orders_ch1_optional COV2-002): "Walk up your stairs onto the upper floor" completed on the
+## frame the landing tile was placed, 12 s before Krystal walked up. Now only standing up there completes it: the
+## Haven's watcher polls her position; the foot of the stairs, the ramp and the ground under the landing never count.
+func test_the_upstairs_goal_waits_until_krystal_walks_up() -> void:
+	var h := _haven()
+	var area: Node3D = h[0]
+	var k: Node3D = h[1]
+	GameState.add_structure("workbench", Vector3(-9, 0, 9.5), 0)   # the goal is shown
+	_place_real("wood_wall", Vector3(-5, 0, 0), 0)
+	_place_real("wood_wall", Vector3(-6, 0, 1), 90)
+	_place_real("wood_stairs", Vector3(-5, 0, 4), 0)
+	_place_real("upper_floor", Vector3(-5, 0, 1), 0)
+	GameState.optional_goals.evaluate()
+	assert_false(bool(GameState.get_flag("c1x_upstairs_reachable")), "placing the landing is not walking up")
+	assert_false(GameState.optional_goals.is_done("opt_upstairs"), "the goal waits for her")
+	assert_not_null(area.get_node_or_null("UpstairsWatch"), "the Haven watches for her walking up")
+	for feet in [Vector3(-5, 0, 6.5), Vector3(-5, 1.5, 4.5), Vector3(-5, 2.6, 2.5), Vector3(-5, 0, 1)]:
+		_poll_watch(area, k, feet)
+		assert_false(bool(GameState.get_flag("c1x_upstairs_reachable")), "not upstairs yet at %s" % str(feet))
+	_poll_watch(area, k, Vector3(-5, 3.12, 1))
+	assert_true(bool(GameState.get_flag("c1x_upstairs_reachable")), "she stands on the upper floor")
+	GameState.optional_goals.evaluate()
+	assert_true(GameState.optional_goals.is_done("opt_upstairs"), "the goal completes now")
+	var w: Node = area.get_node_or_null("UpstairsWatch")
+	assert_true(w == null or w.is_queued_for_deletion(), "a latched goal needs no watcher")
+	_end_haven(h)
+
+
+## A saved house from an older save (stairs onto a reachable landing, no flag): loading the Haven no longer
+## completes the goal by itself - the first walk up does. A save whose goal is done gets no watcher at all.
+func test_a_saved_house_completes_the_goal_when_she_walks_up() -> void:
+	GameState.add_structure("workbench", Vector3(-9, 0, 9.5), 0)
+	GameState.add_structure("wood_wall", Vector3(-5, 0, 0), 0)
+	var tile := GameState.add_structure("upper_floor", Vector3(-5, 3, 1), 0)
+	GameState.structures[tile]["data"]["level"] = 1
+	GameState.add_structure("wood_stairs", Vector3(-5, 0, 4), 0)
+	assert_false(bool(GameState.get_flag("c1x_upstairs_reachable")))
+	var h := _haven()
+	var area: Node3D = h[0]
+	var k: Node3D = h[1]
+	GameState.optional_goals.evaluate()
+	assert_false(bool(GameState.get_flag("c1x_upstairs_reachable")), "loading the Haven is not walking up")
+	assert_false(GameState.optional_goals.is_done("opt_upstairs"))
+	_poll_watch(area, k, Vector3(-5, 0.05, 7))
+	assert_false(bool(GameState.get_flag("c1x_upstairs_reachable")), "at the foot of the stairs")
+	_poll_watch(area, k, Vector3(-5.5, 3.12, 0.5))
+	assert_true(bool(GameState.get_flag("c1x_upstairs_reachable")), "up on the landing")
+	GameState.optional_goals.evaluate()
+	assert_true(GameState.optional_goals.is_done("opt_upstairs"))
+	_end_haven(h)
+	var h2 := _haven()
+	assert_null(h2[0].get_node_or_null("UpstairsWatch"), "the goal is done: no watcher")
+	_end_haven(h2)

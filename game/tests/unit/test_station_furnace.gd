@@ -336,6 +336,39 @@ func test_furnace_interact_collects_then_opens_the_queue() -> void:
 	n.free()
 
 
+## COV-006 (QA bot, lamp_orders_ch1_optional COV2-003): the furnace's prompt and toast used the singular for counts
+## above 1 ("Collect 3 Copper Bar", "Collected 3 Copper Bar."). Crafting.describe_items now names counts through
+## ItemDB.display_count: "Collect 3 Copper Bars" / "Collected 3 Copper Bars."; one bar stays "1 Copper Bar".
+func test_furnace_prompt_and_toast_use_the_plural_for_several_bars() -> void:
+	var toasts: Array = []
+	var on_notify := func(text: String, _kind: String) -> void: toasts.append(text)
+	Events.notify.connect(on_notify)
+	_t(0.0)
+	var n := _spawn(_uid, "furnace")
+	GameState.give_item("copper_ore", 6)
+	for i in 3:
+		assert_true(n.queue_add("copper_bar"), Furnace.last_reason)
+	_t(_secs("copper_bar") * 2.0 + 1.0)
+	n._process(0.6)
+	assert_eq(String(n.get_interaction(null)["text"]), "Collect 2 Copper Bars", "two bars ready")
+	_t(_secs("copper_bar") * 3.0 + 1.0)
+	n._process(0.6)
+	assert_eq(String(n.get_interaction(null)["text"]), "Collect 3 Copper Bars", "three bars ready")
+	n.interact(null)   # Game.open_panel without a UI root is a no-op
+	assert_eq(GameState.count_item("copper_bar"), 3)
+	assert_true(toasts.has("Collected 3 Copper Bars."), str(toasts))
+	# One bar reads in the singular.
+	GameState.give_item("copper_ore", 2)
+	assert_true(n.queue_add("copper_bar"), Furnace.last_reason)
+	_t(_secs("copper_bar") * 5.0 + 1.0)
+	n._process(0.6)
+	assert_eq(String(n.get_interaction(null)["text"]), "Collect 1 Copper Bar")
+	n.interact(null)
+	assert_true(toasts.has("Collected 1 Copper Bar."), str(toasts))
+	Events.notify.disconnect(on_notify)
+	n.free()
+
+
 func test_loom_and_kitchen_use_the_workbench_station_script() -> void:
 	for sid in ["loom", "kitchen_counter", "workbench"]:
 		var uid := GameState.add_structure(sid, Vector3(8, 0, 0), 0)

@@ -9,6 +9,9 @@ extends Node
 ## Visual QA: while a panel is open the logo and the menu fade out (UI-16: sliced words peeked out beside Settings,
 ## Credits and the comfort screen) and come back when it closes; the footer sits on a small dark pill so it reads
 ## on the bright grass (UI-17); Credits name Chapter Two once the save has reached it (UI-04).
+## Loading: while Continue is offered, the area it resumes in is prefetched (Game.prefetch_continue); Continue and a
+## confirmed New Game fade the title to black, then Game.load_area() covers it with its loading card before the scene
+## change (the area builds in one frozen frame behind the card).
 
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const IconFactory := preload("res://src/ui/icon_factory.gd")
@@ -249,6 +252,10 @@ func _refresh_continue() -> void:
 	continue_sub.text = SaveSystem.FUTURE_ERROR if blocked else continue_text(_save_meta)
 	if footer_l != null:
 		footer_l.text = footer_text(_save_meta)
+	# Continue is offered: the area it resumes in starts compiling on loader threads now (Game.prefetch_continue,
+	# idempotent), so pressing Continue only has to build it - behind Game's loading card.
+	if not _save_meta.is_empty() and Game.has_method("prefetch_continue"):
+		Game.prefetch_continue.call_deferred(_save_meta)
 
 
 func _focus_menu() -> void:

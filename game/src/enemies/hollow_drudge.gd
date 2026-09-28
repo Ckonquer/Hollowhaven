@@ -9,6 +9,9 @@ extends "res://src/enemies/enemy_base.gd"
 ## Both marks follow its facing for the first 60% of the wind-up, then lock. Scrapes can start from further
 ## away (they reach along the lane) and never come twice in a row.
 ## Counterplay: step out of the narrow wedge / the lane, or roll through; punish the long recovery.
+## Teaching fight (Tobin's annex lockers, the Works Tool Lockers): only Krystal's own hits flinch it out of a tell;
+## a companion's bolt / puff / headbutt still hurts it but never cancels the wind-up (enemy_base
+## holds_tell_against, COV-002), so both tells always play when a pet is out.
 ## Stats: data/enemies.gd "hollow_drudge" (underground: damage scales with horror intensity).
 ## Sounds (existing names only): gloomling_alert (alert), dir_creak (idle / pick raised), mine_hit (swing),
 ## dir_scratch (scrape tell), rock_break (scrape / defeat), enemy_hurt.

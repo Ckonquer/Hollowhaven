@@ -145,3 +145,40 @@ func test_the_landing_edge_and_railing_hold_her_upstairs() -> void:
 	assert_true(b.global_position.z > -0.2, "the railing stops her at the landing's edge")
 	assert_almost(b.global_position.y, P.LEVEL_HEIGHT + P.UPPER_TOP, 0.12, "still upstairs")
 	b.queue_free()
+
+
+## COV-005: "Walk up your stairs onto the upper floor" (c1x_upstairs_reachable) is set by Krystal really walking up,
+## not by building the house: the Haven's upstairs watcher (BuildingSystem.attach) sees the capsule reach the landing
+## with real physics, and nothing sets the flag while she is still at the foot of the stairs or on the ramp.
+func test_walking_up_the_stairs_completes_the_upstairs_goal() -> void:
+	_make_area()
+	preload("res://src/building/building_system.gd").attach(_area)
+	_house()
+	assert_false(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "the house is built, but she has not walked up")
+	var saved: Array = [Game.area, Game.player, Game.area_id]
+	var b := _walker(46.0)
+	b.global_position = Vector3(-5.0, 0.05, 7.2)
+	Game.area = _area
+	Game.player = b
+	Game.area_id = "surface"
+	await wait_physics(40)
+	assert_false(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "standing at the foot of the stairs")
+	var early: Array = []
+	await _walk(b, Vector3(0, 0, -1), func(n: CharacterBody3D) -> bool:
+		if early.is_empty() and n.global_position.z > 2.0 and bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)):
+			early.append(n.global_position)     # where it was first seen set before the landing
+		return n.global_position.z < 1.0, 360)
+	assert_eq(early, [], "not set on the ramp")
+	var i := 0
+	while i < 120 and not bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)):
+		await wait_physics(1)
+		i += 1
+	assert_almost(b.global_position.y, P.LEVEL_HEIGHT + P.UPPER_TOP, 0.12, "she stands on the landing")
+	assert_true(bool(GameState.get_flag(Ops.FLAG_UPSTAIRS)), "walking up set it")
+	GameState.add_structure("workbench", Vector3(-9, 0, 9.5), 0)   # the goal is shown once a workbench stands
+	GameState.optional_goals.evaluate()
+	assert_true(GameState.optional_goals.is_done("opt_upstairs"), "the goal completes")
+	Game.area = saved[0]
+	Game.player = saved[1]
+	Game.area_id = String(saved[2])
+	b.queue_free()

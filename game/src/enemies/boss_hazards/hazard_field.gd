@@ -270,6 +270,14 @@ func _erase_own_slow() -> void:
 	_own_left = 0.0
 
 
+## The "boss_tripline" hint (shared with weaver_boss._begin_trips). Arachnophobia (`alt`): the pale root lines,
+## matching the phase-2 alt hint and the snag caption (COV-004). Chosen when emitted, so a live toggle is honoured.
+static func tripline_hint(alt_mode: bool) -> String:
+	if alt_mode:
+		return "Root lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over."
+	return "Trip-lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over."
+
+
 func _snag(line: Node) -> void:
 	line.snap("snag")
 	snags += 1
@@ -280,7 +288,7 @@ func _snag(line: Node) -> void:
 		dir = dir.normalized() if dir.length_squared() > 0.0001 else Vector3.BACK
 		h.apply_damage(SNAG_DAMAGE * Combat.intensity_damage_mult(intensity), boss if boss != null and is_instance_valid(boss) else self, dir)
 	Events.caption.emit("[a pale root snags her ankle]" if alt else "[a thread snags her ankle]")
-	Events.hint.emit("boss_tripline", "Trip-lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over.")
+	Events.hint.emit("boss_tripline", tripline_hint(alt))
 	line_cut.emit("snag")
 
 

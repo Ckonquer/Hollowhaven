@@ -3,11 +3,14 @@ extends "res://tests/test_case.gd"
 ## scrape (telegraph 1.4 s, a second distinct tell: pale-blue lane + pick dragged low) -> scrape -> recover
 ## 1.4 s; one hit each through the health path; the swing is narrow, the lane can be side-stepped; the two
 ## tells differ in pose, colour and mark; never two scrapes in a row; horror-intensity scaling.
+## COV-002 (its teaching fight): a companion's hit never flinches it (or any ordinary enemy) out of a tell, while
+## Krystal's own hits and Pebble's Stoneheart stagger still do.
 
 const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Base := preload("res://src/enemies/enemy_base.gd")
 const TelegraphFx := preload("res://src/enemies/telegraph_fx.gd")
 const Drudge := preload("res://src/enemies/hollow_drudge.gd")
+const CompanionCombat := preload("res://src/companions/companion_combat.gd")
 
 const DT := 1.0 / 60.0
 
@@ -29,6 +32,13 @@ class Dummy extends CharacterBody3D:
 
 	func knockback(_dir: Vector3, _force: float) -> void:
 		pass
+
+
+## A stand-in companion (group "companion") with what companion_combat.gd asks of its node for deliver() (Pebble's
+## headbutt) and stagger_near() (Pebble's Stoneheart).
+class FakePet extends Node3D:
+	func _enemy_alive(e: Variant) -> bool:
+		return e is Node and is_instance_valid(e) and (e as Node).is_in_group("enemy") and not bool((e as Node).call("is_dead"))
 
 
 func before_each() -> void:
@@ -63,8 +73,21 @@ func _dummy(pos: Vector3) -> Node3D:
 	return d
 
 
+func _pet(pos: Vector3) -> Node3D:
+	var p := FakePet.new()
+	add_child(p)
+	p.global_position = pos
+	p.add_to_group("companion")
+	_nodes.append(p)
+	return p
+
+
 func _drudge(target: Node3D, pos: Vector3 = Vector3.ZERO) -> Node:
-	var e: Node = Factory.create("hollow_drudge", {"home": pos, "no_drops": true})
+	return _enemy("hollow_drudge", target, pos)
+
+
+func _enemy(id: String, target: Node3D, pos: Vector3 = Vector3.ZERO) -> Node:
+	var e: Node = Factory.create(id, {"home": pos, "no_drops": true})
 	add_child(e)
 	(e as Node3D).global_position = pos
 	e.set_physics_process(false)
@@ -197,3 +220,112 @@ func test_underground_damage_scales() -> void:
 	e.next_attack = "pick_swing"
 	_until(e, "recover", 5.0)
 	assert_almost(float(d.health.hp), 100.0 - 15.0 * 0.6, 0.01, "Gentle: 60% damage")
+
+
+# --- COV-002: a companion's hit never cancels a tell -----------------------------------------------------------------
+
+## The annex repro (Lumi out): her automatic Light Bolt (6 dmg; a projectile credits its shooter, the companion) and
+## Pebble's headbutt (8 dmg, companion_combat.deliver) flinched it out of 2 of 3 wind-ups, so the teaching fight
+## barely showed its tells. Now both tells play out and land; the companion damage still counts.
+func test_companion_hits_never_cancel_either_tell() -> void:
+	var d := _dummy(Vector3(0, 0, -2.0))
+	var pet := _pet(Vector3(1.5, 0, 0.5))
+	var cc := CompanionCombat.new(pet, "pebble")
+	var e := _drudge(d)
+	var max_hp := float(e.health.max_hp)
+	e.next_attack = "pick_swing"
+	_until(e, "telegraph", 4.0)
+	e.health.apply_damage(6.0, pet, Vector3.FORWARD)          # Lumi's Light Bolt, early in the wind-up
+	assert_eq(e.state, "telegraph", "a companion's bolt does not flinch it out of the pick-swing tell")
+	assert_true(float(e.health.hp) < max_hp, "but it still hurts (%.1f)" % float(e.health.hp))
+	while e.state == "telegraph" and e.state_time < 0.9:
+		e.tick(DT)
+	assert_true(float(cc.deliver(e, 8.0, Vector3.FORWARD, 0.0)) > 0.0, "Pebble's headbutt lands")
+	assert_eq(e.state, "telegraph", "nor does a companion's headbutt late in the wind-up")
+	_until(e, "recover", 3.0)
+	assert_almost(float(d.health.hp), 85.0, 0.001, "the pick-swing plays out and lands")
+	_until(e, "chase", 3.0)
+	e.next_attack = "scrape"
+	_until(e, "telegraph", 6.0)
+	assert_eq(String(e.attack_kind), "scrape", "precondition: the scrape tell")
+	e.health.apply_damage(6.0, pet, Vector3.FORWARD)
+	cc.deliver(e, 8.0, Vector3.FORWARD, 0.0)
+	assert_eq(e.state, "telegraph", "the scrape tell is kept too")
+	_until(e, "recover", 3.0)
+	assert_almost(float(d.health.hp), 71.0, 0.001, "and the scrape plays out and lands")
+
+
+## Krystal's own blows are unchanged: they still flinch it out of a tell, also right after a companion hit.
+func test_krystal_still_flinches_it_out_of_a_tell() -> void:
+	var d := _dummy(Vector3(0, 0, -2.0))
+	var pet := _pet(Vector3(1.5, 0, 0.5))
+	var e := _drudge(d)
+	e.next_attack = "scrape"
+	_until(e, "telegraph", 4.0)
+	e.health.apply_damage(6.0, pet, Vector3.FORWARD)
+	assert_eq(e.state, "telegraph", "the companion's bolt keeps the tell")
+	e.health.apply_damage(10.0, d, Vector3.FORWARD)
+	assert_eq(e.state, "flinch", "Krystal's own blow interrupts the wind-up as before")
+	assert_almost(float(e.get("_flinch_immune")), Base.FLINCH_IMMUNITY, 0.001, "with the legacy flinch immunity")
+
+
+## Only the wind-up is protected: outside it a companion hit staggers it exactly as before (the legacy rule).
+func test_companion_hit_outside_a_tell_still_staggers() -> void:
+	var d := _dummy(Vector3(0, 0, -6.0))
+	var pet := _pet(Vector3(1.5, 0, 0.5))
+	var e := _drudge(d)
+	_until(e, "chase", 4.0)
+	assert_eq(e.state, "chase", "precondition: chasing")
+	e.health.apply_damage(6.0, pet, Vector3.FORWARD)
+	assert_eq(e.state, "flinch", "a companion hit while it chases still flinches it")
+
+
+## Pebble's Stoneheart is a deliberate skill: its brief stagger (companion_combat.stagger_near: can_stagger + stun)
+## still stops a tell - and a companion bolt just before it no longer uses up the stagger window.
+func test_stoneheart_still_staggers_a_tell() -> void:
+	var d := _dummy(Vector3(0, 0, -2.0))
+	var pet := _pet(Vector3(1.5, 0, 0.5))
+	var cc := CompanionCombat.new(pet, "pebble")
+	var e := _drudge(d)
+	e.next_attack = "pick_swing"
+	_until(e, "telegraph", 4.0)
+	e.health.apply_damage(6.0, pet, Vector3.FORWARD)
+	assert_eq(e.state, "telegraph", "the bolt keeps the tell")
+	assert_eq(int(cc.stagger_near(d.global_position, 0.8)), 1, "Stoneheart staggers it")
+	assert_eq(e.state, "stunned", "out of the wind-up")
+	for i in 30:
+		e.tick(DT)
+	assert_almost(float(d.health.hp), 100.0, 0.001, "the staggered swing never lands")
+
+
+## The rule is general (enemy_base.holds_tell_against): the Chapter One Brambling / Gloomling keep their wind-up
+## against a companion too (Krystal's hit still flinches them); elites and bosses keep their own poise rules.
+func test_rule_covers_ordinary_enemies_but_not_elites_or_bosses() -> void:
+	var pet := _pet(Vector3(0, 0, 4.0))
+	var x := 0.0
+	for id in ["brambling", "gloomling"]:
+		Base.reset_attack_tokens()
+		var d := _dummy(Vector3(x, 0, -1.5))
+		var e := _enemy(id, d, Vector3(x, 0, 0))
+		_until(e, "telegraph", 5.0)
+		assert_eq(e.state, "telegraph", "%s: precondition" % id)
+		e.health.apply_damage(3.0, pet, Vector3.FORWARD)
+		assert_eq(e.state, "telegraph", "%s: a companion hit keeps its wind-up" % id)
+		e.health.apply_damage(3.0, d, Vector3.FORWARD)
+		assert_eq(e.state, "flinch", "%s: Krystal's hit still flinches it" % id)
+		x += 8.0
+	Base.reset_attack_tokens()
+	var dd := _dummy(Vector3(24, 0, -2.0))
+	var e2 := _drudge(dd, Vector3(24, 0, 0))
+	e2.next_attack = "pick_swing"
+	_until(e2, "telegraph", 4.0)
+	assert_true(bool(e2.holds_tell_against(pet)), "an ordinary enemy holds its tell against a companion")
+	assert_false(bool(e2.holds_tell_against(dd)), "never against Krystal")
+	assert_false(bool(e2.holds_tell_against(null)), "nor against a hit without a source")
+	var own: Dictionary = (e2.data as Dictionary).duplicate()
+	own["elite"] = true
+	e2.data = own
+	assert_false(bool(e2.holds_tell_against(pet)), "elites keep their own stagger rules")
+	own.erase("elite")
+	own["boss"] = true
+	assert_false(bool(e2.holds_tell_against(pet)), "bosses too")

@@ -2,11 +2,14 @@ extends "res://tests/test_case.gd"
 ## Game flow rules for Chapter Two (autoload/game.gd, docs/CHAPTER_TWO_SPEC.md §1, §5, §8, MP §9):
 ## manual save / quiet autosave per area (SAFE_SAVE_AREAS anywhere; other Chapter Two areas in a safe
 ## zone; the Below and trials never; never with a boss active or something chasing within 20 m),
-## per-area respawn memory, the Lantern Road list and gate, companion_present(), the new-game look,
+## per-area respawn memory (a lit checkpoint arrived on through its own entrance is the return point, COV-001),
+## the Lantern Road list and gate, companion_present(), the new-game look,
 ## complete_chapter_two() granting exactly once (twice in a row, and after a save/reload) with one gifts toast,
 ## and Continue on an upper storey (the saved spot is validated again once the structures exist).
 
 const Reach := preload("res://data/hallowmere_layout.gd")
+const LanternScript := preload("res://src/world/below/checkpoint_lantern.gd")
+const CandleScript := preload("res://src/world/manor/manor_checkpoint.gd")
 
 var _saved := {}
 var _tmp: Array = []
@@ -166,6 +169,98 @@ func test_per_area_respawn_memory() -> void:
 	GameState.player["below_respawn"] = "cp_shrine"
 	assert_eq(Game.area_respawn_of("hallowmere_reach"), "")
 	assert_eq(Game.area_respawn_of("below"), "cp_shrine")
+
+
+## A stand-in area `id` registering `spawn_ids` and checkpoint nodes {key: [script, setup params]} (real lanterns /
+## candles: they read their lit flag when they enter the tree). `single` = the annex's one `checkpoint` node instead.
+func _cp_area(id: String, spawn_ids: Array, cps: Dictionary, single: bool = false) -> Node3D:
+	var s := GDScript.new()
+	s.source_code = "extends \"res://src/world/area_base.gd\"\nvar checkpoints: Dictionary = {}\nvar checkpoint: Node3D = null\n"
+	s.reload()
+	var a := Node3D.new()
+	a.set_script(s)
+	a.set("area_id", id)
+	for sp in spawn_ids:
+		a.call("register_spawn", String(sp), Transform3D.IDENTITY)
+	add_child(a)
+	_tmp.append(a)
+	for key in cps:
+		var n: Node3D = (cps[key][0] as Script).new()
+		n.call("setup", cps[key][1])
+		a.add_child(n)
+		if single:
+			a.set("checkpoint", n)
+		else:
+			(a.get("checkpoints") as Dictionary)[key] = n
+	Game.area = a
+	Game.area_id = id
+	return a
+
+
+## COV-001: arriving on a lit checkpoint through its own entrance makes it the return point, like a lit arch. After
+## the Choir the Works remembers vault_exit (choir_arena.gd), 160 m below; the refuge hatch lands on the refuge
+## lantern's spawn and the Bellhouse stair on the Service Landing lantern's. The manor's front door lands in the
+## cloakroom (no candle): a defeat there still wakes her at the last rest candle. The Below keeps its legacy rule.
+func test_arriving_on_a_lit_checkpoint_makes_it_the_return_point() -> void:
+	var works_cps := {
+		"hw_landing": [LanternScript, {"id": "hw_landing", "spawn": "service_landing", "zone": "hw_landing", "area": "hushed_works"}],
+		"hw_lockers": [LanternScript, {"id": "hw_lockers", "spawn": "works_lockers", "zone": "hw_lockers", "area": "hushed_works"}],
+		"hw_refuge": [LanternScript, {"id": "hw_refuge", "spawn": "refuge", "zone": "hw_refuge", "area": "hushed_works"}],
+	}
+	var works_spawns := ["service_landing", "works_lockers", "refuge", "bell_throat", "vault_exit"]
+	Game.set_respawn("hushed_works", "vault_exit")
+	var works := _cp_area("hushed_works", works_spawns, works_cps)
+	assert_eq(Game.checkpoint_spawns(works), {"service_landing": false, "works_lockers": false, "refuge": false}, "lanterns by spawn, unlit")
+	assert_eq(Game.return_point("hushed_works", "refuge"), "vault_exit", "an unlit lantern is no return point yet")
+	GameState.set_flag("cp_lit_hw_refuge", true)
+	works = _cp_area("hushed_works", works_spawns, works_cps)
+	assert_eq(Game.checkpoint_spawns(works), {"service_landing": false, "works_lockers": false, "refuge": true}, "the lit refuge lantern")
+	var arrived := Game.return_point("hushed_works", "refuge")
+	assert_eq(arrived, "refuge", "the refuge hatch lands on the lit refuge lantern: it is the return point now")
+	Game.set_respawn("hushed_works", arrived)          # what change_area does on arrival
+	assert_eq([String(GameState.player["respawn_area"]), String(GameState.player["respawn_spawn"])], ["hushed_works", "refuge"],
+		"a defeat right after the hatch wakes her at the refuge, where Continue resumes too")
+	assert_eq(Game.area_respawn_of("hushed_works"), "refuge", "remembered for the next trip")
+	Game.set_respawn("hushed_works", "vault_exit")
+	assert_eq(Game.return_point("hushed_works", "service_landing"), "vault_exit", "the Service Landing lantern is still unlit")
+	GameState.set_flag("cp_lit_hw_landing", true)
+	works = _cp_area("hushed_works", works_spawns, works_cps)
+	assert_eq(Game.return_point("hushed_works", "service_landing"), "service_landing", "the Bellhouse stair lands on the lit landing lantern")
+	assert_eq(Game.return_point("hushed_works", "bell_throat"), "vault_exit", "an arrival on no lantern keeps the remembered point")
+	# A lantern lit while she is in the area counts at once (its node state), before any flag is read again.
+	fresh_state()
+	Game.set_respawn("hushed_works", "vault_exit")
+	works = _cp_area("hushed_works", works_spawns, works_cps)
+	(works.get("checkpoints") as Dictionary)["hw_lockers"].set("lit", true)
+	assert_eq(Game.return_point("hushed_works", "works_lockers"), "works_lockers", "node state")
+	# Tobin's annex keeps its one lantern in `checkpoint`; its arrivals (the door, the hatch) are no lantern.
+	GameState.set_flag("cp_lit_ta_lantern", true)
+	var annex := _cp_area("tobin_annex", ["annex_entry", "annex_lantern", "annex_hatch_below"],
+		{"ta_lantern": [LanternScript, {"id": "ta_lantern", "spawn": "annex_lantern", "zone": "ta_lockers", "area": "tobin_annex"}]}, true)
+	assert_eq(Game.checkpoint_spawns(annex), {"annex_lantern": true})
+	assert_eq(Game.return_point("tobin_annex", "annex_entry"), "annex_entry", "the annex default (nothing remembered)")
+	# The manor: the front door lands in the cloakroom, which has no candle -> the last rest candle (documented rule).
+	GameState.set_flag("mm_cp_manor_ballroom", true)
+	GameState.set_flag("mm_cp_manor_balcony", true)
+	Game.set_respawn("moonveil_manor", "manor_balcony")
+	var manor := _cp_area("moonveil_manor", ["manor_entry", "manor_ballroom", "manor_balcony"], {
+		"manor_ballroom": [CandleScript, {"area": "moonveil_manor", "spawn": "manor_ballroom"}],
+		"manor_balcony": [CandleScript, {"area": "moonveil_manor", "spawn": "manor_balcony"}]})
+	assert_eq(Game.checkpoint_spawns(manor), {"manor_ballroom": true, "manor_balcony": true}, "candles answer is_lit()")
+	assert_eq(Game.return_point("moonveil_manor", "manor_entry"), "manor_balcony", "manor: a defeat wakes her at the last rest candle")
+	# The Reach keeps the lit-arch rule; the Below keeps "the lantern used last", even arriving on a lit lantern.
+	var reach := _cp_area("hallowmere_reach", ["commons_arch", "orchard_arch", "bellhouse_stair"], {})
+	assert_eq(Game.checkpoint_spawns(reach), {})
+	Game.set_respawn("hallowmere_reach", "orchard_arch")
+	assert_eq(Game.return_point("hallowmere_reach", "bellhouse_stair"), "orchard_arch", "Reach: the remembered arch")
+	GameState.set_flag(Reach.arch_flag("commons"), true)
+	assert_eq(Game.return_point("hallowmere_reach", "commons_arch"), "commons_arch", "Reach: a lit arch")
+	GameState.player["below_respawn"] = "cp_shrine"
+	GameState.set_flag("cp_lit_office", true)
+	_cp_area("below", ["mine_entry", "cp_shrine", "cp_office"], {"office": [LanternScript, {"id": "office", "spawn": "cp_office", "area": "below"}]})
+	assert_eq(Game.return_point("below", "cp_office"), "cp_shrine", "Below: the lantern she rested at last (legacy rule)")
+	GameState.player["below_respawn"] = ""
+	assert_eq(Game.return_point("below", "mine_entry"), "cp_office", "Below, old saves: the deepest lit lantern")
 
 
 # --- Lantern Road ---------------------------------------------------------------------------------------

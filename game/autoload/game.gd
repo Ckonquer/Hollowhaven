@@ -61,6 +61,10 @@ const DIRECTOR_SCRIPT := "res://src/horror/director.gd"
 const TEST_AREAS := {"arena": "res://tests/preview/arena.tscn"}   # debug builds only
 const FALLBACK_PLAYER := "res://tests/preview/fallback_player.gd"
 const FALLBACK_UI := "res://tests/preview/fallback_ui.gd"
+## Loading card (CanvasLayer 60, one node under this autoload, created in _ready): load_area() puts it on screen and
+## waits until frames with it were drawn BEFORE the area scene builds its children in one blocking main-thread frame.
+const LOADING_CARD_SCRIPT := "res://src/ui/screens/loading_card.gd"
+const LOADING_CARD_NODE := "LoadingCard"
 ## Session-wide listeners wired once in _ready() (wire_session_systems): small masteries (static Events listeners,
 ## src/core/mastery.gd), the Chapter Two story / cross-area activity tracker (one node under this autoload), the
 ## Lanternwake Expeditions (static), the Music Box's song discovery (static), the Chapter Two onboarding hints (one
@@ -111,6 +115,7 @@ var companion_nodes: Dictionary = {}   # companion id -> node in the current are
 var zone_id: String = ""
 var in_safe_zone: bool = true
 var director: Node = null          # horror director in the Below (src/horror/director.gd)
+var loading_card: Node = null      # src/ui/screens/loading_card.gd (null if that script failed to load)
 
 ## Quiet autosave: every AUTOSAVE_SECONDS of unpaused play where saving is allowed (can_manual_save; bed, lantern, mine
 ## and manual saves restart the countdown). Retries every AUTOSAVE_RETRY s while saving isn't allowed.
@@ -145,6 +150,7 @@ func _ready() -> void:
 	Events.boss_defeated.connect(_on_boss_defeated)
 	Events.area_exiting.connect(_on_area_exiting_bosses)
 	wire_session_systems()
+	_ensure_loading_card()
 
 
 ## Wires the session-wide listeners exactly once (idempotent: the test runner calls it again between suites
@@ -183,6 +189,55 @@ func wire_session_systems() -> void:
 ## The session's story tracker node (null if the story module is missing).
 func story_tracker() -> Node:
 	return get_node_or_null(STORY_TRACKER_NODE)
+
+
+# --- Loading card ------------------------------------------------------------------------------------------
+
+## Creates the loading card once (a child of this autoload, so it outlives every scene change). A missing or broken
+## script leaves loading_card null: areas then load as before, without the card.
+func _ensure_loading_card() -> Node:
+	if is_instance_valid(loading_card) and not loading_card.is_queued_for_deletion():
+		return loading_card
+	loading_card = null
+	var s: Script = _safe_load(LOADING_CARD_SCRIPT)
+	if s == null:
+		return null
+	loading_card = s.new()
+	loading_card.name = LOADING_CARD_NODE
+	add_child(loading_card)
+	return loading_card
+
+
+## Puts the loading card for `target_area` on screen and returns once it is fully shown and frames showing it have
+## been drawn (loading_card.gd PRESENT_FRAMES): the blocking frame that builds the area then keeps showing the card.
+func show_loading_card(target_area: String) -> void:
+	var c := _ensure_loading_card()
+	if c != null and c.has_method("show_card"):
+		await c.show_card(target_area)
+
+
+## Dissolves the loading card (fade < 0: its default). Not awaitable; see _wait_loading_card_gone().
+func hide_loading_card(fade: float = -1.0) -> void:
+	if not is_instance_valid(loading_card) or not loading_card.has_method("hide_card"):
+		return
+	if fade < 0.0:
+		loading_card.hide_card()
+	else:
+		loading_card.hide_card(fade)
+
+
+## True while the loading card is on screen (fading in, shown or dissolving).
+func loading_card_showing() -> bool:
+	return is_instance_valid(loading_card) and loading_card.has_method("is_showing") \
+		and bool(loading_card.is_showing())
+
+
+## Waits (bounded) while the loading card is still dissolving; returns at once when it is gone or shown again.
+func _wait_loading_card_gone(max_seconds: float = 2.0) -> void:
+	var end_ms := Time.get_ticks_msec() + int(max_seconds * 1000.0)
+	while is_instance_valid(loading_card) and loading_card.has_method("is_hiding") \
+			and bool(loading_card.is_hiding()) and Time.get_ticks_msec() < end_ms:
+		await get_tree().process_frame
 
 
 func _process(delta: float) -> void:
@@ -332,6 +387,7 @@ func goto_title() -> void:
 	if ui != null:
 		ui.queue_free()
 		ui = null
+	hide_loading_card(0.0)          # never left over the title
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().change_scene_to_file(TITLE_SCENE)
 	# New Game and most Continues arrive in the Woods: start compiling them while the title is up.
@@ -380,26 +436,44 @@ func _apply_new_game_look(look: Dictionary) -> void:
 func continue_game() -> bool:
 	if not SaveSystem.load_game():
 		return false
-	var a: String = String(GameState.player.get("area", "surface"))
-	var spawn: String = String(GameState.player.get("spawn", "haven_respawn"))
+	var dest := continue_target(GameState.player)
+	await load_area(String(dest["area"]), String(dest["spawn"]), bool(dest["use_saved"]))
+	# load_game() announces a backup restore from the title, where no toast widget exists yet:
+	# repeat it now that the gameplay UI is up so Krystal is actually told.
+	if SaveSystem.recovered_from_backup:
+		Events.notify.emit(SaveSystem.BACKUP_NOTICE, "warn")
+	return true
+
+
+## Where Continue resumes for a saved player record (GameState.player): {"area", "spawn", "use_saved"}. The saved
+## area at its saved spot; a trial is never resumed (spec §1: it always returns to its origin): a save that was
+## written inside one (by some other system) continues at the respawn point, which change_area never moves into a
+## trial. An unknown area becomes the surface. Pure (continue_game() and the title's prefetch share it).
+func continue_target(saved_player: Dictionary) -> Dictionary:
+	var a: String = String(saved_player.get("area", "surface"))
+	var spawn: String = String(saved_player.get("spawn", "haven_respawn"))
 	var use_saved := true
-	# A trial is never resumed (spec §1: it always returns to its origin): a save that was written inside
-	# one (by some other system) continues at the respawn point, which change_area never moves into a trial.
 	if TRANSIENT_AREAS.has(a):
-		a = String(GameState.player.get("respawn_area", "surface"))
-		spawn = String(GameState.player.get("respawn_spawn", "haven_respawn"))
+		a = String(saved_player.get("respawn_area", "surface"))
+		spawn = String(saved_player.get("respawn_spawn", "haven_respawn"))
 		use_saved = false
 		if TRANSIENT_AREAS.has(a) or not AREAS.has(a):
 			a = "surface"
 			spawn = "haven_respawn"
 	if not AREAS.has(a):
 		a = "surface"
-	await load_area(a, spawn, use_saved)
-	# load_game() announces a backup restore from the title, where no toast widget exists yet:
-	# repeat it now that the gameplay UI is up so Krystal is actually told.
-	if SaveSystem.recovered_from_backup:
-		Events.notify.emit(SaveSystem.BACKUP_NOTICE, "warn")
-	return true
+	return {"area": a, "spawn": spawn, "use_saved": use_saved}
+
+
+## The title calls this when it offers Continue: starts compiling the area that save resumes in (prefetch_area, loader
+## threads, idempotent) so pressing Continue only has to build it. `save_data` is SaveSystem.peek(). Returns how many
+## new requests were started (0 without a usable save).
+func prefetch_continue(save_data: Dictionary) -> int:
+	var st: Variant = save_data.get("state", {})
+	var pl: Variant = (st as Dictionary).get("player", {}) if st is Dictionary else {}
+	if not (pl is Dictionary) or (pl as Dictionary).is_empty():
+		return 0
+	return prefetch_area(String(continue_target(pl as Dictionary)["area"]))
 
 
 # --- Areas -------------------------------------------------------------------------------
@@ -424,6 +498,11 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	prefetch_area(target_area)
 	if ui != null and ui.has_method("fade_out"):
 		await ui.fade_out(0.45)
+	# The area scene builds all its children on the main thread in ONE frame (up to ~2.8 s cold in the packaged build)
+	# and nothing can be drawn meanwhile: the loading card must already be on screen, over black, BEFORE that frame -
+	# show_loading_card() returns only after frames with it fully shown were drawn. From the title (no UI root yet) the
+	# title has faded to black itself; the card covers it before the scene change removes it.
+	await show_loading_card(target_area)
 	if area_id != "":
 		Events.area_exiting.emit(area_id)
 	get_tree().paused = false
@@ -499,8 +578,11 @@ func load_area(target_area: String, spawn_id: String, use_saved_position: bool =
 	GameState.request_quest_eval()
 	_transitioning = false
 	_collect_warmups()
+	# Built: the card dissolves while the UI root fades the area in (same 0.6 s as before; the card's 0.4 s fits in it).
+	hide_loading_card()
 	if ui != null and ui.has_method("fade_in"):
 		await ui.fade_in(0.6)
+	await _wait_loading_card_gone()
 	if prev_mode == "title":
 		pass
 	_pause_if_focus_lost()
@@ -697,9 +779,12 @@ func return_point(target_area: String, arrival_spawn: String) -> String:
 	return _area_return_point(target_area, arrival_spawn)
 
 
-## Chapter Two areas: arriving at a lit Lantern Road arch makes it the return point; otherwise the
-## remembered one (area_respawn), else the area default (AREA_DEFAULT_RESPAWN), else the arrival spawn.
-## Only spawns the loaded area actually registers are used.
+## Chapter Two areas: arriving at a lit Lantern Road arch, or on a lit checkpoint through its own entrance
+## (COV-001: the Works refuge hatch -> the refuge lantern, the Bellhouse stair -> the Service Landing lantern),
+## makes it the return point; otherwise the remembered one (area_respawn), else the area default
+## (AREA_DEFAULT_RESPAWN), else the arrival spawn. Only spawns the loaded area actually registers are used.
+## The manor's front door lands in the cloakroom, which has no candle: a defeat there still wakes her at the
+## last rest candle.
 func _area_return_point(target_area: String, arrival_spawn: String) -> String:
 	var spawns: Dictionary = {}
 	if area != null and is_instance_valid(area) and area.get("spawns") is Dictionary:
@@ -708,6 +793,8 @@ func _area_return_point(target_area: String, arrival_spawn: String) -> String:
 		var arch := Reach.arch_for_spawn(arrival_spawn)
 		if arch != "" and bool(GameState.get_flag(Reach.arch_flag(arch))) and spawns.has(arrival_spawn):
 			return arrival_spawn
+	if spawns.has(arrival_spawn) and bool(checkpoint_spawns(area).get(arrival_spawn, false)):
+		return arrival_spawn
 	var last := area_respawn_of(target_area)
 	if last != "" and spawns.has(last):
 		return last
@@ -715,6 +802,44 @@ func _area_return_point(target_area: String, arrival_spawn: String) -> String:
 	if def != "" and spawns.has(def):
 		return def
 	return arrival_spawn
+
+
+## The checkpoints of area node `a` as {spawn id: lit}: its `checkpoints` dictionary (Works lanterns, manor
+## candles) and a single `checkpoint` node (Tobin's annex). Lit = the node says so (`lit` / is_lit()) or its
+## flag cp_lit_<checkpoint id> is set. {} for no area. Also read by the pause menu's "Return to safety".
+func checkpoint_spawns(a: Node) -> Dictionary:
+	var out: Dictionary = {}
+	if a == null or not is_instance_valid(a):
+		return out
+	var found: Array = []                 # [[key, node], ...]
+	var cps: Variant = a.get("checkpoints")
+	if cps is Dictionary:
+		for id in cps:
+			found.append([String(id), cps[id]])
+	var one: Variant = a.get("checkpoint")
+	if is_instance_valid(one) and one is Node:
+		found.append(["", one])
+	for pair in found:
+		var cp: Variant = pair[1]
+		if not is_instance_valid(cp) or not (cp is Node):
+			continue
+		var sp: Variant = (cp as Node).get("spawn_id")
+		if not (sp is String) or String(sp) == "":
+			continue
+		var lit: bool = bool(out.get(String(sp), false)) or _checkpoint_lit(cp as Node, String(pair[0]))
+		out[String(sp)] = lit
+	return out
+
+
+static func _checkpoint_lit(cp: Node, key: String) -> bool:
+	var l: Variant = cp.get("lit")
+	if l is bool and l:
+		return true
+	if cp.has_method("is_lit") and bool(cp.call("is_lit")):
+		return true
+	var cid: Variant = cp.get("checkpoint_id")
+	var id: String = String(cid) if cid is String and String(cid) != "" else key
+	return id != "" and bool(GameState.get_flag("cp_lit_" + id))
 
 
 ## The remembered return point of an area ("" if none). The Below keeps its legacy key below_respawn
@@ -1032,6 +1157,11 @@ func travel_lantern_road() -> void:
 	buttons.append(["cancel", "Stay here", ""])
 	if ui == null or not is_instance_valid(ui) or not ui.has_method("confirm"):
 		return
+	# While Krystal chooses, the other areas on the list start compiling on loader threads (idempotent; kept for
+	# the trip, collected on quit): a trip then mostly just builds the area, behind the loading card.
+	for d in dests:
+		if String(d["area"]) != area_id:
+			prefetch_area(String(d["area"]))
 	var pick: String = await ui.confirm("The Lantern Road", "The lanterns remember every road they light. Where to?", buttons)
 	if pick == "" or pick == "cancel":
 		return

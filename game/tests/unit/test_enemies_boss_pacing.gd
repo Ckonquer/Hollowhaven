@@ -35,6 +35,7 @@ const KIT := ["fan_tele", "trip_tele", "release", "channel", "telegraph"]
 
 var _nodes: Array = []
 var _hints: Array = []
+var _hint_texts: Dictionary = {}     # hint id -> the last text emitted with it
 
 
 class Dummy extends CharacterBody3D:
@@ -56,6 +57,7 @@ func before_each() -> void:
 	fresh_state()
 	_nodes.clear()
 	_hints.clear()
+	_hint_texts.clear()
 	Settings.set_value("arachnophobia", false)
 	Settings.set_value("timing_assist", false)
 	Settings.set_value("high_visibility_cues", false)
@@ -65,6 +67,7 @@ func before_each() -> void:
 func after_each() -> void:
 	Events.hint.disconnect(_on_hint)
 	Settings.set_value("timing_assist", false)
+	Settings.set_value("arachnophobia", false)
 	await _free_nodes()
 	for n in get_tree().get_nodes_in_group("heartseed_pickup"):
 		n.queue_free()
@@ -72,8 +75,9 @@ func after_each() -> void:
 	await wait_frames(2)
 
 
-func _on_hint(id: String, _text: String) -> void:
+func _on_hint(id: String, text: String) -> void:
 	_hints.append(id)
+	_hint_texts[id] = text
 
 
 func _free_nodes() -> void:
@@ -310,6 +314,40 @@ func test_a_light_during_the_phase_two_transition_is_banked_until_her_first_fan(
 	_tick_until(b, "cling", 3.0)
 	(brs[2] as Node).call("light")
 	assert_eq(String(b.state), "scorch_fall", "after the introduction the light scorches at once")
+
+
+## COV-004: with arachnophobia on - here switched on mid-fight, after she was built as the Weaver - the banked-scorch
+## ("clings on") and trip-line ("Trip-lines") hints use the comfort wording like every sibling hint and caption
+## (the '[it wails, smouldering, but holds on]' caption, the phase-2 hint's "root lines"); switched back, the
+## originals return. The text is picked when the hint is emitted.
+func test_banked_and_tripline_hints_follow_arachnophobia_live() -> void:
+	var d := _dummy(Vector3(0, 0, 3))
+	var brs := _braziers()
+	var b := _boss(d, brs)
+	_to_phase_two(b, brs)
+	Settings.set_value("arachnophobia", true)
+	assert_true(bool(b.get("_using_shade")), "precondition: the Hollow Mother now")
+	(brs[1] as Node).call("light")
+	assert_true(bool(b.scorch_banked()), "precondition: the scorch is banked")
+	assert_eq(String(_hint_texts.get("boss_banked", "")),
+		"It holds on through the heat! Watch what it does next - the light will still bring it down.", "comfort banked hint")
+	b.call("_begin_trips")
+	assert_eq(String(b.state), "trip_tele", "precondition: root lines were cast")
+	var trip := String(_hint_texts.get("boss_tripline", ""))
+	assert_eq(trip, "Root lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over.",
+		"comfort trip-line hint")
+	for h in [String(_hint_texts.get("boss_banked", "")), trip]:
+		for word in ["clings", "trip-line", "web", "silk", "thread", "spider"]:
+			assert_false(h.to_lower().contains(word), "no spider-mode word '%s' in: %s" % [word, h])
+	# Switched back mid-fight: the Weaver's own wording.
+	Settings.set_value("arachnophobia", false)
+	assert_false(bool(b.get("_using_shade")), "precondition: the Weaver again")
+	b.call("_bank_scorch")
+	assert_eq(String(_hint_texts.get("boss_banked", "")),
+		"It clings on through the heat! Watch what it does next - the light will still bring it down.", "original banked hint")
+	b.field.clear_all(false)
+	b.call("_begin_trips")
+	assert_true(String(_hint_texts.get("boss_tripline", "")).begins_with("Trip-lines snap"), String(_hint_texts.get("boss_tripline", "")))
 
 
 func test_trip_lines_and_the_release_also_introduce_phase_two() -> void:

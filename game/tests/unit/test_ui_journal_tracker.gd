@@ -430,8 +430,11 @@ func test_tracker_node_follows_every_stage() -> void:
 	assert_eq(tracker.title_l.text, "Three Roads, Three Lamps")
 	var rows: Array = tracker.shown_rows()
 	var vrows: Array = Tracker.objective_view()["rows"]
-	assert_eq(rows.size(), vrows.size(), "one row per objective row (pooled rows reused, extras hidden)")
-	assert_eq(_labels(rows), _labels(vrows))
+	# every lamp found: the card leaves out the done search's rows (R3-03), the view keeps them
+	var card_rows := _road_rows(vrows)
+	assert_eq(card_rows.size(), vrows.size() - 3, "the view still has the three search rows")
+	assert_eq(rows.size(), card_rows.size(), "one row per card row (pooled rows reused, extras hidden)")
+	assert_eq(_labels(rows), _labels(card_rows))
 	var lamps := _counted(_road_rows(vrows))
 	assert_eq(lamps.size(), 3, "three lamp rows")
 	var done_by_label := {}
@@ -452,6 +455,45 @@ func test_tracker_node_follows_every_stage() -> void:
 	GameState.active = false
 	tracker.refresh()
 	assert_false(tracker.visible)
+
+
+## R3-03: once all three lamps are found (ch2_outer_lamps done) the HUD card drops the search's three
+## "Find the ... lamp" rows (it listed up to 8 rows) and keeps the lamp roads; the journal / map view
+## (objective_view, shared with journal_panel.gd and map_panel.gd) keeps them, ticked.
+func test_tracker_card_drops_the_lamp_search_rows_once_found() -> void:
+	_accept()
+	for f in ["ch2_waygate_repaired", "ch2_arch_commons", "ch2_read_festival_map", "ch2_found_orchard_lamp",
+			"ch2_found_quarry_lamp"]:
+		GameState.set_flag(f)
+	GameState.chapter2.evaluate()
+	await _spawn_tracker()
+	assert_eq(tracker.title_l.text, "Three Roads, Three Lamps")
+	var search := ["Find the orchard lamp", "Find the quarry lamp", "Find the manor lamp"]
+	var vw := Tracker.objective_view()
+	assert_false(GameState.chapter2.is_done("ch2_outer_lamps"), "one lamp still unfound")
+	assert_eq(_labels(tracker.shown_rows()), _labels(vw["rows"]), "search open: the card lists every row")
+	for l in search:
+		assert_true(l in _labels(tracker.shown_rows()), "search open: '%s' on the card" % l)
+	# the last lamp found: the search is done and its rows leave the card
+	GameState.set_flag("ch2_found_manor_lamp")
+	GameState.chapter2.evaluate()               # emits objectives_changed
+	await wait_frames(1)
+	assert_true(GameState.chapter2.is_done("ch2_outer_lamps"))
+	vw = Tracker.objective_view()
+	var shown := _labels(tracker.shown_rows())
+	for l in search:
+		assert_false(l in shown, "'%s' left the HUD card" % l)
+	assert_eq(shown, _labels(_road_rows(vw["rows"])), "the card keeps every lamp-road row, in order")
+	assert_eq(_labels(_counted(_road_rows(vw["rows"]))), ["Light the garden lamp", "Light the quarry lamp", "Light the manor lamp"])
+	assert_eq(tracker.title_l.text, "Three Roads, Three Lamps", "same group card")
+	# the journal keeps them, ticked
+	var in_view := {}
+	for r in vw["rows"]:
+		in_view[String(r["label"])] = bool(r["done"])
+	for l in search:
+		assert_true(in_view.has(l) and bool(in_view[l]), "the journal view still lists '%s', ticked" % l)
+	assert_eq(String(vw["parts"][0]["id"]), "ch2_outer_lamps")
+	assert_eq((vw["parts"][0]["rows"] as Array).size(), 3, "the search part keeps its three rows")
 
 
 func test_tracker_node_live_arachnophobia_toggle() -> void:

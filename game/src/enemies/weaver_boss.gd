@@ -935,7 +935,7 @@ func _begin_trips() -> void:
 	_enter("trip_tele", tele)
 	Audio.play_3d(_snd("skitter"), global_position, -3.0, 0.1, 45.0)
 	Events.caption.emit(_caption("trips"))
-	Events.hint.emit("boss_tripline", "Trip-lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over.")
+	Events.hint.emit("boss_tripline", HazardField.tripline_hint(_using_shade))
 
 
 func _sacs_due() -> bool:
@@ -1147,7 +1147,8 @@ func _bank_scorch() -> void:
 	_banked += 1
 	Audio.play_3d(_snd("shriek"), global_position, -5.0, 0.05, 60.0)
 	Events.caption.emit(_caption("banked"))
-	Events.hint.emit("boss_banked", "It clings on through the heat! Watch what it does next - the light will still bring it down.")
+	Events.hint.emit("boss_banked", "It clings on through the heat! Watch what it does next - the light will still bring it down." if not _using_shade
+		else "It holds on through the heat! Watch what it does next - the light will still bring it down.")
 	HitFx.burst(get_aim_point(), Color("ffb35c"), 16, 2.6, 1.1, 1.5, 0.8, 120.0)
 	_set_banked_fx(true)
 

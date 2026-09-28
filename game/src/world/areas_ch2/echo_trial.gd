@@ -44,9 +44,12 @@ const BelowLayout := preload("res://src/world/below/below_layout.gd")
 const Kit := preload("res://src/art/mesh_kit.gd")
 const CameraBlock := preload("res://src/camera/camera_block.gd")
 const TrialsData := preload("res://data/trials.gd")
+const Annexes := preload("res://src/world/surface/annexes.gd")
 const BOSS_SCRIPT := "res://src/enemies/weaver_boss.gd"
 
 const TRIAL_MATRON := "matron"
+## The arena's one zone (get_zone_at answers it everywhere). A helper zone, never a map landmark (COV-003).
+const TRIAL_ZONE := "trial"
 const TRIALS := TrialsData.TRIALS
 const ARENA_RADIUS := 11.0
 const WALL_RADIUS := 11.8
@@ -382,7 +385,7 @@ func _ready() -> void:
 		"lamps": [[Vector3(0, 3.2, PAD_Z + 0.5), Color("ffe2a8"), 0.9, 7.0], [Vector3(0, 9.0, 0), Color("b6a4f0"), 0.5, 20.0]]})
 	_build_room()
 	place_spawn("trial_start", Vector3(0, floor_y, PAD_Z + 0.8), 0.0)
-	add_zone("trial", Vector3(0, floor_y, 5.0), 22.0, false)
+	_add_trial_zone(Vector3(0, floor_y, 5.0), 22.0)
 	add_safe_spot(Vector3(0, floor_y, PAD_Z + 0.8), 2.8)
 	var door := add_exit("leave", {"text": String(trial_info(trial_id).get("exit_text", "Leave the echo (back to the chamber door)")), "use_respawn": true, "style": "stair"},
 		Vector3(0, floor_y, CORRIDOR_END - EXIT_INSET), PI)
@@ -427,7 +430,7 @@ func _build_from_builder() -> bool:
 	var pad: Vector3 = arena["pad"]
 	bounds = arena.get("bounds", Rect2())
 	place_spawn("trial_start", pad, 0.0)
-	add_zone("trial", arena.get("zone_center", Vector3.ZERO), float(arena.get("zone_radius", 30.0)), false)
+	_add_trial_zone(arena.get("zone_center", Vector3.ZERO), float(arena.get("zone_radius", 30.0)))
 	add_safe_spot(pad, 2.8)
 	var door := add_exit("leave", {"text": String(trial_info(trial_id).get("exit_text", "Leave the echo")), "use_respawn": true, "style": "stair"},
 		arena.get("exit", pad + Vector3(0, 0, 2.5)), float(arena.get("exit_yaw", PI)))
@@ -490,8 +493,17 @@ func _wire_boss() -> void:
 		boss.connect("state_changed", _on_boss_state)
 
 
+## The "trial" zone is a HELPER zone (COV-003), like the surface waygate's safe circle (annexes.gd mark_helper_zone,
+## CH2-010): Game.is_landmark_zone() says no, so entering an echo is no map discovery (no "echo_trial" entry in
+## GameState.discovered, no Wayfinding landmark xp) and no companion new-zone bond - a trial leaves the journey
+## untouched (data/trials.gd). Game's zone poll still reports it (zone_entered, music, hints).
+func _add_trial_zone(center: Vector3, radius: float) -> void:
+	add_zone(TRIAL_ZONE, center, radius, false)
+	Annexes.mark_helper_zone(self, TRIAL_ZONE)
+
+
 func get_zone_at(_pos: Vector3) -> String:
-	return "trial"
+	return TRIAL_ZONE
 
 
 func _process(delta: float) -> void:

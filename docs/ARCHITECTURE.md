@@ -391,6 +391,14 @@ after bug-fix round 1 CH2-001..017 and the visual fixes; its evidence is `QA_REP
   `"landmark": false`, set by `annexes.gd` `mark_helper_zone()`: the Woods waygate circle), which is never a discovery or Lumi bond XP;
   camera-only blockers (`CameraBlock.add_box()`, layer 512) sit on the waygate lintel, Lantern Road arch tops, Works lift roofs and the
   Echo Trial pale door, and arrival spawns keep ~5 m clear behind them (`test_camera_spawn_clearance.gd`).
+* **Loading card** (after 2.0.0, perf finding "Continue freezes the screen"): an area still builds its children in ONE blocking
+  main-thread frame, so `load_area()` shows `Game.loading_card` (`src/ui/screens/loading_card.gd`, CanvasLayer 60 under the Game
+  autoload: fade-colour backdrop, parchment card with `MapView.area_name`, a lantern glow that pulses - steady with `reduce_flashing`)
+  after the UI root's fade-out and awaits `show_loading_card()`, which returns only once `PRESENT_FRAMES` (2) more frames with the
+  full card were drawn; only then `area_exiting`, the scene change and the build. After `area_loaded` it dissolves (0.4 s) inside
+  the UI root's 0.6 s fade-in. The UI root's hush is `"loading"` while it is up and `Game.mode == "loading"`. `Game.continue_target(player)`
+  is Continue's destination rule; the title calls `Game.prefetch_continue(SaveSystem.peek())` while it offers Continue, and the
+  Lantern Road menu prefetches its other-area destinations. Order guard: `tests/unit/test_flow_loading_card.gd`.
 * **Echo Trials** (world_areas.md §8; spec §1): one area `echo_trial`, the table `data/trials.gd` (`matron`, `velour`, `choir`),
   arena builders `src/world/trial/{velour,choir}_trial.gd` (`static build(area) -> Dictionary`, the real bosses in mode "trial"),
   echo stones `src/world/trial/trial_entry.gd` at each origin checkpoint (Below `cp_arena`, manor `manor_ballroom`, Works

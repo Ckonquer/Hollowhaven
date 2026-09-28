@@ -571,6 +571,97 @@ func test_unstuck_labels_and_targets_per_area() -> void:
 	assert_eq(PausePanel.unstuck_target(), "trial_start", "a trial returns to its pad")
 
 
+## COV-001: in an indoor Chapter Two area "Return to safety" uses the safe point of the room Krystal stands in
+## (a checkpoint's spawn, lit or not, her arrival spawn or the area's entrance) before the remembered rest point.
+## Stand-in area: three round zones (a safe cloakroom with the entrance, a hall with nothing, a room with a candle).
+func test_return_to_safety_prefers_the_safe_point_in_her_room() -> void:
+	for a in ["surface", "below", "echo_trial", "hallowmere_reach", ""]:
+		assert_false(PausePanel.uses_nearby_rule(a), "%s keeps its own rule" % a)
+	for a in ["moonveil_manor", "hushed_works", "tobin_annex"]:
+		assert_true(PausePanel.uses_nearby_rule(a), a)
+	var s := GDScript.new()
+	s.source_code = "extends \"res://src/world/area_base.gd\"\nvar checkpoints: Dictionary = {}\n"
+	s.reload()
+	var area: Node3D = Node3D.new()
+	area.set_script(s)
+	area.set("area_id", "moonveil_manor")
+	area.call("add_zone", "cloak", Vector3(0, 0, 0), 5.0, true)
+	area.call("add_zone", "hall", Vector3(0, 0, -20), 8.0, false)
+	area.call("add_zone", "far", Vector3(0, 0, -80), 8.0, false)
+	var at := {"entry": Vector3(0, 0, -2), "candle": Vector3(2, 0, -82), "other": Vector3(-3, 0, -78)}
+	for sp in at:
+		area.call("register_spawn", String(sp), Transform3D(Basis.IDENTITY, at[sp] as Vector3))
+	_holder.add_child(area)
+	var cp: Node3D = Node3D.new()
+	var cs := GDScript.new()
+	cs.source_code = "extends Node3D\nvar spawn_id := \"candle\"\nvar lit := false\n"
+	cs.reload()
+	cp.set_script(cs)
+	area.add_child(cp)
+	(area.get("checkpoints") as Dictionary)["c"] = cp
+	# Pure helpers.
+	assert_eq(PausePanel.nearby_candidates(area, "entry", "entry"), ["candle", "entry"], "checkpoint spawns (lit or not), arrival, entrance")
+	assert_eq(PausePanel.nearby_candidates(area, "gone", ""), ["candle"], "unregistered ids are dropped")
+	var c := ["candle", "entry"]
+	assert_eq(PausePanel.nearby_spawn(area, c, Vector3(1, 0, -3), true), "entry", "in the cloakroom: its own entrance")
+	assert_eq(PausePanel.nearby_spawn(area, c, Vector3(0, 0, -79), false), "candle", "a room with its own candle, even unsafe")
+	assert_eq(PausePanel.nearby_spawn(area, c, Vector3(0, 0, -20), false), "", "a hall with no safe point: none")
+	assert_eq(PausePanel.nearby_spawn(area, c, Vector3(0, 0, -40), true, 50.0), "entry", "safe but no point in the zone: the nearest safe one, if closer")
+	assert_eq(PausePanel.nearby_spawn(area, c, Vector3(0, 0, -40), true, 10.0), "", "never farther than the remembered point")
+	# Live: the remembered rest point is the far candle; the death respawn never changes.
+	Game.area = area
+	Game.area_id = "moonveil_manor"
+	GameState.player["area_respawn"] = {"moonveil_manor": "candle"}
+	GameState.player["respawn_area"] = "moonveil_manor"
+	GameState.player["respawn_spawn"] = "candle"
+	GameState.player["spawn"] = "entry"               # she came in by the front door (Continue resumes there)
+	GameState.player["pos"] = [0.5, 0.0, -4.0]         # standing in the cloakroom
+	assert_eq(PausePanel.unstuck_target(), "entry", "carried to the cloakroom's own safe point, not 80 m away")
+	GameState.player["pos"] = [0.0, 0.0, -20.0]
+	assert_eq(PausePanel.unstuck_target(), "candle", "from the hall: the last rest point")
+	GameState.player["pos"] = [-2.0, 0.0, -79.0]
+	assert_eq(PausePanel.unstuck_target(), "candle", "beside the candle: the candle")
+	assert_eq(String(GameState.player["respawn_spawn"]), "candle", "the defeat respawn is untouched")
+	# The live player's position wins over the saved one.
+	var p := Node3D.new()
+	_holder.add_child(p)
+	p.global_position = Vector3(0.0, 0.0, -1.0)
+	Game.player = p
+	assert_eq(PausePanel.unstuck_target(), "entry", "live position (cloakroom)")
+	Game.player = null
+	# Outdoor and legacy areas are untouched by the rule.
+	Game.area_id = "hallowmere_reach"
+	GameState.player["area_respawn"] = {"hallowmere_reach": "candle"}
+	GameState.player["pos"] = [0.5, 0.0, -4.0]
+	assert_eq(PausePanel.unstuck_target(), "candle", "the Reach: its remembered arch rule")
+
+
+## COV-001 in the real manor: Krystal walked in by the front door (cloakroom, no candle) and last rested at the
+## balcony candles. "Return to safety" keeps her in the cloakroom; a defeat still wakes her at the balcony.
+func test_return_to_safety_in_the_manor_cloakroom_stays_there() -> void:
+	var manor: Node3D = (load("res://scenes/moonveil_manor.tscn") as PackedScene).instantiate()
+	_holder.add_child(manor)
+	await wait_physics(2)
+	Game.area = manor
+	Game.area_id = "moonveil_manor"
+	Game.set_respawn("moonveil_manor", "manor_balcony")
+	GameState.player["spawn"] = "manor_entry"
+	var entry: Vector3 = (manor.get_spawn("manor_entry") as Transform3D).origin
+	GameState.player["pos"] = [entry.x + 0.6, entry.y, entry.z - 2.0]
+	assert_true(bool(manor.is_safe_zone(entry)), "the cloakroom is safe")
+	assert_eq(Game.return_point("moonveil_manor", "manor_entry"), "manor_balcony", "a defeat wakes her at the last rest candle")
+	var t := PausePanel.unstuck_target()
+	assert_eq(t, "manor_entry", "Return to safety stays in the cloakroom")
+	var here := Vector3(entry.x + 0.6, entry.y, entry.z - 2.0)
+	assert_true((manor.get_spawn(t) as Transform3D).origin.distance_to(here) < 5.0, "a few steps, not 84 m")
+	# In the hall (no candle, not safe) the last rest candle is still the answer.
+	GameState.player["pos"] = [0.0, 0.0, -20.0]
+	assert_eq(PausePanel.unstuck_target(), "manor_balcony", "from the hall: the balcony candles")
+	# Beside the ballroom candles: those candles.
+	GameState.player["pos"] = [5.0, 0.0, -36.0]
+	assert_eq(PausePanel.unstuck_target(), "manor_ballroom", "in the ballroom: its own candles")
+
+
 func test_preview_renders_in_its_own_world_and_frames_krystal() -> void:
 	var w := await _open_wardrobe()
 	var pv: Control = w.preview

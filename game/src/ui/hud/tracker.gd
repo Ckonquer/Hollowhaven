@@ -5,7 +5,8 @@ extends PanelContainer
 ##   * Chapter One complete, Chapter Two not accepted -> a gentle pointer: "The Ward Stone has something new
 ##     to say" (never the legacy "OPTIONAL GOALS" free-play card: those goals live in the journal).
 ##   * Chapter Two accepted -> its current step; the three lamp branches (group "lamps") are shown TOGETHER,
-##     done lamps ticked, in any order.
+##     done lamps ticked, in any order. Once every lamp is found, the HUD card drops the lamp search's three
+##     "Find the ... lamp" rows (hud_rows, R3-03); the journal and the map keep every row of objective_view().
 ##   * Chapter Two finished -> one pending optional goal as a signpost ("SOMETHING TO DO"), else hidden.
 ##   * A Lanternwake Expedition under way (src/expeditions/expeditions.gd tracker_view(), kind "expedition") takes
 ##     the card ONLY where it would otherwise be a signpost / done / hidden: never over a chapter, legacy or
@@ -35,6 +36,10 @@ const POINTER_WHERE := "At the Ward Stone in Krystal's Haven"
 const POINTER_WHERE_READ := "Read the Ward Stone again whenever you're ready"
 const POINTER_READ_FLAG := "read_ward_ch2"
 const SEP := "   ·   "
+## Steps whose rows the HUD card leaves out once the step is done (R3-03): the lamp search's "Find the ... lamp"
+## rows say nothing new once all three are found, and with them the lamp card listed up to 8 rows. Card only:
+## objective_view() (journal, map) keeps them.
+const HUD_FOLD_DONE_STEPS := ["ch2_outer_lamps"]
 
 var header: Label
 var title_l: Label
@@ -238,6 +243,22 @@ static func _signpost_view(v: Dictionary) -> Dictionary:
 	return v
 
 
+## The rows the HUD card lists for `view`: view["rows"] without the rows of a done HUD_FOLD_DONE_STEPS step
+## (a Chapter Two group card only; every other view is returned unchanged).
+static func hud_rows(view: Dictionary) -> Array:
+	var rows: Array = view.get("rows", [])
+	if String(view.get("kind", "")) != "chapter2":
+		return rows
+	var fold := {}
+	for p in view.get("parts", []):
+		var pid := String((p as Dictionary).get("id", ""))
+		if bool((p as Dictionary).get("done", false)) and HUD_FOLD_DONE_STEPS.has(pid):
+			fold[pid] = true
+	if fold.is_empty():
+		return rows
+	return rows.filter(func(r: Dictionary) -> bool: return not fold.has(String(r.get("step", ""))))
+
+
 ## Targets of a view that are not done yet.
 static func pending_targets(view: Dictionary) -> Array:
 	var out: Array = []
@@ -330,7 +351,7 @@ func refresh() -> void:
 	if Game.player != null and is_instance_valid(Game.player) and Game.player is Node3D:
 		ppos = (Game.player as Node3D).global_position
 	var where := where_text(view, Game.area_id, ppos, Game.zone_id)
-	var status: Array = view["rows"]
+	var status: Array = hud_rows(view)
 	var sig := "%s|%s|%s|%s|%s|%s" % [view_kind, String(view["step_id"]), String(view["header"]), String(view["title"]), str(status), where]
 	if sig == _last_sig:
 		return
