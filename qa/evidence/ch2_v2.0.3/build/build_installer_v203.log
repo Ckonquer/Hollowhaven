@@ -1,0 +1,10 @@
+== Hollowhaven 2.0.3 installer ==
+Source: builds\Hollowhaven (6 files, 184.9 MB), exe file version 2.0.3.0
+builds\Hollowhaven matches Hollowhaven-2.0.3-Windows.zip file for file (SHA-256)
+Moved superseded Hollowhaven-Setup-2.0.2.exe to builds\superseded\
+== Compiling (ISCC, lzma2/ultra64 solid - about a minute) ==
+Built C:\Users\Ali\Desktop\Hollowhaven\dist\Hollowhaven-Setup-2.0.3.exe (100.8 MB, 105736221 bytes, 42s) SHA256 9A8660DDF85E344C2333100B1E47FC90A791B9F49162B59ED8CE3822A26D18E2
+Updated dist\SHA256SUMS.txt:
+  1788D65B101CCF4581011C3ABE60963CF18511A96A59DAA58FA5FBD2FA60A670  Hollowhaven-2.0.3-Windows.zip
+  9A8660DDF85E344C2333100B1E47FC90A791B9F49162B59ED8CE3822A26D18E2  Hollowhaven-Setup-2.0.3.exe
+EXIT=0

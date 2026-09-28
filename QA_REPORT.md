@@ -1,10 +1,12 @@
-# QA report — Hollowhaven v0.9.0 (Chapter One) and v2.0.0 / v2.0.1 / v2.0.2 (Chapter Two)
+# QA report — Hollowhaven v0.9.0 (Chapter One) and v2.0.0 - v2.0.3 (Chapter Two)
 
 Sections 1-8: Chapter One (v0.9.0 / v0.9.1). **Section 9: the Chapter Two release 2.0.0** (executed-test matrix, save integrity,
 bot runs, visual inspection, bugs, music, performance, the natural chain, and the NOT YET DONE list). Section 10: Chapter Two
 development records. **Section 11: the bug-fix release 2.0.1** (what changed, full suite, Run A / Run B on the packaged 2.0.1 exe,
 focus protection, the updated NOT YET DONE list); it supersedes §9 where they differ. **Section 12: release 2.0.2** (the
-boss-fight tip fix, suite, the Mochi / Lumi investigation, verification runs on the packaged 2.0.2 exe).
+boss-fight tip fix, suite, the Mochi / Lumi investigation, verification runs on the packaged 2.0.2 exe). **Section 13: release
+2.0.3, the gift build** (installer, first-time player - Krystal has never played, so the returning-player instructions and the
+personal-save caveat of §9-§12 are obsolete; the QA primary-monitor incident; the current NOT YET DONE list).
 
 Every entry says what KIND of check it was:
 **[code]** source review · **[auto]** automated tests (headless engine) · **[visual]** launched and inspected
@@ -588,3 +590,121 @@ Road round trip); nothing judged in motion; Pipkin not implemented; CH2-011 acce
 checked by unit tests and, for the Weaver after the Chapter One ending, on screen in V1 (`play_039_ending.png`); the Crossing
 Matron / Choir / Velour / Warden cases were not rendered on 2.0.2 (V2 is headless), so for them the fix rests on the unit tests.
 Only V1 re-ran Chapter One and only V2 re-ran the Chapter Two finale on 2.0.2; S1-T34 of Chapter Two were not re-run on 2.0.2.
+
+## 13. Release 2.0.3 — the gift build: installer, first-time player (2026-09-28)
+
+**Context change (from the owner, 2026-09-28).** Krystal has **never played** Hollowhaven and never received any version. She will
+play for the first time, on her own PC (specs unknown), starting with **New Game** (comfort options -> "Meet Krystal" -> Chapter One
+-> Chapter Two at the Ward Stone), from an **installer**. So the returning-player framing of §9-§12 is obsolete: there is no
+Chapter One save to Continue, the "Chapter Two - What's New" note is retired, and **PERSONAL-SAVE VERIFICATION BLOCKED no longer
+applies** (there is no personal save). The v1 -> v2 migration evidence (§9.3, `docs/ch2/SAVE_INTEGRITY_REPORT.md`) only matters for a
+pre-2.0 save, which she does not have. Her path - a save written by New Game in a 2.x build - is what the native-save runs (§13.4)
+and F1 / F2 (§13.7) cover.
+
+**Build under test.** Installer `dist/Hollowhaven-Setup-2.0.3.exe` (100.8 MB, 105,736,221 bytes, SHA-256
+`9A8660DDF85E344C2333100B1E47FC90A791B9F49162B59ED8CE3822A26D18E2`) and zip `dist/Hollowhaven-2.0.3-Windows.zip` (111.1 MB, SHA-256
+`1788D65B101CCF4581011C3ABE60963CF18511A96A59DAA58FA5FBD2FA60A670`), both in `dist/SHA256SUMS.txt` (checked); git `8f5cbc0` (committed
+18:15:02). `tools/build_release.ps1 -SkipTests` finished 18:15:29 (`qa/tmp/build_v203.log`, EXIT=0, no test output);
+`tools/build_installer.ps1` 18:16 (`qa/tmp/build_installer_v203.log`, EXIT=0: exe file version 2.0.3.0, `builds/Hollowhaven` matches the
+zip file for file by SHA-256, Setup-2.0.2 moved to `builds/superseded/`). The zip now holds 6 files - `Hollowhaven.exe` (184.8 MB),
+`How to Play.txt`, `Licenses/` (4 files); "Chapter Two - What's New.txt" is no longer shipped. `How to Play.txt` and
+`Licenses/THIRD_PARTY_NOTICES.txt` are byte-identical to `docs/player/How to Play.txt` and `THIRD_PARTY_NOTICES.md`; the zip's exe is
+byte-identical to `builds/Hollowhaven/Hollowhaven.exe` and to the silent test install (§13.3). Evidence copies:
+`qa/evidence/ch2_v2.0.3/` (its `README.md` lists each file).
+
+### 13.1 What changed since 2.0.2 (`git log 02aec8f..8f5cbc0`)
+| Commit | What | Tests / checks |
+|---|---|---|
+| `88218b6` | **Installer** (Inno Setup 6.7, `tools/installer/hollowhaven.iss`, `tools/build_installer.ps1`, `docs/INSTALLER.md`): per-user, no admin / UAC prompt, `%LOCALAPPDATA%\Programs\Hollowhaven`, Start Menu "Hollowhaven" + "How to Play", Desktop shortcut ticked by default, a welcome message for Krystal, constant AppId (a later installer updates in place), uninstall never touches `%APPDATA%\Hollowhaven` (saves, settings) | silent tests only (§13.3) |
+| `eab619d` | **First-time player text**: `How to Play.txt` rewritten for someone who has never played (New Game, both chapters; reviewer fixed 4 small factual errors), the returning-player "What's New" note retired, in-game "update" wording removed (controls tip, wardrobe reset -> "Classic look", companion / kitchen / onboarding texts, the Heartbloom goal text); release build ships `How to Play.txt` only | new `test_first_time_player_text` (6); `test_onboarding_text`, `test_audit_release_packaging` updated |
+| `bb79708` | QA only: the primary-monitor guard (§13.6); `chain.py` / `s1_continuation.py` accept a native version-2 start save (no migration checks) | dummy-window tests of the guard |
+| `37d93ef` | **Different-PC readiness** report `docs/ch2/DIFFERENT_PC_READINESS.md` (renderer fallback chain Vulkan -> Direct3D 12 -> OpenGL, a clean first run, small windows, integrated-GPU presets, minimum / recommended PC); no game code change | new `test_pc_readiness_settings` (6) pins the fallback settings |
+| `caab0a4` | **Fight-tip priorities** (`hint_card.gd`): openings ("strike now") > boss instructions > elite attack tells (`tell_quarry_warden_*`, `tell_knotted_elder_*`, now fight tips too) > ordinary tips; nothing outlives the fight (also a hidden boss bar ends the Knotted Elder's tips); the Warden's bench give-up tip is no longer dropped in the same tick | `test_hint_card_fight_tips` 7 -> 16 tests; replays (§13.5) |
+| `36934ae` | **Companions never drawn inside the camera**: hidden below 0.85 m from the follow camera, shown again above 1.0 m (visual only; AI, collision, saving, portraits unchanged). Found in `native_202_visible` (Mochi filled the frame on the Sunken Bellhouse service stair, `s4/005`) | new `test_companions_camera_clearance` (6); a short visible source check `qa/tmp/cam_companion/visible1` |
+| `ac5c69c` | **HUD**: toasts never cover the goal card (the toast column starts below the day dial / goal card / a wide banner; waiting toasts keep their time); the quest banner measures a wrapped line at its real width (the festival-map card was 247-2410 px tall); a neutral journal tag for goals open from the start | new `test_ui_toast_layout` (5), `test_ui_journal_tabs` updated; probes `qa/tmp/ui_overlap_review/` |
+| `8f5cbc0` | version 2.0.3 | - |
+
+### 13.2 Automated tests — [auto]
+| When | Tree | Result | Log |
+|---|---|---|---|
+| 18:15-18:31 | `8f5cbc0` (clean working tree, after the version bump: the code the build was exported from) | **2712 tests, 0 failed, 949.9 s**, EXIT=0; `parse_all` passes; 21 `ISOLATION` repairs; "8 ObjectDB instances were leaked at exit" (CH2-011) | `qa/tmp/full_final4.log` (copy in `qa/evidence/ch2_v2.0.3/`) |
+
+### 13.3 Installer — silent tests only
+* **2.0.2-era installer** (15:11-15:41, `Hollowhaven-Setup-2.0.2.exe` and a 2.0.0 test build; `qa/tmp/installer/`, independent review
+  `qa/tmp/installer/review/`): byte-identical files, the Settings > Apps entry under HKCU only (nothing in HKLM), a headless boot of the
+  installed game, same-version reinstall, 2.0.0 -> 2.0.2 update in place without `/DIR` (one entry), Start Menu + Desktop shortcuts
+  resolving to the right targets (also in a folder path with spaces, an accent, ♥ and a Chinese character), silent uninstall removing
+  everything it installed, and `%APPDATA%\Hollowhaven` unchanged by all of it. An update while a *headless* game ran from the install
+  folder was refused safely (Setup aborted before changing a file); the normal case - a game window Setup can close - was not run.
+* **2.0.3 installer**: `build_installer.ps1` checked `builds/Hollowhaven` against the zip file for file; a silent install
+  (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOICONS /MERGETASKS=!desktopicon`) into `qa/tmp/final203/install` succeeded; its 6 game
+  files have the same SHA-256 list as `builds/Hollowhaven` (`installed.sha` = `builds.sha`), no Start Menu or Desktop shortcut was
+  created. F2 (§13.7) ran that installed exe. Afterwards a silent uninstall (`unins000.exe /VERYSILENT`, exit 0,
+  `qa/tmp/final203/logs/uninstall.log`: "Removed all? Yes") removed the folder and the HKCU uninstall entry (AppId
+  `6FD89CDE...`); `%APPDATA%\Hollowhaven\saves` stayed empty and `settings.cfg` untouched (mtime 2026-09-27 20:27).
+* **Never seen on screen**: no installer or uninstaller window was ever opened, so the wizard pages (welcome text, picture, the
+  "Play Hollowhaven now" box) have not been looked at. Not tested either: SmartScreen / Smart App Control on another PC, an update
+  while a visible game window runs, a OneDrive-redirected Desktop.
+
+### 13.4 Chapter Two from a New-Game save (packaged 2.0.2 exe) — [bot]
+Start save `qa/tmp/bot/chain/native_start_202/slot1.json` = the save the 2.0.2 V1 fresh New Game wrote (same SHA-256 as
+`qa/tmp/e2e/final_202_fresh/saves/slot1.json`): the first chains from a save made by New Game (no v1 migration) - Krystal's path.
+These ran on the **2.0.2** exe, before the 2.0.3 fixes.
+
+| Run | Mode | Result | Total | Segments (s) | Notes |
+|---|---|---|---|---|---|
+| `native_202_visible` (15:04-15:28) | visible 1920×1080, sound on, virtual input | **completes** | 1393.0 s | S1 121.9 / S2 235.5 / T23 81.9 / S3 198.8 / T34 55.9 / S4 681.4 / END 12.4 | 0 deaths, 0 SCRIPT ERRORs, 63 music cue changes, 121 of 122 screenshots, Continue after relaunch 4.3 s with the same items; Warden 31.9 s, 3 exposures; watchdog 0 focus takes - **but the window sat on the owner's primary monitor (§13.6)**. Found: Mochi inside the camera on the Bellhouse stair (-> `36934ae`), the Warden's late tells (-> `caab0a4`) |
+| `native_202_headless` | headless | **stopped in T23** (`lantern_road_commons`: "no Ward Stone near the Haven" - the bot got lost; fixed in the bot) | 436.8 s | S1 97.9 / S2 239.8 / T23 96.6 (stop) | 0 SCRIPT ERRORs |
+| `native_202_headless_resumeT23` | headless, resumed from that run's `S2_end` checkpoint | **completes** | 1076.6 s | T23 76.6 / S3 206.0 / T34 51.0 / S4 723.4 / END 9.5 | 0 deaths, 0 SCRIPT ERRORs, same items after relaunch |
+| `native_202_headless_full` (15:28-15:51) | headless, from the native start save | **completes** | 1426.1 s | S1 102.1 / S2 233.2 / T23 89.6 / S3 223.7 / T34 55.6 / S4 709.8 / END 9.4 | 0 SCRIPT ERRORs, 64 music cue changes, Continue after relaunch 3.5 s with the same items |
+
+### 13.5 Fight-tip priorities — [replay]
+Checked by replaying the tip emissions recorded in earlier bot runs through the real `hint_card.gd` (old 2.0.2 vs new; headless, no
+fight watched on screen): 19 builder and 59 reviewer fight windows plus 600 fuzz runs (commit `caab0a4`; `qa/tmp/fighttips/report.txt`,
+`qa/tmp/fighttips_review/`). Example, the Warden in `native_202_visible`: 2.0.2 showed its tells 16-26 s late, dropped "the shell is
+open" unshown, and left two tells on screen 6.9 s and 15.3 s past its defeat; new: tells 0.35-4.8 s late, the opening 0.35 s after
+it was emitted, nothing after the end. Over all replays: no fight tip on screen after an encounter end and no ordinary tip lost - but
+an ordinary tip emitted during a fight now waits (e.g. `tell_brood_skitter_leap` shown 26.9 s after emission in one Weaver replay).
+
+### 13.6 QA incident: test windows on the owner's primary monitor (QA process, not the game)
+On 2026-09-28, about 15:00-15:56, the 1920×1080 QA windows that were asked for at 1920,0 (the second monitor) sat at **0,0 on the
+owner's primary monitor**: the visible native Chapter Two chain (`native_202_visible`, 15:04-15:28, about 23 minutes, **with sound**)
+and the full-size PC-readiness probes (`qa/tmp/pcready/runs/`: a_default, b_d3d12, c_compat, c2_angle, e1-e7, f1, f2, g1, g2; muted).
+Telemetry `window_pos` was [0, 0] for all 18 of those processes; every smaller window (1366×768, 1280×720, 1728×1080, 1620×1080,
+1920×822) landed correctly at 1920,0. The windows never took keyboard focus, so the focus watchdog (0 focus takes in every run) did not
+notice. Fixed in `bb79708`: launchers take a rect 8 px inside the live second monitor and refuse any rect not fully on a non-primary
+monitor, and the watchdog moves a window that overlaps the primary monitor back and kills the game if it is still there ~0.5 s later
+(tested with dummy windows). Later visible runs (`qa/tmp/hud_clutter/visible`, `qa/tmp/cam_companion/visible1`, 16:48-16:49) opened
+at [1928, 8] with `on_primary_checks` 0. This also answers `docs/ch2/DIFFERENT_PC_READINESS.md` §7's open question about where the
+probe windows were: the 1920×1080 probes were on the primary monitor. Evidence: `qa/evidence/ch2_v2.0.3/incident_primary_monitor/`.
+
+### 13.7 Verification on the 2.0.3 build — [bot]
+| Run | Command / what ran | Result |
+|---|---|---|
+| F1, first attempt: fresh New Game -> Chapter One -> accept Chapter Two, headless | a headless `tools/qa/playthrough.py` run into `qa/tmp/final203/fresh` (console `qa/tmp/final203/fresh.console.txt`, 18:16:49-18:21:06). Its console (line 1) shows the Godot 4.7.2 console binary running the **source project** `game/` (at `8f5cbc0`), not the installed exe: `playthrough.py --headless` only uses a given `--exe` when it is a console binary | **stopped** at step `home` after 9 passed steps: "StepFailed: no ['Grass', 'Fiber'] nearby" after two `walk_to stuck` events - a bot navigation problem (no world or gathering code changed in 2.0.3; the same steps passed in the 2.0.2 V1 run and in the re-run below); `game_log_errors: []`, no problems filed |
+| F1 re-run: the same route with the headless route bot | `tools/qa/ch2/s0_fresh_c1.py --attempt 31 --out qa/tmp/final203/s0` (console `qa/tmp/final203/s0.console.txt`, 18:21:52-18:34; result `s0/s0_result.json`); `headless_session` always runs the **source project** (`8f5cbc0` = the build's code) | **completes**, 721.5 s, 21 of 21 steps, `problems: []`, `game_log_errors: []`; the look chosen on "Meet Krystal" kept (Strawberry Picnic, braided crown); Tailor's Cache, Brave Little Steps (ribbon tied, Mochi follows) and the courage lantern done; Weaver Matron 69.0 s, phases 1-2-3, 0 deaths, lowest HP 79; ending; Chapter Two accepted (`ch2_waygate`); save; Continue check ok (9.8 s to play, no mismatches) |
+| F2 Chapter Two S1 -> END from the native New-Game save, headless | `tools/qa/ch2/chain.py` headless into `qa/tmp/final203/chain_native` (console `qa/tmp/final203/chain_native.console.txt`, started 18:16:49): its first lines show `exe=qa/tmp/final203/install/Hollowhaven.exe` - the **installed** 2.0.3 exe - and `start_save=qa/tmp/final203/native_start/slot1.json` (native_v2, from S1; a copy of `qa/tmp/bot/chain/native_start_202`, the 2.0.2 V1 New-Game save, same SHA-256) | **completes**, `start_kind: native_v2`, `natural: true`, 1509.3 s (S1 102.8 / S2 226.9 / T23 79.5 / S3 212.1 / T34 45.7 / S4 829.0 / END 10.4), 0 deaths (lowest HP 28.2 in S4), 0 SCRIPT ERRORs, 0 warnings, `bugs.json` `[]`, 64 music cue changes; Quarry Warden 32.1 s, 3 pillar exposures, 0 hits taken; Count Velour phases 1-2-3, lowest HP 62; END: saved before quit, Save & Quit, relaunch, Continue in 3.8 s with the same items, `chapter_two_complete: true`, 20 of 20 steps. All three game processes were the installed exe with `--headless` (nothing rendered, 0 of 122 screenshots) |
+
+**So, on 2.0.3:** Chapter One (fresh New Game -> accepting Chapter Two) completed only **headless on the 2.0.3 sources** (the re-run;
+the first attempt stopped on a bot navigation problem) - it was **not** run on the installed exe; Chapter Two from a New-Game save
+completed on the **installed exe**, headless. No 2.0.3 run rendered anything on screen.
+
+### 13.8 NOT YET DONE for the gift (honest list; replaces §11.6 / §12.5)
+* **No human has played** any 2.x build; Krystal will be the first. Human playtime is unmeasured (bot: ~11-12 min for Chapter One,
+  ~22-26 min for Chapter Two, route-aware - not human times).
+* **No OS-level real-input run**, **no human listening** (music, Music Box, mix), **nothing judged in motion** (stills and bot runs only).
+* **Her PC is unknown.** Nothing ran on a second physical PC. The weaker-GPU numbers in `docs/ch2/DIFFERENT_PC_READINESS.md` are
+  estimates scaled from one measured weak built-in chip (15 FPS at the automatic settings, 22-25 FPS at Low); the renderer fallbacks
+  were simulated per process; the default fullscreen first start was never run. The owner chose to ship 2.0.3 **without** the
+  readiness report's recommended first-start quality changes (§6 items 3 and 4: Low / lower render scale on integrated GPUs, not
+  High on the OpenGL fallback); they stay open. On a slow PC the fix is by hand: `How to Play.txt` "IF THE GAME RUNS SLOWLY"
+  (Settings > Video > Graphics quality Medium or Low, a lower Render scale).
+* **Chapter One on the installed 2.0.3 exe** was not run (only headless on the identical sources, §13.7).
+* **Installer**: the wizard pages were never seen on screen; SmartScreen / Smart App Control on her Windows and an update over a running
+  game window are untested (`docs/INSTALLER.md`).
+* **Performance** of 2.0.1-2.0.3 not re-profiled (the RTX 4090 profile is of the 2.0.0 exe, §9.8).
+* Known small issues kept for 2.0.3 (`KNOWN_ISSUES.md` §3): the Bellhouse service-stair camera sits ~0.25 m above a tread; a companion
+  near the camera vanishes / reappears instantly (no fade); toasts on screen can vanish and come back later when a longer dialogue
+  line shrinks the room; ordinary tips emitted during a fight wait behind fight tips; enemy tell tips are emitted once per session;
+  Pipkin not implemented; CH2-011 leak warning (developer logs only).
+* No longer applicable: PERSONAL-SAVE VERIFICATION (no personal save exists).

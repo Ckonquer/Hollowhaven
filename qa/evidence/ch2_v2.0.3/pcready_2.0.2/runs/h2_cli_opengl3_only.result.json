@@ -1,0 +1,110 @@
+{
+ "variant": "h2_cli_opengl3_only",
+ "engine_args": [
+  "--rendering-driver",
+  "opengl3",
+  "--log-file",
+  "C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/pcready/runs/h2_cli_opengl3_only/godot.log"
+ ],
+ "window": [
+  1280,
+  720
+ ],
+ "preset": null,
+ "settings_file_existed": false,
+ "exe_copy": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\pcready\\runs\\h2_cli_opengl3_only\\qa_exe\\Hollowhaven.exe",
+ "t_start": "2026-09-28 15:58:10",
+ "seconds_to_title": 2.4,
+ "title_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit"
+ ],
+ "title_mode_reached": true,
+ "env_at_title": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "3.3.0 NVIDIA 595.71",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "opengl3",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "gl_compatibility",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "env_last": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "3.3.0 NVIDIA 595.71",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "opengl3",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "gl_compatibility",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "final_mode": "title",
+ "final_area": "",
+ "appearance": {
+  "back": "satchel",
+  "eyes": "eye_1",
+  "hair": "side_braid",
+  "hair_acc": "flower_clip",
+  "hair_color": "auburn",
+  "hat": "",
+  "lower": "explorer_trousers",
+  "outfit": "cozy_explorer",
+  "palette": {
+   "accent": "plum",
+   "primary": "teal",
+   "secondary": "sunflower"
+  },
+  "shoes": "explorer_boots",
+  "skin": "skin_2",
+  "upper": "explorer_jacket"
+ },
+ "mem_all": {
+  "private_mb_max": 406.9,
+  "ws_mb_max": 277.4,
+  "peak_ws_mb": 285.7
+ },
+ "exit_code_before_stop": null,
+ "seconds_total": 4.1,
+ "focus_watchdog": {
+  "checks": 16,
+  "game_had_focus": 0,
+  "handed_back": 0
+ },
+ "settings_file_final": null,
+ "log_lines": 5,
+ "log_header": [
+  "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org",
+  "OpenGL API 3.3.0 NVIDIA 595.71 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 4090"
+ ],
+ "log_errors": [
+  "WARNING: Screen-space AA is only available when using the Forward+ or Mobile renderer."
+ ],
+ "log_error_count": 0,
+ "log_warning_count": 1
+}

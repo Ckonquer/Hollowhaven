@@ -1,12 +1,14 @@
 # Hollowhaven — For Krystal
 
 A small 3D cozy survival-adventure with creature companions and a restrained horror dungeon, made as
-a gift for Krystal. Chapter One: *The Dimming Ward* (about 45–90 minutes), then free-play in your own
-little haven. Chapter Two: *The Lanterns of Hallowmere* (version 2.0.2, the second bug-fix release of 2.0.0) continues
-the same save: a lantern road to an autumn festival town, a wardrobe, companions that fight beside you, new gear,
-two-storey building, Halloween decorations, echo trials, expeditions, a music box and a lot of new music.
-Chapter Two has been tested by automated tests, a test bot with virtual input (headless, and on the packaged game
-on a second monitor) and screenshots, but not yet played by a person or listened to - see `KNOWN_ISSUES.md`.
+a gift for Krystal. Chapter One: *The Dimming Ward* (designed for about 45–90 minutes; no player has timed it yet), then free-play in your own
+little haven. Chapter Two: *The Lanterns of Hallowmere* follows in the same save, from the Ward Stone: a lantern
+road to an autumn festival town, a wardrobe, companions that fight beside you, new gear, two-storey building,
+Halloween decorations, echo trials, expeditions, a music box and a lot of new music.
+**Version 2.0.3 is the gift build**: one installer for Krystal, who has never played and starts with New Game.
+The game has been tested by automated tests, a test bot with virtual input (headless, and on the packaged game on a
+second monitor) and screenshots, but not yet played by a person, listened to, or run on a PC other than the
+development one - see `KNOWN_ISSUES.md`. Hand-over notes: `docs/ch2/HANDOFF_2.0.3.md`.
 
 ## Just want to play?
 1. Run the installer **`dist/Hollowhaven-Setup-2.0.3.exe`** (built by `tools/build_installer.ps1` after
@@ -33,12 +35,12 @@ forward, or going back to it, is a developer topic: `docs/ch2/SAVE_INTEGRITY_REP
 | Path | What it is |
 |---|---|
 | `builds/Hollowhaven/` | The playable game (after building) |
-| `dist/` | The ZIP of the playable game + SHA-256 checksum (the build script moves older zips to `builds/superseded/`) |
+| `dist/` | The installer (`Hollowhaven-Setup-2.0.3.exe`), the same game as a ZIP, and `SHA256SUMS.txt` (the build scripts move older zips / installers to `builds/superseded/`) |
 | `game/` | Editable Godot 4.7.2 project (source code, shaders, data, audio) |
-| `tools/` | Build, test, toolchain and asset-generation scripts |
-| `docs/` | Architecture contract, Chapter Two contract (`CHAPTER_TWO_SPEC.md`), save migration, install log, Chapter Two build records, the 2.0.2 handoff (`docs/ch2/HANDOFF_2.0.2.md`; the earlier `HANDOFF_2.0.1.md`, `HANDOFF_2.0.0.md`), save-integrity report and music manifest (`docs/ch2/`) |
+| `tools/` | Build, installer (`tools/installer/`, `build_installer.ps1`), test, toolchain and asset-generation scripts |
+| `docs/` | The installer guide (`INSTALLER.md`), the 2.0.3 handoff (`docs/ch2/HANDOFF_2.0.3.md`; the earlier returning-player handoffs `HANDOFF_2.0.0.md`-`HANDOFF_2.0.2.md`), the PC-readiness report (`docs/ch2/DIFFERENT_PC_READINESS.md`), architecture contract, Chapter Two contract (`CHAPTER_TWO_SPEC.md`), save migration, install log, Chapter Two build records, save-integrity report and music manifest (`docs/ch2/`) |
 | `docs/player/` | `How to Play.txt` (the player guide shipped next to the game and opened from the Start Menu) |
-| `qa/` | Test evidence (screenshots, logs; release evidence in `qa/evidence/ch2_v2.0.0/`, `ch2_v2.0.1/`, `ch2_v2.0.2/`) |
+| `qa/` | Test evidence (screenshots, logs; release evidence in `qa/evidence/ch2_v2.0.0/` ... `ch2_v2.0.3/`) |
 | `GAME_SPEC.md` | Game design (concise) |
 | `PROJECT_STATE.md` | What's done, what's next (for future development) |
 | `QA_REPORT.md` | What was actually tested and how |
@@ -53,6 +55,7 @@ powershell -ExecutionPolicy Bypass -File tools/setup_toolchain.ps1   # Godot 4.7
 tools/test.sh                                                        # headless automated tests
 tools/godot.sh --path game --windowed --resolution 1600x900          # run from source
 powershell -ExecutionPolicy Bypass -File tools/build_release.ps1     # export + zip
+powershell -ExecutionPolicy Bypass -File tools/build_installer.ps1   # installer from that build (docs/INSTALLER.md)
 ```
 To edit in the Godot editor: run `.tools/godot/Godot_v4.7.2-stable_win64.exe` and open `game/project.godot`.
 Regenerate audio: `.tools/pyenv/Scripts/python.exe tools/audio/generate_all.py` (Chapter One sounds and music) and the

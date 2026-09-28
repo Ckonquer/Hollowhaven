@@ -1,0 +1,2871 @@
+{
+ "chain": "Chapter Two natural route (MP 20.4 Run A): S1 -> S2 -> T23 -> S3 -> T34 -> S4 -> relaunch",
+ "status": "completes",
+ "natural": true,
+ "start_save": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_start_202\\slot1.json",
+ "start_kind": "native_v2",
+ "resumed_from": null,
+ "mode": {
+  "headless": false,
+  "packaged_exe": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\builds\\Hollowhaven\\Hollowhaven.exe",
+  "project": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\game",
+  "godot": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\.tools\\godot\\Godot_v4.7.2-stable_win64.exe",
+  "muted": false,
+  "qa_window": [
+   1920,
+   0,
+   1920,
+   1080
+  ],
+  "seed": null
+ },
+ "started": "2026-09-28 15:04:52",
+ "total_seconds": 1393.0,
+ "durations": {
+  "S1": 121.9,
+  "S2": 235.5,
+  "T23": 81.9,
+  "S3": 198.8,
+  "T34": 55.9,
+  "S4": 681.4,
+  "END": 12.4
+ },
+ "segments": [
+  {
+   "id": "S1",
+   "title": "Chapter Two start from a version-2 save (load checks, wardrobe, Ward Stone menu, waygate, Commons, relaunch)",
+   "start": "2026-09-28 15:04:54",
+   "start_state": {
+    "area": "",
+    "zone": "",
+    "mode": "title",
+    "pos": null,
+    "hp": null,
+    "food": {},
+    "keys": {},
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [],
+    "ch2_done": 0,
+    "chapter2_finished": false,
+    "music": "",
+    "game": "g1"
+   },
+   "seconds": 121.9,
+   "end": "2026-09-28 15:06:56",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_commons",
+    "mode": "playing",
+    "pos": [
+     1.43,
+     -2.38,
+     68.26
+    ],
+    "hp": 88.0,
+    "food": {
+     "berry_snack": 3,
+     "berries": 1
+    },
+    "keys": {
+     "foreman_key": 1
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_outer_lamps",
+     "ch2_orchard",
+     "ch2_quarry",
+     "ch2_manor"
+    ],
+    "ch2_done": 3,
+    "chapter2_finished": false,
+    "music": "m16",
+    "game": "g2"
+   },
+   "checkpoints": [
+    {
+     "name": "title_continue",
+     "ok": true,
+     "seconds": 7.0,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "load_checks",
+     "ok": true,
+     "seconds": 0.0,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "first_save_checks",
+     "ok": true,
+     "seconds": 1.0,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "wardrobe",
+     "ok": true,
+     "seconds": 16.2,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "equipment",
+     "ok": true,
+     "seconds": 0.0,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "ward_stone",
+     "ok": true,
+     "seconds": 1.2,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "materials",
+     "ok": true,
+     "seconds": 26.1,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "waygate",
+     "ok": true,
+     "seconds": 21.1,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "travel_reach",
+     "ok": true,
+     "seconds": 8.3,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "commons_arch",
+     "ok": true,
+     "seconds": 3.2,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "festival_map",
+     "ok": true,
+     "seconds": 3.1,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "lantern_road_home",
+     "ok": true,
+     "seconds": 5.3,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "lantern_road_back",
+     "ok": true,
+     "seconds": 9.9,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "save_and_quit",
+     "ok": true,
+     "seconds": 4.3,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "relaunch_continue",
+     "ok": true,
+     "seconds": 11.1,
+     "area": "hallowmere_reach",
+     "error": ""
+    }
+   ],
+   "screenshot_requests": {
+    "total": 28,
+    "ok": 27,
+    "failed": 1,
+    "labels": [
+     "title_continue",
+     "load_checks",
+     "first_save_checks",
+     "wardrobe_new_look",
+     "wardrobe_preset",
+     "wardrobe",
+     "equipment",
+     "ward_stone_menu",
+     "ward_stone",
+     "materials",
+     "waygate_repaired",
+     "waygate",
+     "travel_reach",
+     "commons_arch_lit",
+     "commons_arch",
+     "festival_map",
+     "festival_map",
+     "lantern_road_list",
+     "haven_after_trip",
+     "lantern_road_home",
+     "ward_stone_menu",
+     "lantern_road_back",
+     "pause_saved",
+     "save_and_quit",
+     "after_relaunch",
+     "relaunch_continue",
+     "S1_start",
+     "S1_end"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m01",
+     "seg": "S1",
+     "game": 1,
+     "t": 0.15,
+     "area": "",
+     "wall": "2026-09-28 15:04:55"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S1",
+     "game": 1,
+     "t": 0.36,
+     "area": "",
+     "wall": "2026-09-28 15:04:55"
+    },
+    {
+     "cue": "m03",
+     "seg": "S1",
+     "game": 1,
+     "t": 1.7,
+     "area": "surface",
+     "wall": "2026-09-28 15:04:58"
+    },
+    {
+     "cue": "m07",
+     "seg": "S1",
+     "game": 1,
+     "t": 60.46,
+     "area": "surface",
+     "wall": "2026-09-28 15:05:58"
+    },
+    {
+     "cue": "m15",
+     "seg": "S1",
+     "game": 1,
+     "t": 72.92,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:06:14"
+    },
+    {
+     "cue": "m02",
+     "seg": "S1",
+     "game": 1,
+     "t": 86.02,
+     "area": "surface",
+     "wall": "2026-09-28 15:06:28"
+    },
+    {
+     "cue": "m16",
+     "seg": "S1",
+     "game": 1,
+     "t": 94.07,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:06:36"
+    },
+    {
+     "cue": "m01",
+     "seg": "S1",
+     "game": 2,
+     "t": 0.13,
+     "area": "",
+     "wall": "2026-09-28 15:06:47"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S1",
+     "game": 2,
+     "t": 0.28,
+     "area": "",
+     "wall": "2026-09-28 15:06:47"
+    },
+    {
+     "cue": "m16",
+     "seg": "S1",
+     "game": 2,
+     "t": 1.65,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:06:53"
+    }
+   ],
+   "deaths": 0,
+   "saves": 5,
+   "hp_min": 88.0,
+   "problems": [],
+   "result_file": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\s1\\s1_result.json"
+  },
+  {
+   "id": "S2",
+   "title": "Hallowmere west + east (orchard, quarry, Quarry Warden)",
+   "start": "2026-09-28 15:06:56",
+   "start_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_commons",
+    "mode": "playing",
+    "pos": [
+     1.43,
+     -2.38,
+     68.26
+    ],
+    "hp": 88.0,
+    "food": {
+     "berry_snack": 3,
+     "berries": 1
+    },
+    "keys": {
+     "foreman_key": 1
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_outer_lamps",
+     "ch2_orchard",
+     "ch2_quarry",
+     "ch2_manor"
+    ],
+    "ch2_done": 3,
+    "chapter2_finished": false,
+    "music": "m16",
+    "game": "g2"
+   },
+   "seconds": 235.5,
+   "end": "2026-09-28 15:10:52",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_quarry",
+    "mode": "playing",
+    "pos": [
+     93.46,
+     7.71,
+     -3.15
+    ],
+    "hp": 92.0,
+    "food": {
+     "berry_snack": 2,
+     "pumpkin": 3,
+     "berries": 1
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "quarry_seal": 1
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_outer_lamps",
+     "ch2_manor"
+    ],
+    "ch2_done": 5,
+    "chapter2_finished": false,
+    "music": "m18",
+    "game": "g2"
+   },
+   "checkpoints": [
+    {
+     "name": "s2_start",
+     "ok": true,
+     "seconds": null,
+     "at_s": 2.4,
+     "hp": 88.0,
+     "detail": "inv={'berries': 1, 'berry_snack': 3, 'copper_ore': 1, 'copper_sword': 1, 'glowcap': 1, 'haven_banner': 1, 'lantern': 1, 'pumpkin_seeds': 3, 'roseberry_seeds': 2, 'shiny_pebble': 1, 'stone': 5, 'stone_"
+    },
+    {
+     "name": "to_orchard",
+     "ok": true,
+     "seconds": 15.1,
+     "at_s": 17.8,
+     "hp": 88.0,
+     "detail": "15.1s"
+    },
+    {
+     "name": "light_orchard_arch",
+     "ok": true,
+     "seconds": 1.5,
+     "at_s": 19.6,
+     "hp": 88.0,
+     "detail": "1.5s"
+    },
+    {
+     "name": "find_orchard_lamp",
+     "ok": true,
+     "seconds": 0.0,
+     "at_s": 19.9,
+     "hp": 88.0,
+     "detail": "0.0s"
+    },
+    {
+     "name": "seed_box_note",
+     "ok": true,
+     "seconds": 2.5,
+     "at_s": 22.7,
+     "hp": 88.0,
+     "detail": "2.5s"
+    },
+    {
+     "name": "irrigation",
+     "ok": true,
+     "seconds": 7.4,
+     "at_s": 30.4,
+     "hp": 88.0,
+     "detail": "7.4s"
+    },
+    {
+     "name": "plant_festival_seed",
+     "ok": true,
+     "seconds": 10.9,
+     "at_s": 41.6,
+     "hp": 88.0,
+     "detail": "10.9s"
+    },
+    {
+     "name": "mimic_pocket",
+     "ok": true,
+     "seconds": 23.7,
+     "at_s": 65.6,
+     "hp": 63.9,
+     "detail": "23.7s"
+    },
+    {
+     "name": "light_garden_lamp",
+     "ok": true,
+     "seconds": 7.2,
+     "at_s": 73.1,
+     "hp": 68.8,
+     "detail": "7.2s"
+    },
+    {
+     "name": "garden_seal",
+     "ok": true,
+     "seconds": 0.0,
+     "at_s": 73.3,
+     "hp": 68.8,
+     "detail": "0.0s"
+    },
+    {
+     "name": "patchwalkers_optional",
+     "ok": true,
+     "seconds": 27.3,
+     "at_s": 102.6,
+     "hp": 92.0,
+     "detail": "27.3s"
+    },
+    {
+     "name": "gather_food",
+     "ok": true,
+     "seconds": 2.5,
+     "at_s": 105.3,
+     "hp": 92.0,
+     "detail": "2.5s"
+    },
+    {
+     "name": "to_quarry",
+     "ok": true,
+     "seconds": 26.9,
+     "at_s": 132.5,
+     "hp": 92.0,
+     "detail": "26.9s"
+    },
+    {
+     "name": "light_quarry_arch",
+     "ok": true,
+     "seconds": 1.5,
+     "at_s": 134.3,
+     "hp": 92.0,
+     "detail": "1.5s"
+    },
+    {
+     "name": "gather_wood",
+     "ok": true,
+     "seconds": 11.1,
+     "at_s": 145.7,
+     "hp": 92.0,
+     "detail": "11.1s"
+    },
+    {
+     "name": "mine_iron",
+     "ok": true,
+     "seconds": 18.2,
+     "at_s": 164.2,
+     "hp": 92.0,
+     "detail": "18.2s"
+    },
+    {
+     "name": "to_winch_find_lamp",
+     "ok": true,
+     "seconds": 11.4,
+     "at_s": 175.9,
+     "hp": 92.0,
+     "detail": "11.4s"
+    },
+    {
+     "name": "quarry_lamp_found",
+     "ok": true,
+     "seconds": 0.2,
+     "at_s": 176.3,
+     "hp": 92.0,
+     "detail": "0.2s"
+    },
+    {
+     "name": "repair_winch",
+     "ok": true,
+     "seconds": 4.2,
+     "at_s": 180.8,
+     "hp": 92.0,
+     "detail": "4.2s"
+    },
+    {
+     "name": "quarry_warden",
+     "ok": true,
+     "seconds": 33.2,
+     "at_s": 216.0,
+     "hp": 92.0,
+     "detail": "33.2s"
+    },
+    {
+     "name": "light_quarry_lamp",
+     "ok": true,
+     "seconds": 11.0,
+     "at_s": 227.2,
+     "hp": 92.0,
+     "detail": "11.0s"
+    },
+    {
+     "name": "verify",
+     "ok": true,
+     "seconds": 0.0,
+     "at_s": 227.5,
+     "hp": 92.0,
+     "detail": "0.0s"
+    },
+    {
+     "name": "save_quit_continue",
+     "ok": true,
+     "seconds": 7.2,
+     "at_s": 234.9,
+     "hp": 92.0,
+     "detail": "7.2s"
+    }
+   ],
+   "screenshot_requests": {
+    "total": 25,
+    "ok": 25,
+    "failed": 0,
+    "labels": [
+     "s2_start",
+     "to_orchard",
+     "light_orchard_arch",
+     "find_orchard_lamp",
+     "seed_box_note",
+     "irrigation",
+     "plant_festival_seed",
+     "mimic_pocket",
+     "light_garden_lamp",
+     "garden_seal",
+     "patchwalkers_optional",
+     "gather_food",
+     "to_quarry",
+     "light_quarry_arch",
+     "gather_wood",
+     "mine_iron",
+     "to_winch_find_lamp",
+     "quarry_lamp_found",
+     "repair_winch",
+     "quarry_warden",
+     "light_quarry_lamp",
+     "verify",
+     "save_quit_continue",
+     "S2_start",
+     "S2_end"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m17",
+     "seg": "S2",
+     "game": 2,
+     "t": 34.65,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:07:28"
+    },
+    {
+     "cue": "m22",
+     "seg": "S2",
+     "game": 2,
+     "t": 54.47,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:07:48"
+    },
+    {
+     "cue": "m17",
+     "seg": "S2",
+     "game": 2,
+     "t": 70.48,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:08:04"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S2",
+     "game": 2,
+     "t": 80.98,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:08:15"
+    },
+    {
+     "cue": "m22",
+     "seg": "S2",
+     "game": 2,
+     "t": 105.37,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:08:40"
+    },
+    {
+     "cue": "m16",
+     "seg": "S2",
+     "game": 2,
+     "t": 107.58,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:08:43"
+    },
+    {
+     "cue": "m18",
+     "seg": "S2",
+     "game": 2,
+     "t": 175.61,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:09:51"
+    },
+    {
+     "cue": "m22",
+     "seg": "S2",
+     "game": 2,
+     "t": 185.23,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:10:01"
+    },
+    {
+     "cue": "m15",
+     "seg": "S2",
+     "game": 2,
+     "t": 221.4,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:10:38"
+    },
+    {
+     "cue": "m01",
+     "seg": "S2",
+     "game": 2,
+     "t": 228.78,
+     "area": "",
+     "wall": "2026-09-28 15:10:46"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S2",
+     "game": 2,
+     "t": 230.07,
+     "area": "",
+     "wall": "2026-09-28 15:10:47"
+    },
+    {
+     "cue": "m18",
+     "seg": "S2",
+     "game": 2,
+     "t": 231.42,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:10:49"
+    }
+   ],
+   "deaths": 0,
+   "saves": 3,
+   "hp_min": 49.0,
+   "problems": [],
+   "result_file": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\s2\\s2_result.json"
+  },
+  {
+   "id": "T23",
+   "title": "Home to rest and cook, then the road to the manor",
+   "start": "2026-09-28 15:10:52",
+   "start_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_quarry",
+    "mode": "playing",
+    "pos": [
+     93.46,
+     7.71,
+     -3.15
+    ],
+    "hp": 92.0,
+    "food": {
+     "berry_snack": 2,
+     "pumpkin": 3,
+     "berries": 1
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "quarry_seal": 1
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_outer_lamps",
+     "ch2_manor"
+    ],
+    "ch2_done": 5,
+    "chapter2_finished": false,
+    "music": "m18",
+    "game": "g2"
+   },
+   "seconds": 81.9,
+   "end": "2026-09-28 15:12:14",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_manor_grounds",
+    "mode": "playing",
+    "pos": [
+     10.38,
+     1.24,
+     -51.3
+    ],
+    "hp": 100.0,
+    "food": {
+     "berry_snack": 5,
+     "pumpkin": 3,
+     "berries": 3
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "quarry_seal": 1
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_outer_lamps",
+     "ch2_manor"
+    ],
+    "ch2_done": 5,
+    "chapter2_finished": false,
+    "music": "m15",
+    "game": "g2"
+   },
+   "checkpoints": [
+    {
+     "name": "quarry_to_arch",
+     "ok": true,
+     "seconds": 13.7,
+     "at_s": 13.7,
+     "area": "hallowmere_reach",
+     "pos": [
+      65.27,
+      0.32,
+      35.17
+     ],
+     "hp": 92.0,
+     "error": ""
+    },
+    {
+     "name": "lantern_road_home",
+     "ok": true,
+     "seconds": 6.9,
+     "at_s": 20.9,
+     "area": "surface",
+     "pos": [
+      -2.0,
+      0.0,
+      5.0
+     ],
+     "hp": 92.0,
+     "error": ""
+    },
+    {
+     "name": "home_rest",
+     "ok": true,
+     "seconds": 22.7,
+     "at_s": 43.9,
+     "area": "surface",
+     "pos": [
+      -25.93,
+      -0.34,
+      12.81
+     ],
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "lantern_road_commons",
+     "ok": true,
+     "seconds": 14.2,
+     "at_s": 58.4,
+     "area": "hallowmere_reach",
+     "pos": [
+      0.0,
+      -2.38,
+      73.4
+     ],
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "road_to_manor_arch",
+     "ok": true,
+     "seconds": 22.7,
+     "at_s": 81.3,
+     "area": "hallowmere_reach",
+     "pos": [
+      10.38,
+      1.24,
+      -51.3
+     ],
+     "hp": 100.0,
+     "error": ""
+    }
+   ],
+   "screenshot_requests": {
+    "total": 8,
+    "ok": 8,
+    "failed": 0,
+    "labels": [
+     "T23_start",
+     "T23_quarry_to_arch",
+     "T23_lantern_road_home",
+     "craft_Berry_Snack",
+     "T23_home_rest",
+     "T23_lantern_road_commons",
+     "T23_road_to_manor_arch",
+     "T23_end"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m05",
+     "seg": "T23",
+     "game": 2,
+     "t": 250.47,
+     "area": "surface",
+     "wall": "2026-09-28 15:11:10"
+    },
+    {
+     "cue": "m03",
+     "seg": "T23",
+     "game": 2,
+     "t": 282.23,
+     "area": "surface",
+     "wall": "2026-09-28 15:11:42"
+    },
+    {
+     "cue": "m15",
+     "seg": "T23",
+     "game": 2,
+     "t": 287.4,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:11:47"
+    }
+   ],
+   "deaths": 0,
+   "saves": 3,
+   "hp_min": 92.0,
+   "problems": [],
+   "result_file": null
+  },
+  {
+   "id": "S3",
+   "title": "Moonveil Manor (Count Velour)",
+   "start": "2026-09-28 15:12:14",
+   "start_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_manor_grounds",
+    "mode": "playing",
+    "pos": [
+     10.63,
+     1.24,
+     -51.99
+    ],
+    "hp": 100.0,
+    "food": {
+     "berry_snack": 5,
+     "pumpkin": 3,
+     "berries": 3
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "quarry_seal": 1
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_outer_lamps",
+     "ch2_manor"
+    ],
+    "ch2_done": 5,
+    "chapter2_finished": false,
+    "music": "m15",
+    "game": "g2"
+   },
+   "seconds": 198.8,
+   "end": "2026-09-28 15:15:33",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_manor_grounds",
+    "mode": "playing",
+    "pos": [
+     18.0,
+     4.73,
+     -82.0
+    ],
+    "hp": 78.0,
+    "food": {
+     "berry_snack": 5,
+     "roseberries": 1,
+     "pumpkin": 3,
+     "berries": 3
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_prepare"
+    ],
+    "ch2_done": 7,
+    "chapter2_finished": false,
+    "music": "m20",
+    "game": "g2"
+   },
+   "checkpoints": [
+    {
+     "name": "start_in_reach",
+     "ok": true,
+     "seconds": 6.0,
+     "at_s": 6.0,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "light_manor_arch",
+     "ok": true,
+     "seconds": 0.7,
+     "at_s": 6.9,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "enter_manor",
+     "ok": true,
+     "seconds": 9.0,
+     "at_s": 16.2,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "looking_glass_hall",
+     "ok": true,
+     "seconds": 13.7,
+     "at_s": 30.1,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "velvet_scrap_1_powder_room",
+     "ok": true,
+     "seconds": 17.5,
+     "at_s": 47.8,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "ballroom_puzzle",
+     "ok": true,
+     "seconds": 15.4,
+     "at_s": 63.3,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "ballroom_rest",
+     "ok": true,
+     "seconds": 3.9,
+     "at_s": 67.3,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "velvet_scrap_2_nook",
+     "ok": true,
+     "seconds": 13.2,
+     "at_s": 80.6,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "velour_encounter_start",
+     "ok": true,
+     "seconds": 6.1,
+     "at_s": 86.9,
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "velour_defeated",
+     "ok": true,
+     "seconds": 81.1,
+     "at_s": 168.1,
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "velvet_scrap_3_dressing_room",
+     "ok": true,
+     "seconds": 9.2,
+     "at_s": 177.4,
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "talk_to_the_count",
+     "ok": true,
+     "seconds": 3.3,
+     "at_s": 180.7,
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "manor_lantern_lit",
+     "ok": true,
+     "seconds": 7.7,
+     "at_s": 188.6,
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "balcony_rest",
+     "ok": true,
+     "seconds": 3.0,
+     "at_s": 191.7,
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "shortcut_open",
+     "ok": true,
+     "seconds": 2.2,
+     "at_s": 194.0,
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "garden_stair_to_reach",
+     "ok": true,
+     "seconds": 4.2,
+     "at_s": 198.3,
+     "hp": 78.0,
+     "error": ""
+    }
+   ],
+   "screenshot_requests": {
+    "total": 18,
+    "ok": 18,
+    "failed": 0,
+    "labels": [
+     "start_in_reach",
+     "light_manor_arch",
+     "enter_manor",
+     "looking_glass_hall",
+     "velvet_scrap_1_powder_room",
+     "ballroom_puzzle",
+     "ballroom_rest",
+     "velvet_scrap_2_nook",
+     "velour_encounter_start",
+     "velour_defeated",
+     "velvet_scrap_3_dressing_room",
+     "talk_to_the_count",
+     "manor_lantern_lit",
+     "balcony_rest",
+     "shortcut_open",
+     "garden_stair_to_reach",
+     "S3_start",
+     "S3_end"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m20",
+     "seg": "S3",
+     "game": 2,
+     "t": 329.04,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:12:29"
+    },
+    {
+     "cue": "m22",
+     "seg": "S3",
+     "game": 2,
+     "t": 346.5,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:12:47"
+    },
+    {
+     "cue": "m20",
+     "seg": "S3",
+     "game": 2,
+     "t": 363.11,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:13:04"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S3",
+     "game": 2,
+     "t": 370.36,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:13:11"
+    },
+    {
+     "cue": "m20",
+     "seg": "S3",
+     "game": 2,
+     "t": 392.89,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:13:34"
+    },
+    {
+     "cue": "m21",
+     "seg": "S3",
+     "game": 2,
+     "t": 400.84,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:13:41"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S3",
+     "game": 2,
+     "t": 480.23,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:15:02"
+    },
+    {
+     "cue": "m20",
+     "seg": "S3",
+     "game": 2,
+     "t": 488.05,
+     "area": "moonveil_manor",
+     "wall": "2026-09-28 15:15:10"
+    }
+   ],
+   "deaths": 0,
+   "saves": 4,
+   "hp_min": 78.0,
+   "problems": [],
+   "result_file": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\s3\\s3_result.json"
+  },
+  {
+   "id": "T34",
+   "title": "Home to rest and cook before the Hushed Works",
+   "start": "2026-09-28 15:15:33",
+   "start_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_manor_grounds",
+    "mode": "playing",
+    "pos": [
+     18.0,
+     4.73,
+     -82.0
+    ],
+    "hp": 78.0,
+    "food": {
+     "berry_snack": 5,
+     "roseberries": 1,
+     "pumpkin": 3,
+     "berries": 3
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_prepare"
+    ],
+    "ch2_done": 7,
+    "chapter2_finished": false,
+    "music": "m20",
+    "game": "g2"
+   },
+   "seconds": 55.9,
+   "end": "2026-09-28 15:16:29",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_commons",
+    "mode": "playing",
+    "pos": [
+     0.0,
+     -2.38,
+     73.4
+    ],
+    "hp": 100.0,
+    "food": {
+     "berry_snack": 9,
+     "roseberries": 1,
+     "pumpkin": 3,
+     "berries": 2
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_prepare"
+    ],
+    "ch2_done": 7,
+    "chapter2_finished": false,
+    "music": "m16",
+    "game": "g2"
+   },
+   "checkpoints": [
+    {
+     "name": "grounds_to_manor_arch",
+     "ok": true,
+     "seconds": 5.5,
+     "at_s": 5.5,
+     "area": "hallowmere_reach",
+     "pos": [
+      11.14,
+      1.24,
+      -53.84
+     ],
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "lantern_road_home",
+     "ok": true,
+     "seconds": 5.6,
+     "at_s": 11.3,
+     "area": "surface",
+     "pos": [
+      -2.0,
+      0.0,
+      5.0
+     ],
+     "hp": 78.0,
+     "error": ""
+    },
+    {
+     "name": "home_rest",
+     "ok": true,
+     "seconds": 25.9,
+     "at_s": 37.5,
+     "area": "surface",
+     "pos": [
+      -45.56,
+      -0.88,
+      22.64
+     ],
+     "hp": 100.0,
+     "error": ""
+    },
+    {
+     "name": "lantern_road_commons",
+     "ok": true,
+     "seconds": 17.7,
+     "at_s": 55.5,
+     "area": "hallowmere_reach",
+     "pos": [
+      0.0,
+      -2.38,
+      73.4
+     ],
+     "hp": 100.0,
+     "error": ""
+    }
+   ],
+   "screenshot_requests": {
+    "total": 7,
+    "ok": 7,
+    "failed": 0,
+    "labels": [
+     "T34_start",
+     "T34_grounds_to_manor_arch",
+     "T34_lantern_road_home",
+     "craft_Berry_Snack",
+     "T34_home_rest",
+     "T34_lantern_road_commons",
+     "T34_end"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m02",
+     "seg": "T34",
+     "game": 2,
+     "t": 518.48,
+     "area": "surface",
+     "wall": "2026-09-28 15:15:41"
+    },
+    {
+     "cue": "m16",
+     "seg": "T34",
+     "game": 2,
+     "t": 562.06,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:16:25"
+    }
+   ],
+   "deaths": 0,
+   "saves": 3,
+   "hp_min": 78.0,
+   "problems": [],
+   "result_file": null
+  },
+  {
+   "id": "S4",
+   "title": "Link the lanterns, the Hushed Works, the Crossing, the Choir, the Lanternwake, free play",
+   "start": "2026-09-28 15:16:30",
+   "start_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_commons",
+    "mode": "playing",
+    "pos": [
+     0.0,
+     -2.38,
+     73.4
+    ],
+    "hp": 100.0,
+    "food": {
+     "berry_snack": 9,
+     "roseberries": 1,
+     "pumpkin": 3,
+     "berries": 2
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_prepare"
+    ],
+    "ch2_done": 7,
+    "chapter2_finished": false,
+    "music": "m16",
+    "game": "g2"
+   },
+   "seconds": 681.4,
+   "end": "2026-09-28 15:27:51",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "surface",
+    "zone": "haven",
+    "mode": "playing",
+    "pos": [
+     -2.0,
+     0.0,
+     5.0
+    ],
+    "hp": 72.6,
+    "food": {
+     "hearty_stew": 2,
+     "berry_snack": 9,
+     "roseberries": 1,
+     "pumpkin": 7,
+     "berries": 2,
+     "candy": 6
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [],
+    "ch2_done": 20,
+    "chapter2_finished": true,
+    "music": "m04",
+    "game": "g2"
+   },
+   "checkpoints": [
+    {
+     "name": "start",
+     "ok": true,
+     "seconds": 4.0,
+     "hp": 100.0,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "read_preparations",
+     "ok": true,
+     "seconds": 14.6,
+     "hp": 100.0,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "link_lanterns",
+     "ok": true,
+     "seconds": 6.6,
+     "hp": 100.0,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "service_gate",
+     "ok": true,
+     "seconds": 29.5,
+     "hp": 100.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "true_signal",
+     "ok": true,
+     "seconds": 33.1,
+     "hp": 86.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "refuge",
+     "ok": true,
+     "seconds": 18.7,
+     "hp": 86.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "line_water",
+     "ok": true,
+     "seconds": 21.8,
+     "hp": 86.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "line_bell",
+     "ok": true,
+     "seconds": 102.0,
+     "hp": 75.4,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "line_light",
+     "ok": true,
+     "seconds": 26.2,
+     "hp": 75.4,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "winch",
+     "ok": true,
+     "seconds": 17.4,
+     "hp": 75.4,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "crossing",
+     "ok": true,
+     "seconds": 71.3,
+     "hp": 77.6,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "wrong_landing",
+     "ok": true,
+     "seconds": 21.0,
+     "hp": 77.6,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "false_home",
+     "ok": true,
+     "seconds": 18.0,
+     "hp": 77.6,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "bell_throat",
+     "ok": true,
+     "seconds": 15.4,
+     "hp": 77.6,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "choir",
+     "ok": true,
+     "seconds": 193.2,
+     "hp": 66.6,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "return_reach",
+     "ok": true,
+     "seconds": 5.1,
+     "hp": 72.6,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "travel_home",
+     "ok": true,
+     "seconds": 21.0,
+     "hp": 72.6,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "homecoming",
+     "ok": true,
+     "seconds": 6.0,
+     "hp": 72.6,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "lanternwake",
+     "ok": true,
+     "seconds": 12.6,
+     "hp": 72.6,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "free_play",
+     "ok": true,
+     "seconds": 43.4,
+     "hp": 72.6,
+     "area": "surface",
+     "error": ""
+    }
+   ],
+   "screenshot_requests": {
+    "total": 35,
+    "ok": 35,
+    "failed": 0,
+    "labels": [
+     "preparation_notes",
+     "conservatory_pedestal",
+     "lanterns_linked",
+     "bellhouse_forecourt",
+     "service_gate_open",
+     "service_landing",
+     "rail_junction",
+     "pocket_conservatory",
+     "refuge_done",
+     "sluice",
+     "bells",
+     "light_well",
+     "threaded_winch",
+     "crossing_gate",
+     "crossing_cleared",
+     "wrong_landing",
+     "false_lift_siding",
+     "borrowed_porch",
+     "true_stair",
+     "bell_throat",
+     "choir_vault_door",
+     "choir_defeated",
+     "reach_after_choir",
+     "lantern_road_list",
+     "home_haven",
+     "homecoming",
+     "ward_stone_menu",
+     "celebration",
+     "ending_card",
+     "chapter_two_complete",
+     "free_play_reach",
+     "free_play_refuge",
+     "free_play_home",
+     "S4_start",
+     "S4_end"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 2,
+     "t": 619.26,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:17:23"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 2,
+     "t": 627.38,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:17:31"
+    },
+    {
+     "cue": "m22",
+     "seg": "S4",
+     "game": 2,
+     "t": 636.42,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:17:41"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 2,
+     "t": 640.04,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:17:44"
+    },
+    {
+     "cue": "m24",
+     "seg": "S4",
+     "game": 2,
+     "t": 678.4,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:18:23"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 2,
+     "t": 703.65,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:18:48"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 2,
+     "t": 706.41,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:18:51"
+    },
+    {
+     "cue": "m22",
+     "seg": "S4",
+     "game": 2,
+     "t": 761.89,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:19:47"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 2,
+     "t": 769.53,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:19:55"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 2,
+     "t": 833.66,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:20:59"
+    },
+    {
+     "cue": "m25",
+     "seg": "S4",
+     "game": 2,
+     "t": 841.44,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:21:07"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 2,
+     "t": 905.52,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:22:11"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 2,
+     "t": 918.58,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:22:25"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 2,
+     "t": 932.96,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:22:39"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 2,
+     "t": 965.12,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:23:11"
+    },
+    {
+     "cue": "m26",
+     "seg": "S4",
+     "game": 2,
+     "t": 969.59,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:23:16"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 2,
+     "t": 1149.51,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:26:18"
+    },
+    {
+     "cue": "m15",
+     "seg": "S4",
+     "game": 2,
+     "t": 1165.73,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:26:34"
+    },
+    {
+     "cue": "m04",
+     "seg": "S4",
+     "game": 2,
+     "t": 1179.11,
+     "area": "surface",
+     "wall": "2026-09-28 15:26:48"
+    },
+    {
+     "cue": "m27",
+     "seg": "S4",
+     "game": 2,
+     "t": 1187.23,
+     "area": "surface",
+     "wall": "2026-09-28 15:26:56"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 2,
+     "t": 1202.73,
+     "area": "surface",
+     "wall": "2026-09-28 15:27:12"
+    },
+    {
+     "cue": "m16",
+     "seg": "S4",
+     "game": 2,
+     "t": 1202.88,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:27:12"
+    },
+    {
+     "cue": "m24",
+     "seg": "S4",
+     "game": 2,
+     "t": 1222.64,
+     "area": "hushed_works",
+     "wall": "2026-09-28 15:27:32"
+    },
+    {
+     "cue": "m15",
+     "seg": "S4",
+     "game": 2,
+     "t": 1226.98,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 15:27:37"
+    },
+    {
+     "cue": "m04",
+     "seg": "S4",
+     "game": 2,
+     "t": 1239.57,
+     "area": "surface",
+     "wall": "2026-09-28 15:27:50"
+    }
+   ],
+   "deaths": 0,
+   "saves": 15,
+   "hp_min": 36.1,
+   "problems": [],
+   "result_file": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\s4\\s4_result.json"
+  },
+  {
+   "id": "END",
+   "title": "Relaunch + Continue check (free play resumes in the same save)",
+   "start": "2026-09-28 15:27:51",
+   "start_state": {
+    "area": "surface",
+    "zone": "haven",
+    "mode": "playing",
+    "pos": [
+     -2.0,
+     0.0,
+     5.0
+    ],
+    "hp": 72.6,
+    "food": {
+     "hearty_stew": 2,
+     "berry_snack": 9,
+     "roseberries": 1,
+     "pumpkin": 7,
+     "berries": 2,
+     "candy": 6
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [],
+    "ch2_done": 20,
+    "chapter2_finished": true,
+    "music": "m04",
+    "game": "g2"
+   },
+   "seconds": 12.4,
+   "end": "2026-09-28 15:28:04",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "surface",
+    "zone": "haven",
+    "mode": "playing",
+    "pos": [
+     -1.48,
+     0.0,
+     2.16
+    ],
+    "hp": 72.6,
+    "food": {
+     "hearty_stew": 2,
+     "berry_snack": 9,
+     "roseberries": 1,
+     "pumpkin": 7,
+     "berries": 2,
+     "candy": 6
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [],
+    "ch2_done": 20,
+    "chapter2_finished": true,
+    "music": "m02",
+    "game": "g3"
+   },
+   "checkpoints": [
+    {
+     "name": "relaunch_continue",
+     "ok": true,
+     "seconds": 4.3
+    }
+   ],
+   "screenshot_requests": {
+    "total": 1,
+    "ok": 1,
+    "failed": 0,
+    "labels": [
+     "END_before_quit"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m01",
+     "seg": "END",
+     "game": 3,
+     "t": 0.15,
+     "area": "",
+     "wall": "2026-09-28 15:27:57"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "END",
+     "game": 3,
+     "t": 0.28,
+     "area": "",
+     "wall": "2026-09-28 15:27:57"
+    },
+    {
+     "cue": "m02",
+     "seg": "END",
+     "game": 3,
+     "t": 1.63,
+     "area": "surface",
+     "wall": "2026-09-28 15:28:01"
+    }
+   ],
+   "deaths": 0,
+   "saves": 1,
+   "hp_min": 72.6,
+   "problems": [],
+   "result_file": null
+  }
+ ],
+ "home_rests": {
+  "T23": {
+   "hp_before": 92.0,
+   "food_before": {
+    "berry_snack": 2,
+    "pumpkin": 3,
+    "berries": 1
+   },
+   "slept": true,
+   "hp_after_sleep": 100.0,
+   "sleep_msgs": [
+    "journey saved"
+   ],
+   "harvest": {
+    "prompt": "Harvest Sunflax",
+    "ok": true,
+    "sweetroot": 0
+   },
+   "berries_picked": 14,
+   "hp_after": 100.0,
+   "food_after": {
+    "berry_snack": 5,
+    "pumpkin": 3,
+    "berries": 3
+   }
+  },
+  "T34": {
+   "hp_before": 78.0,
+   "food_before": {
+    "berry_snack": 5,
+    "roseberries": 1,
+    "pumpkin": 3,
+    "berries": 3
+   },
+   "slept": true,
+   "hp_after_sleep": 100.0,
+   "sleep_msgs": [
+    "journey saved"
+   ],
+   "berries_picked": 15,
+   "hp_after": 100.0,
+   "food_after": {
+    "berry_snack": 9,
+    "roseberries": 1,
+    "pumpkin": 3,
+    "berries": 2
+   }
+  }
+ },
+ "end_check": {
+  "saved_before_quit": true,
+  "quit": "pause menu: Quit Game -> Save & Quit",
+  "exited_by_itself": true,
+  "before": {
+   "area": "surface",
+   "inv": {
+    "bat_bunting": 2,
+    "berries": 2,
+    "berry_snack": 9,
+    "candy": 6,
+    "copper_ore": 1,
+    "copper_sword": 1,
+    "crescent_window": 1,
+    "fiber": 6,
+    "glowcap": 1,
+    "haven_banner": 1,
+    "hearty_stew": 2,
+    "iron_ore": 2,
+    "lantern": 1,
+    "lantern_wax": 4,
+    "moonpetal": 3,
+    "pumpkin": 7,
+    "pumpkin_seeds": 8,
+    "roseberries": 1,
+    "roseberry_seeds": 2,
+    "shiny_pebble": 1,
+    "stone": 1,
+    "stone_axe": 1,
+    "stone_pickaxe": 1,
+    "sugarcap": 3,
+    "sunflax": 5,
+    "sunflax_seeds": 5,
+    "sweetroot_seeds": 8,
+    "thread_veil": 1,
+    "wardlight": 1
+   },
+   "keys": {
+    "foreman_key": 1,
+    "garden_seal": 1,
+    "manor_seal": 1,
+    "quarry_seal": 1,
+    "velvet_scrap": 3
+   },
+   "pos": [
+    -2.0,
+    0.0,
+    5.0
+   ]
+  },
+  "continue_load_s": 4.3,
+  "after": {
+   "area": "surface",
+   "inv": {
+    "bat_bunting": 2,
+    "berries": 2,
+    "berry_snack": 9,
+    "candy": 6,
+    "copper_ore": 1,
+    "copper_sword": 1,
+    "crescent_window": 1,
+    "fiber": 6,
+    "glowcap": 1,
+    "haven_banner": 1,
+    "hearty_stew": 2,
+    "iron_ore": 2,
+    "lantern": 1,
+    "lantern_wax": 4,
+    "moonpetal": 3,
+    "pumpkin": 7,
+    "pumpkin_seeds": 8,
+    "roseberries": 1,
+    "roseberry_seeds": 2,
+    "shiny_pebble": 1,
+    "stone": 1,
+    "stone_axe": 1,
+    "stone_pickaxe": 1,
+    "sugarcap": 3,
+    "sunflax": 5,
+    "sunflax_seeds": 5,
+    "sweetroot_seeds": 8,
+    "thread_veil": 1,
+    "wardlight": 1
+   },
+   "keys": {
+    "foreman_key": 1,
+    "garden_seal": 1,
+    "manor_seal": 1,
+    "quarry_seal": 1,
+    "velvet_scrap": 3
+   },
+   "pos": [
+    -2.0,
+    0.0,
+    5.0
+   ],
+   "finished": true,
+   "chapter_two_complete": true,
+   "ch2_done": 20,
+   "tracker": {
+    "kind": "signpost",
+    "step": "opt_pumpkin_face",
+    "targets": [],
+    "title": "A Pumpkin With a Face"
+   }
+  },
+  "same_items": true,
+  "moved": true
+ },
+ "music_cue_changes": [
+  {
+   "cue": "m01",
+   "seg": "S1",
+   "game": 1,
+   "t": 0.15,
+   "area": "",
+   "wall": "2026-09-28 15:04:55",
+   "title": "A Little Light (safe)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S1",
+   "game": 1,
+   "t": 0.36,
+   "area": "",
+   "wall": "2026-09-28 15:04:55",
+   "title": ""
+  },
+  {
+   "cue": "m03",
+   "seg": "S1",
+   "game": 1,
+   "t": 1.7,
+   "area": "surface",
+   "wall": "2026-09-28 15:04:58",
+   "title": "Wood, Wool & Windows (safe)"
+  },
+  {
+   "cue": "m07",
+   "seg": "S1",
+   "game": 1,
+   "t": 60.46,
+   "area": "surface",
+   "wall": "2026-09-28 15:05:58",
+   "title": "Footpaths & Ferns (explore)"
+  },
+  {
+   "cue": "m15",
+   "seg": "S1",
+   "game": 1,
+   "t": 72.92,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:06:14",
+   "title": "Welcome to Lanternwake (safe)"
+  },
+  {
+   "cue": "m02",
+   "seg": "S1",
+   "game": 1,
+   "t": 86.02,
+   "area": "surface",
+   "wall": "2026-09-28 15:06:28",
+   "title": "Home in the Clearing (safe)"
+  },
+  {
+   "cue": "m16",
+   "seg": "S1",
+   "game": 1,
+   "t": 94.07,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:06:36",
+   "title": "Copper Leaves at Dusk (explore)"
+  },
+  {
+   "cue": "m01",
+   "seg": "S1",
+   "game": 2,
+   "t": 0.13,
+   "area": "",
+   "wall": "2026-09-28 15:06:47",
+   "title": "A Little Light (safe)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S1",
+   "game": 2,
+   "t": 0.28,
+   "area": "",
+   "wall": "2026-09-28 15:06:47",
+   "title": ""
+  },
+  {
+   "cue": "m16",
+   "seg": "S1",
+   "game": 2,
+   "t": 1.65,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:06:53",
+   "title": "Copper Leaves at Dusk (explore)"
+  },
+  {
+   "cue": "m17",
+   "seg": "S2",
+   "game": 2,
+   "t": 34.65,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:07:28",
+   "title": "Pumpkin Patch Parade (explore)"
+  },
+  {
+   "cue": "m22",
+   "seg": "S2",
+   "game": 2,
+   "t": 54.47,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:07:48",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m17",
+   "seg": "S2",
+   "game": 2,
+   "t": 70.48,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:08:04",
+   "title": "Pumpkin Patch Parade (explore)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S2",
+   "game": 2,
+   "t": 80.98,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:08:15",
+   "title": ""
+  },
+  {
+   "cue": "m22",
+   "seg": "S2",
+   "game": 2,
+   "t": 105.37,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:08:40",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m16",
+   "seg": "S2",
+   "game": 2,
+   "t": 107.58,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:08:43",
+   "title": "Copper Leaves at Dusk (explore)"
+  },
+  {
+   "cue": "m18",
+   "seg": "S2",
+   "game": 2,
+   "t": 175.61,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:09:51",
+   "title": "Stone Bells, Quiet Hills (explore)"
+  },
+  {
+   "cue": "m22",
+   "seg": "S2",
+   "game": 2,
+   "t": 185.23,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:10:01",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m15",
+   "seg": "S2",
+   "game": 2,
+   "t": 221.4,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:10:38",
+   "title": "Welcome to Lanternwake (safe)"
+  },
+  {
+   "cue": "m01",
+   "seg": "S2",
+   "game": 2,
+   "t": 228.78,
+   "area": "",
+   "wall": "2026-09-28 15:10:46",
+   "title": "A Little Light (safe)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S2",
+   "game": 2,
+   "t": 230.07,
+   "area": "",
+   "wall": "2026-09-28 15:10:47",
+   "title": ""
+  },
+  {
+   "cue": "m18",
+   "seg": "S2",
+   "game": 2,
+   "t": 231.42,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:10:49",
+   "title": "Stone Bells, Quiet Hills (explore)"
+  },
+  {
+   "cue": "m05",
+   "seg": "T23",
+   "game": 2,
+   "t": 250.47,
+   "area": "surface",
+   "wall": "2026-09-28 15:11:10",
+   "title": "Lanterns After Dark (safe)"
+  },
+  {
+   "cue": "m03",
+   "seg": "T23",
+   "game": 2,
+   "t": 282.23,
+   "area": "surface",
+   "wall": "2026-09-28 15:11:42",
+   "title": "Wood, Wool & Windows (safe)"
+  },
+  {
+   "cue": "m15",
+   "seg": "T23",
+   "game": 2,
+   "t": 287.4,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:11:47",
+   "title": "Welcome to Lanternwake (safe)"
+  },
+  {
+   "cue": "m20",
+   "seg": "S3",
+   "game": 2,
+   "t": 329.04,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:12:29",
+   "title": "The Empty Waltz (explore)"
+  },
+  {
+   "cue": "m22",
+   "seg": "S3",
+   "game": 2,
+   "t": 346.5,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:12:47",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m20",
+   "seg": "S3",
+   "game": 2,
+   "t": 363.11,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:13:04",
+   "title": "The Empty Waltz (explore)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S3",
+   "game": 2,
+   "t": 370.36,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:13:11",
+   "title": ""
+  },
+  {
+   "cue": "m20",
+   "seg": "S3",
+   "game": 2,
+   "t": 392.89,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:13:34",
+   "title": "The Empty Waltz (explore)"
+  },
+  {
+   "cue": "m21",
+   "seg": "S3",
+   "game": 2,
+   "t": 400.84,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:13:41",
+   "title": "A Midnight Invitation (boss)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S3",
+   "game": 2,
+   "t": 480.23,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:15:02",
+   "title": ""
+  },
+  {
+   "cue": "m20",
+   "seg": "S3",
+   "game": 2,
+   "t": 488.05,
+   "area": "moonveil_manor",
+   "wall": "2026-09-28 15:15:10",
+   "title": "The Empty Waltz (explore)"
+  },
+  {
+   "cue": "m02",
+   "seg": "T34",
+   "game": 2,
+   "t": 518.48,
+   "area": "surface",
+   "wall": "2026-09-28 15:15:41",
+   "title": "Home in the Clearing (safe)"
+  },
+  {
+   "cue": "m16",
+   "seg": "T34",
+   "game": 2,
+   "t": 562.06,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:16:25",
+   "title": "Copper Leaves at Dusk (explore)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 2,
+   "t": 619.26,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:17:23",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 2,
+   "t": 627.38,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:17:31",
+   "title": ""
+  },
+  {
+   "cue": "m22",
+   "seg": "S4",
+   "game": 2,
+   "t": 636.42,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:17:41",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 2,
+   "t": 640.04,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:17:44",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "m24",
+   "seg": "S4",
+   "game": 2,
+   "t": 678.4,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:18:23",
+   "title": "A Pocket of Day (safe)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 2,
+   "t": 703.65,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:18:48",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 2,
+   "t": 706.41,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:18:51",
+   "title": ""
+  },
+  {
+   "cue": "m22",
+   "seg": "S4",
+   "game": 2,
+   "t": 761.89,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:19:47",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 2,
+   "t": 769.53,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:19:55",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 2,
+   "t": 833.66,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:20:59",
+   "title": ""
+  },
+  {
+   "cue": "m25",
+   "seg": "S4",
+   "game": 2,
+   "t": 841.44,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:21:07",
+   "title": "No Thread Left Unseen (boss)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 2,
+   "t": 905.52,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:22:11",
+   "title": ""
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 2,
+   "t": 918.58,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:22:25",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 2,
+   "t": 932.96,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:22:39",
+   "title": ""
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 2,
+   "t": 965.12,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:23:11",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "m26",
+   "seg": "S4",
+   "game": 2,
+   "t": 969.59,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:23:16",
+   "title": "The Borrowed Welcome (boss)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 2,
+   "t": 1149.51,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:26:18",
+   "title": ""
+  },
+  {
+   "cue": "m15",
+   "seg": "S4",
+   "game": 2,
+   "t": 1165.73,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:26:34",
+   "title": "Welcome to Lanternwake (safe)"
+  },
+  {
+   "cue": "m04",
+   "seg": "S4",
+   "game": 2,
+   "t": 1179.11,
+   "area": "surface",
+   "wall": "2026-09-28 15:26:48",
+   "title": "Berry Tea Afternoon (safe)"
+  },
+  {
+   "cue": "m27",
+   "seg": "S4",
+   "game": 2,
+   "t": 1187.23,
+   "area": "surface",
+   "wall": "2026-09-28 15:26:56",
+   "title": "Every Road Leads Home (ending)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 2,
+   "t": 1202.73,
+   "area": "surface",
+   "wall": "2026-09-28 15:27:12",
+   "title": ""
+  },
+  {
+   "cue": "m16",
+   "seg": "S4",
+   "game": 2,
+   "t": 1202.88,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:27:12",
+   "title": "Copper Leaves at Dusk (explore)"
+  },
+  {
+   "cue": "m24",
+   "seg": "S4",
+   "game": 2,
+   "t": 1222.64,
+   "area": "hushed_works",
+   "wall": "2026-09-28 15:27:32",
+   "title": "A Pocket of Day (safe)"
+  },
+  {
+   "cue": "m15",
+   "seg": "S4",
+   "game": 2,
+   "t": 1226.98,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 15:27:37",
+   "title": "Welcome to Lanternwake (safe)"
+  },
+  {
+   "cue": "m04",
+   "seg": "S4",
+   "game": 2,
+   "t": 1239.57,
+   "area": "surface",
+   "wall": "2026-09-28 15:27:50",
+   "title": "Berry Tea Afternoon (safe)"
+  },
+  {
+   "cue": "m01",
+   "seg": "END",
+   "game": 3,
+   "t": 0.15,
+   "area": "",
+   "wall": "2026-09-28 15:27:57",
+   "title": "A Little Light (safe)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "END",
+   "game": 3,
+   "t": 0.28,
+   "area": "",
+   "wall": "2026-09-28 15:27:57",
+   "title": ""
+  },
+  {
+   "cue": "m02",
+   "seg": "END",
+   "game": 3,
+   "t": 1.63,
+   "area": "surface",
+   "wall": "2026-09-28 15:28:01",
+   "title": "Home in the Clearing (safe)"
+  }
+ ],
+ "script_errors": {
+  "total": 0,
+  "unique": []
+ },
+ "warnings": {
+  "total": 0,
+  "sample": []
+ },
+ "screenshot_requests": {
+  "total": 122,
+  "ok": 121,
+  "failed": 1
+ },
+ "focus_report": {
+  "telemetry_frames": 13182,
+  "frames_focused": 0,
+  "frames_mouse_captured": 0
+ },
+ "notes": [
+  "S2 Warden: fight 31.9 s, exposures=3 damage/exposure=[105.0, 105.0, 81.2] pulses_fired=3 charges={'pillar': 3} hits_taken=0 deaths=0 climbs=0",
+  "S3 Velour: hp_min=78.0 eats=0 deaths=0 phases=[1, 2, 3]"
+ ],
+ "processes": [
+  {
+   "name": "g1",
+   "port": 9700,
+   "cmd": [
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\qa_exe\\Hollowhaven.exe",
+    "--windowed",
+    "--position",
+    "1920,0",
+    "--resolution",
+    "1920x1080",
+    "--log-file",
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\g1_godot.log",
+    "--",
+    "--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/g1_telemetry.jsonl",
+    "--qa-interval=0.1",
+    "--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/saves",
+    "--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/qa_settings.cfg",
+    "--qa-input-port=9700",
+    "--qa-no-focus",
+    "--no-focus-pause",
+    "--max-seconds=4800",
+    "--qa-window=1920,0,1920,1080"
+   ],
+   "godot_log": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\g1_godot.log"
+  },
+  {
+   "name": "g2",
+   "port": 9701,
+   "cmd": [
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\qa_exe\\Hollowhaven.exe",
+    "--windowed",
+    "--position",
+    "1920,0",
+    "--resolution",
+    "1920x1080",
+    "--log-file",
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\g2_godot.log",
+    "--",
+    "--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/g2_telemetry.jsonl",
+    "--qa-interval=0.1",
+    "--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/saves",
+    "--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/qa_settings.cfg",
+    "--qa-input-port=9701",
+    "--qa-no-focus",
+    "--no-focus-pause",
+    "--max-seconds=4800",
+    "--qa-window=1920,0,1920,1080"
+   ],
+   "godot_log": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\g2_godot.log"
+  },
+  {
+   "name": "g3",
+   "port": 9702,
+   "cmd": [
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\qa_exe\\Hollowhaven.exe",
+    "--windowed",
+    "--position",
+    "1920,0",
+    "--resolution",
+    "1920x1080",
+    "--log-file",
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\g3_godot.log",
+    "--",
+    "--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/g3_telemetry.jsonl",
+    "--qa-interval=0.1",
+    "--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/saves",
+    "--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/native_202_visible/qa_settings.cfg",
+    "--qa-input-port=9702",
+    "--qa-no-focus",
+    "--no-focus-pause",
+    "--max-seconds=4800",
+    "--qa-window=1920,0,1920,1080"
+   ],
+   "godot_log": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\native_202_visible\\g3_godot.log"
+  }
+ ]
+}

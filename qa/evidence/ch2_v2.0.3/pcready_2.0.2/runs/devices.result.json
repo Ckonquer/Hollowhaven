@@ -1,0 +1,128 @@
+{
+ "variant": "devices",
+ "engine_args": [
+  "--verbose",
+  "--log-file",
+  "C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/pcready/runs/devices/godot.log"
+ ],
+ "window": [
+  1280,
+  720
+ ],
+ "preset": null,
+ "settings_file_existed": false,
+ "exe_copy": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\pcready\\runs\\devices\\qa_exe\\Hollowhaven.exe",
+ "t_start": "2026-09-28 15:05:14",
+ "seconds_to_title": 3.2,
+ "title_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit"
+ ],
+ "title_mode_reached": true,
+ "env_at_title": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "1.4.329",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "env_last": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "1.4.329",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "final_mode": "title",
+ "final_area": "",
+ "appearance": {
+  "back": "satchel",
+  "eyes": "eye_1",
+  "hair": "side_braid",
+  "hair_acc": "flower_clip",
+  "hair_color": "auburn",
+  "hat": "",
+  "lower": "explorer_trousers",
+  "outfit": "cozy_explorer",
+  "palette": {
+   "accent": "plum",
+   "primary": "teal",
+   "secondary": "sunflower"
+  },
+  "shoes": "explorer_boots",
+  "skin": "skin_2",
+  "upper": "explorer_jacket"
+ },
+ "mem_all": {
+  "private_mb_max": 1377.7,
+  "ws_mb_max": 759.4,
+  "peak_ws_mb": 766.3
+ },
+ "exit_code_before_stop": null,
+ "seconds_total": 5.0,
+ "focus_watchdog": {
+  "checks": 19,
+  "game_had_focus": 0,
+  "handed_back": 0
+ },
+ "settings_file_final": null,
+ "log_lines": 514,
+ "log_header": [
+  "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org",
+  "Accessibility: AccessKit driver loaded.",
+  "   at: _debug_messenger_callback (drivers/vulkan/rendering_context_driver_vulkan.cpp:654)",
+  "   at: _debug_messenger_callback (drivers/vulkan/rendering_context_driver_vulkan.cpp:654)",
+  "Optional Vulkan device extension VK_EXT_fragment_density_map not found",
+  "Optional Vulkan device extension VK_EXT_fragment_density_map2 not found",
+  "Optional Vulkan device extension VK_QCOM_fragment_density_map_offset not found",
+  "Optional Vulkan device extension VK_EXT_astc_decode_mode not found",
+  "Optional Vulkan device extension VK_EXT_texture_compression_astc_hdr not found",
+  "Optional Vulkan device extension VK_NV_ray_tracing_validation not found",
+  "Optional Vulkan device extension VK_KHR_external_memory_fd not found",
+  "Optional Vulkan device extension VK_EXT_debug_marker not found",
+  "- Vulkan Fragment Shading Rate supported:",
+  "- Vulkan Fragment Density Map not supported",
+  "- Vulkan multiview supported:",
+  "- Vulkan subgroup:",
+  "- Vulkan Acceleration Structure supported",
+  "- Vulkan Raytracing supported",
+  "Vulkan 1.4.329 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4090",
+  "Using \"winink\" pen tablet driver..."
+ ],
+ "log_errors": [
+  "WARNING: GENERAL - Message Id Number: 0 | Message Id Name: Loader Message",
+  "WARNING: GENERAL - Message Id Number: 0 | Message Id Name: Loader Message"
+ ],
+ "log_error_count": 0,
+ "log_warning_count": 2
+}

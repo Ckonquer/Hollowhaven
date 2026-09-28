@@ -1,0 +1,240 @@
+0.15 [music] m01
+8.74 [music] 
+9.84 [hint] quest_wake: Move with {move} and look with the mouse. Walk up to the Ward Stone and press {interact} to read it.
+9.84 [quest] optional completed opt_look_of_your_own
+9.84 [notify] quest: Optional goal complete: A Look of Your Own
+9.84 [notify] info: Your wardrobe is always open at a mirror.
+10.35 [music] m04
+10.73 [discover] surface:haven
+10.96 [hint] intro_move: Move with {move}. Hold {sprint} to sprint. Press {help} any time to see all controls.
+14.2 [saved] journey saved
+16.86 [say] Ward Stone: Light kept, home kept. The seed sleeps below; the stone remembers.
+16.86 [quest] completed wake
+16.86 [notify] quest: Goal complete: A Dim Haven
+16.86 [hint] quest_gather_basics: Press {interact} to pick up sticks and stones, and to pull tall grass for fiber.
+16.86 [notify] quest: New goal: Gather Supplies
+21.29 [saved] journey saved
+22.97 [say] Ward Stone: Welcome, Krystal. This haven has waited a long time for someone to love it.
+36.79 [notify] success: Gathering mastery rank 1! Gathering takes 5% less effort.
+52.74 [music] m08
+57.79 [quest] completed gather_basics
+57.79 [notify] quest: Goal complete: Gather Supplies
+57.79 [hint] quest_craft_axe: Press {craft} to open crafting. Select the Stone Axe and press Craft.
+57.79 [notify] quest: New goal: A Proper Tool
+65.37 [saved] journey saved
+67.43 [quest] completed craft_axe
+67.43 [notify] quest: Goal complete: A Proper Tool
+67.43 [hint] quest_chop: Face a tree and press {attack} to chop it. Your axe is used automatically.
+67.43 [notify] quest: New goal: Timber!
+69.47 [saved] journey saved
+80.09 [quest] completed chop
+80.09 [notify] quest: Goal complete: Timber!
+80.09 [hint] quest_workbench: Craft a Workbench, then press {build} to enter build mode. Place it inside the Haven.
+80.09 [notify] quest: New goal: A Place to Work
+102.6 [saved] journey saved
+117.94 [hint] build_controls: Place with {attack}. R rotates, X takes a piece apart (full refund). Mouse wheel or 1-8 picks a piece. {build} or Esc to finish.
+117.94 [hint] build_controls_ch2: Z undoes your last piece (press twice). P recolours the piece you point at with dyes from the Loom. Stairs lead up to upper floors, held up by walls or porch posts.
+118.07 [quest] completed workbench
+118.07 [notify] quest: Goal complete: A Place to Work
+118.07 [hint] quest_mochi: Pick berries from bushes with {interact}. Approach the creature slowly and offer 3 berries.
+118.07 [notify] quest: New goal: A Timid Friend
+119.02 [saved] journey saved
+124.51 [discover] surface:old_oak
+126.81 [notify] success: Inside: plans for a loom, a ribbon bow pattern and a pouch of sunflax seeds. You can build a Loom now.
+126.81 [say] : Pinned inside the lid: "For whoever follows my ribbons - may your stitches stay straight. A loom is only wood and patience."
+126.81 [hint] c1x_loom: The Loom turns sunflax and fiber into woven cloth. Find it in your workbench recipes.
+126.81 [quest] optional completed opt_tailors_cache
+126.81 [notify] quest: Optional goal complete: The Tailor's Cache
+126.81 [notify] info: The cache held cloth and a loom pattern.
+133.91 [saved] journey saved
+137.97 [music] m02
+141.97 [notify] success: Wayfinding mastery rank 1! Sprinting costs 5% less stamina.
+141.97 [discover] surface:glade
+146.12 [notify] success: Gathering mastery rank 2! 5% chance of an extra material.
+157.62 [quest] completed mochi
+157.62 [notify] quest: Goal complete: A Timid Friend
+157.62 [notify] info: Mochi dug up a little pouch of Sweetroot Seeds for you!
+157.62 [hint] quest_pebble: Craft a Stone Pickaxe. Mine rocks and ore with {attack}.
+157.62 [notify] quest: New goal: Something Stuck
+159.13 [say] Mochi: Mochi nibbles a berry, then bumps its cap against your boot. You've made a friend!
+160.96 [saved] journey saved
+161.51 [music] m07
+181.29 [music] m03
+186.74 [discover] surface:quarry
+191.21 [caption] [the boulder grumbles]
+193.96 [quest] completed pebble
+193.96 [notify] quest: Goal complete: Something Stuck
+193.96 [notify] info: Pebble shows you where the best copper veins are.
+193.96 [hint] quest_home: Build a Cozy Bed and a Crop Plot. Select seeds on your hotbar and press {interact} on the plot to plant them.
+193.96 [notify] quest: New goal: Make It Home
+195.57 [say] Pebble: The boulder cracks apart and a little stone creature tumbles out. It salutes you with great seriousness. Pebble has joined you!
+202.65 [music] m08
+203.6 [say] Pebble: Pebble headbutts the rock! Extra stone!
+213.43 [saved] journey saved
+246.48 [say] Pebble: Pebble found a shiny pebble just for you.
+257.88 [music] m04
+278.88 [music] m07
+291.11 [notify] success: Hearthcraft mastery rank 1! Recipe: Crescent Window.
+296.82 [hint] build_controls: Place with {attack}. R rotates, X takes a piece apart (full refund). Mouse wheel or 1-8 picks a piece. {build} or Esc to finish.
+296.82 [hint] build_controls_ch2: Z undoes your last piece (press twice). P recolours the piece you point at with dyes from the Loom. Stairs lead up to upper floors, held up by walls or porch posts.
+299.12 [music] m02
+300.34 [hint] build_controls: Place with {attack}. R rotates, X takes a piece apart (full refund). Mouse wheel or 1-8 picks a piece. {build} or Esc to finish.
+300.34 [hint] build_controls_ch2: Z undoes your last piece (press twice). P recolours the piece you point at with dyes from the Loom. Stairs lead up to upper floors, held up by walls or porch posts.
+301.36 [say] Mochi: Mochi pats the new cozy bed approvingly.
+301.89 [notify] info: Planted Sunflax Seeds.
+301.89 [hint] farming_growth: Crops grow as time passes. A friend at home will tend them so they grow faster.
+301.89 [quest] completed home
+301.89 [notify] quest: Goal complete: Make It Home
+301.89 [notify] info: Sleeping in your bed sets your return point and saves your journey.
+301.89 [hint] quest_lumi: A Copper Sword makes fighting easier. Enemies wiggle before they attack. Press {dodge} to roll away.
+301.89 [notify] quest: New goal: Lights in the Ruin
+311.91 [saved] journey saved
+335.49 [notify] bond: Pebble's bond grew! (1/5)
+335.49 [discover] surface:ruin
+335.99 [say] Pebble: Pebble growls a tiny gravelly growl.
+336.77 [skill] pebble: stoneheart
+337.47 [music] m10
+357.94 [music] m08
+359.09 [quest] completed lumi
+359.09 [notify] quest: Goal complete: Lights in the Ruin
+359.09 [hint] quest_prepare: Craft a Lantern at the Workbench and press {lantern} to raise it. Cook or craft healing food.
+359.09 [notify] quest: New goal: The Ward Remembers
+360.39 [say] Lumi: The little light creeps out of the ruin and settles beside you, glowing warmly. Lumi trusts you now.
+362.42 [saved] journey saved
+375.55 [say] Ward Stone: Its heart was taken to the deep. What took it still weaves in the dark.
+375.55 [quest] completed prepare
+375.55 [notify] quest: Goal complete: The Ward Remembers
+375.55 [hint] quest_descend: Clear the rubble with your pickaxe. You can adjust horror comfort settings any time from the pause menu.
+375.55 [notify] quest: New goal: The Hollow Mine
+383.21 [say] Ward Stone: Carry light. Carry friends. Come home.
+383.82 [saved] journey saved
+386.22 [music] m03
+414.61 [notify] success: Hearthcraft mastery rank 2! Recipe: Gothic Porch Trim.
+415.64 [say] Mochi: Mochi curls up for a little nap in the sun.
+419.38 [hint] build_controls: Place with {attack}. R rotates, X takes a piece apart (full refund). Mouse wheel or 1-8 picks a piece. {build} or Esc to finish.
+419.38 [hint] build_controls_ch2: Z undoes your last piece (press twice). P recolours the piece you point at with dyes from the Loom. Stairs lead up to upper floors, held up by walls or porch posts.
+421.04 [hint] loom_crafting: Weave cloth, sew clothing patterns and mix dyes at the Loom. A pattern or dye is yours forever once made.
+425.7 [say] Pebble: Pebble knocks on the new loom & dye bench. Solid.
+427.35 [say] Mochi: Mochi holds very still while you tie the ribbon, then keeps peeking at it.
+428.15 [say] Mochi: Mochi bounces along behind Krystal.
+429.12 [saved] journey saved
+448.52 [say] Mochi: Mochi stops at the mine's mouth and trembles. It will wait for you here.
+449.05 [discover] surface:mine_mouth
+450.12 [say] Mochi: Mochi checks its ribbon. Then it takes one very brave little step.
+450.12 [quest] optional completed opt_brave_little_steps
+450.12 [notify] quest: Optional goal complete: Brave Little Steps
+450.12 [notify] info: Mochi feels brave enough to follow you underground.
+450.79 [music] m07
+458.85 [notify] quest: The way into the Hollow Mine is clear.
+462.55 [quest] completed descend
+462.55 [notify] quest: Goal complete: The Hollow Mine
+462.55 [hint] quest_old_mine: Light lanterns on the walls with {interact} to save and set your return point.
+462.55 [notify] quest: New goal: The Old Mine
+463.5 [hint] below_lantern: It's dark down here. Press {lantern} to raise your lantern.
+463.5 [music] m11
+463.52 [notify] bond: Mochi's bond grew! (1/5)
+463.52 [notify] success: Wayfinding mastery rank 2! The map remembers where you gathered special materials.
+463.52 [discover] below:mine
+464.11 [saved] journey saved
+466.86 [saved] journey saved
+466.86 [notify] success: Lantern lit - progress saved
+472.94 [caption] [timbers creak, somewhere down the dark passage]
+472.94 [say] Mochi: Mochi hides behind you, trembling.
+473.12 [music] 
+493.62 [saved] journey saved
+493.62 [notify] success: Lantern lit - progress saved
+498.11 [notify] item: Obtained: Foreman's Key
+498.11 [say] : A heavy iron key, stamped with a pickaxe. It's still warm from the lamp.
+498.11 [quest] completed old_mine
+498.11 [notify] quest: Goal complete: The Old Mine
+498.11 [notify] quest: New goal: Deeper Still
+498.97 [say] The Foreman's Order: The lower gate stays LOCKED. Nobody goes below after the bell. Something down there has learned our voices. If you hear a friend calling from the dark, do not answer. Look for your own light. I'm keeping the key.
+504.04 [caption] [the lock turns with a heavy clunk]
+505.17 [music] m11
+506.96 [discover] below:ruins
+511.99 [caption] [something skitters past the far doorway]
+512.11 [music] 
+515.79 [say] Mochi: Mochi squeaks and ducks behind Krystal.
+530.57 [caption] [a familiar chime... played backwards]
+533.89 [saved] journey saved
+533.89 [notify] success: Lantern lit - progress saved
+537.79 [discover] below:silk
+538.36 [caption] [something shifts in the silk]
+538.36 [quest] completed deeper
+538.36 [notify] quest: Goal complete: Deeper Still
+538.36 [hint] quest_silk: Light drives it back. Listen for the rattle before it strikes.
+538.36 [notify] quest: New goal: The Silk Hollows
+540.34 [caption] [it slips away into the dark above]
+540.34 [hint] silk_light: It shrinks from your light.
+549.97 [saved] journey saved
+549.97 [notify] success: Lantern lit - progress saved
+552.37 [notify] bond: Mochi's bond grew! (2/5)
+552.37 [discover] below:boss
+553.29 [music] m13
+553.29 [caption] [a piercing shriek echoes through the chamber]
+553.29 [hint] boss_braziers: Light the braziers with {interact} to burn it off the ceiling. Your Lantern can kindle them.
+556.94 [caption] [the brazier roars to life]
+556.94 [caption] [it shrieks as the light scorches it]
+557.54 [hint] boss_scorched: The light burned it off the ceiling! Strike while it's stunned!
+559.92 [caption] [the Matron shrieks; silk begins to fall]
+559.92 [hint] boss_phase2: The floor is turning to web! Step out of the pale wedges, and cut or burn the trip-lines.
+566.04 [caption] [silk hisses down from above]
+566.04 [hint] boss_fan: A pale wedge marks where it will spin a web sheet. Step out of the wedge - the sheet only slows you.
+570.25 [caption] [Krystal tears free of the silk]
+574.07 [caption] [a dry rattle overhead]
+575.75 [hint] boss_stuck: It's stuck! Strike now with {attack}!
+575.99 [say] Mochi: Mochi squeaks and ducks behind Krystal.
+581.14 [caption] [egg sacs along the wall begin to shake]
+581.14 [hint] boss_sacs: Something is about to hatch at the edge of the chamber. Pop the shaking sacs with {attack}, or get ready.
+586.62 [caption] [threads twang taut across the floor]
+586.62 [hint] boss_tripline: Trip-lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over.
+589.9 [hint] tell_brood_skitter_leap: Draws in tight and a small mark appears on the ground, then a short leap onto the mark.
+589.9 [caption] [something skitters and tenses]
+592.0 [caption] [a dry rattle overhead]
+593.69 [hint] boss_stuck: It's stuck! Strike now with {attack}!
+595.17 [caption] [the Matron's shriek turns desperate]
+595.17 [hint] boss_phase3: Braziers can now be stoked again once their ring glows. Don't let it smother one!
+601.14 [caption] [silk hisses down from above]
+601.14 [hint] boss_fan: A pale wedge marks where it will spin a web sheet. Step out of the wedge - the sheet only slows you.
+603.17 [caption] [a slow, deliberate rattle overhead]
+605.05 [hint] boss_stuck: It's stuck! Strike now with {attack}!
+606.47 [caption] [the brazier roars to life]
+606.47 [caption] [it shrieks as the light scorches it]
+611.34 [caption] [the brazier flares up]
+611.34 [caption] [it shrieks as the light scorches it]
+611.94 [hint] boss_scorched: The light burned it off the ceiling! Strike while it's stunned!
+614.2 [caption] [the Weaver shrieks and flees into the deep]
+618.32 [music] 
+619.99 [notify] item: Obtained: The Heartseed
+619.99 [caption] [a warm heartbeat]
+619.99 [quest] completed silk
+619.99 [notify] quest: Goal complete: The Silk Hollows
+619.99 [notify] quest: New goal: Bring Back the Light
+622.77 [caption] [the old lift groans and begins to rise]
+625.7 [say] Mochi: Mochi squeaks and ducks behind Krystal.
+626.9 [say] : Warm air drifts down from the surface. The way home is open.
+630.09 [saved] journey saved
+636.82 [music] m08
+648.62 [music] m14
+648.62 [caption] [The Ward Stone hums, warm and bright]
+648.62 [quest] completed return
+648.62 [notify] quest: Goal complete: Bring Back the Light
+648.62 [notify] info: The Haven is safe. New recipe: Heartbloom Lamp.
+648.62 [notify] quest: New goal: Krystal's Haven
+658.63 [say] Mochi: Mochi spins in circles, spores sparkling!
+676.6 [say] Pebble: Pebble adds a stone to its cairn with great ceremony.
+703.72 [music] 
+703.72 [music] m07
+704.24 [saved] journey saved
+706.14 [saved] journey saved
+707.26 [say] Ward Stone: A light well kept reaches farther than its keeper knows. There are lanterns beyond these woods. Tonight, one has answered.
+707.46 [say] Ward Stone: Your hearth is safe. No road you follow shall unmake it.
+707.46 [quest] ch2 started ch2_light_beyond
+707.46 [quest] ch2 completed ch2_light_beyond
+707.46 [notify] quest: Goal complete: A Light Beyond
+707.46 [notify] info: An old trail glimmers north of the Moonlit Ruin. Everything you won here stays won.
+707.46 [quest] ch2 started ch2_waygate
+707.46 [hint] quest_ch2_waygate: Bring wood, stone and copper ore to the waygate and press {interact} to repair it.
+707.46 [notify] quest: New goal: The Hallowmere Way
+710.92 [saved] journey saved
+713.06 [saved] journey saved

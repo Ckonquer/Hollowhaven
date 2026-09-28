@@ -1,0 +1,90 @@
+﻿2026-09-28 15:15:26.146   Log opened. (Time zone: UTC-04:00)
+2026-09-28 15:15:26.146   Setup version: Inno Setup version 6.7.3
+2026-09-28 15:15:26.146   Original Setup EXE: C:\Users\Ali\Desktop\Hollowhaven\dist\Hollowhaven-Setup-2.0.2.exe
+2026-09-28 15:15:26.146   Setup command line: /SL5="$94E08B0,103047324,893440,C:\Users\Ali\Desktop\Hollowhaven\dist\Hollowhaven-Setup-2.0.2.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOICONS /MERGETASKS="!desktopicon" /LOG="C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\logs\t5b_upgrade_to_202.log" 
+2026-09-28 15:15:26.146   Windows version: 10.0.26200
+2026-09-28 15:15:26.146   Windows architecture: x64 (64-bit)
+2026-09-28 15:15:26.146   Machine types supported by system: x86 x64
+2026-09-28 15:15:26.146   User privileges: None
+2026-09-28 15:15:26.214   Administrative install mode: No
+2026-09-28 15:15:26.214   Install mode root key: HKEY_CURRENT_USER
+2026-09-28 15:15:26.214   64-bit install mode: Yes
+2026-09-28 15:15:26.214   RedirectionGuard status for current process: Enabled in enforcing mode
+2026-09-28 15:15:26.216   Created temporary directory: C:\Users\Ali\AppData\Local\Temp\is-TV58N88IJ8.tmp
+2026-09-28 15:15:26.342   Found 1 files to register with RestartManager.
+2026-09-28 15:15:26.342   Calling RestartManager's RmGetList.
+2026-09-28 15:15:26.400   RmGetList finished successfully.
+2026-09-28 15:15:26.400   RestartManager found no applications using one of our files.
+2026-09-28 15:15:26.405   Starting the installation process.
+2026-09-28 15:15:26.407   Directory for uninstall files: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up
+2026-09-28 15:15:26.407   Will append to existing uninstall log: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\unins000.dat
+2026-09-28 15:15:26.410   -- File entry --
+2026-09-28 15:15:26.410   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\unins000.exe
+2026-09-28 15:15:26.410   Non-default bitness: 32-bit
+2026-09-28 15:15:26.413   Time stamp of our file: 2026-09-28 15:15:25.947
+2026-09-28 15:15:26.413   Dest file exists.
+2026-09-28 15:15:26.413   Time stamp of existing file: 2026-09-28 15:15:18.295
+2026-09-28 15:15:26.413   Version of our file: 51.1054.0.0
+2026-09-28 15:15:26.415   Version of existing file: 51.1054.0.0
+2026-09-28 15:15:26.415   Installing the file.
+2026-09-28 15:15:26.471   Leaving temporary file in place for now.
+2026-09-28 15:15:26.471   -- File entry --
+2026-09-28 15:15:26.471   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\Chapter Two - What's New.txt
+2026-09-28 15:15:26.471   Time stamp of our file: 2026-09-28 10:31:16.000
+2026-09-28 15:15:26.471   Dest file exists.
+2026-09-28 15:15:26.472   Time stamp of existing file: 2026-09-28 10:31:16.000
+2026-09-28 15:15:26.472   Installing the file.
+2026-09-28 15:15:26.477   Successfully installed the file.
+2026-09-28 15:15:26.477   -- File entry --
+2026-09-28 15:15:26.477   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\Hollowhaven.exe
+2026-09-28 15:15:26.477   Time stamp of our file: 2026-09-28 14:12:08.000
+2026-09-28 15:15:26.477   Dest file exists.
+2026-09-28 15:15:26.478   Time stamp of existing file: 2026-09-28 14:12:08.000
+2026-09-28 15:15:26.478   Installing the file.
+2026-09-28 15:15:31.599   Successfully installed the file.
+2026-09-28 15:15:31.599   -- File entry --
+2026-09-28 15:15:31.599   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\How to Play.txt
+2026-09-28 15:15:31.599   Time stamp of our file: 2026-09-28 10:31:24.000
+2026-09-28 15:15:31.599   Dest file exists.
+2026-09-28 15:15:31.599   Time stamp of existing file: 2026-09-28 10:31:24.000
+2026-09-28 15:15:31.599   Installing the file.
+2026-09-28 15:15:31.604   Successfully installed the file.
+2026-09-28 15:15:31.604   -- File entry --
+2026-09-28 15:15:31.604   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\Licenses\Godot_Engine_Licenses.txt
+2026-09-28 15:15:31.605   Time stamp of our file: 2026-09-28 14:12:10.000
+2026-09-28 15:15:31.605   Dest file exists.
+2026-09-28 15:15:31.605   Time stamp of existing file: 2026-09-28 14:12:10.000
+2026-09-28 15:15:31.605   Installing the file.
+2026-09-28 15:15:31.613   Successfully installed the file.
+2026-09-28 15:15:31.613   -- File entry --
+2026-09-28 15:15:31.613   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\Licenses\OFL-Fredoka.txt
+2026-09-28 15:15:31.613   Time stamp of our file: 2026-09-27 15:32:32.000
+2026-09-28 15:15:31.613   Dest file exists.
+2026-09-28 15:15:31.613   Time stamp of existing file: 2026-09-27 15:32:32.000
+2026-09-28 15:15:31.613   Installing the file.
+2026-09-28 15:15:31.617   Successfully installed the file.
+2026-09-28 15:15:31.617   -- File entry --
+2026-09-28 15:15:31.617   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\Licenses\OFL-Nunito.txt
+2026-09-28 15:15:31.618   Time stamp of our file: 2026-09-27 15:32:32.000
+2026-09-28 15:15:31.618   Dest file exists.
+2026-09-28 15:15:31.618   Time stamp of existing file: 2026-09-27 15:32:32.000
+2026-09-28 15:15:31.618   Installing the file.
+2026-09-28 15:15:31.623   Successfully installed the file.
+2026-09-28 15:15:31.623   -- File entry --
+2026-09-28 15:15:31.623   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\Licenses\THIRD_PARTY_NOTICES.txt
+2026-09-28 15:15:31.623   Time stamp of our file: 2026-09-28 10:32:00.000
+2026-09-28 15:15:31.623   Dest file exists.
+2026-09-28 15:15:31.623   Time stamp of existing file: 2026-09-28 10:32:00.000
+2026-09-28 15:15:31.624   Installing the file.
+2026-09-28 15:15:31.627   Successfully installed the file.
+2026-09-28 15:15:31.627   Saving uninstall information.
+2026-09-28 15:15:31.627   Renaming uninstaller.
+2026-09-28 15:15:31.630   Deleting uninstall key left over from previous non administrative install.
+2026-09-28 15:15:31.630   Creating new uninstall key: HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6FD89CDE-658C-4364-8ACE-AC51476C639C}_is1
+2026-09-28 15:15:31.630   Writing uninstall key values.
+2026-09-28 15:15:31.631   Detected previous administrative 64-bit install? No
+2026-09-28 15:15:31.631   Detected previous administrative 32-bit install? No
+2026-09-28 15:15:31.635   Installation process succeeded.
+2026-09-28 15:15:31.635   Need to restart Windows? No
+2026-09-28 15:15:31.644   Deinitializing Setup.
+2026-09-28 15:15:31.657   Log closed.

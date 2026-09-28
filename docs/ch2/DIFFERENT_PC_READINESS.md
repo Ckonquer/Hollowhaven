@@ -405,6 +405,12 @@ Suggested evidence to keep (copy to `qa/evidence/pcready_2.0.2/`): `qa/tmp/pcrea
   (`DisplayServer.window_get_current_screen()`) is **1** for all 1920x1080 probes and **0** for all smaller windows,
   and on this PC Windows enumerates DISPLAY2 before DISPLAY1. So the index alone does not show that every window was
   on DISPLAY2; the cause is not established. Only "never focused" (the watchdog) is measured.
+  **Correction (later on 2026-09-28):** the telemetry *did* log the window position (`window_pos`). Every 1920x1080 probe here
+  (a_default, b_d3d12, c_compat, c2_angle, e1-e7, f1, f2, g1, g2) sat at [0, 0] - on the owner's **primary** monitor - and every
+  smaller window at [1920, 0] as asked. The same happened to the visible native Chapter Two chain run (15:04-15:28, with sound).
+  None of them took keyboard focus, which is why the watchdog saw nothing. Why Windows placed them there is not established; the fix (`bb79708`: rect 8 px inside the live
+  second monitor, refuse any rect not fully on a non-primary monitor, the watchdog moves / kills a window on the primary monitor):
+  `QA_REPORT.md` §13.6; per-run positions: `qa/evidence/ch2_v2.0.3/incident_primary_monitor/window_positions.txt`.
 * The real default **fullscreen** first start. QA always runs windowed on the second monitor.
 * A PC that **truly** lacks Vulkan / D3D12. Both were simulated per process: the Vulkan loader was pointed at no
   driver, and a stub `d3d12.dll` was used. Real old drivers can also fail differently, for example by crashing

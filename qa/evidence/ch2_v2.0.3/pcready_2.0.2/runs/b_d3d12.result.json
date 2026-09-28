@@ -1,0 +1,280 @@
+{
+ "variant": "b_d3d12",
+ "engine_args": [
+  "--rendering-driver",
+  "d3d12",
+  "--log-file",
+  "C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/pcready/runs/b_d3d12/godot.log"
+ ],
+ "window": [
+  1920,
+  1080
+ ],
+ "preset": null,
+ "settings_file_existed": false,
+ "exe_copy": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\pcready\\runs\\b_d3d12\\qa_exe\\Hollowhaven.exe",
+ "t_start": "2026-09-28 15:08:49",
+ "seconds_to_title": 5.2,
+ "title_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit"
+ ],
+ "title_mode_reached": true,
+ "env_at_title": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "12_0",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "d3d12",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 1,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1920,
+   1080
+  ]
+ },
+ "after_new_game_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit",
+  "Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.",
+  "Standard | recommended | The intended experience: tense and unsettling, with a few real scares.",
+  "Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.",
+  "Off",
+  "Off",
+  "Off",
+  "On",
+  "Play a test sound",
+  "Play a test sound",
+  "Play a test sound",
+  "Begin the journey",
+  "Close"
+ ],
+ "comfort_clipped": [],
+ "meet_clipped": [],
+ "seconds_confirm_to_playing": 6.3,
+ "first_load": {
+  "area": "surface",
+  "frames": 149,
+  "from": "",
+  "long_frames": 3,
+  "ms": 5050.5,
+  "n": 1,
+  "post_done": false,
+  "post_long_frames": 1,
+  "post_worst_ms": 92.68,
+  "worst_frame_ms": 2555.17
+ },
+ "sample_pan": {
+  "turned_deg": 360.7,
+  "seconds": 16.2,
+  "px_per_deg": 7.6923
+ },
+ "sample_walk": {
+  "walked_m": 30.4,
+  "start": [
+   0.0,
+   0.0,
+   7.0
+  ],
+  "end": [
+   -0.86,
+   0.0,
+   7.07
+  ],
+  "interrupted_by_ui": []
+ },
+ "sample_frames": {
+  "frames": 5761,
+  "seconds": 24.72,
+  "avg_fps": 233.0,
+  "avg_ms": 4.291,
+  "median_ms": 4.246,
+  "low1_fps": 89.9,
+  "low01_fps": 19.2,
+  "p95_ms": 5.59,
+  "p99_ms": 6.06,
+  "p999_ms": 7.32,
+  "worst_ms": 254.53,
+  "over_16_7": 2,
+  "over_33": 1,
+  "over_50": 1,
+  "over_100": 1,
+  "spikes_2x_median": 3,
+  "tele_pct": 1.04,
+  "tele_max_ms": 3.11,
+  "tele_spikes": 0,
+  "low1_fps_minus_tele": 91.4,
+  "avg_fps_minus_tele": 235.5,
+  "gpu_avg_ms": 3.347,
+  "gpu_p99_ms": 4.37,
+  "gpu_share": 0.78,
+  "cpu_render_avg_ms": 1.298,
+  "engine_fps_monitor_avg": 231.9,
+  "engine_fps_monitor_min": 175.0,
+  "video_mb_max": 796.7,
+  "texture_mb_max": 359.1,
+  "buffer_mb_max": 44.2,
+  "draw_calls_avg": 1848.7,
+  "primitives_avg": 8456063.5,
+  "process_ms_avg": 16.9,
+  "physics_ms_avg": 1.3,
+  "nodes_max": 5076.0
+ },
+ "sample_mem": {
+  "private_mb_max": 2019.3,
+  "ws_mb_max": 1127.4
+ },
+ "steps": [
+  {
+   "step": "read_ward",
+   "ok": true,
+   "seconds": 9.3,
+   "quest": "gather_basics"
+  },
+  {
+   "step": "gather_basics",
+   "ok": true,
+   "seconds": 117.0,
+   "quest": "craft_axe"
+  }
+ ],
+ "play_frames": {
+  "frames": 30825,
+  "seconds": 126.85,
+  "avg_fps": 243.0,
+  "avg_ms": 4.115,
+  "median_ms": 4.167,
+  "low1_fps": 117.1,
+  "low01_fps": 34.7,
+  "p95_ms": 5.42,
+  "p99_ms": 6.0,
+  "p999_ms": 7.07,
+  "worst_ms": 280.83,
+  "over_16_7": 3,
+  "over_33": 3,
+  "over_50": 3,
+  "over_100": 3,
+  "spikes_2x_median": 14,
+  "tele_pct": 1.04,
+  "tele_max_ms": 4.11,
+  "tele_spikes": 2,
+  "low1_fps_minus_tele": 118.6,
+  "avg_fps_minus_tele": 245.6,
+  "gpu_avg_ms": 3.098,
+  "gpu_p99_ms": 4.26,
+  "gpu_share": 0.75,
+  "cpu_render_avg_ms": 1.093,
+  "engine_fps_monitor_avg": 243.5,
+  "engine_fps_monitor_min": 165.0,
+  "video_mb_max": 805.5,
+  "texture_mb_max": 361.1,
+  "buffer_mb_max": 44.6,
+  "draw_calls_avg": 1549.0,
+  "primitives_avg": 7545142.9,
+  "process_ms_avg": 10.8,
+  "physics_ms_avg": 1.2,
+  "nodes_max": 5363.0
+ },
+ "ui_tour": [
+  {
+   "label": "pause",
+   "ui_stack": [
+    "pause"
+   ],
+   "clipped": [],
+   "buttons": 10
+  },
+  {
+   "label": "settings_first_tab",
+   "ui_stack": [
+    "pause",
+    "settings"
+   ],
+   "clipped": [
+    "Off",
+    "Show tips again"
+   ],
+   "buttons": 19
+  },
+  {
+   "label": "settings_video",
+   "ui_stack": [
+    "pause",
+    "settings"
+   ],
+   "clipped": [],
+   "buttons": 18
+  }
+ ],
+ "env_last": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "12_0",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "d3d12",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 1,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1920,
+   1080
+  ]
+ },
+ "final_mode": "playing",
+ "final_area": "surface",
+ "appearance": {
+  "back": "picnic_basket",
+  "eyes": "eye_1",
+  "hair": "braided_crown",
+  "hair_acc": "strawberry_clip",
+  "hair_color": "auburn",
+  "hat": "",
+  "lower": "pinafore_skirt",
+  "outfit": "strawberry_picnic",
+  "palette": {
+   "accent": "berry",
+   "primary": "rose",
+   "secondary": "cream"
+  },
+  "shoes": "mary_janes",
+  "skin": "skin_2",
+  "upper": "puff_blouse"
+ },
+ "mem_all": {
+  "private_mb_max": 2077.5,
+  "ws_mb_max": 1200.5,
+  "peak_ws_mb": 1325.6
+ },
+ "exit_code_before_stop": null,
+ "seconds_total": 185.2,
+ "focus_watchdog": {
+  "checks": 706,
+  "game_had_focus": 0,
+  "handed_back": 0
+ },
+ "settings_file_final": "[settings]\n\nmouse_sensitivity=0.5\ninvert_y=false\nfov=70.0\ncamera_distance=5.0\nshow_hints=true\nmaster_volume=0.85\nmusic_volume=0.6\nambience_volume=0.8\nsfx_volume=0.85\nui_volume=0.7\nhorror_intensity=1\narachnophobia=false\nreduce_shake=false\nreduce_flashing=false\ncaptions=true\ncomfort_confirmed=true\nhigh_visibility_cues=false\ntiming_assist=false\ncompanion_auto_attack=true\ncompanion_autocast=true\nseasonal_decor=false\nfullscreen=true\nvsync=true\nmax_fps=0\nrender_scale=1.0\nquality=2\nshow_fps=false\nbindings={}\n",
+ "log_lines": 0,
+ "log_header": [],
+ "log_errors": [],
+ "log_error_count": 0,
+ "log_warning_count": 0
+}

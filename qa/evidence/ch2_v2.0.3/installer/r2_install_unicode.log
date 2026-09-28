@@ -1,0 +1,87 @@
+﻿2026-09-28 15:36:24.666   Log opened. (Time zone: UTC-04:00)
+2026-09-28 15:36:24.666   Setup version: Inno Setup version 6.7.3
+2026-09-28 15:36:24.666   Original Setup EXE: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\fakeroot\dist\Hollowhaven-Setup-2.0.2.exe
+2026-09-28 15:36:24.668   Setup command line: /SL5="$222E0E14,103047324,893440,C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\fakeroot\dist\Hollowhaven-Setup-2.0.2.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR="C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven" /LOG="C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\logs\r2_install_unicode.log" /TASKS="desktopicon" 
+2026-09-28 15:36:24.668   Windows version: 10.0.26200
+2026-09-28 15:36:24.668   Windows architecture: x64 (64-bit)
+2026-09-28 15:36:24.668   Machine types supported by system: x86 x64
+2026-09-28 15:36:24.668   User privileges: None
+2026-09-28 15:36:24.729   Administrative install mode: No
+2026-09-28 15:36:24.729   Install mode root key: HKEY_CURRENT_USER
+2026-09-28 15:36:24.729   64-bit install mode: Yes
+2026-09-28 15:36:24.729   RedirectionGuard status for current process: Enabled in enforcing mode
+2026-09-28 15:36:24.734   Created temporary directory: C:\Users\Ali\AppData\Local\Temp\is-CLNT15M9LT.tmp
+2026-09-28 15:36:24.839   Found 1 files to register with RestartManager.
+2026-09-28 15:36:24.839   Calling RestartManager's RmGetList.
+2026-09-28 15:36:24.855   RmGetList finished successfully.
+2026-09-28 15:36:24.855   RestartManager found no applications using one of our files.
+2026-09-28 15:36:24.861   Starting the installation process.
+2026-09-28 15:36:24.862   Creating directory: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test
+2026-09-28 15:36:24.862   Creating directory: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs
+2026-09-28 15:36:24.862   Creating directory: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven
+2026-09-28 15:36:24.864   Directory for uninstall files: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven
+2026-09-28 15:36:24.864   Creating new uninstall log: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\unins000.dat
+2026-09-28 15:36:24.865   -- File entry --
+2026-09-28 15:36:24.866   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\unins000.exe
+2026-09-28 15:36:24.866   Non-default bitness: 32-bit
+2026-09-28 15:36:24.869   Time stamp of our file: 2026-09-28 15:36:24.448
+2026-09-28 15:36:24.869   Installing the file.
+2026-09-28 15:36:24.927   Successfully installed the file.
+2026-09-28 15:36:24.927   -- File entry --
+2026-09-28 15:36:24.927   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\Chapter Two - What's New.txt
+2026-09-28 15:36:24.927   Time stamp of our file: 2026-09-28 10:31:16.000
+2026-09-28 15:36:24.927   Installing the file.
+2026-09-28 15:36:24.932   Successfully installed the file.
+2026-09-28 15:36:24.932   -- File entry --
+2026-09-28 15:36:24.932   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\Hollowhaven.exe
+2026-09-28 15:36:24.932   Time stamp of our file: 2026-09-28 14:12:08.000
+2026-09-28 15:36:24.932   Installing the file.
+2026-09-28 15:36:29.796   Successfully installed the file.
+2026-09-28 15:36:29.796   -- File entry --
+2026-09-28 15:36:29.796   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\How to Play.txt
+2026-09-28 15:36:29.796   Time stamp of our file: 2026-09-28 15:33:16.000
+2026-09-28 15:36:29.796   Installing the file.
+2026-09-28 15:36:29.800   Successfully installed the file.
+2026-09-28 15:36:29.801   -- File entry --
+2026-09-28 15:36:29.801   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\Licenses\Godot_Engine_Licenses.txt
+2026-09-28 15:36:29.801   Time stamp of our file: 2026-09-28 14:12:10.000
+2026-09-28 15:36:29.801   Installing the file.
+2026-09-28 15:36:29.801   Creating directory: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\Licenses
+2026-09-28 15:36:29.810   Successfully installed the file.
+2026-09-28 15:36:29.810   -- File entry --
+2026-09-28 15:36:29.810   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\Licenses\OFL-Fredoka.txt
+2026-09-28 15:36:29.810   Time stamp of our file: 2026-09-27 15:32:32.000
+2026-09-28 15:36:29.810   Installing the file.
+2026-09-28 15:36:29.814   Successfully installed the file.
+2026-09-28 15:36:29.814   -- File entry --
+2026-09-28 15:36:29.814   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\Licenses\OFL-Nunito.txt
+2026-09-28 15:36:29.814   Time stamp of our file: 2026-09-27 15:32:32.000
+2026-09-28 15:36:29.814   Installing the file.
+2026-09-28 15:36:29.818   Successfully installed the file.
+2026-09-28 15:36:29.818   -- File entry --
+2026-09-28 15:36:29.818   Dest filename: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\review\Krystál ♥ 家 test\Programs\Hollowhaven\Licenses\THIRD_PARTY_NOTICES.txt
+2026-09-28 15:36:29.818   Time stamp of our file: 2026-09-28 10:32:00.000
+2026-09-28 15:36:29.818   Installing the file.
+2026-09-28 15:36:29.822   Successfully installed the file.
+2026-09-28 15:36:29.822   -- Icon entry --
+2026-09-28 15:36:29.822   Dest filename: C:\Users\Ali\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Hollowhaven\Hollowhaven.lnk
+2026-09-28 15:36:29.823   Creating directory: C:\Users\Ali\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Hollowhaven
+2026-09-28 15:36:29.902   Creating the icon.
+2026-09-28 15:36:30.022   Successfully created the icon.
+2026-09-28 15:36:30.029   -- Icon entry --
+2026-09-28 15:36:30.029   Dest filename: C:\Users\Ali\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Hollowhaven\How to Play.lnk
+2026-09-28 15:36:30.029   Creating the icon.
+2026-09-28 15:36:30.037   Successfully created the icon.
+2026-09-28 15:36:30.042   -- Icon entry --
+2026-09-28 15:36:30.042   Dest filename: C:\Users\Ali\Desktop\Hollowhaven.lnk
+2026-09-28 15:36:30.042   Creating the icon.
+2026-09-28 15:36:30.054   Successfully created the icon.
+2026-09-28 15:36:30.059   Saving uninstall information.
+2026-09-28 15:36:30.059   Creating new uninstall key: HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6FD89CDE-658C-4364-8ACE-AC51476C639C}_is1
+2026-09-28 15:36:30.059   Writing uninstall key values.
+2026-09-28 15:36:30.059   Detected previous administrative 64-bit install? No
+2026-09-28 15:36:30.059   Detected previous administrative 32-bit install? No
+2026-09-28 15:36:30.065   Installation process succeeded.
+2026-09-28 15:36:30.065   Need to restart Windows? No
+2026-09-28 15:36:30.070   Deinitializing Setup.
+2026-09-28 15:36:30.078   Log closed.

@@ -1,0 +1,441 @@
+{
+  "segment": "S0",
+  "status": "completes",
+  "stopped_at": "",
+  "total_seconds": 721.5,
+  "checkpoints": [
+    "title_new_game",
+    "read_ward",
+    "gather_basics",
+    "craft_axe",
+    "chop",
+    "workbench",
+    "tailor_cache",
+    "mochi",
+    "pebble",
+    "home",
+    "lumi",
+    "prepare",
+    "brave_steps",
+    "descend",
+    "old_mine",
+    "deeper",
+    "silk_and_boss",
+    "return_home",
+    "ending",
+    "accept_ch2",
+    "free_play_save"
+  ],
+  "timings": {
+    "title_new_game": 17.1,
+    "read_ward": 6.0,
+    "gather_basics": 43.1,
+    "craft_axe": 3.2,
+    "chop": 32.0,
+    "workbench": 15.3,
+    "tailor_cache": 14.0,
+    "mochi": 26.1,
+    "pebble": 51.5,
+    "home": 97.4,
+    "lumi": 49.6,
+    "prepare": 20.4,
+    "brave_steps": 48.0,
+    "descend": 35.9,
+    "old_mine": 33.8,
+    "deeper": 39.9,
+    "silk_and_boss": 81.6,
+    "return_home": 28.3,
+    "ending": 57.0,
+    "accept_ch2": 3.8,
+    "free_play_save": 2.1
+  },
+  "screenshots": [
+    "qa\\tmp\\final203\\s0\\shots\\s0_001_meet_krystal.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_002_meet_krystal_chosen.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_003_title_new_game.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_004_read_ward.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_005_gather_basics.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_006_craft_Stone_Axe.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_007_craft_axe.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_008_chop.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_009_craft_Workbench.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_010_placed_workbench.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_011_workbench.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_012_tailor_cache.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_013_mochi.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_014_craft_Stone_Pickaxe.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_015_pebble.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_016_craft_Cozy_Bed.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_017_craft_Crop_Plot.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_018_placed_bed.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_019_placed_crop_plot.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_020_home.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_021_craft_Copper_Sword.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_022_craft_Lantern.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_023_craft_Berry_Snack.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_024_lumi.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_025_craft_Berry_Snack.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_026_prepare.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_027_craft_Loom_&_Dye_Bench.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_028_placed_loom.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_029_comfort_ribbon.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_030_mochi_ribbon.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_031_brave_steps.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_032_descend.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_033_old_mine.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_034_deeper.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_035_silk_and_boss.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_036_return_home.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_037_restoration.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_038_ending_credits.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_039_ending.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_040_ward_stone_choice.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_041_accept_ch2.png",
+    "qa\\tmp\\final203\\s0\\shots\\s0_042_free_play_save.png"
+  ],
+  "problems": [],
+  "notes": {
+    "overwrite_confirm": "not shown (no save in the isolated save dir)",
+    "look": {
+      "wanted": {
+        "outfit": "strawberry_picnic",
+        "hair": "braided_crown"
+      },
+      "got": {
+        "outfit": "strawberry_picnic",
+        "hair": "braided_crown"
+      }
+    },
+    "tailor_cache": {
+      "flag": true,
+      "optional_done": true
+    },
+    "brave_steps": {
+      "ribbon_tied": true,
+      "mochi_follows": true
+    },
+    "courage_lantern": {
+      "flag": true,
+      "optional_done": true
+    },
+    "brazier_uses": [
+      {
+        "brazier": 0,
+        "phase": 1,
+        "text": "Light the brazier"
+      },
+      {
+        "brazier": 2,
+        "phase": 3,
+        "text": "Light the brazier"
+      },
+      {
+        "brazier": 0,
+        "phase": 3,
+        "text": "Stoke the brazier"
+      }
+    ],
+    "dodges": {
+      "fan": 2,
+      "drop": 2
+    },
+    "drops_seen": 2,
+    "minion_hits": 3,
+    "boss": {
+      "seconds": 69.0,
+      "phases_seen": [
+        1,
+        2,
+        3
+      ],
+      "deaths": 0,
+      "lowest_hp": 79.0,
+      "braziers_used": [
+        0,
+        2
+      ],
+      "defeated": true
+    },
+    "chapter2_after_accept": {
+      "current": [
+        "ch2_waygate"
+      ],
+      "done": [
+        "ch2_light_beyond"
+      ],
+      "tracker": {
+        "kind": "chapter2",
+        "step": "ch2_waygate",
+        "targets": [
+          {
+            "area": "surface",
+            "id": "ruin"
+          }
+        ],
+        "title": "The Hallowmere Way"
+      }
+    }
+  },
+  "final_state": {
+    "mode": "playing",
+    "area": "surface",
+    "step": "free_play",
+    "flags": [
+      "c1x_look_chosen",
+      "hint_quest_wake",
+      "hint_intro_move",
+      "read_ward_intro",
+      "hint_quest_gather_basics",
+      "hint_quest_craft_axe",
+      "hint_quest_chop",
+      "hint_quest_workbench",
+      "hint_build_controls",
+      "hint_build_controls_ch2",
+      "hint_quest_mochi",
+      "c1x_tailor_cache",
+      "hint_c1x_loom",
+      "hint_quest_pebble",
+      "hint_quest_home",
+      "hint_farming_growth",
+      "hint_quest_lumi",
+      "spawner_cleared_ruin_bramblings",
+      "ruin_cleared",
+      "hint_quest_prepare",
+      "read_ward_warning",
+      "hint_quest_descend",
+      "hint_loom_crafting",
+      "c1x_ribbon_given",
+      "c1x_mochi_courage",
+      "mine_opened",
+      "mine_comfort_seen",
+      "entered_below",
+      "hint_quest_old_mine",
+      "hint_below_lantern",
+      "cp_lit_landing",
+      "moment_threshold",
+      "spawner_cleared_gallery_gloom",
+      "gallery_cleared",
+      "cp_lit_office",
+      "foreman_key_taken",
+      "lower_gate_open",
+      "moment_crossing",
+      "spawner_cleared_hall_gloom",
+      "imitation_seen",
+      "cp_lit_shrine",
+      "reached_silk_hollows",
+      "hint_quest_silk",
+      "moment_silk_intro",
+      "hint_silk_light",
+      "cp_lit_arena",
+      "hint_boss_braziers",
+      "hint_boss_scorched",
+      "hint_boss_phase2",
+      "hint_boss_fan",
+      "hint_boss_stuck",
+      "hint_boss_sacs",
+      "hint_boss_tripline",
+      "hint_tell_brood_skitter_leap",
+      "hint_boss_phase3",
+      "weaver_defeated",
+      "moment_return",
+      "ward_restored",
+      "chapter_one_complete",
+      "read_ward_ch2",
+      "ch2_accepted",
+      "hint_quest_ch2_waygate"
+    ],
+    "companions": {
+      "lumi": "home",
+      "mochi": "follow",
+      "pebble": "home"
+    },
+    "optional": {
+      "done": [
+        "opt_look_of_your_own",
+        "opt_brave_little_steps",
+        "opt_tailors_cache"
+      ],
+      "done_count": 3,
+      "pending": [
+        "opt_copper_courage",
+        "opt_bramblewatch",
+        "opt_gardeners_afternoon",
+        "opt_tobins_shift",
+        "opt_upstairs",
+        "opt_pumpkin_face",
+        "opt_counts_wardrobe",
+        "opt_groundskeeper",
+        "opt_hat_too_large",
+        "opt_long_way_home",
+        "opt_harvest_table",
+        "opt_room_for_friends",
+        "opt_miner_came_back",
+        "opt_legacy_bond",
+        "opt_legacy_heartbloom"
+      ]
+    },
+    "appearance": {
+      "back": "picnic_basket",
+      "eyes": "eye_1",
+      "hair": "braided_crown",
+      "hair_acc": "strawberry_clip",
+      "hair_color": "auburn",
+      "hat": "",
+      "lower": "pinafore_skirt",
+      "outfit": "strawberry_picnic",
+      "palette": {
+        "accent": "berry",
+        "primary": "rose",
+        "secondary": "cream"
+      },
+      "shoes": "mary_janes",
+      "skin": "skin_2",
+      "upper": "puff_blouse"
+    },
+    "chapter2": {
+      "active": true,
+      "available": true,
+      "chapter": 2,
+      "current": [
+        "ch2_waygate"
+      ],
+      "done": [
+        "ch2_light_beyond"
+      ],
+      "finished": false,
+      "title": "The Hallowmere Way"
+    },
+    "tracker": {
+      "kind": "chapter2",
+      "step": "ch2_waygate",
+      "targets": [
+        {
+          "area": "surface",
+          "id": "ruin"
+        }
+      ],
+      "title": "The Hallowmere Way"
+    },
+    "inv": {
+      "berries": 5,
+      "berry_snack": 3,
+      "copper_ore": 3,
+      "copper_sword": 1,
+      "echo_shard": 1,
+      "fiber": 1,
+      "glowcap": 2,
+      "haven_banner": 1,
+      "lantern": 1,
+      "shiny_pebble": 1,
+      "stone": 10,
+      "stone_axe": 1,
+      "stone_pickaxe": 1,
+      "sunflax_seeds": 1,
+      "sweetroot_seeds": 5,
+      "wood": 3
+    },
+    "keys": {
+      "foreman_key": 1
+    }
+  },
+  "events_tail": [
+    "566.04 [caption] [silk hisses down from above]",
+    "566.04 [hint] boss_fan: A pale wedge marks where it will spin a web sheet. Step out of the wedge - the sheet only slows you.",
+    "570.25 [caption] [Krystal tears free of the silk]",
+    "574.07 [caption] [a dry rattle overhead]",
+    "575.75 [hint] boss_stuck: It's stuck! Strike now with {attack}!",
+    "575.99 [say] Mochi: Mochi squeaks and ducks behind Krystal.",
+    "581.14 [caption] [egg sacs along the wall begin to shake]",
+    "581.14 [hint] boss_sacs: Something is about to hatch at the edge of the chamber. Pop the shaking sacs with {attack}, or get ready.",
+    "586.62 [caption] [threads twang taut across the floor]",
+    "586.62 [hint] boss_tripline: Trip-lines snap when you walk into them. Cut them with {attack}, burn them with your lit lantern, or jump over.",
+    "589.9 [hint] tell_brood_skitter_leap: Draws in tight and a small mark appears on the ground, then a short leap onto the mark.",
+    "589.9 [caption] [something skitters and tenses]",
+    "592.0 [caption] [a dry rattle overhead]",
+    "593.69 [hint] boss_stuck: It's stuck! Strike now with {attack}!",
+    "595.17 [caption] [the Matron's shriek turns desperate]",
+    "595.17 [hint] boss_phase3: Braziers can now be stoked again once their ring glows. Don't let it smother one!",
+    "601.14 [caption] [silk hisses down from above]",
+    "601.14 [hint] boss_fan: A pale wedge marks where it will spin a web sheet. Step out of the wedge - the sheet only slows you.",
+    "603.17 [caption] [a slow, deliberate rattle overhead]",
+    "605.05 [hint] boss_stuck: It's stuck! Strike now with {attack}!",
+    "606.47 [caption] [the brazier roars to life]",
+    "606.47 [caption] [it shrieks as the light scorches it]",
+    "611.34 [caption] [the brazier flares up]",
+    "611.34 [caption] [it shrieks as the light scorches it]",
+    "611.94 [hint] boss_scorched: The light burned it off the ceiling! Strike while it's stunned!",
+    "614.2 [caption] [the Weaver shrieks and flees into the deep]",
+    "618.32 [music] ",
+    "619.99 [notify] item: Obtained: The Heartseed",
+    "619.99 [caption] [a warm heartbeat]",
+    "619.99 [quest] completed silk",
+    "619.99 [notify] quest: Goal complete: The Silk Hollows",
+    "619.99 [notify] quest: New goal: Bring Back the Light",
+    "622.77 [caption] [the old lift groans and begins to rise]",
+    "625.7 [say] Mochi: Mochi squeaks and ducks behind Krystal.",
+    "626.9 [say] : Warm air drifts down from the surface. The way home is open.",
+    "630.09 [saved] journey saved",
+    "636.82 [music] m08",
+    "648.62 [music] m14",
+    "648.62 [caption] [The Ward Stone hums, warm and bright]",
+    "648.62 [quest] completed return",
+    "648.62 [notify] quest: Goal complete: Bring Back the Light",
+    "648.62 [notify] info: The Haven is safe. New recipe: Heartbloom Lamp.",
+    "648.62 [notify] quest: New goal: Krystal's Haven",
+    "658.63 [say] Mochi: Mochi spins in circles, spores sparkling!",
+    "676.6 [say] Pebble: Pebble adds a stone to its cairn with great ceremony.",
+    "703.72 [music] ",
+    "703.72 [music] m07",
+    "704.24 [saved] journey saved",
+    "706.14 [saved] journey saved",
+    "707.26 [say] Ward Stone: A light well kept reaches farther than its keeper knows. There are lanterns beyond these woods. Tonight, one has answered.",
+    "707.46 [say] Ward Stone: Your hearth is safe. No road you follow shall unmake it.",
+    "707.46 [quest] ch2 started ch2_light_beyond",
+    "707.46 [quest] ch2 completed ch2_light_beyond",
+    "707.46 [notify] quest: Goal complete: A Light Beyond",
+    "707.46 [notify] info: An old trail glimmers north of the Moonlit Ruin. Everything you won here stays won.",
+    "707.46 [quest] ch2 started ch2_waygate",
+    "707.46 [hint] quest_ch2_waygate: Bring wood, stone and copper ore to the waygate and press {interact} to repair it.",
+    "707.46 [notify] quest: New goal: The Hallowmere Way",
+    "710.92 [saved] journey saved",
+    "713.06 [saved] journey saved"
+  ],
+  "start": "natural (fresh New Game)",
+  "wall_seconds": 724.2,
+  "game_log_errors": [],
+  "focus_report": {
+    "telemetry_frames": 6128,
+    "frames_focused": 6128,
+    "frames_mouse_captured": 0
+  },
+  "continue_check": {
+    "save": "qa\\tmp\\final203\\s0\\saves\\slot1.json",
+    "ok": true,
+    "mismatches": [],
+    "seconds_to_play": 9.8,
+    "observed": {
+      "area": "surface",
+      "step": "free_play",
+      "ui_stack": [],
+      "hair": "braided_crown",
+      "outfit": "strawberry_picnic",
+      "chapter2_current": [
+        "ch2_waygate"
+      ],
+      "optional_done": [
+        "opt_brave_little_steps",
+        "opt_look_of_your_own",
+        "opt_tailors_cache"
+      ],
+      "companions": {
+        "lumi": "home",
+        "mochi": "follow",
+        "pebble": "home"
+      },
+      "keys": {
+        "foreman_key": 1
+      }
+    },
+    "game_log_errors": []
+  }
+}

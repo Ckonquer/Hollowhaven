@@ -1,0 +1,298 @@
+[18:21:52] launched (HEADLESS, virtual input, port 7031) C:\Users\Ali\Desktop\Hollowhaven\.tools\godot\Godot_v4.7.2-stable_win64_console.exe pid=39556 args=['--headless', '--max-fps', '60', '--path', 'C:\\Users\\Ali\\Desktop\\Hollowhaven\\game', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/s0_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/saves', '--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/qa_settings.cfg', '--qa-input-port=7031', '--qa-no-focus', '--no-focus-pause', '--max-seconds=6300']
+[18:21:52] S0 run: natural (fresh New Game)
+[18:21:52] === STEP title_new_game (quest step wake, +0s) ===
+[18:21:55] button not found: 'Start fresh'; visible: ['New Game', 'Settings', 'Credits', 'Quit', 'Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.', 'Standard | recommended | The intended experience: tense and unsettling, with a few real scares.', 'Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.', 'Off', 'Off', 'Off', 'On', 'Play a test sound', 'Play a test sound', 'Play a test sound', 'Begin the journey', 'Close']
+[18:21:56] button not found: 'Start a new journey'; visible: ['New Game', 'Settings', 'Credits', 'Quit', 'Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.', 'Standard | recommended | The intended experience: tense and unsettling, with a few real scares.', 'Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.', 'Off', 'Off', 'Off', 'On', 'Play a test sound', 'Play a test sound', 'Play a test sound', 'Begin the journey', 'Close']
+[18:21:57] screenshot s0_001_meet_krystal.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_001_meet_krystal.png'}: no screenshot in a headless run
+[18:22:01] screenshot s0_002_meet_krystal_chosen.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_002_meet_krystal_chosen.png'}: no screenshot in a headless run
+[18:22:09] calibrated look (virtual): 0.2597 px/deg (motion 2.00 px -> dyaw=-7.7) invert=1.0
+[18:22:09] screenshot s0_003_title_new_game.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_003_title_new_game.png'}: no screenshot in a headless run
+[18:22:10] === STEP read_ward (quest step wake, +18s) ===
+[18:22:16] screenshot s0_004_read_ward.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_004_read_ward.png'}: no screenshot in a headless run
+[18:22:17] === STEP gather_basics (quest step gather_basics, +25s) ===
+[18:22:20] walk_to stuck at [1.89, 0.0, -7.32] (dist 13.0); unstick #1
+[18:23:00] screenshot s0_005_gather_basics.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_005_gather_basics.png'}: no screenshot in a headless run
+[18:23:01] === STEP craft_axe (quest step craft_axe, +69s) ===
+[18:23:01] craft Stone Axe x1
+[18:23:04] screenshot s0_006_craft_Stone_Axe.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_006_craft_Stone_Axe.png'}: no screenshot in a headless run
+[18:23:04] crafted: {'stone_axe': 1}
+[18:23:04] screenshot s0_007_craft_axe.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_007_craft_axe.png'}: no screenshot in a headless run
+[18:23:05] === STEP chop (quest step chop, +73s) ===
+[18:23:38] screenshot s0_008_chop.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_008_chop.png'}: no screenshot in a headless run
+[18:23:39] === STEP workbench (quest step workbench, +107s) ===
+[18:23:49] craft Workbench x1
+[18:23:51] screenshot s0_009_craft_Workbench.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_009_craft_Workbench.png'}: no screenshot in a headless run
+[18:23:52] crafted: {'workbench': 1}
+[18:23:52] place workbench
+[18:23:53] screenshot s0_010_placed_workbench.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_010_placed_workbench.png'}: no screenshot in a headless run
+[18:23:54] screenshot s0_011_workbench.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_011_workbench.png'}: no screenshot in a headless run
+[18:23:55] === STEP tailor_cache (quest step mochi, +123s) ===
+[18:23:55] travel to old_oak
+[18:24:09] screenshot s0_012_tailor_cache.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_012_tailor_cache.png'}: no screenshot in a headless run
+[18:24:10] === STEP mochi (quest step mochi, +138s) ===
+[18:24:10] travel to glade
+[18:24:36] screenshot s0_013_mochi.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_013_mochi.png'}: no screenshot in a headless run
+[18:24:37] === STEP pebble (quest step pebble, +165s) ===
+[18:24:47] walk_to stuck at [-9.28, 0.0, 2.38] (dist 9.4); unstick #1
+[18:24:49] craft Stone Pickaxe x1
+[18:24:52] screenshot s0_014_craft_Stone_Pickaxe.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_014_craft_Stone_Pickaxe.png'}: no screenshot in a headless run
+[18:24:52] crafted: {'stone_pickaxe': 1}
+[18:24:52] travel to quarry
+[18:25:28] screenshot s0_015_pebble.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_015_pebble.png'}: no screenshot in a headless run
+[18:25:29] === STEP home (quest step home, +217s) ===
+[18:25:42] walk_to stuck at [5.72, 0.0, 0.5] (dist 6.7); unstick #1
+[18:25:47] walk_to stuck at [-2.58, 0.0, -4.79] (dist 15.5); unstick #1
+[18:25:52] walk_to stuck at [-6.59, 0.0, -14.39] (dist 5.1); unstick #2
+[18:26:29] craft Cozy Bed x1
+[18:26:40] walk_to stuck at [-9.28, 0.0, 2.52] (dist 9.4); unstick #1
+[18:26:47] screenshot s0_016_craft_Cozy_Bed.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_016_craft_Cozy_Bed.png'}: no screenshot in a headless run
+[18:26:48] crafted: {'bed': 1}
+[18:26:48] craft Crop Plot x1
+[18:26:50] screenshot s0_017_craft_Crop_Plot.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_017_craft_Crop_Plot.png'}: no screenshot in a headless run
+[18:26:51] crafted: {'crop_plot': 1}
+[18:26:51] place bed
+[18:26:52] screenshot s0_018_placed_bed.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_018_placed_bed.png'}: no screenshot in a headless run
+[18:26:53] place crop_plot
+[18:26:56] screenshot s0_019_placed_crop_plot.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_019_placed_crop_plot.png'}: no screenshot in a headless run
+[18:27:01] interact attempt 1 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 56m'}
+[18:27:03] interact attempt 2 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 55m'}
+[18:27:05] interact attempt 3 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 53m'}
+[18:27:07] interact attempt 4 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 51m'}
+[18:27:07] screenshot s0_020_home.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_020_home.png'}: no screenshot in a headless run
+[18:27:08] === STEP lumi (quest step lumi, +316s) ===
+[18:27:08] craft Copper Sword x1
+[18:27:13] screenshot s0_021_craft_Copper_Sword.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_021_craft_Copper_Sword.png'}: no screenshot in a headless run
+[18:27:14] crafted: {'copper_sword': 1}
+[18:27:14] craft Lantern x1
+[18:27:18] screenshot s0_022_craft_Lantern.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_022_craft_Lantern.png'}: no screenshot in a headless run
+[18:27:18] crafted: {'lantern': 1}
+[18:27:18] craft Berry Snack x2
+[18:27:21] screenshot s0_023_craft_Berry_Snack.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_023_craft_Berry_Snack.png'}: no screenshot in a headless run
+[18:27:22] crafted: {'berry_snack': 2}
+[18:27:22] travel to ruin
+[18:27:57] screenshot s0_024_lumi.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_024_lumi.png'}: no screenshot in a headless run
+[18:27:58] === STEP prepare (quest step prepare, +366s) ===
+[18:28:16] craft Berry Snack x1
+[18:28:18] screenshot s0_025_craft_Berry_Snack.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_025_craft_Berry_Snack.png'}: no screenshot in a headless run
+[18:28:19] crafted: {'berry_snack': 1}
+[18:28:19] screenshot s0_026_prepare.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_026_prepare.png'}: no screenshot in a headless run
+[18:28:20] === STEP brave_steps (quest step descend, +388s) ===
+[18:28:24] walk_to stuck at [-0.35, 0.1, -5.28] (dist 7.9); unstick #1
+[18:28:41] walk_to stuck at [-19.19, 0.0, -4.19] (dist 20.9); unstick #1
+[18:28:46] craft Loom & Dye Bench x1
+[18:28:55] screenshot s0_027_craft_Loom_&_Dye_Bench.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_027_craft_Loom_&_Dye_Bench.png'}: no screenshot in a headless run
+[18:28:55] crafted: {'loom': 1}
+[18:28:55] place loom
+[18:28:59] screenshot s0_028_placed_loom.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_028_placed_loom.png'}: no screenshot in a headless run
+[18:29:02] screenshot s0_029_comfort_ribbon.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_029_comfort_ribbon.png'}: no screenshot in a headless run
+[18:29:04] goto (-6.634407521621953, 7.115296642722136) failed at [1.69, 0.0, 11.3]
+[18:29:05] goto (-6.71439910104958, 7.341342046186342) failed at [-6.98, 0.0, 7.18]
+[18:29:08] screenshot s0_030_mochi_ribbon.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_030_mochi_ribbon.png'}: no screenshot in a headless run
+[18:29:08] screenshot s0_031_brave_steps.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_031_brave_steps.png'}: no screenshot in a headless run
+[18:29:09] === STEP descend (quest step descend, +437s) ===
+[18:29:09] travel to mine
+[18:29:12] walk_to stuck at [-1.67, 0.0, -2.92] (dist 11.9); unstick #1
+[18:29:45] screenshot s0_032_descend.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_032_descend.png'}: no screenshot in a headless run
+[18:29:45] === STEP old_mine (quest step old_mine, +473s) ===
+[18:30:19] screenshot s0_033_old_mine.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_033_old_mine.png'}: no screenshot in a headless run
+[18:30:19] === STEP deeper (quest step deeper, +507s) ===
+[18:30:59] screenshot s0_034_deeper.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_034_deeper.png'}: no screenshot in a headless run
+[18:30:59] === STEP silk_and_boss (quest step silk, +547s) ===
+[18:31:11] entering the Heartseed Chamber
+[18:31:14] boss: state=intro phase=1 hp=240.0 me=(105.01, -129.03) hp_me=79.0 lantern=True
+[18:31:19] boss: state=scorched phase=1 hp=152.4 me=(109.05, -135.15) hp_me=79.0 lantern=True
+[18:31:24] boss: state=cling phase=2 hp=144.0 me=(109.05, -135.15) hp_me=79.0 lantern=True
+[18:31:29] boss: state=cling phase=2 hp=144.0 me=(112.07, -134.58) hp_me=79.0 lantern=True
+[18:31:35] boss: state=telegraph phase=2 hp=144.0 me=(110.26, -131.2) hp_me=79.0 lantern=True
+[18:31:40] boss: state=cling phase=2 hp=108.0 me=(111.37, -133.16) hp_me=79.0 lantern=True
+[18:31:45] boss: state=cling phase=2 hp=108.0 me=(111.37, -133.16) hp_me=79.0 lantern=True
+[18:31:51] boss: state=cling phase=2 hp=108.0 me=(108.28, -134.54) hp_me=79.0 lantern=True
+[18:31:56] boss: state=climb phase=3 hp=72.0 me=(109.18, -135.38) hp_me=79.0 lantern=True
+[18:32:01] boss: state=fan_tele phase=3 hp=72.0 me=(109.18, -135.38) hp_me=79.0 lantern=True
+[18:32:06] boss: state=scorched phase=3 hp=72.0 me=(105.46, -143.76) hp_me=79.0 lantern=True
+[18:32:08] goto (110.78, -136.75) failed at [107.24, -12.0, -139.06]
+[18:32:12] boss: state=scorched phase=3 hp=36.0 me=(110.77, -134.8) hp_me=79.0 lantern=True
+[18:32:17] boss: state=defeat phase=3 hp=0.0 me=(110.89, -141.1) hp_me=79.0 lantern=True
+[18:32:20] boss summary: {'seconds': 69.0, 'phases_seen': [1, 2, 3], 'deaths': 0, 'lowest_hp': 79.0, 'braziers_used': [0, 2], 'defeated': True}
+[18:32:20] screenshot s0_035_silk_and_boss.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_035_silk_and_boss.png'}: no screenshot in a headless run
+[18:32:20] === STEP return_home (quest step return, +628s) ===
+[18:32:48] screenshot s0_036_return_home.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_036_return_home.png'}: no screenshot in a headless run
+[18:32:48] === STEP ending (quest step free_play, +656s) ===
+[18:33:00] screenshot s0_037_restoration.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_037_restoration.png'}: no screenshot in a headless run
+[18:33:40] screenshot s0_038_ending_credits.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_038_ending_credits.png'}: no screenshot in a headless run
+[18:33:43] button not found: 'Continue exploring'; visible: ['  Continue  ']
+[18:33:45] screenshot s0_039_ending.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_039_ending.png'}: no screenshot in a headless run
+[18:33:47] === STEP accept_ch2 (quest step free_play, +715s) ===
+[18:33:47] screenshot s0_040_ward_stone_choice.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_040_ward_stone_choice.png'}: no screenshot in a headless run
+[18:33:50] screenshot s0_041_accept_ch2.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_041_accept_ch2.png'}: no screenshot in a headless run
+[18:33:51] === STEP free_play_save (quest step free_play, +719s) ===
+[18:33:54] screenshot s0_042_free_play_save.png not taken: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/shots/s0_042_free_play_save.png'}: no screenshot in a headless run
+[18:33:54] focus report: {'telemetry_frames': 6128, 'frames_focused': 6128, 'frames_mouse_captured': 0}
+[18:33:56] launched (HEADLESS, virtual input, port 7081) C:\Users\Ali\Desktop\Hollowhaven\.tools\godot\Godot_v4.7.2-stable_win64_console.exe pid=56212 args=['--headless', '--max-fps', '60', '--path', 'C:\\Users\\Ali\\Desktop\\Hollowhaven\\game', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/continue_check/continue_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/continue_check/saves', '--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/s0/continue_check/qa_settings.cfg', '--qa-input-port=7081', '--qa-no-focus', '--no-focus-pause', '--max-seconds=300']
+[18:34:06] continue check: {'save': 'qa\\tmp\\final203\\s0\\saves\\slot1.json', 'ok': True, 'mismatches': [], 'seconds_to_play': 9.8, 'observed': {'area': 'surface', 'step': 'free_play', 'ui_stack': [], 'hair': 'braided_crown', 'outfit': 'strawberry_picnic', 'chapter2_current': ['ch2_waygate'], 'optional_done': ['opt_brave_little_steps', 'opt_look_of_your_own', 'opt_tailors_cache'], 'companions': {'lumi': 'home', 'mochi': 'follow', 'pebble': 'home'}, 'keys': {'foreman_key': 1}}}
+[18:34:06] focus report: {'telemetry_frames': 52, 'frames_focused': 52, 'frames_mouse_captured': 0}
+{
+ "status": "completes",
+ "total_seconds": 721.5,
+ "wall_seconds": 724.2,
+ "checkpoints": [
+  "title_new_game",
+  "read_ward",
+  "gather_basics",
+  "craft_axe",
+  "chop",
+  "workbench",
+  "tailor_cache",
+  "mochi",
+  "pebble",
+  "home",
+  "lumi",
+  "prepare",
+  "brave_steps",
+  "descend",
+  "old_mine",
+  "deeper",
+  "silk_and_boss",
+  "return_home",
+  "ending",
+  "accept_ch2",
+  "free_play_save"
+ ],
+ "timings": {
+  "title_new_game": 17.1,
+  "read_ward": 6.0,
+  "gather_basics": 43.1,
+  "craft_axe": 3.2,
+  "chop": 32.0,
+  "workbench": 15.3,
+  "tailor_cache": 14.0,
+  "mochi": 26.1,
+  "pebble": 51.5,
+  "home": 97.4,
+  "lumi": 49.6,
+  "prepare": 20.4,
+  "brave_steps": 48.0,
+  "descend": 35.9,
+  "old_mine": 33.8,
+  "deeper": 39.9,
+  "silk_and_boss": 81.6,
+  "return_home": 28.3,
+  "ending": 57.0,
+  "accept_ch2": 3.8,
+  "free_play_save": 2.1
+ },
+ "problems": [],
+ "notes": {
+  "overwrite_confirm": "not shown (no save in the isolated save dir)",
+  "look": {
+   "wanted": {
+    "outfit": "strawberry_picnic",
+    "hair": "braided_crown"
+   },
+   "got": {
+    "outfit": "strawberry_picnic",
+    "hair": "braided_crown"
+   }
+  },
+  "tailor_cache": {
+   "flag": true,
+   "optional_done": true
+  },
+  "brave_steps": {
+   "ribbon_tied": true,
+   "mochi_follows": true
+  },
+  "courage_lantern": {
+   "flag": true,
+   "optional_done": true
+  },
+  "brazier_uses": [
+   {
+    "brazier": 0,
+    "phase": 1,
+    "text": "Light the brazier"
+   },
+   {
+    "brazier": 2,
+    "phase": 3,
+    "text": "Light the brazier"
+   },
+   {
+    "brazier": 0,
+    "phase": 3,
+    "text": "Stoke the brazier"
+   }
+  ],
+  "dodges": {
+   "fan": 2,
+   "drop": 2
+  },
+  "drops_seen": 2,
+  "minion_hits": 3,
+  "boss": {
+   "seconds": 69.0,
+   "phases_seen": [
+    1,
+    2,
+    3
+   ],
+   "deaths": 0,
+   "lowest_hp": 79.0,
+   "braziers_used": [
+    0,
+    2
+   ],
+   "defeated": true
+  },
+  "chapter2_after_accept": {
+   "current": [
+    "ch2_waygate"
+   ],
+   "done": [
+    "ch2_light_beyond"
+   ],
+   "tracker": {
+    "kind": "chapter2",
+    "step": "ch2_waygate",
+    "targets": [
+     {
+      "area": "surface",
+      "id": "ruin"
+     }
+    ],
+    "title": "The Hallowmere Way"
+   }
+  }
+ },
+ "continue_check": {
+  "save": "qa\\tmp\\final203\\s0\\saves\\slot1.json",
+  "ok": true,
+  "mismatches": [],
+  "seconds_to_play": 9.8,
+  "observed": {
+   "area": "surface",
+   "step": "free_play",
+   "ui_stack": [],
+   "hair": "braided_crown",
+   "outfit": "strawberry_picnic",
+   "chapter2_current": [
+    "ch2_waygate"
+   ],
+   "optional_done": [
+    "opt_brave_little_steps",
+    "opt_look_of_your_own",
+    "opt_tailors_cache"
+   ],
+   "companions": {
+    "lumi": "home",
+    "mochi": "follow",
+    "pebble": "home"
+   },
+   "keys": {
+    "foreman_key": 1
+   }
+  },
+  "game_log_errors": []
+ }
+}
+EXIT=0

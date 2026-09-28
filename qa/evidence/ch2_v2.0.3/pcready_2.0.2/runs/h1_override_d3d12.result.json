@@ -1,0 +1,103 @@
+{
+ "variant": "h1_override_d3d12",
+ "engine_args": [
+  "--log-file",
+  "C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/pcready/runs/h1_override_d3d12/godot.log"
+ ],
+ "window": [
+  1280,
+  720
+ ],
+ "preset": null,
+ "settings_file_existed": false,
+ "exe_copy": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\pcready\\runs\\h1_override_d3d12\\qa_exe\\Hollowhaven.exe",
+ "t_start": "2026-09-28 15:57:56",
+ "seconds_to_title": 3.6,
+ "title_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit"
+ ],
+ "title_mode_reached": true,
+ "env_at_title": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "12_0",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "d3d12",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "env_last": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "12_0",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "d3d12",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "final_mode": "title",
+ "final_area": "",
+ "appearance": {
+  "back": "satchel",
+  "eyes": "eye_1",
+  "hair": "side_braid",
+  "hair_acc": "flower_clip",
+  "hair_color": "auburn",
+  "hat": "",
+  "lower": "explorer_trousers",
+  "outfit": "cozy_explorer",
+  "palette": {
+   "accent": "plum",
+   "primary": "teal",
+   "secondary": "sunflower"
+  },
+  "shoes": "explorer_boots",
+  "skin": "skin_2",
+  "upper": "explorer_jacket"
+ },
+ "mem_all": {
+  "private_mb_max": 1099.8,
+  "ws_mb_max": 654.6,
+  "peak_ws_mb": 686.7
+ },
+ "exit_code_before_stop": null,
+ "seconds_total": 5.4,
+ "focus_watchdog": {
+  "checks": 20,
+  "game_had_focus": 0,
+  "handed_back": 0
+ },
+ "settings_file_final": null,
+ "log_lines": 0,
+ "log_header": [],
+ "log_errors": [],
+ "log_error_count": 0,
+ "log_warning_count": 0
+}

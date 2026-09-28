@@ -1,0 +1,184 @@
+{
+  "results": [
+    {
+      "step": "title_new_game",
+      "ok": true,
+      "seconds": 16.5,
+      "elapsed": 16.5,
+      "quest": "wake",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_003_title_new_game.png"
+    },
+    {
+      "step": "read_ward",
+      "ok": true,
+      "seconds": 6.1,
+      "elapsed": 22.7,
+      "quest": "gather_basics",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_004_read_ward.png"
+    },
+    {
+      "step": "gather_basics",
+      "ok": true,
+      "seconds": 41.0,
+      "elapsed": 63.7,
+      "quest": "craft_axe",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_005_gather_basics.png"
+    },
+    {
+      "step": "craft_axe",
+      "ok": true,
+      "seconds": 3.3,
+      "elapsed": 67.0,
+      "quest": "chop",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_007_craft_axe.png"
+    },
+    {
+      "step": "chop",
+      "ok": true,
+      "seconds": 26.3,
+      "elapsed": 93.2,
+      "quest": "workbench",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_008_chop.png"
+    },
+    {
+      "step": "workbench",
+      "ok": true,
+      "seconds": 19.4,
+      "elapsed": 112.6,
+      "quest": "mochi",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_011_workbench.png"
+    },
+    {
+      "step": "tailor_cache",
+      "ok": true,
+      "seconds": 13.8,
+      "elapsed": 126.4,
+      "quest": "mochi",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_012_tailor_cache.png"
+    },
+    {
+      "step": "mochi",
+      "ok": true,
+      "seconds": 26.4,
+      "elapsed": 152.9,
+      "quest": "pebble",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_013_mochi.png"
+    },
+    {
+      "step": "pebble",
+      "ok": true,
+      "seconds": 51.5,
+      "elapsed": 204.4,
+      "quest": "home",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_015_pebble.png"
+    },
+    {
+      "step": "home",
+      "ok": false,
+      "seconds": 53.0,
+      "elapsed": 257.4,
+      "quest": "home",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_016_home.png"
+    }
+  ],
+  "problems": [],
+  "notes": {
+    "overwrite_confirm": "not shown (no save in the isolated save dir)",
+    "look": {
+      "wanted": {
+        "outfit": "strawberry_picnic",
+        "hair": "braided_crown"
+      },
+      "got": {
+        "outfit": "strawberry_picnic",
+        "hair": "braided_crown"
+      }
+    },
+    "tailor_cache": {
+      "flag": true,
+      "optional_done": true
+    }
+  },
+  "final_state": {
+    "step": "home",
+    "area": "surface",
+    "inv": {
+      "berries": 12,
+      "copper_ore": 11,
+      "fiber": 11,
+      "shiny_pebble": 1,
+      "stone": 5,
+      "stone_axe": 1,
+      "stone_pickaxe": 1,
+      "sunflax_seeds": 2,
+      "sweetroot_seeds": 4,
+      "wood": 20,
+      "woven_cloth": 2
+    },
+    "keys": {},
+    "flags": [
+      "c1x_look_chosen",
+      "hint_quest_wake",
+      "hint_intro_move",
+      "read_ward_intro",
+      "hint_quest_gather_basics",
+      "hint_quest_craft_axe",
+      "hint_quest_chop",
+      "hint_quest_workbench",
+      "hint_build_controls",
+      "hint_build_controls_ch2",
+      "hint_quest_mochi",
+      "c1x_tailor_cache",
+      "hint_c1x_loom",
+      "hint_quest_pebble",
+      "hint_quest_home"
+    ],
+    "companions": {
+      "lumi": "wild",
+      "mochi": "home",
+      "pebble": "follow"
+    },
+    "optional": {
+      "done": [
+        "opt_look_of_your_own",
+        "opt_tailors_cache"
+      ],
+      "done_count": 2,
+      "pending": [
+        "opt_brave_little_steps",
+        "opt_copper_courage",
+        "opt_upstairs",
+        "opt_legacy_bond",
+        "opt_legacy_heartbloom"
+      ]
+    },
+    "appearance": {
+      "back": "picnic_basket",
+      "eyes": "eye_1",
+      "hair": "braided_crown",
+      "hair_acc": "strawberry_clip",
+      "hair_color": "auburn",
+      "hat": "",
+      "lower": "pinafore_skirt",
+      "outfit": "strawberry_picnic",
+      "palette": {
+        "accent": "berry",
+        "primary": "rose",
+        "secondary": "cream"
+      },
+      "shoes": "mary_janes",
+      "skin": "skin_2",
+      "upper": "puff_blouse"
+    },
+    "chapter2": {
+      "active": false,
+      "available": false,
+      "chapter": 1,
+      "current": [],
+      "done": [],
+      "finished": false,
+      "title": ""
+    }
+  },
+  "game_log_errors": []
+}

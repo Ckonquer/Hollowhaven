@@ -1,11 +1,14 @@
 # Save-integrity report — Hollowhaven 2.0.x (save schema v2)
 
-Written 2026-09-28 for the 2.0.0 release (`dist/Hollowhaven-2.0.0-Windows.zip`, git `36e2e8a`). **Still current for 2.0.1 and
-2.0.2:** `game/autoload/save_system.gd` - the file with the schema, the v1 -> v2 migration, the upgrade backup and the
-save-side future-version check - is unchanged since 2.0.0 (`git diff 36e2e8a 991014c -- game/autoload/save_system.gd` is empty). The
-measurements below were made on 2.0.0 or earlier code; "2.0.x" below means any of these builds, today 2.0.2. Design: master prompt §2 and
+Written 2026-09-28 for the 2.0.0 release (`dist/Hollowhaven-2.0.0-Windows.zip`, git `36e2e8a`). **Still current for 2.0.1 -
+2.0.3:** `game/autoload/save_system.gd` - the file with the schema, the v1 -> v2 migration, the upgrade backup and the
+save-side future-version check - is unchanged since 2.0.0 (`git diff 36e2e8a 8f5cbc0 -- game/autoload/save_system.gd` is empty). The
+measurements below were made on 2.0.0 or earlier code; "2.0.x" below means any of these builds, today 2.0.3. Design: master prompt §2 and
 §20.1-20.2. Implementation and rules: `docs/SAVE_MIGRATION.md` (the reference; this file is the evidence summary).
 
+> **2.0.3 note:** Krystal has never played Hollowhaven and has no save; she starts with New Game, which writes a version-2 save
+> directly (no migration). The block below and the gate in §7 only matter if a pre-2.0 (v0.9.x) Chapter One save ever turns up.
+>
 > **PERSONAL-SAVE VERIFICATION BLOCKED.** Krystal's own save is not on this PC: `%APPDATA%\Hollowhaven\saves` on the development
 > PC is empty, and the immutable pre-Chapter-Two snapshot records the same (`Desktop\Hollowhaven_Backups\pre_chapter2_v0.9.1_2026-09-27\MANIFEST.txt`:
 > "profile_snapshot/saves/ ... EMPTY. Krystal's personal save is not on this PC"). Everything below was measured on synthetic
@@ -113,7 +116,7 @@ Tests: `test_save_v2_migration.test_future_*`, `test_save_v2_title.*`, matrix `1
 
 1. Close the game. Copy `%APPDATA%\Hollowhaven\saves\slot1.json` (and `slot1.bak.json`) from her PC to a scratch folder, e.g.
    `D:\hh_gate\saves\`; record `certutil -hashfile slot1.json SHA256` (never work in her real folder).
-2. Run the current 2.0.x build (2.0.2) on the copy only: `Hollowhaven.exe -- --save-dir=D:\hh_gate\saves`, press Continue, stand still, Pause > Save Game,
+2. Run the current 2.0.x build (2.0.3) on the copy only: `Hollowhaven.exe -- --save-dir=D:\hh_gate\saves`, press Continue, stand still, Pause > Save Game,
    quit.
 3. Compare: `.tools/pyenv/Scripts/python.exe tools/qa/save_integrity.py <original copy of slot1.json> D:\hh_gate\saves\slot1.json --out gate_report.json`
    (exit 0 = preserved; with a few seconds of play expect only clock / float / respawn-timer differences as in §3).

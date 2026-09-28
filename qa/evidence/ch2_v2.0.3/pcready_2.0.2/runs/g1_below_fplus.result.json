@@ -1,0 +1,142 @@
+{
+ "variant": "g1_below_fplus",
+ "engine_args": [
+  "--log-file",
+  "C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/pcready/runs/g1_below_fplus/godot.log"
+ ],
+ "window": [
+  1920,
+  1080
+ ],
+ "preset": null,
+ "settings_file_existed": true,
+ "exe_copy": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\pcready\\runs\\g1_below_fplus\\qa_exe\\Hollowhaven.exe",
+ "t_start": "2026-09-28 15:52:20",
+ "seconds_to_title": 2.8,
+ "title_buttons": [
+  "Continue",
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit"
+ ],
+ "title_mode_reached": true,
+ "env_at_title": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "1.4.329",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 1,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1920,
+   1080
+  ]
+ },
+ "seconds_continue_to_playing": 2.2,
+ "sample_frames": {
+  "frames": 7311,
+  "seconds": 18.83,
+  "avg_fps": 388.2,
+  "avg_ms": 2.576,
+  "median_ms": 2.39,
+  "low1_fps": 82.1,
+  "low01_fps": 11.8,
+  "p95_ms": 3.58,
+  "p99_ms": 4.03,
+  "p999_ms": 7.97,
+  "worst_ms": 188.55,
+  "over_16_7": 3,
+  "over_33": 3,
+  "over_50": 3,
+  "over_100": 3,
+  "spikes_2x_median": 7,
+  "tele_pct": 0.79,
+  "tele_max_ms": 1.38,
+  "tele_spikes": 0,
+  "low1_fps_minus_tele": 82.6,
+  "avg_fps_minus_tele": 391.3,
+  "gpu_avg_ms": 1.673,
+  "gpu_p99_ms": 3.71,
+  "gpu_share": 0.65,
+  "cpu_render_avg_ms": 1.13,
+  "engine_fps_monitor_avg": 388.7,
+  "engine_fps_monitor_min": 303.0,
+  "video_mb_max": 498.2,
+  "texture_mb_max": 390.2,
+  "buffer_mb_max": 36.1,
+  "draw_calls_avg": 885.6,
+  "primitives_avg": 7758092.0,
+  "process_ms_avg": 34.7,
+  "physics_ms_avg": 0.8,
+  "nodes_max": 2554.0
+ },
+ "env_last": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "1.4.329",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 1,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1920,
+   1080
+  ]
+ },
+ "final_mode": "playing",
+ "final_area": "below",
+ "appearance": {
+  "back": "satchel",
+  "eyes": "eye_1",
+  "hair": "side_braid",
+  "hair_acc": "flower_clip",
+  "hair_color": "auburn",
+  "hat": "",
+  "lower": "explorer_trousers",
+  "outfit": "cozy_explorer",
+  "palette": {
+   "accent": "plum",
+   "primary": "teal",
+   "secondary": "sunflower"
+  },
+  "shoes": "explorer_boots",
+  "skin": "skin_2",
+  "upper": "explorer_jacket"
+ },
+ "mem_all": {
+  "private_mb_max": 1834.1,
+  "ws_mb_max": 822.1,
+  "peak_ws_mb": 829.6
+ },
+ "exit_code_before_stop": null,
+ "seconds_total": 33.9,
+ "focus_watchdog": {
+  "checks": 129,
+  "game_had_focus": 0,
+  "handed_back": 0
+ },
+ "settings_file_final": "[settings]\n\ncomfort_confirmed=true\n",
+ "log_lines": 0,
+ "log_header": [],
+ "log_errors": [],
+ "log_error_count": 0,
+ "log_warning_count": 0
+}

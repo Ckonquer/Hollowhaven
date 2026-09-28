@@ -1,0 +1,43 @@
+{
+ "dev_s2": {
+  "quarry_warden": {
+   "OLD 2.0.2": {
+    "fight_tips_accepted": 4,
+    "shown": 3,
+    "dropped_or_never": [
+     "hint_quarry_warden_exposed"
+    ],
+    "median_late": 20.1,
+    "max_late": 23.8,
+    "instr_max_late": null,
+    "opening_lates": [],
+    "openings_unshown": [
+     "hint_quarry_warden_exposed"
+    ],
+    "fight_tips_after_end": [
+     [
+      "tell_quarry_warden_charge",
+      4.31
+     ],
+     [
+      "tell_quarry_warden_pulses",
+      14.11
+     ]
+    ]
+   },
+   "NEW": {
+    "fight_tips_accepted": 4,
+    "shown": 4,
+    "dropped_or_never": [],
+    "median_late": 0.35,
+    "max_late": 4.05,
+    "instr_max_late": 0.35,
+    "opening_lates": [
+     0.35
+    ],
+    "openings_unshown": [],
+    "fight_tips_after_end": []
+   }
+  }
+ }
+}

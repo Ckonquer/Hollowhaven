@@ -1,0 +1,36 @@
+[15:11:43] CHAIN out=C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\bot\chain\native_202_headless_resumeT23 headless=True exe=C:\Users\Ali\Desktop\Hollowhaven\builds\Hollowhaven\Hollowhaven.exe project=C:\Users\Ali\Desktop\Hollowhaven\game start_save=qa\tmp\bot\chain\native_202_headless\checkpoints\S2_end\slot1.json (native_v2) from=T23 until=
+[15:11:52] CHAIN ################ T23: Home to rest and cook, then the road to the manor ################
+[15:11:52] CHAIN === T23 step quarry_to_arch ===
+[15:12:06] CHAIN === T23 step quarry_to_arch: OK in 14.1s 
+[15:12:06] CHAIN === T23 step lantern_road_home ===
+[15:12:06] CHAIN Lantern Road list at the quarry arch: ['The Haven (home)', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Stay here', 'Close']
+[15:12:11] CHAIN === T23 step lantern_road_home: OK in 5.5s 
+[15:12:11] CHAIN === T23 step home_rest ===
+[15:12:34] CHAIN home rest T23: {'hp_before': 100.0, 'food_before': {'berry_snack': 1, 'pumpkin': 3, 'berries': 1}, 'slept': True, 'hp_after_sleep': 100.0, 'sleep_msgs': ['journey saved'], 'harvest': {'prompt': 'Harvest Sunflax', 'ok': True, 'sweetroot': 0}, 'berries_picked': 15, 'hp_after': 100.0, 'food_after': {'berry_snack': 5, 'pumpkin': 3}}
+[15:12:34] CHAIN === T23 step home_rest: OK in 23.0s 
+[15:12:34] CHAIN === T23 step lantern_road_commons ===
+[15:12:41] CHAIN Lantern Road list at the Ward Stone: ['Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Stay here', 'Close']
+[15:12:45] CHAIN === T23 step lantern_road_commons: OK in 10.9s 
+[15:12:45] CHAIN === T23 step road_to_manor_arch ===
+[15:13:08] CHAIN === T23 step road_to_manor_arch: OK in 23.0s 
+[15:13:08] CHAIN ################ T23: OK in 76.6s - completes (script errors 0, music cues 2, shots 8)
+[15:13:08] CHAIN ################ S3: Moonveil Manor (Count Velour) ################
+[15:16:34] CHAIN ################ S3: OK in 206.0s - completes (script errors 0, music cues 8, shots 18)
+[15:16:34] CHAIN ################ T34: Home to rest and cook before the Hushed Works ################
+[15:16:34] CHAIN === T34 step grounds_to_manor_arch ===
+[15:16:40] CHAIN === T34 step grounds_to_manor_arch: OK in 5.8s 
+[15:16:40] CHAIN === T34 step lantern_road_home ===
+[15:16:41] CHAIN Lantern Road list at the manor arch: ['The Haven (home)', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Stay here', 'Close']
+[15:16:45] CHAIN === T34 step lantern_road_home: OK in 5.3s 
+[15:16:45] CHAIN === T34 step home_rest ===
+[15:17:10] CHAIN home rest T34: {'hp_before': 78.0, 'food_before': {'berry_snack': 5, 'pumpkin': 3}, 'slept': True, 'hp_after_sleep': 100.0, 'sleep_msgs': ['journey saved'], 'berries_picked': 14, 'hp_after': 100.0, 'food_after': {'berry_snack': 8, 'pumpkin': 3, 'berries': 2}}
+[15:17:10] CHAIN === T34 step home_rest: OK in 24.8s 
+[15:17:10] CHAIN === T34 step lantern_road_commons ===
+[15:17:21] CHAIN Lantern Road list at the Ward Stone: ['Lanternwake Commons', 'Pumpkintide Orchard', 'Ashbell Quarry', 'Moonveil Manor', 'Stay here', 'Close']
+[15:17:25] CHAIN === T34 step lantern_road_commons: OK in 15.1s 
+[15:17:25] CHAIN ################ T34: OK in 51.0s - completes (script errors 0, music cues 2, shots 7)
+[15:17:25] CHAIN ################ S4: Link the lanterns, the Hushed Works, the Crossing, the Choir, the Lanternwake, free play ################
+[15:29:29] CHAIN ################ S4: OK in 723.4s - completes (script errors 0, music cues 26, shots 35)
+[15:29:29] CHAIN ################ END: Relaunch + Continue check (free play resumes in the same save) ################
+[15:29:32] CHAIN relaunched as g2 (port 9811)
+[15:29:38] CHAIN ################ END: OK in 9.5s - completes (script errors 0, music cues 3, shots 1)

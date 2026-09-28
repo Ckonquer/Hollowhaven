@@ -1,0 +1,41 @@
+Where the QA game windows really were (telemetry fields window_pos / window, first and last frame of each process).
+Generated 2026-09-28 from qa/tmp telemetry (read-only). The primary monitor is 0,0 1920x1080; the second monitor starts at x=1920.
+Requested position for every run below: x=1920, y=0 (--position 1920,0 / --qa-window=1920,0,<w>,<h>).
+
+run                                          first window_pos   size           last window_pos    file time
+bot/chain/native_202_visible g1              [0, 0]             [1920, 1080]   [0, 0]             15:06
+bot/chain/native_202_visible g2              [0, 0]             [1920, 1080]   [0, 0]             15:27
+bot/chain/native_202_visible g3              [0, 0]             [1920, 1080]   [0, 0]             15:28
+pcready/runs/a_default                       [0, 0]             [1920, 1080]   [0, 0]             15:08
+pcready/runs/b_d3d12                         [0, 0]             [1920, 1080]   [0, 0]             15:11
+pcready/runs/c2_angle                        [0, 0]             [1920, 1080]   [0, 0]             15:19
+pcready/runs/c_compat                        [0, 0]             [1920, 1080]   [0, 0]             15:14
+pcready/runs/d1_1366                         [1920, 0]          [1366, 768]    [1920, 0]          15:26
+pcready/runs/d2_1280_noaudio                 [1920, 0]          [1280, 720]    [1920, 0]          15:29
+pcready/runs/d3_1610                         [1920, 0]          [1728, 1080]   [1920, 0]          15:45
+pcready/runs/d4_32                           [1920, 0]          [1620, 1080]   [1920, 0]          16:04
+pcready/runs/d5_219                          [1920, 0]          [1920, 822]    [1920, 0]          15:48
+pcready/runs/devices                         [1920, 0]          [1280, 720]    [1920, 0]          15:05
+pcready/runs/e1_igpu_auto                    [0, 0]             [1920, 1080]   [0, 0]             15:31
+pcready/runs/e2_igpu_low                     [0, 0]             [1920, 1080]   [0, 0]             15:35
+pcready/runs/e3_igpu_high                    [0, 0]             [1920, 1080]   [0, 0]             15:38
+pcready/runs/e4_igpu_low_lean                [0, 0]             [1920, 1080]   [0, 0]             15:40
+pcready/runs/e5_igpu_low_lean_50             [0, 0]             [1920, 1080]   [0, 0]             15:41
+pcready/runs/e6_igpu_medium_fsr              [0, 0]             [1920, 1080]   [0, 0]             15:56
+pcready/runs/e7_igpu_medium                  [0, 0]             [1920, 1080]   [0, 0]             15:55
+pcready/runs/f1_no_vulkan                    [0, 0]             [1920, 1080]   [0, 0]             15:21
+pcready/runs/f2_no_vulkan_no_d3d12           [0, 0]             [1920, 1080]   [0, 0]             15:22
+pcready/runs/g1_below_fplus                  [0, 0]             [1920, 1080]   [0, 0]             15:52
+pcready/runs/g2_below_compat                 [0, 0]             [1920, 1080]   [0, 0]             15:53
+pcready/runs/h1_override_d3d12               [1920, 0]          [1280, 720]    [1920, 0]          15:58
+pcready/runs/h2_cli_opengl3_only             [1920, 0]          [1280, 720]    [1920, 0]          15:58
+
+18 of 26 processes had window_pos [0, 0] (on the primary monitor); every one of them is 1920x1080.
+
+After the fix (bb79708: rect 8 px inside the live second monitor, launchers refuse a rect not fully on a non-primary
+monitor, watchdog moves / kills a window overlapping the primary monitor):
+run                                          first window_pos   size           watchdog
+hud_clutter/visible toast_1904x1064          [1928, 8]          [1904, 1062]   on_primary_checks 0 of 90 checks
+hud_clutter/visible toast_1280x720           [1928, 8]          [1280, 718]    on_primary_checks 0 of 66 checks
+cam_companion/visible1 g1                    [1928, 8]          [1904, 1062]   on_primary_checks 0 of 114 checks
+(watchdog files copied next to this one)

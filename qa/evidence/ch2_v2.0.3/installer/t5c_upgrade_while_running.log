@@ -1,0 +1,30 @@
+﻿2026-09-28 15:15:53.223   Log opened. (Time zone: UTC-04:00)
+2026-09-28 15:15:53.224   Setup version: Inno Setup version 6.7.3
+2026-09-28 15:15:53.224   Original Setup EXE: C:\Users\Ali\Desktop\Hollowhaven\dist\Hollowhaven-Setup-2.0.2.exe
+2026-09-28 15:15:53.224   Setup command line: /SL5="$94F08B0,103047324,893440,C:\Users\Ali\Desktop\Hollowhaven\dist\Hollowhaven-Setup-2.0.2.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOICONS /MERGETASKS="!desktopicon" /LOGCLOSEAPPLICATIONS /DIR="C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up" /LOG="C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\logs\t5c_upgrade_while_running.log" 
+2026-09-28 15:15:53.224   Windows version: 10.0.26200
+2026-09-28 15:15:53.224   Windows architecture: x64 (64-bit)
+2026-09-28 15:15:53.224   Machine types supported by system: x86 x64
+2026-09-28 15:15:53.224   User privileges: None
+2026-09-28 15:15:53.291   Administrative install mode: No
+2026-09-28 15:15:53.291   Install mode root key: HKEY_CURRENT_USER
+2026-09-28 15:15:53.291   64-bit install mode: Yes
+2026-09-28 15:15:53.291   RedirectionGuard status for current process: Enabled in enforcing mode
+2026-09-28 15:15:53.293   Created temporary directory: C:\Users\Ali\AppData\Local\Temp\is-JIBKDECLK1.tmp
+2026-09-28 15:15:53.399   Found a file to register with RestartManager: C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\installer\install_up\Hollowhaven.exe
+2026-09-28 15:15:53.400   Found 1 files to register with RestartManager.
+2026-09-28 15:15:53.400   Calling RestartManager's RmGetList.
+2026-09-28 15:15:53.486   RmGetList finished successfully.
+2026-09-28 15:15:53.487   RestartManager found an application using one of our files: Hollowhaven - For Krystal
+2026-09-28 15:15:53.487   Can use RestartManager to avoid reboot? Yes (0)
+2026-09-28 15:15:53.493   Starting the installation process.
+2026-09-28 15:15:53.495   Shutting down applications using our files.
+2026-09-28 15:15:53.582   Some applications could not be shut down.
+2026-09-28 15:15:53.582   Defaulting to Abort for suppressed message box (Abort/Retry/Ignore):
+                          Setup was unable to automatically close all applications. It is recommended that you close all applications using files that need to be updated by Setup before continuing.
+2026-09-28 15:15:53.582   User canceled the installation process.
+2026-09-28 15:15:53.582   Rolling back changes.
+2026-09-28 15:15:53.584   Starting the uninstallation process.
+2026-09-28 15:15:53.584   Uninstallation process succeeded.
+2026-09-28 15:15:53.584   Deinitializing Setup.
+2026-09-28 15:15:53.588   Log closed.

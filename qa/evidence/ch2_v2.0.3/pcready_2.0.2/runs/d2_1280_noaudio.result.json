@@ -1,0 +1,387 @@
+{
+ "variant": "d2_1280_noaudio",
+ "engine_args": [
+  "--audio-driver",
+  "Dummy",
+  "--log-file",
+  "C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/pcready/runs/d2_1280_noaudio/godot.log"
+ ],
+ "window": [
+  1280,
+  720
+ ],
+ "preset": null,
+ "settings_file_existed": false,
+ "exe_copy": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\pcready\\runs\\d2_1280_noaudio\\qa_exe\\Hollowhaven.exe",
+ "t_start": "2026-09-28 15:26:22",
+ "seconds_to_title": 3.1,
+ "title_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit"
+ ],
+ "title_mode_reached": true,
+ "env_at_title": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "1.4.329",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "after_new_game_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit",
+  "Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.",
+  "Standard | recommended | The intended experience: tense and unsettling, with a few real scares.",
+  "Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.",
+  "Off",
+  "Off",
+  "Off",
+  "On",
+  "Play a test sound",
+  "Play a test sound",
+  "Play a test sound",
+  "Begin the journey",
+  "Close"
+ ],
+ "comfort_clipped": [],
+ "meet_clipped": [],
+ "seconds_confirm_to_playing": 5.7,
+ "first_load": {
+  "area": "surface",
+  "frames": 118,
+  "from": "",
+  "long_frames": 3,
+  "ms": 3296.0,
+  "n": 1,
+  "post_done": false,
+  "post_long_frames": 0,
+  "post_worst_ms": 0.0,
+  "worst_frame_ms": 1670.68
+ },
+ "sample_pan": {
+  "turned_deg": 359.6,
+  "seconds": 16.0,
+  "px_per_deg": 5.1546
+ },
+ "sample_walk": {
+  "walked_m": 31.4,
+  "start": [
+   0.0,
+   0.0,
+   7.0
+  ],
+  "end": [
+   -0.31,
+   0.0,
+   6.79
+  ],
+  "interrupted_by_ui": []
+ },
+ "sample_frames": {
+  "frames": 5070,
+  "seconds": 24.46,
+  "avg_fps": 207.3,
+  "avg_ms": 4.825,
+  "median_ms": 4.789,
+  "low1_fps": 89.9,
+  "low01_fps": 23.4,
+  "p95_ms": 6.62,
+  "p99_ms": 7.28,
+  "p999_ms": 9.0,
+  "worst_ms": 148.98,
+  "over_16_7": 2,
+  "over_33": 2,
+  "over_50": 1,
+  "over_100": 1,
+  "spikes_2x_median": 5,
+  "tele_pct": 1.23,
+  "tele_max_ms": 3.96,
+  "tele_spikes": 2,
+  "low1_fps_minus_tele": 93.5,
+  "avg_fps_minus_tele": 209.8,
+  "gpu_avg_ms": 3.308,
+  "gpu_p99_ms": 4.64,
+  "gpu_share": 0.69,
+  "cpu_render_avg_ms": 1.56,
+  "engine_fps_monitor_avg": 207.1,
+  "engine_fps_monitor_min": 174.0,
+  "video_mb_max": 315.2,
+  "texture_mb_max": 213.8,
+  "buffer_mb_max": 31.9,
+  "draw_calls_avg": 1839.6,
+  "primitives_avg": 8419085.7,
+  "process_ms_avg": 14.0,
+  "physics_ms_avg": 1.4,
+  "nodes_max": 5076.0
+ },
+ "sample_mem": {
+  "private_mb_max": 1646.9,
+  "ws_mb_max": 1012.5
+ },
+ "steps": [
+  {
+   "step": "read_ward",
+   "ok": true,
+   "seconds": 9.1,
+   "quest": "gather_basics"
+  },
+  {
+   "step": "gather_basics",
+   "ok": true,
+   "seconds": 77.9,
+   "quest": "craft_axe"
+  }
+ ],
+ "play_frames": {
+  "frames": 26654,
+  "seconds": 87.38,
+  "avg_fps": 305.0,
+  "avg_ms": 3.278,
+  "median_ms": 2.962,
+  "low1_fps": 116.5,
+  "low01_fps": 43.3,
+  "p95_ms": 5.56,
+  "p99_ms": 6.48,
+  "p999_ms": 8.34,
+  "worst_ms": 156.88,
+  "over_16_7": 3,
+  "over_33": 3,
+  "over_50": 3,
+  "over_100": 2,
+  "spikes_2x_median": 35,
+  "tele_pct": 1.29,
+  "tele_max_ms": 5.91,
+  "tele_spikes": 5,
+  "low1_fps_minus_tele": 121.0,
+  "avg_fps_minus_tele": 309.0,
+  "gpu_avg_ms": 1.836,
+  "gpu_p99_ms": 4.36,
+  "gpu_share": 0.56,
+  "cpu_render_avg_ms": 1.232,
+  "engine_fps_monitor_avg": 303.8,
+  "engine_fps_monitor_min": 178.0,
+  "video_mb_max": 317.4,
+  "texture_mb_max": 215.7,
+  "buffer_mb_max": 32.3,
+  "draw_calls_avg": 1623.5,
+  "primitives_avg": 7862401.8,
+  "process_ms_avg": 10.2,
+  "physics_ms_avg": 1.3,
+  "nodes_max": 5363.0
+ },
+ "ui_tour": [
+  {
+   "label": "pause",
+   "ui_stack": [
+    "pause"
+   ],
+   "clipped": [],
+   "buttons": 10
+  },
+  {
+   "label": "settings_first_tab",
+   "ui_stack": [
+    "pause",
+    "settings"
+   ],
+   "clipped": [
+    "Off",
+    "Show tips again"
+   ],
+   "buttons": 19
+  },
+  {
+   "label": "settings_video",
+   "ui_stack": [
+    "pause",
+    "settings"
+   ],
+   "clipped": [],
+   "buttons": 18
+  },
+  {
+   "label": "inventory",
+   "ui_stack": [
+    "inventory"
+   ],
+   "clipped": [],
+   "buttons": 38
+  },
+  {
+   "label": "crafting",
+   "ui_stack": [
+    "crafting"
+   ],
+   "clipped": [
+    "Storage Chest | 10 Wood, 1 Copper Ore",
+    "Cozy Bed | 8 Wood, 6 Plant Fiber",
+    "Wooden Floor | 2 Wood",
+    "Wooden Wall | 3 Wood",
+    "Window Wall | 3 Wood, 1 Plant Fiber",
+    "Doorway | 3 Wood",
+    "Roof Tile | 2 Wood, 2 Plant Fiber",
+    "Picket Fence  x2 | 2 Wood",
+    "Lantern Post | 3 Wood, 1 Copper Ore, 1 Plant Fiber",
+    "Flower Pot | 3 Stone, 1 Plant Fiber",
+    "Woven Rug | 6 Plant Fiber, 2 Berries",
+    "Table | 5 Wood",
+    "Stool | 2 Wood",
+    "Pebble Cairn | 3 Shiny Pebble, 2 Stone",
+    "Echo Chime | 3 Echo Shard, 1 Wood, 1 Plant Fiber",
+    "Furnace | 10 Stone, 4 Wood, 2 Copper Ore",
+    "Vanity Mirror | 4 Wood, 2 Copper Ore, 2 Stone",
+    "Kitchen Counter | 8 Stone, 6 Wood, 2 Copper Bar",
+    "Lantern Wax  x2 | 1 Amber Resin, 1 Plant Fiber",
+    "Copper Axe | 3 Wood, 3 Copper Bar, 2 Plant Fiber",
+    "Copper Pickaxe | 3 Wood, 3 Copper Bar, 2 Plant Fiber",
+    "Sparkseed Wand | 4 Wood, 2 Copper Bar, 2 Glowcap",
+    "Copperwood Hood | 2 Woven Cloth, 1 Copper Bar",
+    "Copperwood Vest | 3 Woven Cloth, 2 Copper Bar",
+    "Copperwood Boots | 2 Woven Cloth, 1 Copper Bar",
+    "Gatherer's Charm | 2 Amber Resin, 2 Copper Bar, 2 Plant Fibe",
+    "Swiftstep Charm | 2 Iron Bar, 2 Moonpetal, 1 Woven Cloth",
+    "Kindling Charm | 1 Moonsteel Bar, 2 Glowcap, 2 Woven Cloth",
+    "Wooden Stairs | 8 Wood",
+    "Upper Floor | 3 Wood",
+    "Railing  x2 | 2 Wood",
+    "Half Wall | 2 Wood",
+    "Porch Post | 2 Wood",
+    "Arched Window | 3 Wood, 1 Plant Fiber",
+    "Gable Roof | 2 Wood, 2 Plant Fiber",
+    "Roof Corner | 2 Wood, 2 Plant Fiber",
+    "Window Flower Box | 2 Wood, 2 Plant Fiber",
+    "Bookshelf | 6 Wood",
+    "Wardrobe | 8 Wood, 2 Plant Fiber",
+    "Companion Bed | 3 Wood, 4 Plant Fiber",
+    "Companion Perch | 4 Wood, 2 Plant Fiber",
+    "Cottage Bench | 4 Wood",
+    "Music Box | 6 Wood, 2 Copper Bar, 1 Echo Shard",
+    "Candy Bowl | 2 Wood, 3 Lanternwake Candy",
+    "Hearty Stew | 2 Sweetroot, 3 Berries",
+    "Glowcap Skewer | 2 Glowcap, 1 Wood",
+    "Moonpetal Tea | 2 Moonpetal, 1 Sweetroot",
+    "Copper Bar | 2 Copper Ore",
+    "Iron Bar | 2 Iron Ore",
+    "Woven Cloth  x2 | 3 Sunflax, 2 Plant Fiber",
+    "Comfort Ribbon | 2 Woven Cloth, 2 Berries",
+    "Padded Hood | 1 Woven Cloth, 3 Plant Fiber",
+    "Padded Vest | 2 Woven Cloth, 4 Plant Fiber",
+    "Padded Boots | 1 Woven Cloth, 2 Plant Fiber",
+    "Curtains | 2 Woven Cloth, 1 Wood",
+    "Bat Bunting  x2 | 2 Woven Cloth, 2 Plant Fiber",
+    "Bigger Backpack (40 slots) | 4 Woven Cloth, 2 Copper Bar",
+    "Bigger Backpack (48 slots) | 6 Woven Cloth, 2 Iron Bar",
+    "Rose Dye | 4 Roseberries",
+    "Pumpkin Dye | 2 Pumpkin",
+    "Lavender Dye | 3 Moonpetal",
+    "Cream Dye | 4 Sunflax",
+    "Ember Dye | 2 Amber Resin, 3 Berries",
+    "Midnight Dye | 2 Moonpetal, 1 Echo Shard",
+    "Roseberry Tart | 2 Roseberries, 1 Sugarcap",
+    "Lanternwake Platter | 1 Pumpkin, 2 Roseberries, 1 Sweetroot"
+   ],
+   "buttons": 83
+  },
+  {
+   "label": "journal",
+   "ui_stack": [
+    "journal"
+   ],
+   "clipped": [],
+   "buttons": 1
+  },
+  {
+   "label": "map",
+   "ui_stack": [
+    "map"
+   ],
+   "clipped": [],
+   "buttons": 1
+  },
+  {
+   "label": "wardrobe",
+   "ui_stack": [
+    "wardrobe"
+   ],
+   "clipped": [],
+   "buttons": 35
+  }
+ ],
+ "env_last": {
+  "adapter": "NVIDIA GeForce RTX 4090",
+  "api": "1.4.329",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 2,
+  "refresh_hz": 144.0,
+  "render_scale": 1.0,
+  "screen": 0,
+  "threads": 32,
+  "vendor": "NVIDIA",
+  "vsync_mode": 1,
+  "window": [
+   1280,
+   720
+  ]
+ },
+ "final_mode": "playing",
+ "final_area": "surface",
+ "appearance": {
+  "back": "picnic_basket",
+  "eyes": "eye_1",
+  "hair": "braided_crown",
+  "hair_acc": "strawberry_clip",
+  "hair_color": "auburn",
+  "hat": "",
+  "lower": "pinafore_skirt",
+  "outfit": "strawberry_picnic",
+  "palette": {
+   "accent": "berry",
+   "primary": "rose",
+   "secondary": "cream"
+  },
+  "shoes": "mary_janes",
+  "skin": "skin_2",
+  "upper": "puff_blouse"
+ },
+ "mem_all": {
+  "private_mb_max": 1693.0,
+  "ws_mb_max": 1053.6,
+  "peak_ws_mb": 1058.9
+ },
+ "exit_code_before_stop": null,
+ "seconds_total": 161.4,
+ "focus_watchdog": {
+  "checks": 616,
+  "game_had_focus": 0,
+  "handed_back": 0
+ },
+ "settings_file_final": "[settings]\n\nmouse_sensitivity=0.5\ninvert_y=false\nfov=70.0\ncamera_distance=5.0\nshow_hints=true\nmaster_volume=0.85\nmusic_volume=0.6\nambience_volume=0.8\nsfx_volume=0.85\nui_volume=0.7\nhorror_intensity=1\narachnophobia=false\nreduce_shake=false\nreduce_flashing=false\ncaptions=true\ncomfort_confirmed=true\nhigh_visibility_cues=false\ntiming_assist=false\ncompanion_auto_attack=true\ncompanion_autocast=true\nseasonal_decor=false\nfullscreen=true\nvsync=true\nmax_fps=0\nrender_scale=1.0\nquality=2\nshow_fps=false\nbindings={}\n",
+ "log_lines": 0,
+ "log_header": [],
+ "log_errors": [],
+ "log_error_count": 0,
+ "log_warning_count": 0
+}

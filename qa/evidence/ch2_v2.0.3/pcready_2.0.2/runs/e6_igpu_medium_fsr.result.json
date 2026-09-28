@@ -1,0 +1,201 @@
+{
+ "variant": "e6_igpu_medium_fsr",
+ "engine_args": [
+  "--gpu-index",
+  "1",
+  "--log-file",
+  "C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/pcready/runs/e6_igpu_medium_fsr/godot.log"
+ ],
+ "window": [
+  1920,
+  1080
+ ],
+ "preset": {
+  "quality": 1,
+  "render_scale": 0.85
+ },
+ "settings_file_existed": true,
+ "exe_copy": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\pcready\\runs\\e6_igpu_medium_fsr\\qa_exe\\Hollowhaven.exe",
+ "t_start": "2026-09-28 15:55:26",
+ "seconds_to_title": 2.8,
+ "title_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit"
+ ],
+ "title_mode_reached": true,
+ "env_at_title": {
+  "adapter": "AMD Radeon(TM) Graphics",
+  "api": "1.4.315",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 1,
+  "refresh_hz": 144.0,
+  "render_scale": 0.85,
+  "screen": 1,
+  "threads": 32,
+  "vendor": "AMD",
+  "vsync_mode": 1,
+  "window": [
+   1920,
+   1080
+  ]
+ },
+ "after_new_game_buttons": [
+  "New Game",
+  "Settings",
+  "Credits",
+  "Quit",
+  "Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.",
+  "Standard | recommended | The intended experience: tense and unsettling, with a few real scares.",
+  "Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.",
+  "Off",
+  "Off",
+  "Off",
+  "On",
+  "Play a test sound",
+  "Play a test sound",
+  "Play a test sound",
+  "Begin the journey",
+  "Close"
+ ],
+ "comfort_clipped": [],
+ "meet_clipped": [],
+ "seconds_confirm_to_playing": 7.2,
+ "first_load": {
+  "area": "surface",
+  "frames": 14,
+  "from": "",
+  "long_frames": 3,
+  "ms": 4629.5,
+  "n": 1,
+  "post_done": false,
+  "post_long_frames": 1,
+  "post_worst_ms": 80.35,
+  "worst_frame_ms": 2638.36
+ },
+ "sample_pan": {
+  "turned_deg": 307.1,
+  "seconds": 28.8,
+  "px_per_deg": 7.6923
+ },
+ "sample_walk": {
+  "walked_m": 30.9,
+  "start": [
+   0.0,
+   0.0,
+   7.0
+  ],
+  "end": [
+   -0.44,
+   0.0,
+   7.39
+  ],
+  "interrupted_by_ui": []
+ },
+ "sample_frames": {
+  "frames": 531,
+  "seconds": 37.52,
+  "avg_fps": 14.2,
+  "avg_ms": 70.663,
+  "median_ms": 70.774,
+  "low1_fps": 5.8,
+  "low01_fps": 1.8,
+  "p95_ms": 76.44,
+  "p99_ms": 78.46,
+  "p999_ms": 300.97,
+  "worst_ms": 548.54,
+  "over_16_7": 530,
+  "over_33": 530,
+  "over_50": 529,
+  "over_100": 1,
+  "spikes_2x_median": 1,
+  "tele_pct": 0.93,
+  "tele_max_ms": 4.23,
+  "tele_spikes": 0,
+  "low1_fps_minus_tele": 5.8,
+  "avg_fps_minus_tele": 14.3,
+  "gpu_avg_ms": 68.685,
+  "gpu_p99_ms": 76.7,
+  "gpu_share": 0.97,
+  "cpu_render_avg_ms": 1.816,
+  "engine_fps_monitor_avg": 14.1,
+  "engine_fps_monitor_min": 8.0,
+  "video_mb_max": 418.2,
+  "texture_mb_max": 314.7,
+  "buffer_mb_max": 37.2,
+  "draw_calls_avg": 1326.8,
+  "primitives_avg": 6403459.5,
+  "process_ms_avg": 80.8,
+  "physics_ms_avg": 1.8,
+  "nodes_max": 5076.0
+ },
+ "sample_mem": {
+  "private_mb_max": 1448.3,
+  "ws_mb_max": 975.6
+ },
+ "env_last": {
+  "adapter": "AMD Radeon(TM) Graphics",
+  "api": "1.4.315",
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+  "debug_build": false,
+  "driver": "vulkan",
+  "engine": "4.7.2-stable (official)",
+  "max_fps": 0,
+  "method": "forward_plus",
+  "quality": 1,
+  "refresh_hz": 144.0,
+  "render_scale": 0.85,
+  "screen": 1,
+  "threads": 32,
+  "vendor": "AMD",
+  "vsync_mode": 1,
+  "window": [
+   1920,
+   1080
+  ]
+ },
+ "final_mode": "playing",
+ "final_area": "surface",
+ "appearance": {
+  "back": "picnic_basket",
+  "eyes": "eye_1",
+  "hair": "braided_crown",
+  "hair_acc": "strawberry_clip",
+  "hair_color": "auburn",
+  "hat": "",
+  "lower": "pinafore_skirt",
+  "outfit": "strawberry_picnic",
+  "palette": {
+   "accent": "berry",
+   "primary": "rose",
+   "secondary": "cream"
+  },
+  "shoes": "mary_janes",
+  "skin": "skin_2",
+  "upper": "puff_blouse"
+ },
+ "mem_all": {
+  "private_mb_max": 2317.4,
+  "ws_mb_max": 1847.2,
+  "peak_ws_mb": 1898.8
+ },
+ "exit_code_before_stop": null,
+ "seconds_total": 73.9,
+ "focus_watchdog": {
+  "checks": 282,
+  "game_had_focus": 0,
+  "handed_back": 0
+ },
+ "settings_file_final": "[settings]\n\nmouse_sensitivity=0.5\ninvert_y=false\nfov=70.0\ncamera_distance=5.0\nshow_hints=true\nmaster_volume=0.85\nmusic_volume=0.6\nambience_volume=0.8\nsfx_volume=0.85\nui_volume=0.7\nhorror_intensity=1\narachnophobia=false\nreduce_shake=false\nreduce_flashing=false\ncaptions=true\ncomfort_confirmed=true\nhigh_visibility_cues=false\ntiming_assist=false\ncompanion_auto_attack=true\ncompanion_autocast=true\nseasonal_decor=false\nfullscreen=true\nvsync=true\nmax_fps=0\nrender_scale=0.85\nquality=1\nshow_fps=false\nbindings={}\n",
+ "log_lines": 0,
+ "log_header": [],
+ "log_errors": [],
+ "log_error_count": 0,
+ "log_warning_count": 0
+}

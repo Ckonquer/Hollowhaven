@@ -1,0 +1,141 @@
+[18:16:49] launched (HEADLESS, virtual input, port 9900) C:\Users\Ali\Desktop\Hollowhaven\.tools\godot\Godot_v4.7.2-stable_win64_console.exe pid=45524 args=['--headless', '--max-fps', '60', '--path', 'C:\\Users\\Ali\\Desktop\\Hollowhaven\\game', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/saves', '--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/qa_settings.cfg', '--qa-input-port=9900', '--qa-no-focus', '--no-focus-pause', '--qa-mute']
+[18:16:49] === STEP title_new_game (quest step wake, +0s) ===
+[18:16:52] button not found: 'Start fresh'; visible: ['New Game', 'Settings', 'Credits', 'Quit', 'Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.', 'Standard | recommended | The intended experience: tense and unsettling, with a few real scares.', 'Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.', 'Off', 'Off', 'Off', 'On', 'Play a test sound', 'Play a test sound', 'Play a test sound', 'Begin the journey', 'Close']
+[18:16:52] button not found: 'Start a new journey'; visible: ['New Game', 'Settings', 'Credits', 'Quit', 'Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.', 'Standard | recommended | The intended experience: tense and unsettling, with a few real scares.', 'Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.', 'Off', 'Off', 'Off', 'On', 'Play a test sound', 'Play a test sound', 'Play a test sound', 'Begin the journey', 'Close']
+[18:16:54] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_001_meet_krystal.png'}: no screenshot in a headless run
+[18:16:57] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_002_meet_krystal_chosen.png'}: no screenshot in a headless run
+[18:17:05] calibrated look (virtual): 0.2597 px/deg (motion 2.00 px -> dyaw=-7.7) invert=1.0
+[18:17:05] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_003_title_new_game.png'}: no screenshot in a headless run
+[18:17:05] RESULT PASS: playthrough:title_new_game - quest step now wake; ok=True; 17s
+[18:17:05] === STEP read_ward (quest step wake, +17s) ===
+[18:17:11] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_004_read_ward.png'}: no screenshot in a headless run
+[18:17:11] RESULT PASS: playthrough:read_ward - quest step now gather_basics; ok=True; 6s
+[18:17:11] === STEP gather_basics (quest step gather_basics, +23s) ===
+[18:17:14] walk_to stuck at [1.94, 0.0, -7.28] (dist 13.0); unstick #1
+[18:17:52] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_005_gather_basics.png'}: no screenshot in a headless run
+[18:17:52] RESULT PASS: playthrough:gather_basics - quest step now craft_axe; ok=True; 41s
+[18:17:52] === STEP craft_axe (quest step craft_axe, +64s) ===
+[18:17:52] craft Stone Axe x1
+[18:17:55] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_006_craft_Stone_Axe.png'}: no screenshot in a headless run
+[18:17:56] crafted: {'stone_axe': 1}
+[18:17:56] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_007_craft_axe.png'}: no screenshot in a headless run
+[18:17:56] RESULT PASS: playthrough:craft_axe - quest step now chop; ok=True; 3s
+[18:17:56] === STEP chop (quest step chop, +67s) ===
+[18:18:22] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_008_chop.png'}: no screenshot in a headless run
+[18:18:22] RESULT PASS: playthrough:chop - quest step now workbench; ok=True; 26s
+[18:18:22] === STEP workbench (quest step workbench, +93s) ===
+[18:18:28] walk_to stuck at [-43.51, -1.48, 3.22] (dist 43.5); unstick #1
+[18:18:36] craft Workbench x1
+[18:18:38] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_009_craft_Workbench.png'}: no screenshot in a headless run
+[18:18:39] crafted: {'workbench': 1}
+[18:18:39] place workbench
+[18:18:41] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_010_placed_workbench.png'}: no screenshot in a headless run
+[18:18:41] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_011_workbench.png'}: no screenshot in a headless run
+[18:18:41] RESULT PASS: playthrough:workbench - quest step now mochi; ok=True; 19s
+[18:18:41] === STEP tailor_cache (quest step mochi, +113s) ===
+[18:18:41] travel to old_oak
+[18:18:55] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_012_tailor_cache.png'}: no screenshot in a headless run
+[18:18:55] RESULT PASS: playthrough:tailor_cache - quest step now mochi; ok=True; 14s
+[18:18:55] === STEP mochi (quest step mochi, +126s) ===
+[18:18:55] travel to glade
+[18:19:22] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_013_mochi.png'}: no screenshot in a headless run
+[18:19:22] RESULT PASS: playthrough:mochi - quest step now pebble; ok=True; 26s
+[18:19:22] === STEP pebble (quest step pebble, +153s) ===
+[18:19:32] walk_to stuck at [-10.28, 0.0, 2.41] (dist 10.4); unstick #1
+[18:19:34] craft Stone Pickaxe x1
+[18:19:36] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_014_craft_Stone_Pickaxe.png'}: no screenshot in a headless run
+[18:19:37] crafted: {'stone_pickaxe': 1}
+[18:19:37] travel to quarry
+[18:20:13] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_015_pebble.png'}: no screenshot in a headless run
+[18:20:13] RESULT PASS: playthrough:pebble - quest step now home; ok=True; 52s
+[18:20:13] === STEP home (quest step home, +204s) ===
+[18:20:26] walk_to stuck at [5.82, 0.0, 0.62] (dist 6.7); unstick #1
+[18:20:48] walk_to stuck at [5.7, -0.01, 18.78] (dist 15.8); unstick #1
+[18:21:06] StepFailed: no ['Grass', 'Fiber'] nearby
+[18:21:06] screenshot failed: {'shot': 'C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/final203/fresh/play_016_home.png'}: no screenshot in a headless run
+[18:21:06] RESULT FAIL: playthrough:home - quest step now home; ok=False; 53s
+[18:21:06] PLAYTHROUGH STOPPED at home
+[18:21:06] focus report: {'telemetry_frames': 2180, 'frames_focused': 2180, 'frames_mouse_captured': 0}
+[
+ {
+  "step": "title_new_game",
+  "ok": true,
+  "seconds": 16.5,
+  "elapsed": 16.5,
+  "quest": "wake",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_003_title_new_game.png"
+ },
+ {
+  "step": "read_ward",
+  "ok": true,
+  "seconds": 6.1,
+  "elapsed": 22.7,
+  "quest": "gather_basics",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_004_read_ward.png"
+ },
+ {
+  "step": "gather_basics",
+  "ok": true,
+  "seconds": 41.0,
+  "elapsed": 63.7,
+  "quest": "craft_axe",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_005_gather_basics.png"
+ },
+ {
+  "step": "craft_axe",
+  "ok": true,
+  "seconds": 3.3,
+  "elapsed": 67.0,
+  "quest": "chop",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_007_craft_axe.png"
+ },
+ {
+  "step": "chop",
+  "ok": true,
+  "seconds": 26.3,
+  "elapsed": 93.2,
+  "quest": "workbench",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_008_chop.png"
+ },
+ {
+  "step": "workbench",
+  "ok": true,
+  "seconds": 19.4,
+  "elapsed": 112.6,
+  "quest": "mochi",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_011_workbench.png"
+ },
+ {
+  "step": "tailor_cache",
+  "ok": true,
+  "seconds": 13.8,
+  "elapsed": 126.4,
+  "quest": "mochi",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_012_tailor_cache.png"
+ },
+ {
+  "step": "mochi",
+  "ok": true,
+  "seconds": 26.4,
+  "elapsed": 152.9,
+  "quest": "pebble",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_013_mochi.png"
+ },
+ {
+  "step": "pebble",
+  "ok": true,
+  "seconds": 51.5,
+  "elapsed": 204.4,
+  "quest": "home",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_015_pebble.png"
+ },
+ {
+  "step": "home",
+  "ok": false,
+  "seconds": 53.0,
+  "elapsed": 257.4,
+  "quest": "home",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\final203\\fresh\\play_016_home.png"
+ }
+]
+EXIT=0

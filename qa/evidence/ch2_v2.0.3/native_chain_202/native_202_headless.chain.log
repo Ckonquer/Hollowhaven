@@ -1,0 +1,30 @@
+[15:02:37] CHAIN out=C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\bot\chain\native_202_headless headless=True exe=C:\Users\Ali\Desktop\Hollowhaven\builds\Hollowhaven\Hollowhaven.exe project=C:\Users\Ali\Desktop\Hollowhaven\game start_save=qa\tmp\bot\chain\native_start_202\slot1.json (native_v2) from=S1 until=
+[15:02:38] CHAIN ################ S1: Chapter Two start from a version-2 save (load checks, wardrobe, Ward Stone menu, waygate, Commons, relaunch) ################
+[15:04:10] CHAIN relaunched as g2 (port 9801)
+[15:04:16] CHAIN ################ S1: OK in 97.9s - completes (script errors 0, music cues 10, shots 28)
+[15:04:16] CHAIN ################ S2: Hallowmere west + east (orchard, quarry, Quarry Warden) ################
+[15:08:15] CHAIN ################ S2: OK in 239.8s - completes (script errors 0, music cues 11, shots 25)
+[15:08:15] CHAIN ################ T23: Home to rest and cook, then the road to the manor ################
+[15:08:15] CHAIN === T23 step quarry_to_arch ===
+[15:08:30] CHAIN === T23 step quarry_to_arch: OK in 14.2s 
+[15:08:30] CHAIN === T23 step lantern_road_home ===
+[15:08:31] CHAIN Lantern Road list at the quarry arch: ['The Haven (home)', 'Lanternwake Commons', 'Pumpkintide Orchard', 'Stay here', 'Close']
+[15:08:34] CHAIN === T23 step lantern_road_home: OK in 4.9s 
+[15:08:34] CHAIN === T23 step home_rest ===
+[15:09:21] CHAIN berries: no ['Berr'] nearby
+[15:09:21] CHAIN home rest T23: {'hp_before': 100.0, 'food_before': {'berry_snack': 1, 'pumpkin': 3, 'berries': 1}, 'slept': True, 'hp_after_sleep': 100.0, 'sleep_msgs': ['journey saved'], 'harvest': {'prompt': 'Harvest Sunflax', 'ok': True, 'sweetroot': 0}, 'berries_picked': 0, 'hp_after': 100.0, 'food_after': {'berry_snack': 1, 'pumpkin': 3, 'berries': 1}}
+[15:09:21] CHAIN === T23 step home_rest: OK in 46.9s 
+[15:09:21] CHAIN === T23 step lantern_road_commons ===
+[15:09:52] CHAIN Traceback (most recent call last):
+  File "C:\Users\Ali\Desktop\Hollowhaven\tools\qa\ch2\chain.py", line 905, in run_steps
+    r = fn()
+        ^^^^
+  File "C:\Users\Ali\Desktop\Hollowhaven\tools\qa\ch2\chain.py", line 1055, in to_commons
+    return self.ward_stone_travel(p1, "Lanternwake Commons")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ali\Desktop\Hollowhaven\tools\qa\ch2\chain.py", line 954, in ward_stone_travel
+    raise ChainStop(f"no Ward Stone near the Haven (at {p1.pos()})")
+ChainStop: no Ward Stone near the Haven (at [-34.97, 6.87, -103.18])
+
+[15:09:52] CHAIN === T23 step lantern_road_commons: FAILED in 30.6s ChainStop: no Ward Stone near the Haven (at [-34.97, 6.87, -103.18])
+[15:09:52] CHAIN ################ T23: STOPPED in 96.6s - stops at lantern_road_commons: ChainStop: no Ward Stone near the Haven (at [-34.97, 6.87, -103.18]) (script errors 0, music cues 2, shots 6)
