@@ -1,0 +1,6 @@
+[14:12:28] CHAIN out=C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\bot\chain\final_202_s4 headless=True exe=C:\Users\Ali\Desktop\Hollowhaven\builds\Hollowhaven\Hollowhaven.exe project=C:\Users\Ali\Desktop\Hollowhaven\game start_save=qa\tmp\bot\chain\final_201\checkpoints\T34_end\slot1.json from=S4 until=
+[14:12:35] CHAIN ################ S4: Link the lanterns, the Hushed Works, the Crossing, the Choir, the Lanternwake, free play ################
+[14:27:19] CHAIN ################ S4: OK in 883.4s - completes (script errors 0, music cues 26, shots 35)
+[14:27:19] CHAIN ################ END: Relaunch + Continue check (free play resumes in the same save) ################
+[14:27:22] CHAIN relaunched as g2 (port 9601)
+[14:27:28] CHAIN ################ END: OK in 8.8s - completes (script errors 0, music cues 3, shots 1)

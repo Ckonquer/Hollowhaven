@@ -1,0 +1,1105 @@
+{
+ "chain": "Chapter Two natural route (MP 20.4 Run A): S1 -> S2 -> T23 -> S3 -> T34 -> S4 -> relaunch",
+ "status": "completes",
+ "natural": false,
+ "start_save": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_201\\checkpoints\\T34_end\\slot1.json",
+ "resumed_from": "S4",
+ "mode": {
+  "headless": true,
+  "packaged_exe": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\builds\\Hollowhaven\\Hollowhaven.exe",
+  "project": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\game",
+  "godot": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\.tools\\godot\\Godot_v4.7.2-stable_win64_console.exe",
+  "muted": false,
+  "qa_window": null,
+  "seed": null
+ },
+ "started": "2026-09-28 14:12:28",
+ "total_seconds": 900.7,
+ "durations": {
+  "S4": 883.4,
+  "END": 8.8
+ },
+ "segments": [
+  {
+   "id": "S4",
+   "title": "Link the lanterns, the Hushed Works, the Crossing, the Choir, the Lanternwake, free play",
+   "start": "2026-09-28 14:12:35",
+   "start_state": {
+    "area": "hallowmere_reach",
+    "zone": "hr_commons",
+    "mode": "playing",
+    "pos": [
+     0.0,
+     -2.38,
+     73.4
+    ],
+    "hp": 100.0,
+    "food": {
+     "hearty_stew": 1,
+     "berry_snack": 7,
+     "berries": 1
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [
+     "ch2_prepare"
+    ],
+    "ch2_done": 7,
+    "chapter2_finished": false,
+    "music": "m15",
+    "game": "g1"
+   },
+   "seconds": 883.4,
+   "end": "2026-09-28 14:27:19",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "surface",
+    "zone": "haven",
+    "mode": "playing",
+    "pos": [
+     -2.0,
+     0.0,
+     5.0
+    ],
+    "hp": 24.0,
+    "food": {
+     "pumpkin": 4,
+     "candy": 6
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [],
+    "ch2_done": 20,
+    "chapter2_finished": true,
+    "music": "m05",
+    "game": "g1"
+   },
+   "checkpoints": [
+    {
+     "name": "start",
+     "ok": true,
+     "seconds": 2.4,
+     "hp": 100.0,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "read_preparations",
+     "ok": true,
+     "seconds": 13.4,
+     "hp": 100.0,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "link_lanterns",
+     "ok": true,
+     "seconds": 7.0,
+     "hp": 100.0,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "service_gate",
+     "ok": true,
+     "seconds": 28.0,
+     "hp": 100.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "true_signal",
+     "ok": true,
+     "seconds": 32.3,
+     "hp": 100.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "refuge",
+     "ok": true,
+     "seconds": 18.8,
+     "hp": 100.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "line_water",
+     "ok": true,
+     "seconds": 24.2,
+     "hp": 100.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "line_bell",
+     "ok": true,
+     "seconds": 93.5,
+     "hp": 70.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "line_light",
+     "ok": true,
+     "seconds": 30.2,
+     "hp": 70.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "winch",
+     "ok": true,
+     "seconds": 18.0,
+     "hp": 70.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "crossing",
+     "ok": true,
+     "seconds": 74.0,
+     "hp": 36.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "wrong_landing",
+     "ok": true,
+     "seconds": 15.5,
+     "hp": 36.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "false_home",
+     "ok": true,
+     "seconds": 15.2,
+     "hp": 36.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "bell_throat",
+     "ok": true,
+     "seconds": 19.0,
+     "hp": 36.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "choir",
+     "ok": true,
+     "seconds": 412.7,
+     "hp": 24.0,
+     "area": "hushed_works",
+     "error": ""
+    },
+    {
+     "name": "return_reach",
+     "ok": true,
+     "seconds": 6.4,
+     "hp": 24.0,
+     "area": "hallowmere_reach",
+     "error": ""
+    },
+    {
+     "name": "travel_home",
+     "ok": true,
+     "seconds": 19.2,
+     "hp": 24.0,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "homecoming",
+     "ok": true,
+     "seconds": 5.5,
+     "hp": 24.0,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "lanternwake",
+     "ok": true,
+     "seconds": 11.6,
+     "hp": 24.0,
+     "area": "surface",
+     "error": ""
+    },
+    {
+     "name": "free_play",
+     "ok": true,
+     "seconds": 36.3,
+     "hp": 24.0,
+     "area": "surface",
+     "error": ""
+    }
+   ],
+   "screenshot_requests": {
+    "total": 35,
+    "ok": 0,
+    "failed": 35,
+    "labels": [
+     "preparation_notes",
+     "conservatory_pedestal",
+     "lanterns_linked",
+     "bellhouse_forecourt",
+     "service_gate_open",
+     "service_landing",
+     "rail_junction",
+     "pocket_conservatory",
+     "refuge_done",
+     "sluice",
+     "bells",
+     "light_well",
+     "threaded_winch",
+     "crossing_gate",
+     "crossing_cleared",
+     "wrong_landing",
+     "false_lift_siding",
+     "borrowed_porch",
+     "true_stair",
+     "bell_throat",
+     "choir_vault_door",
+     "choir_defeated",
+     "reach_after_choir",
+     "lantern_road_list",
+     "home_haven",
+     "homecoming",
+     "ward_stone_menu",
+     "celebration",
+     "ending_card",
+     "chapter_two_complete",
+     "free_play_reach",
+     "free_play_refuge",
+     "free_play_home",
+     "S4_start",
+     "S4_end"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 1,
+     "t": 54.55,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:13:26"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 1,
+     "t": 61.68,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:13:32"
+    },
+    {
+     "cue": "m22",
+     "seg": "S4",
+     "game": 1,
+     "t": 74.03,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:13:45"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 1,
+     "t": 77.28,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:13:48"
+    },
+    {
+     "cue": "m24",
+     "seg": "S4",
+     "game": 1,
+     "t": 115.68,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:14:27"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 1,
+     "t": 140.91,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:14:52"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 1,
+     "t": 144.01,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:14:55"
+    },
+    {
+     "cue": "m22",
+     "seg": "S4",
+     "game": 1,
+     "t": 195.99,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:15:47"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 1,
+     "t": 196.86,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:15:48"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 1,
+     "t": 265.97,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:16:57"
+    },
+    {
+     "cue": "m25",
+     "seg": "S4",
+     "game": 1,
+     "t": 275.34,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:17:06"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 1,
+     "t": 343.49,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:18:14"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 1,
+     "t": 352.58,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:18:23"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 1,
+     "t": 364.56,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:18:35"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 1,
+     "t": 397.93,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:19:09"
+    },
+    {
+     "cue": "m26",
+     "seg": "S4",
+     "game": 1,
+     "t": 402.43,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:19:13"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 1,
+     "t": 803.84,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:25:55"
+    },
+    {
+     "cue": "m23",
+     "seg": "S4",
+     "game": 1,
+     "t": 810.32,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:26:01"
+    },
+    {
+     "cue": "m16",
+     "seg": "S4",
+     "game": 1,
+     "t": 814.31,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 14:26:05"
+    },
+    {
+     "cue": "m06",
+     "seg": "S4",
+     "game": 1,
+     "t": 833.22,
+     "area": "surface",
+     "wall": "2026-09-28 14:26:25"
+    },
+    {
+     "cue": "m27",
+     "seg": "S4",
+     "game": 1,
+     "t": 840.69,
+     "area": "surface",
+     "wall": "2026-09-28 14:26:32"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "S4",
+     "game": 1,
+     "t": 856.04,
+     "area": "surface",
+     "wall": "2026-09-28 14:26:48"
+    },
+    {
+     "cue": "m15",
+     "seg": "S4",
+     "game": 1,
+     "t": 856.21,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 14:26:48"
+    },
+    {
+     "cue": "m24",
+     "seg": "S4",
+     "game": 1,
+     "t": 872.13,
+     "area": "hushed_works",
+     "wall": "2026-09-28 14:27:03"
+    },
+    {
+     "cue": "m16",
+     "seg": "S4",
+     "game": 1,
+     "t": 876.51,
+     "area": "hallowmere_reach",
+     "wall": "2026-09-28 14:27:08"
+    },
+    {
+     "cue": "m05",
+     "seg": "S4",
+     "game": 1,
+     "t": 886.37,
+     "area": "surface",
+     "wall": "2026-09-28 14:27:18"
+    }
+   ],
+   "deaths": 0,
+   "saves": 15,
+   "hp_min": 24.0,
+   "problems": [],
+   "result_file": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_202_s4\\s4\\s4_result.json"
+  },
+  {
+   "id": "END",
+   "title": "Relaunch + Continue check (free play resumes in the same save)",
+   "start": "2026-09-28 14:27:19",
+   "start_state": {
+    "area": "surface",
+    "zone": "haven",
+    "mode": "playing",
+    "pos": [
+     -2.0,
+     0.0,
+     5.0
+    ],
+    "hp": 24.0,
+    "food": {
+     "pumpkin": 4,
+     "candy": 6
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [],
+    "ch2_done": 20,
+    "chapter2_finished": true,
+    "music": "m05",
+    "game": "g1"
+   },
+   "seconds": 8.8,
+   "end": "2026-09-28 14:27:28",
+   "ok": true,
+   "status": "completes",
+   "end_state": {
+    "area": "surface",
+    "zone": "haven",
+    "mode": "playing",
+    "pos": [
+     -1.46,
+     0.0,
+     2.06
+    ],
+    "hp": 24.0,
+    "food": {
+     "pumpkin": 4,
+     "candy": 6
+    },
+    "keys": {
+     "foreman_key": 1,
+     "garden_seal": 1,
+     "manor_seal": 1,
+     "quarry_seal": 1,
+     "velvet_scrap": 3
+    },
+    "equipment": {
+     "body": "",
+     "boots": "",
+     "charm": "",
+     "head": ""
+    },
+    "ch2_current": [],
+    "ch2_done": 20,
+    "chapter2_finished": true,
+    "music": "m06",
+    "game": "g2"
+   },
+   "checkpoints": [
+    {
+     "name": "relaunch_continue",
+     "ok": true,
+     "seconds": 2.9
+    }
+   ],
+   "screenshot_requests": {
+    "total": 1,
+    "ok": 0,
+    "failed": 1,
+    "labels": [
+     "END_before_quit"
+    ]
+   },
+   "script_errors": [],
+   "warnings": 0,
+   "music_cues": [
+    {
+     "cue": "m01",
+     "seg": "END",
+     "game": 2,
+     "t": 0.14,
+     "area": "",
+     "wall": "2026-09-28 14:27:22"
+    },
+    {
+     "cue": "(silence)",
+     "seg": "END",
+     "game": 2,
+     "t": 0.49,
+     "area": "",
+     "wall": "2026-09-28 14:27:22"
+    },
+    {
+     "cue": "m06",
+     "seg": "END",
+     "game": 2,
+     "t": 1.91,
+     "area": "surface",
+     "wall": "2026-09-28 14:27:25"
+    }
+   ],
+   "deaths": 0,
+   "saves": 1,
+   "hp_min": 24.0,
+   "problems": [],
+   "result_file": null
+  }
+ ],
+ "home_rests": {},
+ "end_check": {
+  "saved_before_quit": true,
+  "quit": "pause menu: Quit Game -> Save & Quit",
+  "exited_by_itself": true,
+  "before": {
+   "area": "surface",
+   "inv": {
+    "bat_bunting": 2,
+    "candy": 6,
+    "copper_ore": 3,
+    "copper_sword": 1,
+    "crescent_window": 1,
+    "echo_shard": 1,
+    "fiber": 10,
+    "haven_banner": 1,
+    "iron_ore": 1,
+    "lantern": 1,
+    "lantern_wax": 4,
+    "moonpetal": 3,
+    "pumpkin": 4,
+    "pumpkin_seeds": 13,
+    "roseberry_seeds": 2,
+    "shiny_pebble": 1,
+    "stone": 3,
+    "stone_axe": 1,
+    "stone_pickaxe": 1,
+    "sugarcap": 4,
+    "sunflax": 2,
+    "sunflax_seeds": 2,
+    "sweetroot_seeds": 8,
+    "thread_veil": 1,
+    "wardlight": 1,
+    "wood": 1
+   },
+   "keys": {
+    "foreman_key": 1,
+    "garden_seal": 1,
+    "manor_seal": 1,
+    "quarry_seal": 1,
+    "velvet_scrap": 3
+   },
+   "pos": [
+    -2.0,
+    0.0,
+    5.0
+   ]
+  },
+  "continue_load_s": 2.9,
+  "after": {
+   "area": "surface",
+   "inv": {
+    "bat_bunting": 2,
+    "candy": 6,
+    "copper_ore": 3,
+    "copper_sword": 1,
+    "crescent_window": 1,
+    "echo_shard": 1,
+    "fiber": 10,
+    "haven_banner": 1,
+    "iron_ore": 1,
+    "lantern": 1,
+    "lantern_wax": 4,
+    "moonpetal": 3,
+    "pumpkin": 4,
+    "pumpkin_seeds": 13,
+    "roseberry_seeds": 2,
+    "shiny_pebble": 1,
+    "stone": 3,
+    "stone_axe": 1,
+    "stone_pickaxe": 1,
+    "sugarcap": 4,
+    "sunflax": 2,
+    "sunflax_seeds": 2,
+    "sweetroot_seeds": 8,
+    "thread_veil": 1,
+    "wardlight": 1,
+    "wood": 1
+   },
+   "keys": {
+    "foreman_key": 1,
+    "garden_seal": 1,
+    "manor_seal": 1,
+    "quarry_seal": 1,
+    "velvet_scrap": 3
+   },
+   "pos": [
+    -2.0,
+    0.0,
+    5.0
+   ],
+   "finished": true,
+   "chapter_two_complete": true,
+   "ch2_done": 20,
+   "tracker": {
+    "kind": "signpost",
+    "step": "opt_pumpkin_face",
+    "targets": [],
+    "title": "A Pumpkin With a Face"
+   }
+  },
+  "same_items": true,
+  "moved": true
+ },
+ "music_cue_changes": [
+  {
+   "cue": "m01",
+   "seg": "-",
+   "game": 1,
+   "t": 0.15,
+   "area": "",
+   "wall": "2026-09-28 14:12:29",
+   "title": "A Little Light (safe)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "-",
+   "game": 1,
+   "t": 0.35,
+   "area": "",
+   "wall": "2026-09-28 14:12:30",
+   "title": ""
+  },
+  {
+   "cue": "m15",
+   "seg": "-",
+   "game": 1,
+   "t": 1.78,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 14:12:33",
+   "title": "Welcome to Lanternwake (safe)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 1,
+   "t": 54.55,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:13:26",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 1,
+   "t": 61.68,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:13:32",
+   "title": ""
+  },
+  {
+   "cue": "m22",
+   "seg": "S4",
+   "game": 1,
+   "t": 74.03,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:13:45",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 1,
+   "t": 77.28,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:13:48",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "m24",
+   "seg": "S4",
+   "game": 1,
+   "t": 115.68,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:14:27",
+   "title": "A Pocket of Day (safe)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 1,
+   "t": 140.91,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:14:52",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 1,
+   "t": 144.01,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:14:55",
+   "title": ""
+  },
+  {
+   "cue": "m22",
+   "seg": "S4",
+   "game": 1,
+   "t": 195.99,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:15:47",
+   "title": "Harvest Trouble (combat)"
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 1,
+   "t": 196.86,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:15:48",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 1,
+   "t": 265.97,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:16:57",
+   "title": ""
+  },
+  {
+   "cue": "m25",
+   "seg": "S4",
+   "game": 1,
+   "t": 275.34,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:17:06",
+   "title": "No Thread Left Unseen (boss)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 1,
+   "t": 343.49,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:18:14",
+   "title": ""
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 1,
+   "t": 352.58,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:18:23",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 1,
+   "t": 364.56,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:18:35",
+   "title": ""
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 1,
+   "t": 397.93,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:19:09",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "m26",
+   "seg": "S4",
+   "game": 1,
+   "t": 402.43,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:19:13",
+   "title": "The Borrowed Welcome (boss)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 1,
+   "t": 803.84,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:25:55",
+   "title": ""
+  },
+  {
+   "cue": "m23",
+   "seg": "S4",
+   "game": 1,
+   "t": 810.32,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:26:01",
+   "title": "Under the Bellhouse (horror)"
+  },
+  {
+   "cue": "m16",
+   "seg": "S4",
+   "game": 1,
+   "t": 814.31,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 14:26:05",
+   "title": "Copper Leaves at Dusk (explore)"
+  },
+  {
+   "cue": "m06",
+   "seg": "S4",
+   "game": 1,
+   "t": 833.22,
+   "area": "surface",
+   "wall": "2026-09-28 14:26:25",
+   "title": "Firefly Wishes (safe)"
+  },
+  {
+   "cue": "m27",
+   "seg": "S4",
+   "game": 1,
+   "t": 840.69,
+   "area": "surface",
+   "wall": "2026-09-28 14:26:32",
+   "title": "Every Road Leads Home (ending)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "S4",
+   "game": 1,
+   "t": 856.04,
+   "area": "surface",
+   "wall": "2026-09-28 14:26:48",
+   "title": ""
+  },
+  {
+   "cue": "m15",
+   "seg": "S4",
+   "game": 1,
+   "t": 856.21,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 14:26:48",
+   "title": "Welcome to Lanternwake (safe)"
+  },
+  {
+   "cue": "m24",
+   "seg": "S4",
+   "game": 1,
+   "t": 872.13,
+   "area": "hushed_works",
+   "wall": "2026-09-28 14:27:03",
+   "title": "A Pocket of Day (safe)"
+  },
+  {
+   "cue": "m16",
+   "seg": "S4",
+   "game": 1,
+   "t": 876.51,
+   "area": "hallowmere_reach",
+   "wall": "2026-09-28 14:27:08",
+   "title": "Copper Leaves at Dusk (explore)"
+  },
+  {
+   "cue": "m05",
+   "seg": "S4",
+   "game": 1,
+   "t": 886.37,
+   "area": "surface",
+   "wall": "2026-09-28 14:27:18",
+   "title": "Lanterns After Dark (safe)"
+  },
+  {
+   "cue": "m01",
+   "seg": "END",
+   "game": 2,
+   "t": 0.14,
+   "area": "",
+   "wall": "2026-09-28 14:27:22",
+   "title": "A Little Light (safe)"
+  },
+  {
+   "cue": "(silence)",
+   "seg": "END",
+   "game": 2,
+   "t": 0.49,
+   "area": "",
+   "wall": "2026-09-28 14:27:22",
+   "title": ""
+  },
+  {
+   "cue": "m06",
+   "seg": "END",
+   "game": 2,
+   "t": 1.91,
+   "area": "surface",
+   "wall": "2026-09-28 14:27:25",
+   "title": "Firefly Wishes (safe)"
+  }
+ ],
+ "script_errors": {
+  "total": 0,
+  "unique": []
+ },
+ "warnings": {
+  "total": 0,
+  "sample": []
+ },
+ "screenshot_requests": {
+  "total": 36,
+  "ok": 0,
+  "failed": 36
+ },
+ "focus_report": {
+  "telemetry_frames": 7662,
+  "frames_focused": 7662,
+  "frames_mouse_captured": 0
+ },
+ "notes": [],
+ "processes": [
+  {
+   "name": "g1",
+   "port": 9600,
+   "cmd": [
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\builds\\Hollowhaven\\Hollowhaven.exe",
+    "--headless",
+    "--max-fps",
+    "60",
+    "--log-file",
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_202_s4\\g1_godot.log",
+    "--",
+    "--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_202_s4/g1_telemetry.jsonl",
+    "--qa-interval=0.1",
+    "--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_202_s4/saves",
+    "--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_202_s4/qa_settings.cfg",
+    "--qa-input-port=9600",
+    "--qa-no-focus",
+    "--no-focus-pause",
+    "--max-seconds=4800"
+   ],
+   "godot_log": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_202_s4\\g1_godot.log"
+  },
+  {
+   "name": "g2",
+   "port": 9601,
+   "cmd": [
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\builds\\Hollowhaven\\Hollowhaven.exe",
+    "--headless",
+    "--max-fps",
+    "60",
+    "--log-file",
+    "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_202_s4\\g2_godot.log",
+    "--",
+    "--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_202_s4/g2_telemetry.jsonl",
+    "--qa-interval=0.1",
+    "--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_202_s4/saves",
+    "--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/bot/chain/final_202_s4/qa_settings.cfg",
+    "--qa-input-port=9601",
+    "--qa-no-focus",
+    "--no-focus-pause",
+    "--max-seconds=4800"
+   ],
+   "godot_log": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\bot\\chain\\final_202_s4\\g2_godot.log"
+  }
+ ]
+}

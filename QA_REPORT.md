@@ -1,9 +1,10 @@
-# QA report — Hollowhaven v0.9.0 (Chapter One) and v2.0.0 / v2.0.1 (Chapter Two)
+# QA report — Hollowhaven v0.9.0 (Chapter One) and v2.0.0 / v2.0.1 / v2.0.2 (Chapter Two)
 
 Sections 1-8: Chapter One (v0.9.0 / v0.9.1). **Section 9: the Chapter Two release 2.0.0** (executed-test matrix, save integrity,
 bot runs, visual inspection, bugs, music, performance, the natural chain, and the NOT YET DONE list). Section 10: Chapter Two
 development records. **Section 11: the bug-fix release 2.0.1** (what changed, full suite, Run A / Run B on the packaged 2.0.1 exe,
-focus protection, the updated NOT YET DONE list); it supersedes §9 where they differ.
+focus protection, the updated NOT YET DONE list); it supersedes §9 where they differ. **Section 12: release 2.0.2** (the
+boss-fight tip fix, suite, the Mochi / Lumi investigation, verification runs on the packaged 2.0.2 exe).
 
 Every entry says what KIND of check it was:
 **[code]** source review · **[auto]** automated tests (headless engine) · **[visual]** launched and inspected
@@ -453,11 +454,10 @@ empty scratch save folder and settings file (`%APPDATA%\Hollowhaven\saves` untou
 * Focus: the watchdog made 2523 checks; the game owned the OS foreground window in **0** of them (0 hand-backs). (The telemetry's
   `frames_focused` 6410/6410 is Godot's own window flag, not the OS foreground.)
 * **Findings (not fixed in 2.0.1):** (1) `play_038_ending.png`: the Weaver's fight tip "It is smothering a brazier!..." is still on
-  the HUD in the Haven after the Chapter One ending (stale boss-fight tip; a HUD fix for the next build was in progress, uncommitted,
-  when this was written). (2) The bot filed one minor problem: the optional Brave Little Steps stopped at `tie_ribbon` - the bot
+  the HUD in the Haven after the Chapter One ending (stale boss-fight tip; fixed in 2.0.2, §12.1). (2) The bot filed one minor problem: the optional Brave Little Steps stopped at `tie_ribbon` - the bot
   pressed E at a "Talk to Mochi" prompt, but the Friends panel that opened was Lumi's (its buttons: "Feed Sweetroot", "Use
-  Glimmerstep (T)"), which offers no ribbon; the Comfort Ribbon stayed in the backpack. Not investigated; possibly the bot's timing
-  (Lumi follows close by). The step is still reported ok: the harness files a failed optional goal as a problem, not a failure.
+  Glimmerstep (T)"), which offers no ribbon; the Comfort Ribbon stayed in the backpack. Investigated after 2.0.1: a bot race, not a game bug
+  (§12.3). The step is still reported ok: the harness files a failed optional goal as a problem, not a failure.
 * Harness labels: `results.jsonl` tags each step `"kind": "interactive"` / "real-input scenario step" but also `"input": "virtual
   (qa_input, second monitor)"` - the input was virtual; these runs are [bot], not [interactive] in the §1 sense.
 * Not covered by Run B: anything in Chapter Two past accepting it, a relaunch / Continue, OS input.
@@ -525,3 +525,66 @@ Trials, Expeditions, other lamp orders and equipment (source tree, headless; §1
 * Not implemented: the optional friend Pipkin; new creature voices (D10).
 * Accepted: CH2-011 / CHAIN-003 ObjectDB leak warning at exit (developer logs only); the "resources still in use" ERROR lines of
   COV-008 are not yet explained (`KNOWN_ISSUES.md` §6).
+
+## 12. Release 2.0.2 — boss-fight tips (2026-09-28)
+
+**Build under test.** `dist/Hollowhaven-2.0.2-Windows.zip` (111.1 MB, SHA-256 `2F77F52F219F5452E4140FD95DA25895C94E7C59E7A20231143ED564E4907FA8`,
+`dist/SHA256SUMS.txt`), exe `builds/Hollowhaven/Hollowhaven.exe` (184.8 MB, 14:12; byte-identical to the exe in the zip - checked),
+git `991014c` = `a31e717` + version bump (`project.godot` / `export_presets.cfg` 2.0.2) + a QA-bot change in `tools/qa/playthrough.py`
+(not shipped). Build log `qa/tmp/build_v202.log`, built with `tools/build_release.ps1 -SkipTests` (no test output in the log; it ends with the
+"Built ... SHA256" line; EXIT=0 was captured in the lead's shell, not in the log). The 2.0.1 zip moved to `builds/superseded/`. The zip has the same 7 files as 2.0.1; its player
+docs and `Licenses/THIRD_PARTY_NOTICES.txt` are still byte-identical to `docs/player/` and `THIRD_PARTY_NOTICES.md` (checked).
+Evidence copies: `qa/evidence/ch2_v2.0.2/`.
+
+### 12.1 The fix (`a31e717`, `game/src/ui/hud/hint_card.gd`; the only game change since 2.0.1)
+* **Fight tips** = hint ids starting with `boss_`, `velour_`, `choir_` or `hint_quarry_warden_` (`FIGHT_TIP_PREFIXES`).
+* A newer fight tip replaces an older one still waiting in the queue; the dropped tip gets its once-per-save flag back, so a later
+  attempt still teaches it.
+* The fight tip on screen makes room after 4 s (`FIGHT_TIP_MIN_SECONDS`) when a newer fight tip waits; ordinary tips keep their
+  full time.
+* The end of the encounter - `boss_encounter_changed` false (won, reset or left), `boss_defeated`, `area_exiting` - drops every
+  fight tip at once, also while the card is held (a held fight tip never comes back).
+
+**Why.** (1) Run B on 2.0.1 (§11.3): `play_038_ending.png` shows the Weaver's "It is smothering a brazier!" tip on the HUD in the
+Haven after the Chapter One ending. (2) Run A on 2.0.1 (`qa/tmp/bot/chain/final_201.console.txt`): during the 75.7 s Crossing Matron
+step the fight emitted 17 `boss_crossing_*` hints of 9 different ids in 67 s (13:49:42-13:50:49; `run6` logged 19); each tip stays
+on the card for several seconds and they were shown one after another, so the queue outlasted the fight. The telemetry has no
+hint-card state, so that overrun is inferred from the emission times and card durations, not observed on screen (the commit
+message counts "ten Crossing Matron tips in 75 s"). Note: a comment in `hint_card.gd` says the Crossing tips spilled "over the Chapter
+One ending"; the tip seen over the Chapter One ending was the Weaver's (comment wording only).
+
+**Tests.** New `game/tests/unit/test_hint_card_fight_tips.gd` (7): `which_tips_are_fight_tips`,
+`a_newer_fight_tip_replaces_an_older_queued_one`, `the_fight_tip_on_screen_makes_room_for_a_newer_one`,
+`ordinary_tips_keep_their_full_time`, `the_end_of_the_encounter_drops_the_fight_tips`,
+`a_held_fight_tip_never_comes_back_after_the_fight`, `defeat_and_area_change_are_wired`. All pass in the full run.
+
+### 12.2 Automated tests — [auto]
+| When | Tree | Result | Log |
+|---|---|---|---|
+| ~13:52-14:07 | the working tree committed right after as `a31e717` (the version bump `991014c` changes only version strings in `game/`) | **2679 tests, 0 failed, 890.7 s** (2672 + the 7 new); `parse_all` passes; 21 `ISOLATION` repairs; "8 ObjectDB instances were leaked at exit" (CH2-011) | `qa/tmp/full_final3.log` (copy in `qa/evidence/ch2_v2.0.2/`) |
+| 14:07 / 14:11 | after the version strings were edited (`project.godot` / `export_presets.cfg` edited, save + audit run, then `991014c` committed at 14:11:57) | save filter **128 / 0**; audit filter **83 / 0** | `qa/tmp/test_results_save.json`, `test_results_audit.json` (copies in `qa/evidence/ch2_v2.0.2/`) |
+
+### 12.3 Run B's "wrong panel" (Mochi / Lumi) — investigated: a bot race, not a game bug
+In Run B (§11.3) the bot pressed E at "Talk to Mochi" and Lumi's Friends panel opened. Cause: the bot read "Talk to Mochi" from a
+telemetry frame 100-200 ms old; when E landed, the game's own prompt already said "Talk to Lumi" (Mochi was running away at ~4.5 m/s,
+Lumi 1.4 m away). The prompt, the HUD and E share `probe.prompt` / `probe.focus` (`player.gd` 328-331 and 1235-1267,
+`interaction_probe.gd` 173-185): E re-scores the target immediately, while the HUD label refreshes every 0.08 s, so when two targets
+cross the label can trail the real target by up to ~160 ms. Minor UX edge, not changed (`KNOWN_ISSUES.md` §3). The bot was fixed in
+`991014c` (`playthrough.py` checks whose panel opened and retries).
+
+### 12.4 Verification runs on the packaged 2.0.2 exe — [bot]
+| Run | Command | Result |
+|---|---|---|
+| V1 fresh New Game, visible on the second monitor, sound on | `python tools/qa/playthrough.py --second-monitor --exe builds/Hollowhaven/Hollowhaven.exe --out qa/tmp/e2e/final_202_fresh` (console `qa/tmp/e2e/final_202_fresh.console.txt`), 14:12:28-14:24:06 | **21 of 21 steps ok, 0 failed, 697.2 s**, EXIT=0; no bot-filed problems - Brave Little Steps finished this time (ribbon tied, Mochi follows: `ribbon_tied: true`, no retry needed, `play_030_mochi_ribbon.png`); 0 SCRIPT ERRORs (`game_log_errors: []`); 42 screenshots; Weaver Matron 63.6 s (phases 1-2-3, 0 deaths, lowest HP 88); Chapter Two accepted (`ch2_waygate`); 23 music-director changes (18 cue starts, 5 silences); watchdog 2669 checks, game in the OS foreground 0 times, 0 hand-backs (the lead's separate foreground monitor also reported nothing). **`play_039_ending.png`**: after the Chapter One ending the HUD shows only the "When you're ready - The Ward Stone has something new to say" card, the "Read the Ward Stone" prompt and "Journey saved" - no stale Weaver tip (2.0.1's `play_038_ending.png` showed "It is smothering a brazier!") |
+| V2 Chapter Two finale, headless, from Run A's `T34_end` checkpoint save (a save the 2.0.1 game wrote in Run A) | `python tools/qa/ch2/chain.py --headless --exe builds/Hollowhaven/Hollowhaven.exe --from S4 --start-save qa/tmp/bot/chain/final_201/checkpoints/T34_end --out qa/tmp/bot/chain/final_202_s4` (console `qa/tmp/bot/chain/final_202_s4.console.txt`): link the lanterns, Hushed Works, Crossing Matron, Borrowed Choir, Lanternwake ending, free play, relaunch + Continue; 14:12:28-14:27:28 | **completes**, 900.7 s (S4 883.4, END 8.8), EXIT=0; 0 deaths (lowest HP 24), 0 SCRIPT ERRORs, 0 warnings, `bugs.json` `[]`, 32 music cue changes; route steps Weaver's Crossing 74.0 s, Borrowed Choir 412.7 s; END: saved before quit, Save & Quit, relaunch, Continue in 2.9 s, same items, `chapter_two_complete: true`, 20 of 20 Chapter Two steps; one quit logged "7 ObjectDB instances were leaked at exit" (CH2-011). Headless: nothing rendered (0 of 36 screenshots), so the Crossing / Choir tips were not seen on screen |
+
+V2 is a resumed start (`--start-save`), not a natural chain from the Chapter One save; S1-T34 on the 2.0.2 exe were not re-run
+(the 2.0.2 change is HUD-only; the natural chain on 2.0.1 is §11.4).
+
+### 12.5 NOT YET DONE after 2.0.2
+Unchanged from §11.6: PERSONAL-SAVE VERIFICATION BLOCKED; no human listening; no OS-level real-input run; human playtime
+unmeasured; performance only on the 2.0.0 exe and an RTX 4090 (2.0.1 / 2.0.2 not re-profiled; memory creep ~8.5 MB per Lantern
+Road round trip); nothing judged in motion; Pipkin not implemented; CH2-011 accepted. The stale boss-fight tip is fixed (§12.1):
+checked by unit tests and, for the Weaver after the Chapter One ending, on screen in V1 (`play_039_ending.png`); the Crossing
+Matron / Choir / Velour / Warden cases were not rendered on 2.0.2 (V2 is headless), so for them the fix rests on the unit tests.
+Only V1 re-ran Chapter One and only V2 re-ran the Chapter Two finale on 2.0.2; S1-T34 of Chapter Two were not re-run on 2.0.2.

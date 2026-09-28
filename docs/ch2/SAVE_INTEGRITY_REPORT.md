@@ -1,6 +1,9 @@
-# Save-integrity report — Hollowhaven 2.0.0 (save schema v2)
+# Save-integrity report — Hollowhaven 2.0.x (save schema v2)
 
-Written 2026-09-28 for the 2.0.0 release (`dist/Hollowhaven-2.0.0-Windows.zip`, git `36e2e8a`). Design: master prompt §2 and
+Written 2026-09-28 for the 2.0.0 release (`dist/Hollowhaven-2.0.0-Windows.zip`, git `36e2e8a`). **Still current for 2.0.1 and
+2.0.2:** `game/autoload/save_system.gd` - the file with the schema, the v1 -> v2 migration, the upgrade backup and the
+save-side future-version check - is unchanged since 2.0.0 (`git diff 36e2e8a 991014c -- game/autoload/save_system.gd` is empty). The
+measurements below were made on 2.0.0 or earlier code; "2.0.x" below means any of these builds, today 2.0.2. Design: master prompt §2 and
 §20.1-20.2. Implementation and rules: `docs/SAVE_MIGRATION.md` (the reference; this file is the evidence summary).
 
 > **PERSONAL-SAVE VERIFICATION BLOCKED.** Krystal's own save is not on this PC: `%APPDATA%\Hollowhaven\saves` on the development
@@ -95,13 +98,13 @@ only), dense two-storey homes (fixture 9 only), and before / after screenshots o
 
 ## 5. Upgrade backup on the player's PC
 
-When Krystal presses Continue in 2.0.0, the game copies her untouched Chapter One files to
+When Krystal first presses Continue in a 2.0.x build, the game copies her untouched Chapter One files to
 `%APPDATA%\Hollowhaven\saves\pre_v2_backup\slot1.v1-<unix time>.json` (and `slot1.bak.v1-<unix time>.json` if a backup existed).
 The game never deletes or rewrites them. Tell her not to delete that folder.
 
 ## 6. Future-version rule
 
-A well-formed save with `version > 2` is not corrupt: 2.0.0 refuses it in place (Continue shown but disabled, "This save was made by
+A well-formed save with `version > 2` is not corrupt: 2.0.x refuses it in place (Continue shown but disabled, "This save was made by
 a newer version of Hollowhaven."), moves nothing, does NOT fall back to an older backup, writes nothing. Only an explicit New Game
 confirmation (which names the newer save and says it is kept) sets it aside as `slot1.future-<ver>-<unix>.json` - never deleted.
 Tests: `test_save_v2_migration.test_future_*`, `test_save_v2_title.*`, matrix `12b`.
@@ -110,7 +113,7 @@ Tests: `test_save_v2_migration.test_future_*`, `test_save_v2_title.*`, matrix `1
 
 1. Close the game. Copy `%APPDATA%\Hollowhaven\saves\slot1.json` (and `slot1.bak.json`) from her PC to a scratch folder, e.g.
    `D:\hh_gate\saves\`; record `certutil -hashfile slot1.json SHA256` (never work in her real folder).
-2. Run 2.0.0 on the copy only: `Hollowhaven.exe -- --save-dir=D:\hh_gate\saves`, press Continue, stand still, Pause > Save Game,
+2. Run the current 2.0.x build (2.0.2) on the copy only: `Hollowhaven.exe -- --save-dir=D:\hh_gate\saves`, press Continue, stand still, Pause > Save Game,
    quit.
 3. Compare: `.tools/pyenv/Scripts/python.exe tools/qa/save_integrity.py <original copy of slot1.json> D:\hh_gate\saves\slot1.json --out gate_report.json`
    (exit 0 = preserved; with a few seconds of play expect only clock / float / respawn-timer differences as in §3).
@@ -132,5 +135,5 @@ falls back to the backup - after two v2 saves only `pre_v2_backup` still holds a
    (sha256 `b4cab2cc…0e95`, listed in `Desktop\Hollowhaven_Backups\pre_chapter2_SHA256.txt`) to a new folder and start it; Continue
    loads the Chapter One save. (Source of that build: `...\source\hollowhaven_b760f79.bundle` / `hollowhaven_source_b760f79.zip`.)
 
-To go forward again: start 2.0.0; it migrates the v1 files again (the existing upgrade backup is kept), or put the files from
+To go forward again: start the 2.0.x build; it migrates the v1 files again (the existing upgrade backup is kept), or put the files from
 `v2_kept\` back to continue the Chapter Two progress.

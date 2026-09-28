@@ -1,0 +1,279 @@
+[14:12:28] launched (virtual input, port 9500) C:\Users\Ali\Desktop\Hollowhaven\qa\tmp\e2e\final_202_fresh\qa_exe\Hollowhaven.exe pid=46832 args=['--windowed', '--position', '1920,0', '--resolution', '1920x1080', '--', '--qa-telemetry=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/e2e/final_202_fresh/play_telemetry.jsonl', '--qa-interval=0.1', '--save-dir=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/e2e/final_202_fresh/saves', '--settings-file=C:/Users/Ali/Desktop/Hollowhaven/qa/tmp/e2e/final_202_fresh/qa_settings.cfg', '--qa-input-port=9500', '--qa-no-focus', '--no-focus-pause', '--qa-window=1920,0,1920,1080', '--windowed']
+[14:12:28] === STEP title_new_game (quest step wake, +0s) ===
+[14:12:32] button not found: 'Start fresh'; visible: ['New Game', 'Settings', 'Credits', 'Quit', 'Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.', 'Standard | recommended | The intended experience: tense and unsettling, with a few real scares.', 'Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.', 'Off', 'Off', 'Off', 'On', 'Play a test sound', 'Play a test sound', 'Play a test sound', 'Begin the journey', 'Close']
+[14:12:32] button not found: 'Start a new journey'; visible: ['New Game', 'Settings', 'Credits', 'Quit', 'Gentle | Fewer scares, no ambushes, softer sounds. Enemies deal less damage.', 'Standard | recommended | The intended experience: tense and unsettling, with a few real scares.', 'Intense | More frequent cues, darker shadows and bolder stalking. For horror fans.', 'Off', 'Off', 'Off', 'On', 'Play a test sound', 'Play a test sound', 'Play a test sound', 'Begin the journey', 'Close']
+[14:12:45] calibrated look (virtual): 7.6923 px/deg (motion 50.00 px -> dyaw=-6.5) invert=1.0
+[14:12:46] RESULT PASS: playthrough:title_new_game - quest step now wake; ok=True; 17s
+[14:12:46] === STEP read_ward (quest step wake, +17s) ===
+[14:12:52] RESULT PASS: playthrough:read_ward - quest step now gather_basics; ok=True; 6s
+[14:12:52] === STEP gather_basics (quest step gather_basics, +24s) ===
+[14:12:54] walk_to stuck at [1.93, 0.0, -7.29] (dist 13.0); unstick #1
+[14:13:34] RESULT PASS: playthrough:gather_basics - quest step now craft_axe; ok=True; 42s
+[14:13:34] === STEP craft_axe (quest step craft_axe, +66s) ===
+[14:13:34] craft Stone Axe x1
+[14:13:37] crafted: {'stone_axe': 1}
+[14:13:38] RESULT PASS: playthrough:craft_axe - quest step now chop; ok=True; 3s
+[14:13:38] === STEP chop (quest step chop, +69s) ===
+[14:14:03] RESULT PASS: playthrough:chop - quest step now workbench; ok=True; 25s
+[14:14:03] === STEP workbench (quest step workbench, +94s) ===
+[14:14:12] craft Workbench x1
+[14:14:15] crafted: {'workbench': 1}
+[14:14:15] place workbench
+[14:14:18] RESULT PASS: playthrough:workbench - quest step now mochi; ok=True; 15s
+[14:14:18] === STEP tailor_cache (quest step mochi, +110s) ===
+[14:14:18] travel to old_oak
+[14:14:32] RESULT PASS: playthrough:tailor_cache - quest step now mochi; ok=True; 15s
+[14:14:32] === STEP mochi (quest step mochi, +124s) ===
+[14:14:32] travel to glade
+[14:14:57] RESULT PASS: playthrough:mochi - quest step now pebble; ok=True; 25s
+[14:14:57] === STEP pebble (quest step pebble, +149s) ===
+[14:15:07] walk_to stuck at [-10.28, 0.0, 2.36] (dist 10.4); unstick #1
+[14:15:10] craft Stone Pickaxe x1
+[14:15:13] crafted: {'stone_pickaxe': 1}
+[14:15:13] travel to quarry
+[14:15:48] RESULT PASS: playthrough:pebble - quest step now home; ok=True; 51s
+[14:15:48] === STEP home (quest step home, +200s) ===
+[14:16:01] walk_to stuck at [5.89, 0.0, 0.71] (dist 6.7); unstick #1
+[14:16:49] craft Cozy Bed x1
+[14:16:54] walk_to stuck at [-19.57, -0.01, -1.48] (dist 8.5); unstick #1
+[14:16:56] walk_to stuck at [-19.44, -0.01, -2.67] (dist 8.8); unstick #2
+[14:17:04] crafted: {'bed': 1}
+[14:17:04] craft Crop Plot x1
+[14:17:07] crafted: {'crop_plot': 1}
+[14:17:07] place bed
+[14:17:08] place crop_plot
+[14:17:17] interact attempt 1 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 57m'}
+[14:17:18] interact attempt 2 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 55m'}
+[14:17:20] interact attempt 3 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 53m'}
+[14:17:22] interact attempt 4 on S_s3 prompt={'action': 'interact', 'enabled': True, 'text': 'Sunflax: sprouting, ripe in ~6h 51m'}
+[14:17:22] RESULT PASS: playthrough:home - quest step now lumi; ok=True; 94s
+[14:17:22] === STEP lumi (quest step lumi, +294s) ===
+[14:17:22] craft Copper Sword x1
+[14:17:28] crafted: {'copper_sword': 1}
+[14:17:28] craft Lantern x1
+[14:17:33] crafted: {'lantern': 1}
+[14:17:33] craft Berry Snack x2
+[14:17:36] crafted: {'berry_snack': 2}
+[14:17:36] travel to ruin
+[14:18:04] RESULT PASS: playthrough:lumi - quest step now prepare; ok=True; 42s
+[14:18:04] === STEP prepare (quest step prepare, +336s) ===
+[14:18:28] craft Berry Snack x1
+[14:18:31] crafted: {'berry_snack': 1}
+[14:18:31] RESULT PASS: playthrough:prepare - quest step now descend; ok=True; 27s
+[14:18:31] === STEP brave_steps (quest step descend, +363s) ===
+[14:18:36] walk_to stuck at [-10.28, 0.0, 2.45] (dist 10.4); unstick #1
+[14:18:43] walk_to stuck at [-18.64, 0.0, -2.35] (dist 5.3); unstick #1
+[14:18:52] walk_to stuck at [-19.16, 0.0, -4.31] (dist 20.9); unstick #1
+[14:19:01] walk_to stuck at [2.35, 0.0, -7.19] (dist 11.8); unstick #1
+[14:19:04] interact attempt 1 on @Node3D@1683 prompt={}
+[14:19:06] walk_to stuck at [3.75, 0.0, -18.43] (dist 0.7); unstick #1
+[14:19:10] craft Loom & Dye Bench x1
+[14:19:21] crafted: {'loom': 1}
+[14:19:21] place loom
+[14:19:29] goto (-5.996767440674846, 6.264718131299859) failed at [-1.14, 0.0, 9.04]
+[14:19:33] RESULT PASS: playthrough:brave_steps - quest step now descend; ok=True; 62s
+[14:19:33] === STEP descend (quest step descend, +425s) ===
+[14:19:33] travel to mine
+[14:20:05] RESULT PASS: playthrough:descend - quest step now old_mine; ok=True; 32s
+[14:20:05] === STEP old_mine (quest step old_mine, +457s) ===
+[14:20:39] RESULT PASS: playthrough:old_mine - quest step now deeper; ok=True; 34s
+[14:20:39] === STEP deeper (quest step deeper, +491s) ===
+[14:21:18] RESULT PASS: playthrough:deeper - quest step now silk; ok=True; 38s
+[14:21:18] === STEP silk_and_boss (quest step silk, +529s) ===
+[14:21:30] entering the Heartseed Chamber
+[14:21:32] boss: state=intro phase=1 hp=240.0 me=(105.0, -128.41) hp_me=88.0 lantern=True
+[14:21:38] boss: state=scorched phase=1 hp=179.4 me=(108.25, -134.11) hp_me=88.0 lantern=True
+[14:21:43] boss: state=cling phase=2 hp=144.0 me=(108.25, -134.11) hp_me=88.0 lantern=True
+[14:21:48] boss: state=cling phase=2 hp=144.0 me=(111.23, -133.03) hp_me=88.0 lantern=True
+[14:21:54] boss: state=stuck phase=2 hp=126.0 me=(110.21, -132.72) hp_me=88.0 lantern=True
+[14:21:59] boss: state=release phase=2 hp=108.0 me=(110.21, -132.72) hp_me=88.0 lantern=True
+[14:22:04] boss: state=trip_tele phase=2 hp=108.0 me=(110.21, -132.72) hp_me=88.0 lantern=True
+[14:22:09] boss: state=telegraph phase=2 hp=108.0 me=(110.46, -137.38) hp_me=88.0 lantern=True
+[14:22:14] boss: state=phase_shriek phase=3 hp=72.0 me=(110.21, -138.46) hp_me=88.0 lantern=True
+[14:22:20] boss: state=snap_fall phase=3 hp=72.0 me=(111.7, -135.75) hp_me=88.0 lantern=True
+[14:22:25] boss: state=scorch_fall phase=3 hp=36.0 me=(105.8, -143.97) hp_me=88.0 lantern=True
+[14:22:30] boss: state=defeat phase=3 hp=0.0 me=(109.39, -142.34) hp_me=88.0 lantern=True
+[14:22:34] boss summary: {'seconds': 63.6, 'phases_seen': [1, 2, 3], 'deaths': 0, 'lowest_hp': 88.0, 'braziers_used': [0, 2], 'defeated': True}
+[14:22:34] RESULT PASS: playthrough:silk_and_boss - quest step now return; ok=True; 76s
+[14:22:34] === STEP return_home (quest step return, +606s) ===
+[14:23:01] RESULT PASS: playthrough:return_home - quest step now free_play; ok=True; 27s
+[14:23:01] === STEP ending (quest step free_play, +633s) ===
+[14:23:56] button not found: 'Continue exploring'; visible: ['  Continue  ']
+[14:23:59] RESULT PASS: playthrough:ending - quest step now free_play; ok=True; 58s
+[14:23:59] === STEP accept_ch2 (quest step free_play, +691s) ===
+[14:24:03] RESULT PASS: playthrough:accept_ch2 - quest step now free_play; ok=True; 4s
+[14:24:03] === STEP free_play_save (quest step free_play, +695s) ===
+[14:24:05] RESULT PASS: playthrough:free_play_save - quest step now free_play; ok=True; 2s
+[14:24:06] focus report: {'telemetry_frames': 6792, 'frames_focused': 6792, 'frames_mouse_captured': 0}
+[14:24:06] foreground watchdog: {'checks': 2669, 'game_had_focus': 0, 'handed_back': 0}
+[
+ {
+  "step": "title_new_game",
+  "ok": true,
+  "seconds": 17.3,
+  "elapsed": 17.3,
+  "quest": "wake",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_003_title_new_game.png"
+ },
+ {
+  "step": "read_ward",
+  "ok": true,
+  "seconds": 6.2,
+  "elapsed": 23.6,
+  "quest": "gather_basics",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_004_read_ward.png"
+ },
+ {
+  "step": "gather_basics",
+  "ok": true,
+  "seconds": 42.3,
+  "elapsed": 65.9,
+  "quest": "craft_axe",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_005_gather_basics.png"
+ },
+ {
+  "step": "craft_axe",
+  "ok": true,
+  "seconds": 3.4,
+  "elapsed": 69.3,
+  "quest": "chop",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_007_craft_axe.png"
+ },
+ {
+  "step": "chop",
+  "ok": true,
+  "seconds": 25.0,
+  "elapsed": 94.3,
+  "quest": "workbench",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_008_chop.png"
+ },
+ {
+  "step": "workbench",
+  "ok": true,
+  "seconds": 15.3,
+  "elapsed": 109.6,
+  "quest": "mochi",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_011_workbench.png"
+ },
+ {
+  "step": "tailor_cache",
+  "ok": true,
+  "seconds": 14.5,
+  "elapsed": 124.1,
+  "quest": "mochi",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_012_tailor_cache.png"
+ },
+ {
+  "step": "mochi",
+  "ok": true,
+  "seconds": 24.7,
+  "elapsed": 148.8,
+  "quest": "pebble",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_013_mochi.png"
+ },
+ {
+  "step": "pebble",
+  "ok": true,
+  "seconds": 51.2,
+  "elapsed": 200.0,
+  "quest": "home",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_015_pebble.png"
+ },
+ {
+  "step": "home",
+  "ok": true,
+  "seconds": 94.1,
+  "elapsed": 294.1,
+  "quest": "lumi",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_020_home.png"
+ },
+ {
+  "step": "lumi",
+  "ok": true,
+  "seconds": 41.9,
+  "elapsed": 336.0,
+  "quest": "prepare",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_024_lumi.png"
+ },
+ {
+  "step": "prepare",
+  "ok": true,
+  "seconds": 27.2,
+  "elapsed": 363.2,
+  "quest": "descend",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_026_prepare.png"
+ },
+ {
+  "step": "brave_steps",
+  "ok": true,
+  "seconds": 61.7,
+  "elapsed": 424.9,
+  "quest": "descend",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_031_brave_steps.png"
+ },
+ {
+  "step": "descend",
+  "ok": true,
+  "seconds": 31.9,
+  "elapsed": 456.8,
+  "quest": "old_mine",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_032_descend.png"
+ },
+ {
+  "step": "old_mine",
+  "ok": true,
+  "seconds": 34.2,
+  "elapsed": 491.0,
+  "quest": "deeper",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_033_old_mine.png"
+ },
+ {
+  "step": "deeper",
+  "ok": true,
+  "seconds": 38.4,
+  "elapsed": 529.5,
+  "quest": "silk",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_034_deeper.png"
+ },
+ {
+  "step": "silk_and_boss",
+  "ok": true,
+  "seconds": 76.1,
+  "elapsed": 605.6,
+  "quest": "return",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_035_silk_and_boss.png"
+ },
+ {
+  "step": "return_home",
+  "ok": true,
+  "seconds": 27.4,
+  "elapsed": 633.0,
+  "quest": "free_play",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_036_return_home.png"
+ },
+ {
+  "step": "ending",
+  "ok": true,
+  "seconds": 57.6,
+  "elapsed": 690.7,
+  "quest": "free_play",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_039_ending.png"
+ },
+ {
+  "step": "accept_ch2",
+  "ok": true,
+  "seconds": 4.3,
+  "elapsed": 695.0,
+  "quest": "free_play",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_041_accept_ch2.png"
+ },
+ {
+  "step": "free_play_save",
+  "ok": true,
+  "seconds": 2.2,
+  "elapsed": 697.2,
+  "quest": "free_play",
+  "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_042_free_play_save.png"
+ }
+]
+EXIT=0

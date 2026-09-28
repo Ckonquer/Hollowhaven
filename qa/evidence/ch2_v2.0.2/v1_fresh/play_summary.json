@@ -1,0 +1,408 @@
+{
+  "results": [
+    {
+      "step": "title_new_game",
+      "ok": true,
+      "seconds": 17.3,
+      "elapsed": 17.3,
+      "quest": "wake",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_003_title_new_game.png"
+    },
+    {
+      "step": "read_ward",
+      "ok": true,
+      "seconds": 6.2,
+      "elapsed": 23.6,
+      "quest": "gather_basics",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_004_read_ward.png"
+    },
+    {
+      "step": "gather_basics",
+      "ok": true,
+      "seconds": 42.3,
+      "elapsed": 65.9,
+      "quest": "craft_axe",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_005_gather_basics.png"
+    },
+    {
+      "step": "craft_axe",
+      "ok": true,
+      "seconds": 3.4,
+      "elapsed": 69.3,
+      "quest": "chop",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_007_craft_axe.png"
+    },
+    {
+      "step": "chop",
+      "ok": true,
+      "seconds": 25.0,
+      "elapsed": 94.3,
+      "quest": "workbench",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_008_chop.png"
+    },
+    {
+      "step": "workbench",
+      "ok": true,
+      "seconds": 15.3,
+      "elapsed": 109.6,
+      "quest": "mochi",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_011_workbench.png"
+    },
+    {
+      "step": "tailor_cache",
+      "ok": true,
+      "seconds": 14.5,
+      "elapsed": 124.1,
+      "quest": "mochi",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_012_tailor_cache.png"
+    },
+    {
+      "step": "mochi",
+      "ok": true,
+      "seconds": 24.7,
+      "elapsed": 148.8,
+      "quest": "pebble",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_013_mochi.png"
+    },
+    {
+      "step": "pebble",
+      "ok": true,
+      "seconds": 51.2,
+      "elapsed": 200.0,
+      "quest": "home",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_015_pebble.png"
+    },
+    {
+      "step": "home",
+      "ok": true,
+      "seconds": 94.1,
+      "elapsed": 294.1,
+      "quest": "lumi",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_020_home.png"
+    },
+    {
+      "step": "lumi",
+      "ok": true,
+      "seconds": 41.9,
+      "elapsed": 336.0,
+      "quest": "prepare",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_024_lumi.png"
+    },
+    {
+      "step": "prepare",
+      "ok": true,
+      "seconds": 27.2,
+      "elapsed": 363.2,
+      "quest": "descend",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_026_prepare.png"
+    },
+    {
+      "step": "brave_steps",
+      "ok": true,
+      "seconds": 61.7,
+      "elapsed": 424.9,
+      "quest": "descend",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_031_brave_steps.png"
+    },
+    {
+      "step": "descend",
+      "ok": true,
+      "seconds": 31.9,
+      "elapsed": 456.8,
+      "quest": "old_mine",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_032_descend.png"
+    },
+    {
+      "step": "old_mine",
+      "ok": true,
+      "seconds": 34.2,
+      "elapsed": 491.0,
+      "quest": "deeper",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_033_old_mine.png"
+    },
+    {
+      "step": "deeper",
+      "ok": true,
+      "seconds": 38.4,
+      "elapsed": 529.5,
+      "quest": "silk",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_034_deeper.png"
+    },
+    {
+      "step": "silk_and_boss",
+      "ok": true,
+      "seconds": 76.1,
+      "elapsed": 605.6,
+      "quest": "return",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_035_silk_and_boss.png"
+    },
+    {
+      "step": "return_home",
+      "ok": true,
+      "seconds": 27.4,
+      "elapsed": 633.0,
+      "quest": "free_play",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_036_return_home.png"
+    },
+    {
+      "step": "ending",
+      "ok": true,
+      "seconds": 57.6,
+      "elapsed": 690.7,
+      "quest": "free_play",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_039_ending.png"
+    },
+    {
+      "step": "accept_ch2",
+      "ok": true,
+      "seconds": 4.3,
+      "elapsed": 695.0,
+      "quest": "free_play",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_041_accept_ch2.png"
+    },
+    {
+      "step": "free_play_save",
+      "ok": true,
+      "seconds": 2.2,
+      "elapsed": 697.2,
+      "quest": "free_play",
+      "evidence": "C:\\Users\\Ali\\Desktop\\Hollowhaven\\qa\\tmp\\e2e\\final_202_fresh\\play_042_free_play_save.png"
+    }
+  ],
+  "problems": [],
+  "notes": {
+    "overwrite_confirm": "not shown (no save in the isolated save dir)",
+    "look": {
+      "wanted": {
+        "outfit": "strawberry_picnic",
+        "hair": "braided_crown"
+      },
+      "got": {
+        "outfit": "strawberry_picnic",
+        "hair": "braided_crown"
+      }
+    },
+    "tailor_cache": {
+      "flag": true,
+      "optional_done": true
+    },
+    "brave_steps": {
+      "ribbon_tied": true,
+      "mochi_follows": true
+    },
+    "courage_lantern": {
+      "flag": true,
+      "optional_done": true
+    },
+    "brazier_uses": [
+      {
+        "brazier": 0,
+        "phase": 1,
+        "text": "Light the brazier"
+      },
+      {
+        "brazier": 2,
+        "phase": 3,
+        "text": "Light the brazier"
+      }
+    ],
+    "drops_seen": 3,
+    "dodges": {
+      "drop": 3,
+      "fan": 1
+    },
+    "minion_hits": 6,
+    "channels_seen": 1,
+    "boss": {
+      "seconds": 63.6,
+      "phases_seen": [
+        1,
+        2,
+        3
+      ],
+      "deaths": 0,
+      "lowest_hp": 88.0,
+      "braziers_used": [
+        0,
+        2
+      ],
+      "defeated": true
+    },
+    "chapter2_after_accept": {
+      "current": [
+        "ch2_waygate"
+      ],
+      "done": [
+        "ch2_light_beyond"
+      ],
+      "tracker": {
+        "kind": "chapter2",
+        "step": "ch2_waygate",
+        "targets": [
+          {
+            "area": "surface",
+            "id": "ruin"
+          }
+        ],
+        "title": "The Hallowmere Way"
+      }
+    }
+  },
+  "final_state": {
+    "step": "free_play",
+    "area": "surface",
+    "inv": {
+      "berries": 1,
+      "berry_snack": 3,
+      "copper_ore": 3,
+      "copper_sword": 1,
+      "glowcap": 1,
+      "haven_banner": 1,
+      "lantern": 1,
+      "shiny_pebble": 1,
+      "stone": 9,
+      "stone_axe": 1,
+      "stone_pickaxe": 1,
+      "sunflax_seeds": 1,
+      "sweetroot_seeds": 5,
+      "wood": 1
+    },
+    "keys": {
+      "foreman_key": 1
+    },
+    "flags": [
+      "c1x_look_chosen",
+      "hint_quest_wake",
+      "hint_intro_move",
+      "read_ward_intro",
+      "hint_quest_gather_basics",
+      "hint_ob_mastery",
+      "hint_quest_craft_axe",
+      "hint_quest_chop",
+      "hint_quest_workbench",
+      "hint_build_controls",
+      "hint_build_controls_ch2",
+      "hint_quest_mochi",
+      "c1x_tailor_cache",
+      "hint_c1x_loom",
+      "hint_quest_pebble",
+      "hint_ob_companion_skill",
+      "hint_quest_home",
+      "hint_ob_furnace",
+      "hint_ob_companion_menu",
+      "hint_farming_growth",
+      "hint_quest_lumi",
+      "spawner_cleared_ruin_bramblings",
+      "ruin_cleared",
+      "hint_quest_prepare",
+      "hint_ob_wardrobe",
+      "read_ward_warning",
+      "hint_quest_descend",
+      "hint_ob_loom",
+      "hint_loom_crafting",
+      "c1x_ribbon_given",
+      "c1x_mochi_courage",
+      "mine_opened",
+      "mine_comfort_seen",
+      "entered_below",
+      "hint_quest_old_mine",
+      "hint_below_lantern",
+      "cp_lit_landing",
+      "moment_threshold",
+      "spawner_cleared_gallery_gloom",
+      "gallery_cleared",
+      "cp_lit_office",
+      "foreman_key_taken",
+      "lower_gate_open",
+      "moment_crossing",
+      "spawner_cleared_hall_gloom",
+      "imitation_seen",
+      "cp_lit_shrine",
+      "reached_silk_hollows",
+      "hint_quest_silk",
+      "moment_silk_intro",
+      "hint_silk_light",
+      "cp_lit_arena",
+      "hint_boss_braziers",
+      "hint_boss_scorched",
+      "hint_boss_phase2",
+      "hint_boss_fan",
+      "hint_boss_stuck",
+      "hint_boss_sacs",
+      "hint_boss_tripline",
+      "hint_tell_brood_skitter_leap",
+      "hint_boss_phase3",
+      "hint_boss_channel",
+      "hint_boss_snapped",
+      "weaver_defeated",
+      "moment_return",
+      "ward_restored",
+      "chapter_one_complete",
+      "read_ward_ch2",
+      "ch2_accepted",
+      "hint_quest_ch2_waygate"
+    ],
+    "companions": {
+      "lumi": "home",
+      "mochi": "follow",
+      "pebble": "home"
+    },
+    "optional": {
+      "done": [
+        "opt_look_of_your_own",
+        "opt_brave_little_steps",
+        "opt_tailors_cache"
+      ],
+      "done_count": 3,
+      "pending": [
+        "opt_copper_courage",
+        "opt_bramblewatch",
+        "opt_gardeners_afternoon",
+        "opt_tobins_shift",
+        "opt_upstairs",
+        "opt_pumpkin_face",
+        "opt_counts_wardrobe",
+        "opt_groundskeeper",
+        "opt_hat_too_large",
+        "opt_long_way_home",
+        "opt_harvest_table",
+        "opt_room_for_friends",
+        "opt_miner_came_back",
+        "opt_legacy_bond",
+        "opt_legacy_heartbloom"
+      ]
+    },
+    "appearance": {
+      "back": "picnic_basket",
+      "eyes": "eye_1",
+      "hair": "braided_crown",
+      "hair_acc": "strawberry_clip",
+      "hair_color": "auburn",
+      "hat": "",
+      "lower": "pinafore_skirt",
+      "outfit": "strawberry_picnic",
+      "palette": {
+        "accent": "berry",
+        "primary": "rose",
+        "secondary": "cream"
+      },
+      "shoes": "mary_janes",
+      "skin": "skin_2",
+      "upper": "puff_blouse"
+    },
+    "chapter2": {
+      "active": true,
+      "available": true,
+      "chapter": 2,
+      "current": [
+        "ch2_waygate"
+      ],
+      "done": [
+        "ch2_light_beyond"
+      ],
+      "finished": false,
+      "title": "The Hallowmere Way"
+    }
+  },
+  "game_log_errors": []
+}

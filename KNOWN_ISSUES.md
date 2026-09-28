@@ -1,10 +1,18 @@
-# Known issues — Hollowhaven 2.0.1 (Chapter One + Chapter Two)
+# Known issues — Hollowhaven 2.0.2 (Chapter One + Chapter Two)
 
-Honest list of what is imperfect or unverified in the 2.0.1 release (`dist/Hollowhaven-2.0.1-Windows.zip`, git `da94714`).
+Honest list of what is imperfect or unverified in the 2.0.2 release (`dist/Hollowhaven-2.0.2-Windows.zip`, git `991014c`).
 Severity is **minor** unless stated. No crash, save corruption or progression blocker is known to be open - but Chapter Two has
 **not been played by a human**, so that statement rests on automated tests, QA-bot runs with virtual input (headless, and visible on
-the second monitor) and still frames only (`QA_REPORT.md` §9, §11). Fixed bugs are not listed here, except the short list below;
-the details are in `QA_REPORT.md` §9.6 and §11.
+the second monitor) and still frames only (`QA_REPORT.md` §9, §11, §12). Fixed bugs are not listed here, except the short lists
+below; the details are in `QA_REPORT.md` §9.6, §11 and §12.
+
+## Fixed in 2.0.2
+* **Boss-fight tips lagged behind the fight or outlived it** (seen in 2.0.1: the Weaver's "It is smothering a brazier!" tip over the
+  Chapter One ending, Run B `play_038_ending.png`; a burst of Crossing Matron tips queued past her defeat in Run A). A newer fight
+  tip now replaces an older queued one, the tip on screen makes room after 4 s, and the end of the encounter drops all fight tips
+  (`hint_card.gd`, `a31e717`; 7 new unit tests, full suite 2679 / 0). On screen in the packaged 2.0.2 build (V1,
+  `qa/evidence/ch2_v2.0.2/v1_fresh/play_039_ending.jpg`): no stale Weaver tip after the Chapter One ending. The Crossing / Choir
+  cases were only run headless (V2), not seen on screen.
 
 ## Fixed in 2.0.1 (open or unnoticed in 2.0.0)
 Checked by new unit / regression tests in the full suite (2672 tests, 0 failed) and, where noted, by bot runs; none by a human.
@@ -46,19 +54,20 @@ Checked by new unit / regression tests in the full suite (2672 tests, 0 failed) 
   Medium + 85 % on an integrated GPU. Lantern Road round trips keep node / object counts flat, but process memory still rises:
   9.9-15.7 MB per Reach <-> Haven cycle in the 3-cycle runs, 8.5 MB per cycle over 10 cycles (harness verdict "slow growth",
   `qa/evidence/ch2_v2.0.0/perf/leak10_summary.md`); a long session was not measured. All of this was the **2.0.0** exe; 2.0.1
-  (loading card, Continue prefetch) was not re-profiled.
+  (loading card, Continue prefetch) and 2.0.2 were not re-profiled.
 * **Packaged-build runs are bot runs.** The packaged exe has now been driven end to end, always with virtual input: 2.0.0 - a
   visible natural Chapter Two chain on the second monitor (1488 s, completes); 2.0.1 - Run B, a fresh New Game through Chapter One,
   the ending and accepting Chapter Two, visible with sound (21/21 steps, 658 s), and Run A, the natural Chapter Two chain, headless
-  (completes: 20/20 steps + relaunch, 1534.8 s, 0 deaths, 0 script errors) (`QA_REPORT.md` §11). On 2.0.1 no Chapter Two area was rendered by any run (Run A is headless).
+  (completes: 20/20 steps + relaunch, 1534.8 s, 0 deaths, 0 script errors) (`QA_REPORT.md` §11). On 2.0.1 no Chapter Two area was
+  rendered by any run (Run A is headless). 2.0.2 - V1, a fresh New Game, visible with sound (21/21 steps,
+  697 s, 0 script errors, ribbon tied), and V2, the Chapter Two finale resumed from Run A's `T34_end` save, headless (completes,
+  900.7 s, relaunch + Continue with the same items) (`QA_REPORT.md` §12.4). No 2.0.2 run rendered a Chapter Two area (V1 stops at
+  accepting Chapter Two in the Haven).
 
-## 2. Open bugs in 2.0.1
-CHAIN-001 / 002 and COV-001..007 are fixed (list above). Still open:
-* **Boss-fight tips can linger after the fight.** Run B's `play_038_ending.png` (2.0.1, `qa/evidence/ch2_v2.0.1/run_b_fresh/`)
-  shows the Weaver's "It is smothering a brazier!" tip on the HUD back in the Haven after the Chapter One ending. Cosmetic; a HUD
-  fix for the next build was in progress (uncommitted) when this was written - not in 2.0.1.
+## 2. Open bugs in 2.0.2
+The lingering boss-fight tips (2.0.2), CHAIN-001 / 002 and COV-001..007 (2.0.1) are fixed (lists above). Still open:
 * **CHAIN-003 = CH2-011 = COV-008 (developer logs only)**: quitting prints "WARNING: N ObjectDB instances were leaked at exit"
-  (N 3-9 in the chain runs, 8-24 in the coverage runs; 8 at the end of the 2.0.1 suite); 3 coverage-run exits also logged
+  (N 3-9 in the chain runs, 8-24 in the coverage runs; 8 at the end of the 2.0.1 and 2.0.2 suites); 3 coverage-run exits also logged
   "ERROR: N resources still in use at exit" (N 1, 2, 7; `qa/tmp/bot/COVERAGE_BUGS.md`). See §6.
 
 ## 3. Open work and small player-visible gaps
@@ -66,14 +75,17 @@ CHAIN-001 / 002 and COV-001..007 are fixed (list above). Still open:
   sound names: safe, arachnophobia swaps work, but many creatures share voices. Planned as ONE audio pass (new `tools/audio` sfx +
   Audio aliases, arachnophobia variants for the Crossing) followed by a human listening check; the requested voice list is in
   `docs/ch2/INTEGRATION_WAVE_D.md` §2 (D10).
+* The interaction prompt can trail the real target by up to ~160 ms when two targets cross (the HUD label refreshes every 0.08 s;
+  E always acts on the freshly re-scored target), e.g. "Talk to Mochi" still showing while E opens Lumi's panel. Minor, not
+  changed. (The case in 2.0.1 Run B was a bot race - it acted on a telemetry frame 100-200 ms old - not a game bug; `QA_REPORT.md` §12.3.)
 * The HUD day dial shows a day sky inside Moonveil Manor, where it is always night (R3-43; the balcony backdrop half of IN-13 was fixed).
 * Onboarding tip pacing (2.5 s calm, 25 s between tips, 30 s after a horror moment) is untuned: a Chapter One save can see about
   five tips in its first minutes (P50).
 * The Bell Throat echo stone stands at (153.6, -28, 27.6) next to the checkpoint; if the wall rocks touch it on screen it should move
   to about (153.4, -28, 24.75) (L10, not checked on screen).
 * The optional fourth friend Pipkin (a stretch goal in the design) is not implemented.
-* Developer-only: the test runner's isolation guard still repairs leftovers on every full run (21 `ISOLATION` lines in the 2.0.0 and
-  the 2.0.1 final runs: stray projectiles / particles, `Game._bosses`, zone flags, Reach world items; F04). No test fails because of it.
+* Developer-only: the test runner's isolation guard still repairs leftovers on every full run (21 `ISOLATION` lines in the 2.0.0,
+  2.0.1 and 2.0.2 final runs: stray projectiles / particles, `Game._bosses`, zone flags, Reach world items; F04). No test fails because of it.
 
 ## 4. Avatar clipping limits (reviewed and kept)
 Checked on still frames only (`qa/tmp/visual/fix_avatar/sheets/`, `qa/tmp/visual/g1_pass3/`):
@@ -126,7 +138,7 @@ Checked on still frames only (`qa/tmp/visual/fix_avatar/sheets/`, `qa/tmp/visual
 
 ## 6. Developer-log leak note (CH2-011 / CHAIN-003 / COV-008)
 Quitting can print "WARNING: N ObjectDB instances were leaked at exit" (N varies, 3-9 in the chain runs, up to 24 in the coverage
-runs; also at the end of the full test suite: 8 in the 2.0.1 run). Three coverage-run exits also printed "ERROR: N resources still in
+runs; also at the end of the full test suite: 8 in the 2.0.1 and 2.0.2 runs). Three coverage-run exits also printed "ERROR: N resources still in
 use at exit" (N 1, 2, 7), one of them from the title screen with no gameplay; their owners were not identified (no `--verbose` re-run
 yet, `qa/tmp/bot/COVERAGE_BUGS.md` COV-008).
 Our own source - background loads never claimed at quit - is fixed (`Game.release_prefetches()`, `test_flow_quit_prefetch.gd`); a
@@ -139,9 +151,7 @@ Commands for the debug views are in `AGENTS.md`; the list is what no human or OS
 * **Controls and panels:** wardrobe grid (arrows / Enter, drag to turn, typing a preset name, every Esc path), the O key (also over
   the pause menu), rebinding Z / P / N and the hints naming the new key, dragging onto equipment slots, map toggle, Q/E journal tabs,
   scroll wheels, mouse capture after Continue.
-* **Companions:** tying the Comfort Ribbon on Mochi while Lumi follows close by (in Run B the bot pressed E at a "Talk to Mochi"
-  prompt but Lumi's Friends panel opened, so Brave Little Steps was not finished; cause not investigated, possibly the bot's timing);
-  the T key (with UI focused, after rebinding, with no follower); navigation in real Below / Works corridors, on
+* **Companions:** the T key (with UI focused, after rebinding, with no follower); navigation in real Below / Works corridors, on
   stairs, upper floors, the quarry gangway and the brook (the local path search is unit-tested only; changing storey relies on the
   4 s stuck recovery).
 * **Building:** walking stairs to an upper floor, Continue while upstairs, a bed upstairs.
@@ -164,7 +174,7 @@ Commands for the debug views are in `AGENTS.md`; the list is what no human or OS
   by day and night, boss tells (Velour's dash lane on the crimson rug, the Crossing's rings with sound muted, the Choir's genuine vs
   false tells), both ending screens, menus at 1080p and 720p on the packaged build.
 
-## 8. Chapter One (still true in 2.0.1)
+## 8. Chapter One (still true in 2.0.2)
 ### Gameplay / feel
 * No navmesh: companions follow breadcrumbs, use a small local path search around walls (added for Chapter Two) and whisker
   steering, with stuck detection that safely teleports a companion back beside Krystal; enemies steer directly. On tricky terrain they

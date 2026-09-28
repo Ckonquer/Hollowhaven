@@ -1,0 +1,505 @@
+{
+	"failed": 0,
+	"results": [
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_arachno_comfort_flashing",
+			"test": "test_lamp_flicker_is_calm_with_reduce_flashing"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_arachno_comfort_flashing",
+			"test": "test_real_below_flicker_respects_reduce_flashing"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_arachno_comfort_flashing",
+			"test": "test_lamp_still_stutters_without_reduce_flashing"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_arachno_comfort_flashing",
+			"test": "test_gentle_dip_is_smooth_when_retriggered_or_switched_on"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_arachno_comfort_live",
+			"test": "test_pale_shapes_swap_when_arachnophobia_is_switched_on"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_arachno_comfort_live",
+			"test": "test_ward_stone_warning_has_no_weaving_with_arachnophobia"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_arachno_comfort_live",
+			"test": "test_title_continue_line_follows_arachnophobia"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_building_bed_wake",
+			"test": "test_bed_flush_against_walls_every_rotation"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_building_bed_wake",
+			"test": "test_fix_prototype_ray_rejects_candidates_behind_walls"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_building_bed_wake",
+			"test": "test_doorway_replaced_by_wall_after_sleeping"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_ai_findings",
+			"test": "test_scorched_boss_never_lands_in_the_heartseed_cocoon"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_ai_findings",
+			"test": "test_scorch_during_a_drop_also_lands_clear_of_the_brazier"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_ai_findings",
+			"test": "test_stalker_pass_plays_out_when_krystal_carries_a_lantern"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_ai_findings",
+			"test": "test_brazier_does_not_restart_the_fight_during_the_death_screen"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_ai_findings",
+			"test": "test_lift_ride_leaves_a_waiting_companion_at_its_spot"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_verify",
+			"test": "test_probe_scorched_at_centre_anchor_reachability"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_verify",
+			"test": "test_probe_death_kindle_timeline"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_combat_verify",
+			"test": "test_probe_normal_slam_next_to_brazier_distance"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_companions_verify",
+			"test": "test_lift_up_waiting_companion_visible_behaviour"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_companions_verify",
+			"test": "test_lift_down_leaves_a_companion_waiting_at_the_landing"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_companions_verify",
+			"test": "test_lift_still_carries_the_follower"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_census",
+			"test": "test_a_census_near_the_haven"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_census",
+			"test": "test_b_copper_veins_reachable"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_census",
+			"test": "test_e_stream_banks_climbable"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_census",
+			"test": "test_zz_cleanup"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_items",
+			"test": "test_mochi_forage_with_full_backpack_leaves_no_drops"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_spawns",
+			"test": "test_b_wall_on_the_bed_wake_spot"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_spawns",
+			"test": "test_d_sealed_bedroom_respawn"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_spawns",
+			"test": "test_e_bed_against_a_wall_wakes_outside"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_economy_world_spawns",
+			"test": "test_c_bed_wake_spot_after_reload_sees_neighbours"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_horror_verify_stalker_pass",
+			"test": "test_real_route_pass_with_lantern"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_horror_verify_stalker_pass",
+			"test": "test_real_route_recoil_at_a_chain_end_never_retreats_toward_krystal"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_horror_verify_stalker_pass",
+			"test": "test_real_route_rattle_still_recoils_from_a_raised_lantern"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_horror_verify_stalker_pass",
+			"test": "test_fixed_variant_crawls_with_lantern"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_window_close_request_on_the_surface_keeps_progress"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_close_request_saves_only_where_a_manual_save_is_allowed"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_new_game_saves_straight_away_and_quietly"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_surface_autosave_is_quiet_and_waits_for_a_safe_moment"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_focus_lost_on_the_death_screen_pauses_after_the_respawn"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_surface_respawn_after_climbing_out_without_a_bed_is_the_haven"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_surface_pause_then_quit_to_title_leaves_clean_state"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_surface_death_respawns_cleanly"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_lifecycle_flow",
+			"test": "test_hitstop_never_leaves_time_scale_slowed"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_below",
+			"test": "test_mid_dungeon_key_taken_gate_still_locked"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_below",
+			"test": "test_after_the_weaver_the_below_is_calm_and_the_heartseed_waits_exactly_once"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_below",
+			"test": "test_lift_ride_then_climb_out_saves_on_the_surface_and_continue_is_on_the_surface"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_flow",
+			"test": "test_continue_with_a_damaged_save_restores_the_backup_and_says_so"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_flow",
+			"test": "test_continue_with_only_a_complete_temp_file"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_flow",
+			"test": "test_quit_to_title_then_new_game_then_continue_does_not_leak_state"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_surface",
+			"test": "test_structures_chest_crop_bed_come_back_with_their_data"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_surface",
+			"test": "test_felled_tree_stays_felled_after_continue_and_regrows_on_time"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_surface",
+			"test": "test_overflow_drop_reappears_exactly_once_and_never_after_pickup"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_surface",
+			"test": "test_companions_follow_wait_home_restore_in_place"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_surface",
+			"test": "test_mochi_waits_at_the_threshold_through_a_below_save_and_rejoins_on_the_way_out"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_surface",
+			"test": "test_lumi_told_to_wait_below_is_still_there_after_a_lantern_save"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_persistence_surface",
+			"test": "test_saved_on_a_stream_crossing_continues_there"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_comfort",
+			"test": "test_closing_pre_mine_comfort_screen_stays_on_the_surface"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_comfort",
+			"test": "test_confirming_pre_mine_comfort_screen_enters_the_mine"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_order",
+			"test": "test_in_order_return_completes_chapter"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_order",
+			"test": "test_heartseed_returned_before_silk_step_still_completes_chapter"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_order",
+			"test": "test_heartseed_returned_before_prepare_still_completes_chapter"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_reentry",
+			"test": "test_lit_lantern_remembered_after_surface_trip"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_reentry",
+			"test": "test_surface_respawn_stays_at_the_haven_after_trip"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_reentry",
+			"test": "test_old_save_without_a_remembered_lantern_uses_the_deepest_lit_one"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_progression_reentry",
+			"test": "test_resting_at_a_lantern_updates_the_remembered_return_point"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_release_packaging",
+			"test": "test_window_close_request_does_not_drop_unsaved_progress"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_release_packaging",
+			"test": "test_engine_window_starts_in_the_default_display_mode"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_release_packaging",
+			"test": "test_export_presets_do_not_ship_override_cfg"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_layout",
+			"test": "test_all_panels_fit_the_virtual_canvas"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_state",
+			"test": "test_backpack_can_eat_more_than_once_per_visit"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_state",
+			"test": "test_backpack_full_health_message_explains_why"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_state",
+			"test": "test_enter_on_focused_recipe_row_does_not_craft_another_recipe"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_state",
+			"test": "test_click_or_scroll_while_capturing_does_not_silently_bind_the_mouse"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_state",
+			"test": "test_escape_during_a_sleep_fade_does_not_open_a_hidden_pause_menu"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_state",
+			"test": "test_focus_lost_during_a_load_still_pauses_once_play_resumes"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_input_state",
+			"test": "test_companion_menu_closes_when_krystal_is_hurt"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_verify",
+			"test": "test_keyboard_enter_on_arrowed_recipe_row_crafts_that_recipe"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_verify",
+			"test": "test_keyboard_reaches_recipe_list_when_nothing_is_craftable"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_verify",
+			"test": "test_wheel_while_capturing_through_viewport"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_verify",
+			"test": "test_reset_to_defaults_keeps_comfort_options"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_ui_verify",
+			"test": "test_title_continue_uses_alt_title_after_toggle"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_verify_surface_crossings",
+			"test": "test_a_proposed_rule_accepts_crossings_and_still_refuses_open_water"
+		},
+		{
+			"msgs": [],
+			"ok": true,
+			"suite": "test_audit_verify_surface_crossings",
+			"test": "test_b_real_validate_position_accepts_crossings_and_refuses_open_water"
+		}
+	],
+	"seconds": 134.47,
+	"total": 83
+}
