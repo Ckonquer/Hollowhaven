@@ -97,7 +97,9 @@ const NODES := {
 ##      rw_c1x_gardener, rw_c1x_tailor_cache, rw_c1x_elder (surface Chapter One additions), rw_c1x_tobin (Tobin's
 ##      annex), rw_ch2_candleyard_pattern, rw_hr_chime_trail (Reach west: Candleyard / Thimblebrook Pools),
 ##      rw_hw_lightwell_alcove (Works rooms 1-8: the Light Well keepsake trunk), rw_ch2_crossing,
-##      rw_hw_throat_supplies (Works deep: Weaver's Crossing, Bell Throat), rw_trial_matron_first (echo trial).
+##      rw_hw_throat_supplies (Works deep: Weaver's Crossing, Bell Throat), rw_trial_matron_first,
+##      rw_trial_velour_first, rw_trial_choir_first (echo trial first clears; exact mirrors of data/trials.gd
+##      FIRST_REWARDS, each setting only its trial's pattern-unlock flag).
 ##    Their flags are recipe unlock / world flags, or the module's own "already paid" marker (hr_chime_trail_done,
 ##    hw_throat_supplies) that nothing else reads.
 ##  * "legacy": how the Chapter One code grants its rewards today. Documentation for ITEM_SOURCES only: never pass
@@ -133,6 +135,8 @@ const REWARDS := {
 	"rw_opt_groundskeeper": {"items": {"ghost_lantern": 1}, "flags": ["ch2_groundskeeper_candle"], "by": "optional_log", "who": "optional goal 'A Candle for the Groundskeeper'"},
 	"rw_opt_harvest_table": {"items": {}, "flags": ["ch2_harvest_table"], "by": "optional_log", "who": "optional goal 'The Harvest Table'"},
 	"rw_trial_matron_first": {"items": {}, "flags": ["ch2_trial_matron"], "by": "content", "who": "echo trial: first Matron clear (isolated trial reward state)"},
+	"rw_trial_velour_first": {"items": {}, "flags": ["ch2_trial_velour"], "by": "content", "who": "echo trial: first Count Velour clear (isolated trial reward state)"},
+	"rw_trial_choir_first": {"items": {}, "flags": ["ch2_trial_choir"], "by": "content", "who": "echo trial: first Borrowed Choir clear (isolated trial reward state)"},
 }
 
 ## Items the Chapter Two story cannot be finished without (each has a guaranteed, non-drop source reachable

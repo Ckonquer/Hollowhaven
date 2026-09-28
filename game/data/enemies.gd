@@ -8,7 +8,8 @@ extends RefCounted
 ##   zones        zone ids of its authored pockets (NEW spawner ids only, e.g. hr_sp_orchard_mimics)
 ##   attacks      [{id, kind, telegraph, damage, recover, tell, ...}] - every attack's readable wind-up and
 ##                visual tell (the tell text doubles as the caption with sound muted). kind: charge | bite |
-##                projectile | swing | scrape | leap | roll | sweep | throw | dash | drain | pulse | root_sweep
+##                projectile | swing | scrape | leap | roll | sweep | throw | dash | drain | pulse | root_sweep |
+##                roots | hazard | channel | zone (a boss's delayed strike zones)
 ##   elite / boss  larger authored encounters (drops are guaranteed materials; story items come from rewards)
 ##   underground  true: horror intensity scales its damage like the legacy "below" enemies
 ##   front_armor  damage taken from the front is multiplied by (1 - front_armor) (never immune)
@@ -163,7 +164,7 @@ const ENEMIES := {
 		"attacks": [{"id": "dash", "kind": "dash", "telegraph": 1.0, "damage": 11.0, "recover": 1.4, "distance": 7.0,
 				"tell": "Hangs still and folds its little cape; a line shows its dash. A missed dash leaves it within reach."},
 			{"id": "drain", "kind": "drain", "telegraph": 1.5, "damage": 6.0, "recover": 1.2, "channel": 2.0,
-				"tell": "A glowing mark links it to you. Break it by stepping out of sight, into ward-light, or with a hit. It only heals if the channel finishes."}],
+				"tell": "A glowing mark links it to you. Break it: raise your lantern inside the mark, step into candle or lamp light, out of sight, or strike it. It only heals if the channel finishes."}],
 		"drops": [{"item": "woven_cloth", "min": 1, "max": 1, "chance": 0.25}, {"item": "roseberries", "min": 1, "max": 2, "chance": 0.4}],
 		"sound": "shade", "voice": "velvet_wing", "area": "moonveil_manor", "areas": ["moonveil_manor", "hallowmere_reach"], "zones": ["mm_hall", "mm_gallery", "hr_manor_grounds"],
 		"desc": "A masked little bat in a tiny velvet cape. It folds its cloak before it dashes along a line.",
@@ -234,27 +235,32 @@ const ENEMIES := {
 		"attacks": [{"id": "pounce", "kind": "leap", "telegraph": 1.3, "damage": 20.0, "recover": 2.6,
 				"tell": "A shadow ring marks the landing spot before a pounce from the anchors.",
 				"alt_tell": "A pale ring marks where she will drop before she sinks down between the stone seals."},
-			{"id": "delayed_pounce", "kind": "leap", "telegraph": 1.8, "damage": 22.0, "recover": 2.8,
-				"tell": "The ring pulses twice, with a final shiver, before a delayed pounce.",
-				"alt_tell": "The ring pulses twice, with a final shiver, before she drops."},
+			{"id": "delayed_pounce", "kind": "leap", "telegraph": 1.9, "damage": 22.0, "recover": 2.8,
+				"tell": "A slow-pulsing double ring; its inner ring snaps bright with a final rattle and a strand drops just before she lets go.",
+				"alt_tell": "A slow-pulsing double ring; its inner ring snaps bright with a final whisper and a pale root drops just before she lets go."},
 			{"id": "threads", "kind": "hazard", "telegraph": 1.2, "damage": 0.0, "recover": 1.0,
 				"tell": "Cuttable threads are cast across one route. Cut them or burn them at a line-brazier.",
 				"alt_tell": "Pale roots are cast across one route. Cut them or burn them at a line-brazier."}],
 		"drops": [],
 		"sound": "weaver", "alt_sound": "shade", "voice": "crossing_matron", "alt_voice": "hollow_mother", "area": "hushed_works", "areas": ["hushed_works", "echo_trial"], "zones": ["hw_crossing", "trial"],
-		"desc": "The escaped Matron guards the service bridge. Light the line-braziers and clear the threads to expose her anchors.",
-		"alt_desc": "The Hollow Mother floats between old stone seals. Light the line-braziers and clear the pale roots to expose her.",
+		"desc": "The escaped Matron guards the service bridge. Light the line-braziers and clear the threads to expose her anchors. Blows alone can't drive her off until the light has burned her twice.",
+		"alt_desc": "The Hollow Mother floats between old stone seals. Light the line-braziers and clear the pale roots to expose her. Blows alone can't drive her off until the light has burned her twice.",
 	},
 	"borrowed_choir": {
 		"name": "The Borrowed Choir", "alt_name": "",
 		"hp": 540.0, "damage": 18.0, "speed": 2.4,
 		"telegraph": 1.5, "recover": 2.6, "cooldown": 3.2, "knockback": 6.0,
-		"boss": true, "underground": true, "false_light": true, "arena_radius": 15.0, "phases": 3, "max_helpers": 2,
-		"attacks": [{"id": "false_welcome", "kind": "sweep", "telegraph": 1.8, "damage": 14.0, "recover": 2.0,
+		"boss": true, "underground": true, "false_light": true, "arena_radius": 12.4, "phases": 3, "max_helpers": 2,
+		# Descriptive (bestiary / tells): src/enemies/choir/choir_rules.gd is the source of truth for timings; each
+		# telegraph below is its Standard warning (T_SWEEP_TELE / T_RING_TELE / T_STRIKE_DELAY / T_HUSH_TELE [1]) and
+		# arena_radius is the vault's (choir_arena.gd). The boss reads only each row's damage.
+		"attacks": [{"id": "false_welcome", "kind": "sweep", "telegraph": 1.3, "damage": 14.0, "recover": 2.0,
 				"tell": "Three forms appear. Only the true one lights the floor beneath it and sways the right way; raise your lantern at an anchor to be sure. A wrong pick brings a slow, marked sweep."},
-			{"id": "rings", "kind": "pulse", "telegraph": 1.5, "damage": 16.0, "recover": 1.8, "radius": 6.0,
+			{"id": "rings", "kind": "pulse", "telegraph": 1.3, "damage": 16.0, "recover": 1.8, "radius": 6.0,
 				"tell": "Expanding rings and marked strike zones appear before they land. Symbols show the resonator order."},
-			{"id": "kept_flame", "kind": "sweep", "telegraph": 1.6, "damage": 18.0, "recover": 2.4,
+			{"id": "strikes", "kind": "zone", "telegraph": 1.3, "damage": 16.0, "recover": 1.8, "radius": 1.7,
+				"tell": "Short delayed strike zones are marked on the floor; step out before they chime."},
+			{"id": "kept_flame", "kind": "sweep", "telegraph": 1.3, "damage": 18.0, "recover": 2.4,
 				"tell": "False cozy lights flare; the true flame stays anchored. Move between lit sectors and reveal it with your lantern."}],
 		"drops": [],
 		"sound": "shade", "voice": "borrowed_choir", "area": "hushed_works", "areas": ["hushed_works", "echo_trial"], "zones": ["hw_vault", "trial"],

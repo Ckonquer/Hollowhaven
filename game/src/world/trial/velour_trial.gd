@@ -15,6 +15,9 @@ extends RefCounted
 ##   static func build(area: Node3D) -> Dictionary   (called by src/world/areas_ch2/echo_trial.gd _ready)
 ## Returns {pad, exit, exit_yaw, bounds, zone_center, zone_radius, plate, boss, candles, cover, curtains, fixture,
 ## helper_points, arena_center, arena_radius, entry}.
+## Lead decision P58 (kept on purpose): the memory starts with all three candles lit and no teaching candle - a trial
+## replays a fight she has already won (the candle rule was taught in the story), and lit candles keep phases B / C
+## fair; after the win the Count's line comes first and the fade line follows 2.4 s later (data/trials.gd fade_delay).
 
 const Layout := preload("res://data/manor_layout.gd")
 const Builder := preload("res://src/world/manor/manor_builder.gd")

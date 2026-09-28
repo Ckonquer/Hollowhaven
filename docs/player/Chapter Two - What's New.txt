@@ -15,9 +15,10 @@ PRESS "CONTINUE", NOT "NEW GAME"
 STYLE KRYSTAL
   Soon after you Continue, somewhere calm, a little card says "Your wardrobe is ready".
   Choose "Open the wardrobe" to change her hair, colours, eyes, outfits and single pieces.
-  Later, any time: Pause (Esc) > Wardrobe, or build a Wardrobe or Vanity Mirror at the
-  Workbench and press E at it. The Ward Stone and a festival mirror in the Lanternwake
-  Commons offer "Change your look" too, once the new road is open.
+  Later, any time: press O (the Wardrobe key), or Pause (Esc) > Wardrobe, or build a
+  Wardrobe or Vanity Mirror at the Workbench and press E at it. The Ward Stone and a
+  festival mirror in the Lanternwake Commons offer "Change your look" too, once the new
+  road is open.
   Three preset slots keep favourite looks. Clothes are only for looks: armor still protects
   her underneath (tick "Show equipped armor" in the wardrobe if you'd like to see it).
   New outfits are sewn as patterns at the Loom, and some are found along the way.
@@ -63,7 +64,8 @@ BUILDING
   railings, half walls, arched windows, gable roofs, flower boxes, curtains, bookshelves,
   a kitchen counter, a cottage bench, a music box and more.
   In build mode (B): Z takes back your last piece (press twice, full refund), P recolours
-  the piece you point at with dyes from the Loom, N picks a carved pumpkin's face.
+  the piece you point at with dyes from the Loom, N picks a carved pumpkin's face. Like
+  every other key, they can be changed in Settings > Controls.
   There is a small cottage plot by the Lanternwake Commons for building in the Reach too.
 
 HALLOWEEN
@@ -78,7 +80,7 @@ MUSIC
   Lots of new music for both chapters: home by day and by night, the woods, the old mine,
   the Reach's orchard, quarry and candleyard, the manor, fights and the celebration. The old
   favourites are still there. Settings > Audio > Music sets the volume, and there is a
-  Music Box to build for your home.
+  Music Box to build for your home (see below).
 
 COMFORT
   Arachnophobia mode covers the new creatures too. New in Settings > Comfort:
@@ -86,13 +88,21 @@ COMFORT
   and "Friends use skills on their own".
 
 GOOD TO KNOW
-  - Echo Trial: after the Heartseed Chamber is won, a pale stone by the lantern before it
-    replays that old fight as a memory, for a reward. Nothing on your journey changes.
-  - After the story ends, free play simply carries on in the same save, and a new Workbench
-    recipe, the Expedition Board, gives your home a place to find optional adventures.
+  - Echo Trials: once a great fight is won, a pale echo stone waits by the lantern (or the
+    candles) before it - by the Heartseed Chamber, in the manor ballroom and at the
+    Bell Throat. Press E to replay that fight as a memory. The first clear of each teaches
+    a new outfit pattern for the Loom; later clears leave a few materials, waiting for you
+    back at the stone. Nothing on your journey changes, and you can leave by the pale door.
+  - After the story ends, free play simply carries on in the same save. A new Workbench
+    recipe, the Expedition Board, opens three hand-made Lanternwake Expeditions through
+    the Reach (Orchard Patrol, Quarry Circuit, Manor Afterglow): a few stops, then a cache
+    of materials and treats, sometimes a keepsake. No timers; setting one aside is free.
+  - The Music Box (Workbench) plays the songs you have heard in calm places. Press E at
+    it, pick a song, and mark favourites: they come round a little more often at home.
+    Fights and scary moments still keep their own music.
   - New tips appear once each. Settings > Gameplay > "Show tips again" brings them back.
-  - Two small things: the build keys Z, P and N can't be changed in Settings yet, and the
-    older version of the game can't open the new save (the backup above is for that).
+  - One small thing: the older version of the game can't open the new save (the backup
+    above is for that).
   - All controls: F1. Full guide: How to Play.txt.
 
 For Krystal, from Ali.

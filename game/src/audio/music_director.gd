@@ -165,6 +165,8 @@ func release(context_id: String, fade: float = -1.0) -> void:
 	# a released boss context also ends the fight seen through Events (e.g. Krystal left the arena)
 	for bid in _bosses:
 		if String(MusicData.BOSSES.get(bid, "")) == context_id:
+			if bool((_bosses[bid] as Dictionary).get("active", false)):
+				_boss_ended()
 			(_bosses[bid] as Dictionary)["active"] = false
 	selector.release(context_id, fade)
 	tick_now()
@@ -487,8 +489,17 @@ func _set_boss(id: String, active: bool, phase: int = -1) -> void:
 		b["phase"] = 1
 	b["active"] = active
 	_bosses[id] = b
+	if was and not active:
+		_boss_ended()
 	if active != was or phase > 0:
 		tick_now()
+
+
+## A boss fight ended (defeat, flight or release): the engagement grace it earned belongs to the boss, so an
+## enemy that is still around counts only by sight from now on (the selector itself restarts its ordinary
+## combat latch when the boss context ends: CH2-008).
+func _boss_ended() -> void:
+	_engaged_ms = -1000000
 
 
 func _on_boss_health(boss_id: String, hp: float, _max_hp: float) -> void:

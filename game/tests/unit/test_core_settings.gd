@@ -56,6 +56,10 @@ func test_defaults_and_default_bindings() -> void:
 	assert_eq(Settings.action_label("inventory"), "Tab")
 	assert_eq(Settings.action_label("pause"), "Escape")
 	assert_eq(Settings.action_label("zoom_in"), "Wheel Up")
+	assert_eq(Settings.action_label("wardrobe"), "O", "wardrobe (lead decision D02)")
+	assert_eq(Settings.action_label("build_undo"), "Z")
+	assert_eq(Settings.action_label("build_recolor"), "P")
+	assert_eq(Settings.action_label("build_variant"), "N")
 	assert_eq(Settings.action_label("no_such_action"), "?")
 	assert_eq(InputMap.action_get_events("move_forward").size(), 2, "WASD plus arrow keys")
 
@@ -203,6 +207,59 @@ bindings={
 	assert_eq(Settings.action_label("attack"), "Right Mouse")
 	assert_eq(Settings.action_label("jump"), "Space", "garbage binding falls back to the default")
 	assert_eq(Settings.action_label("dodge"), "Ctrl")
+
+
+## A settings file from before the wardrobe / Chapter Two build actions existed (custom keys saved, none for the
+## new actions): every new action gets its default key, the saved choices stay, and nothing new is written into
+## the saved bindings. A saved binding for a new action (a newer file) is honoured.
+func test_older_settings_file_gets_the_new_actions_by_default() -> void:
+	write_text(_cfg(), """[settings]
+
+bindings={
+"interact": ["key:%d"],
+"journal": ["key:%d"]
+}
+""" % [KEY_R, KEY_K])
+	Settings.load_settings(_cfg())
+	Settings.setup_input_map()
+	assert_eq(Settings.action_label("interact"), "R", "saved choice kept")
+	assert_eq(Settings.action_label("journal"), "K", "saved choice kept")
+	for pair in [["wardrobe", "O"], ["build_undo", "Z"], ["build_recolor", "P"], ["build_variant", "N"]]:
+		assert_true(InputMap.has_action(String(pair[0])), "%s installed" % pair[0])
+		assert_eq(Settings.action_label(String(pair[0])), String(pair[1]), "%s gets its default key" % pair[0])
+		assert_true(InputMap.event_is_action(_key(OS.find_keycode_from_string(String(pair[1]))), String(pair[0])), "%s answers its key" % pair[0])
+	assert_eq(Settings.get_value("bindings"), {"interact": ["key:%d" % KEY_R], "journal": ["key:%d" % KEY_K]}, "nothing added to the saved bindings")
+	write_text(_cfg(), """[settings]
+
+bindings={
+"build_undo": ["key:%d"],
+"wardrobe": ["key:%d"]
+}
+""" % [KEY_U, KEY_H])
+	Settings.load_settings(_cfg())
+	Settings.setup_input_map()
+	assert_eq(Settings.action_label("build_undo"), "U", "a saved build key is honoured")
+	assert_eq(Settings.action_label("wardrobe"), "H", "a saved wardrobe key is honoured")
+	assert_eq(Settings.action_label("build_recolor"), "P")
+
+
+## The build-mode actions keep the keys build mode used before they existed (its FALLBACK_KEYS), so docs, hints and
+## muscle memory stay right; the wardrobe key avoids Q / E (the wardrobe's own category keys).
+func test_build_and_wardrobe_defaults() -> void:
+	var fallback: Dictionary = load("res://src/building/build_mode.gd").FALLBACK_KEYS
+	for action in fallback:
+		assert_eq(Settings.DEFAULT_BINDINGS.get(action, []), ["key:%d" % int(fallback[action])], "%s default = build mode's key" % action)
+	var w: Array = Settings.DEFAULT_BINDINGS["wardrobe"]
+	assert_false(w.has("key:%d" % KEY_Q) or w.has("key:%d" % KEY_E), "not Q / E")
+	var rebindable := {}
+	for pair in Settings.REBINDABLE:
+		rebindable[String(pair[0])] = true
+	for a in ["wardrobe", "build_undo", "build_recolor", "build_variant"]:
+		assert_true(rebindable.has(a), "%s is rebindable" % a)
+	Settings.rebind("build_variant", _key(KEY_H))
+	assert_eq(Settings.action_label("build_variant"), "H")
+	assert_true(InputMap.event_is_action(_key(KEY_H), "build_variant"))
+	assert_false(InputMap.event_is_action(_key(KEY_N), "build_variant"), "N is free again")
 
 
 func test_load_missing_or_garbage_file_keeps_values() -> void:

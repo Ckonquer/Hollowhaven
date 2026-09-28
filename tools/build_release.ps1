@@ -2,7 +2,8 @@
   build_release.ps1 - builds the playable Windows release and the ZIP.
     1. imports assets   2. runs the automated tests (skip with -SkipTests)
     3. exports builds/Hollowhaven/Hollowhaven.exe (release template, PCK embedded)
-    4. adds player docs + licences   5. zips to dist/Hollowhaven-<version>-Windows.zip
+    4. adds player docs (How to Play, Chapter Two - What's New) + licences
+    5. zips to dist/Hollowhaven-<version>-Windows.zip
   Usage:  powershell -ExecutionPolicy Bypass -File tools\build_release.ps1 [-SkipTests]
 #>
 param([switch]$SkipTests)
@@ -42,6 +43,8 @@ if (Test-Path $Template) {
 
 Write-Host "== Player docs & licences =="
 Copy-Item (Join-Path $Root "docs\player\How to Play.txt") $Out
+# "How to Play.txt" points to the Chapter Two update note: ship it next to it.
+Copy-Item -LiteralPath (Join-Path $Root "docs\player\Chapter Two - What's New.txt") -Destination $Out
 $lic = Join-Path $Out "Licenses"
 New-Item -ItemType Directory -Force $lic | Out-Null
 Copy-Item (Join-Path $Root "THIRD_PARTY_NOTICES.md") (Join-Path $lic "THIRD_PARTY_NOTICES.txt")

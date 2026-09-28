@@ -18,6 +18,9 @@ extends RefCounted
 ##   {"type": "equipped", "slots": ["head", "body", "boots"], "count": 1}
 ##   {"type": "companion_home_spot", "count": 1}           companions with a home spot assigned
 ## Optional "alt_label" on an objective and "alt_<field>" on a step are used in arachnophobia mode.
+## Optional "display": true on an objective makes it a signpost row: shown (tracker / journal) with its real
+## done state, but never required - completion reads only the other objectives (src/core/chapter_log.gd), so
+## a save that meets them without the display row never stalls. Every step keeps at least one real objective.
 ## Step keys: id, title, text, hint (shown once when the step starts), target (landmark / zone id for the
 ## map and tracker, a String exactly like data/quests.gd; "" = none) + target_area (the area that landmark is
 ## in: surface ids are data/world_layout.gd LANDMARKS, Reach ids data/hallowmere_layout.gd LANDMARKS (spec
@@ -36,11 +39,13 @@ extends RefCounted
 ##   ch2_service_gate_open, ch2_true_signal, ch2_refuge_reached, ch2_refuge_shortcut, ch2_refuge_record,
 ##   ch2_line_water, ch2_line_bell, ch2_line_light, ch2_crossing_cleared, ch2_false_home_revealed,
 ##   ch2_choir_defeated, ch2_returned_to_reach, ch2_homecoming, chapter_two_complete (set by the ending flow).
+## Lamp prerequisites - the lamp refuses to light, with its reason, until they hold. The quarry ones are the
+## display rows of step ch2_quarry (shown, never required: the step completes on ch2_quarry_lamp_lit alone):
+##   hr_warden_defeated (Reach east: the Quarry Warden's spawner hr_sp_quarry_warden cleared, or the arena's
+##     Events.boss_defeated("quarry_warden"); its no-Warden fallback sets it too) and
+##   ch2_winch_repaired (the mineral winch; also data/unlocks.gd Moonsteel knowledge) before ch2_quarry_lamp_lit.
 ## More content flags that no step reads (listed so nobody reuses the names):
-##   lamp prerequisites - the lamp refuses to light, with its reason, until they hold:
-##     hr_warden_defeated (Reach east: the Quarry Warden's spawner hr_sp_quarry_warden cleared) and
-##     ch2_winch_repaired (the mineral winch; also data/unlocks.gd Moonsteel knowledge) before ch2_quarry_lamp_lit;
-##     ch2_velour_defeated (manor: its arena sets it on Events.boss_defeated("count_velour")) before
+##   ch2_velour_defeated (manor: its arena sets it on Events.boss_defeated("count_velour")) before
 ##     ch2_manor_lamp_lit;
 ##   ch2_moment_empty_waltz (manor: "The Empty Waltz" authored moment, set first, once per save).
 ## Set by the Reach west module (C2) for its own world state, read by nobody else: ch2_orchard_irrigated,
@@ -53,7 +58,8 @@ extends RefCounted
 ## ch2_feast (final step: the Lanternwake outfit pattern). Two non-recipe flags are set here too (story module
 ## C9): ch2_safe_light_routes (step ch2_lamps_linked: the persistent safe-light routes are a committed reward -
 ## the region's road lights, src/world/reach/road_lights.gd, stay lit; any system may read it) and
-## ch2_trials_open (step ch2_routes_restored: the optional echo trials may be offered, echo trial module).
+## ch2_trials_open (step ch2_routes_restored): a story marker; nothing gates on it - each echo trial opens when
+## its boss is defeated (lead decision, pass 2).
 ## Texts, hints, targets and rewards follow MP §11 (story module C9). The ending (Game.complete_chapter_two)
 ## commits rw_ch2_feast = the final step's give + flags + Game.chapter_two_rewards()'s continued resources (the
 ## step's give already lists those same amounts, story_ch2.gd FEAST_EXTRAS, so both paths pay the same); the
@@ -112,7 +118,10 @@ const STEPS := [
 	{"id": "ch2_quarry", "title": "The Quarry's Pulse", "group": "lamps", "target": "hr_quarry", "target_area": REACH,
 		"text": "Ashbell Quarry rings with a slow, heavy pulse. Something large guards the lamp shelf.",
 		"hint": "The Quarry Warden guards the lamp. Mend the old winch to reach the upper terraces.",
-		"objectives": [{"type": "flag", "flag": "ch2_quarry_lamp_lit", "label": "Light the quarry lamp"}],
+		"objectives": [
+			{"type": "flag", "flag": "hr_warden_defeated", "label": "Calm the Quarry Warden", "display": true},
+			{"type": "flag", "flag": "ch2_winch_repaired", "label": "Mend the mineral winch", "display": true},
+			{"type": "flag", "flag": "ch2_quarry_lamp_lit", "label": "Light the quarry lamp"}],
 		"on_complete": {"give": {"quarry_seal": 1}, "flags": ["ch2_quarry_restored"],
 			"message": "The Quarry Seal hums like a far-off bell. New recipes: Ironwood tools, sword and armor."}},
 	{"id": "ch2_manor", "title": "A Most Peculiar Invitation", "group": "lamps", "target": "hr_manor_grounds", "target_area": REACH,

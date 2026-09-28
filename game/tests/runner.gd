@@ -19,7 +19,13 @@ extends Node
 ## sparkle frees itself once no resource node is left; both are re-created on demand).
 const KEEP_ROOT_NODES := ["HitstopListener", "GatherSparkle"]
 ## Game's session children re-created by Game.wire_session_systems() (never strays).
-const KEEP_GAME_NODES := ["StoryCh2Tracker"]
+const KEEP_GAME_NODES := ["StoryCh2Tracker", "OnboardingHints"]
+## A live runner rewrites run_<pid>/.heartbeat (unix time) at start and before every suite. Another run's folder
+## counts as stale (a killed run: removed at start) only when its heartbeat is older than this. The process id
+## cannot decide it: OS.is_process_running() only knows processes THIS process started (Windows and Unix), so
+## it reported every parallel runner as gone and a starting run wiped their live save folders mid-test.
+const HEARTBEAT_FILE := ".heartbeat"
+const STALE_RUN_SECONDS := 3 * 3600
 
 var results: Array = []
 var _catcher: ScriptErrorCatcher = null
@@ -74,6 +80,7 @@ func _run() -> void:
 	# One save folder per runner PROCESS: several test runs at once (parallel agents / terminals) must never
 	# read, overwrite or delete each other's save files (a roundtrip test once read another run's save).
 	_run_dir = "user://test_saves/run_%d" % OS.get_process_id()
+	_touch_heartbeat()
 	_remove_stale_runs()
 	no_isolation = Debug.has_arg("no-isolation")
 	_record_baseline()
@@ -91,6 +98,7 @@ func _run() -> void:
 			total += 1
 			continue
 		var suite: String = String(path).get_file().get_basename()
+		_touch_heartbeat()
 		SaveSystem.set_save_dir(_run_dir.path_join(suite))
 		var inst: Node = script.new()
 		add_child(inst)
@@ -278,17 +286,42 @@ static func _describe(n: Variant) -> String:
 	return "%s(%s%s)" % [String(node.name), script_name, extra]
 
 
-## Removes the save folders of earlier runs that were killed before they could clean up (their process is gone).
+## Marks this run's folder as alive (see HEARTBEAT_FILE).
+func _touch_heartbeat() -> void:
+	DirAccess.make_dir_recursive_absolute(_run_dir)
+	var f := FileAccess.open(_run_dir.path_join(HEARTBEAT_FILE), FileAccess.WRITE)
+	if f != null:
+		f.store_string(str(Time.get_unix_time_from_system()))
+		f.close()
+
+
+## Removes the save folders of earlier runs that were killed before they could clean up: other runs' folders
+## whose heartbeat is older than STALE_RUN_SECONDS. A parallel run's live folder is never touched.
 static func _remove_stale_runs() -> void:
 	var d := DirAccess.open("user://test_saves")
 	if d == null:
 		return
+	var now := Time.get_unix_time_from_system()
 	for sub in d.get_directories():
 		if not sub.begins_with("run_") or not sub.trim_prefix("run_").is_valid_int():
 			continue
-		var pid := sub.trim_prefix("run_").to_int()
-		if pid != OS.get_process_id() and not OS.is_process_running(pid):
-			_remove_tree("user://test_saves".path_join(sub))
+		if sub.trim_prefix("run_").to_int() == OS.get_process_id():
+			continue
+		var dir_path := "user://test_saves".path_join(sub)
+		if now - _last_alive(dir_path) > STALE_RUN_SECONDS:
+			_remove_tree(dir_path)
+
+
+## Unix time a run folder was last known alive: its heartbeat, else (a folder from an older runner, or one
+## created a moment ago whose heartbeat is not written yet) the folder's own modified time; 0 when unknown.
+static func _last_alive(dir_path: String) -> float:
+	var hb := dir_path.path_join(HEARTBEAT_FILE)
+	if FileAccess.file_exists(hb):
+		var text := FileAccess.get_file_as_string(hb).strip_edges()
+		if text.is_valid_float():
+			return text.to_float()
+		return float(FileAccess.get_modified_time(hb))
+	return float(FileAccess.get_modified_time(dir_path))
 
 
 ## Deletes this run's save folder (only ever a folder under user://test_saves/run_*).

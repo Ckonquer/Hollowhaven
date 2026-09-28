@@ -1,11 +1,15 @@
 extends "res://src/ui/panels/panel_base.gd"
-## Controls overlay (F1): every current binding, grouped into Moving / Doing / Menus, as key caps.
+## Controls overlay (F1): every current binding, grouped into Moving / Doing / Menus / Building, as key caps.
 
 const GROUPS := [
 	["Moving", [["move", "Move"], ["look", "Look around"], ["jump", "Jump"], ["sprint", "Sprint (hold)"], ["dodge", "Dodge roll"], ["zoom", "Zoom camera"]]],
 	["Doing", [["attack", "Attack / gather"], ["interact", "Interact / pick up"], ["use_item", "Use / eat held item"], ["lantern", "Raise lantern"], ["companion_command", "Companion: follow / wait"], ["companion_skill", "Companion skill"], ["hotbar", "Choose hotbar slot"]]],
-	["Menus", [["inventory", "Backpack"], ["craft", "Crafting"], ["build", "Build mode"], ["build_rotate", "Rotate (building)"], ["build_dismantle", "Dismantle (building)"], ["journal", "Journal"], ["map", "Map"], ["pause", "Pause"], ["help", "This help"], ["screenshot", "Screenshot"]]],
+	["Menus", [["inventory", "Backpack"], ["craft", "Crafting"], ["wardrobe", "Wardrobe"], ["journal", "Journal"], ["map", "Map"], ["pause", "Pause"], ["help", "This help"], ["screenshot", "Screenshot"]]],
+	["Building", [["build", "Build mode"], ["build_rotate", "Rotate piece"], ["build_dismantle", "Dismantle piece"], ["build_undo", "Undo last piece"], ["build_recolor", "Recolour piece"], ["build_variant", "Pumpkin face"]]],
 ]
+## Screen columns, as GROUPS indices top to bottom (every group exactly once): Building sits under Moving so the
+## three columns stay close in height and the window fits the 1080p canvas.
+const COLUMNS := [[0, 3], [1], [2]]
 
 var _rebind: Button
 
@@ -20,13 +24,17 @@ func _build() -> void:
 	var cols := Kit.hbox(36)
 	cols.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(cols)
-	for g in GROUPS:
+	for col in COLUMNS:
 		var v := Kit.vbox(10)
 		v.custom_minimum_size.x = 470
 		cols.add_child(v)
-		v.add_child(section_title(String(g[0])))
-		for item in g[1]:
-			v.add_child(_row(String(item[0]), String(item[1])))
+		for gi in col:
+			var g: Array = GROUPS[int(gi)]
+			if v.get_child_count() > 0:
+				v.add_child(Kit.spacer(0, 8))
+			v.add_child(section_title(String(g[0])))
+			for item in g[1]:
+				v.add_child(_row(String(item[0]), String(item[1])))
 	var bottom := Kit.hbox(16)
 	body.add_child(bottom)
 	var tip := Kit.label("Tip: everything here can be changed in Settings.", "Small")

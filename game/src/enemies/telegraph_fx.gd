@@ -16,6 +16,7 @@ extends Node3D
 ## on Events.settings_changed; the outline meshes and their one material are shared (static cache). The numbers of the footprint (radius, width, arc) are the SAME numbers the attack resolves with,
 ## so what is marked is what hits (tests compare them through footprint()).
 ##   var m := enemy.mark(); m.show_lane(a, b, 1.6, TelegraphFx.DANGER); m.set_progress(k, locked); m.hide_mark()
+## Tracking wind-ups move the shown mark instead of re-showing it: move_lane(a, b), move_arc(at, dir), move_ring(at).
 
 const HitFx := preload("res://src/combat/hit_fx.gd")
 
@@ -156,6 +157,17 @@ func move_lane(a: Vector3, b: Vector3) -> void:
 	var head_len := minf(width * 0.8, maxf(length * 0.4, 0.05))
 	_head.scale = Vector3(width * 0.9, 1.0, head_len)
 	_head.position = Vector3(0.0, 0.006, -(length - head_len))
+
+
+## Moves an already shown ring (or disc) to `at` - its fill, rim and high-visibility outline move with it, same
+## radius, no new meshes or materials (cheap; e.g. a drain mark that follows Krystal through a wind-up). Shows a ring
+## with the current radius / colour when no ring or disc is showing.
+func move_ring(at: Vector3) -> void:
+	if kind != "ring" and kind != "disc":
+		show_ring(at, radius, color)
+		return
+	center = at
+	global_transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * Y_OFFSET)
 
 
 ## Turns / moves an already shown arc (cheap; used while a wind-up still tracks Krystal).

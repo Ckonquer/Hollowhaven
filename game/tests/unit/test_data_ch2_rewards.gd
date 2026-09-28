@@ -7,6 +7,10 @@ extends "res://tests/test_case.gd"
 const SourcesData := preload("res://data/sources.gd")
 const ItemsData := preload("res://data/items.gd")
 const AppearanceData := preload("res://data/appearance.gd")
+const UnlocksData := preload("res://data/unlocks.gd")
+const TrialsData := preload("res://data/trials.gd")
+const EchoTrial := preload("res://src/world/areas_ch2/echo_trial.gd")
+const Crafting := preload("res://src/crafting/crafting.gd")
 const QUESTS_CH2 := "res://data/quests_ch2.gd"
 const OPTIONAL_GOALS := "res://data/optional_goals.gd"
 ## Timed-buff keys of docs/CHAPTER_TWO_SPEC.md section 9 (GameState.add_buff keys consumed by Stats).
@@ -174,6 +178,74 @@ func test_content_modules_find_their_bundles() -> void:
 	assert_eq(ItemDB.reward_bundle("rw_hw_lightwell_alcove").get("patterns", []), [], "the keepsake grants no pattern")
 	for it2 in ItemDB.reward_bundle("rw_hw_lightwell_alcove")["items"]:
 		assert_eq(String(ItemDB.item(String(it2)).get("cat", "")), "placeable", "keepsake %s is a decoration" % it2)
+
+
+## Echo Trial first clears (MP 15: "First clears guarantee unique cosmetic patterns"; lead decision L09): every
+## trial's content bundle is catalogued in data/sources.gd REWARDS as an exact mirror of data/trials.gd
+## FIRST_REWARDS, sets only its own pattern-unlock flag (declared in data/unlocks.gd), and that flag is the ONLY way
+## to its pattern: the pattern is in the catalogue (no "not yet" fallback), sewn by one Loom recipe gated by the
+## flag, no other bundle sets the flag or grants the pattern, no other recipe sews it.
+func test_echo_trial_first_clears_unlock_unique_patterns() -> void:
+	var pats := {}
+	for id in TrialsData.ids():
+		var t := TrialsData.trial(String(id))
+		var rid := String(t["first_reward"])
+		var flag := "ch2_trial_" + String(id)
+		var pid := String(t["pattern"])
+		assert_true(SourcesData.REWARDS.has(rid), rid + " is catalogued in data/sources.gd REWARDS")
+		assert_eq(SourcesData.REWARDS.get(rid, {}), TrialsData.FIRST_REWARDS.get(rid, {}), rid + " mirrors data/trials.gd FIRST_REWARDS exactly")
+		assert_eq(ItemDB.reward_bundle(rid).get("flags", []), [flag], rid + " sets only " + flag)
+		assert_eq(EchoTrial.first_bundle(String(id)), SourcesData.REWARDS.get(rid, {}), id + ": the trial pays the catalogued bundle")
+		assert_true(UnlocksData.UNLOCK_FLAGS.has(flag), flag + " is declared in data/unlocks.gd")
+		assert_true(ItemDB.unlock_setter(flag).begins_with("echo trial module"), flag + " is set by the echo trial module")
+		var pat := ItemDB.pattern(pid)
+		assert_false(pat.is_empty(), "%s: pattern %s is in data/appearance.gd" % [id, pid])
+		assert_false(pats.has(pid), pid + " belongs to one trial only")
+		pats[pid] = true
+		assert_eq(String(pat.get("name", "")), String(t["pattern_name"]), pid + ": the name the trial promises")
+		assert_eq(String(pat.get("flag", "")), flag, pid + " is unlocked by this trial's flag")
+		var r := ItemDB.recipe(String(pat.get("recipe", "")))
+		assert_eq(String(r.get("pattern", "")), pid, pid + " has its Loom recipe")
+		assert_eq(String(r.get("station", "")), "loom", pid + " is sewn at the Loom")
+		assert_eq(String(r.get("unlock", "")), flag, pid + " recipe is gated by the trial flag")
+		for other in ItemDB.all_reward_ids():
+			if String(other) == rid:
+				continue
+			var ob := ItemDB.reward_bundle(String(other))
+			assert_false((ob.get("flags", []) as Array).has(flag), "%s never sets %s" % [other, flag])
+			assert_false((ob.get("patterns", []) as Array).has(pid), "%s never grants %s" % [other, pid])
+		for rec in ItemDB.every_recipe_id():
+			if String(rec) != String(pat["recipe"]):
+				assert_ne(String(ItemDB.recipe(String(rec)).get("pattern", "")), pid, "%s never sews %s" % [rec, pid])
+	assert_eq(pats.keys(), ["pat_moon_moth", "pat_echo_masquerade", "pat_echo_chime"])
+
+
+## Save safety (no migration): a save that cleared the Count's echo before the pattern existed only has the flag;
+## that flag alone shows the Loom recipe. A fresh first clear goes through the same path: flag -> recipe -> sewn
+## once -> the wardrobe owns the pattern (both parts).
+func test_a_cleared_trial_flag_is_enough_to_sew_its_pattern() -> void:
+	assert_false(ItemDB.recipe_known("pattern_echo_masquerade"), "locked before the first clear")
+	assert_false(Crafting.known_special("loom").has("pattern_echo_chime"))
+	GameState.set_flag("ch2_trial_velour", true)          # an older save: the flag, no pattern ownership
+	assert_true(ItemDB.recipe_known("pattern_echo_masquerade"), "the existing flag unlocks the recipe")
+	assert_true(Crafting.known_special("loom").has("pattern_echo_masquerade"))
+	GameState.give_item("woven_cloth", 6)
+	GameState.give_item("lantern_wax", 2)
+	GameState.give_item("echo_shard", 2)
+	assert_true(Crafting.craft("pattern_echo_masquerade", ["hand", "loom"]), Crafting.last_reason)
+	assert_true((GameState.wardrobe["owned"] as Array).has("pat_echo_masquerade"))
+	assert_false(Crafting.craft("pattern_echo_masquerade", ["hand", "loom"]), "sewn once")
+	assert_eq(GameState.count_item("woven_cloth"), 3, "cloth used once")
+	assert_eq(GameState.count_item("lantern_wax"), 0)
+	# the Choir: a real first clear sets the flag through the catalogued bundle
+	for f in ["chapter_one_complete", "ch2_choir_defeated"]:
+		GameState.set_flag(f, true)
+	assert_true(bool(EchoTrial.record_clear("choir", 200.0)["first"]), "first clear pays the bundle")
+	assert_true(bool(GameState.get_flag("ch2_trial_choir")))
+	assert_true(ItemDB.recipe_known("pattern_echo_chime"))
+	assert_true(Crafting.craft("pattern_echo_chime", ["hand", "loom"]), Crafting.last_reason)
+	assert_true((GameState.wardrobe["owned"] as Array).has("pat_echo_chime"))
+	assert_eq(GameState.count_item("echo_shard"), 0)
 
 
 func test_legacy_descriptions_are_never_ledger_rewards() -> void:

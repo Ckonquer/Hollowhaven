@@ -66,7 +66,7 @@ and 18 would equal the Copper Sword, far above the prompt's 10-25% support share
 | h | Map room display names stay in `MapView.ROOMS` | One table; the annex names "Side-Door Landing", "Shift Lockers", "The Old Sump" and the alt "Rooted Winch" are now official. |
 | i | After Chapter Two the tracker shows one pending optional goal under "SOMETHING TO DO" (Chapter Two goals first) or hides | Quests are signposts (MP); confirmed. |
 | j | `scenes/echo_trial.tscn` keeps the 3-line `echo_trial_world.gd` shim | No .tscn churn. |
-| k | The trial's repeat rewards stay in `echo_trial.gd` `TRIALS` | Trial-owned content data. |
+| k | The trial's repeat rewards stay in `echo_trial.gd` `TRIALS` | Trial-owned content data. (Wave D1 later moved the whole trial table to `data/trials.gd`; `echo_trial.gd` reads it.) |
 | l | Entering a trial may set the Below respawn to `cp_arena` even if unlit | The echo stone stands at that lantern; it is safe. |
 | m | Gothic/cottage furnishing variants = the Midnight/Cream dye finishes (tints recolour furniture), no extra recipes; the Wardlight stays the homecoming reward (matches `rw_ch2_homecoming`); feast wardrobe/palette unlocks stay tied to the `rw_ch2_feast` ledger entry and are repaired on load | Delivers the MP rewards without new recipes; ledger-bound, save-safe. |
 | n | Celebrating at home before revisiting the Reach stays allowed (step 18 is skipped, `ch2_trials_open` still paid) | Never block the player's ending on a detour. |
@@ -106,19 +106,21 @@ during load (X16); manor shortcut flags, note lore ids and `Events.crafted` for 
 spawns need cheats; X18).
 
 ## 6. Deferred (files busy during the pass, or outside it)
-| id | item | blocked by |
-|---|---|---|
-| D01 | QA bot: click "Confirm" on Meet Krystal in `title_new_game`; for v1 saves click "Maybe later" on the wardrobe card (or pass `-- --no-wardrobe-notice`); relabel "Begin the journey" only together with the bot | `tools/qa` busy |
-| D02 | Optional "wardrobe" hotkey (`Settings.DEFAULT_BINDINGS` / `REBINDABLE`, `ui_root.HOTKEYS`, controls "Menus", `UiUtil.TOKEN_ACTIONS`; avoid Q/E) | `autoload/settings.gd` busy |
-| D03 | Build keys `build_undo` (Z), `build_recolor` (P), `build_variant` (N) in `DEFAULT_BINDINGS` (fallback keys work meanwhile) | `autoload/settings.gd` busy |
-| D04 | Light-fearing Chapter Two enemies implement `expose(seconds)` (Glimmerstep calls it) | busy enemy files |
-| D05 | Make `test_enemies_ch2_mimic.test_dormant_is_decor_that_twitches_in_pairs` deterministic (lead decision: seeded RNG) | busy test file |
-| D06 | Quarry Warden charge: stop at the arena edge or bonk when there is no floor ahead (a baited charge can carry it from L2 down to L1) | busy file |
-| D07 | Boss contracts to verify when the boss modules land: Velour emits `boss_defeated("count_velour")`, one node per encounter, `start_fight` / `reset_fight`, the manor's setup keys, the first bow never repeats; the Crossing Matron burns threads by line index and cut fight threads never regrow; the Choir uses the vault's anchors / resonators | boss modules in progress |
-| D08 | Echo Trials for Velour (origin manor ballroom) and the Choir (origin Bell Throat; west wall z 23.4-26.1 kept free), gated on `ch2_trials_open` + the boss's defeat flag, unique first-clear patterns (MP §15) | needs the bosses' trial modes (Wave D module D1) |
-| D09 | `.uid` files for the new Wave B/C scripts | needs an editor / `--import` run (not allowed during the pass) |
-| D10 | New enemy voices (Brambleback, Lantern Moth, Hollow Drudge, Brood Skitter / Pale Sprout, Knotted Elder) | audio generation module |
-| D11 | Teach the QA bot the new telemetry keys and message kinds | `tools/qa` busy |
+**All of D01-D11 were resolved in pass 2 -> see `docs/ch2/INTEGRATION_WAVE_D.md`** (the second integration pass, after Wave D;
+the last column says how, by that record's request id).
+| id | item | blocked by | resolved in pass 2 -> see INTEGRATION_WAVE_D.md |
+|---|---|---|---|
+| D01 | QA bot: click "Confirm" on Meet Krystal in `title_new_game`; for v1 saves click "Maybe later" on the wardrobe card (or pass `-- --no-wardrobe-notice`); relabel "Begin the journey" only together with the bot | `tools/qa` busy | done by the QA-bot agent (D01) |
+| D02 | Optional "wardrobe" hotkey (`Settings.DEFAULT_BINDINGS` / `REBINDABLE`, `ui_root.HOTKEYS`, controls "Menus", `UiUtil.TOKEN_ACTIONS`; avoid Q/E) | `autoload/settings.gd` busy | the wardrobe key is **O**, rebindable (D02) |
+| D03 | Build keys `build_undo` (Z), `build_recolor` (P), `build_variant` (N) in `DEFAULT_BINDINGS` (fallback keys work meanwhile) | `autoload/settings.gd` busy | real Settings actions, rebindable, HUD tokens `{undo}` `{recolor}` `{variant}` (D03) |
+| D04 | Light-fearing Chapter Two enemies implement `expose(seconds)` (Glimmerstep calls it) | busy enemy files | Velvet Wing (breaks a drain) and Borrowed Wisp (forced reveal) only; the bosses deliberately not (D04) |
+| D05 | Make `test_enemies_ch2_mimic.test_dormant_is_decor_that_twitches_in_pairs` deterministic (lead decision: seeded RNG) | busy test file | optional mimic setup key `seed` + a seeded test (L06) |
+| D06 | Quarry Warden charge: stop at the arena edge or bonk when there is no floor ahead (a baited charge can carry it from L2 down to L1) | busy file | lane clipped to the arena, no floor ahead = bonk (D06) |
+| D07 | Boss contracts to verify when the boss modules land: Velour emits `boss_defeated("count_velour")`, one node per encounter, `start_fight` / `reset_fight`, the manor's setup keys, the first bow never repeats; the Crossing Matron burns threads by line index and cut fight threads never regrow; the Choir uses the vault's anchors / resonators | boss modules in progress | verified, all hold (D07) |
+| D08 | Echo Trials for Velour (origin manor ballroom) and the Choir (origin Bell Throat; west wall z 23.4-26.1 kept free), gated on `ch2_trials_open` + the boss's defeat flag, unique first-clear patterns (MP §15) | needs the bosses' trial modes (Wave D module D1) | built by Wave D1 (D08). **The `ch2_trials_open` gate is superseded by the pass-2 lead decision: no `ch2_trials_open` gate** - each trial opens right after its boss is defeated (L07); patterns (L09), repeat gift paid at the origin (L08), Bell Throat stone kept at (153.6, -28, 27.6) pending a screenshot (L10) |
+| D09 | `.uid` files for the new Wave B/C scripts | needs an editor / `--import` run (not allowed during the pass) | one `--import` run last, after every group (D09, group G10) |
+| D10 | New enemy voices (Brambleback, Lantern Moth, Hollow Drudge, Brood Skitter / Pale Sprout, Knotted Elder) | audio generation module | decision: not in pass 2; merged with every other new-voice request into ONE later audio pass (D10, open in KNOWN_ISSUES) |
+| D11 | Teach the QA bot the new telemetry keys and message kinds | `tools/qa` busy | done by the QA-bot agent (D11) |
 
 ## 7. Follow-ups found while recording the pass (G12, 2026-09-28 03:40)
 * `test_ui_appearance_wardrobe.test_unstuck_labels_and_targets_per_area` still expects "Return to safety" for `echo_trial`; the lead
@@ -127,9 +129,11 @@ spawns need cheats; X18).
 * `test_player_avatar.test_idle_head_height_and_blink` is flaky (the avatar's random 18% double blink can land inside the test's
   0.4 s window; about one run in ten); seed the blink RNG in the test (player module).
 * R38 (quarry step display rows) was not yet in `data/quests_ch2.gd` when this record was written; check the G4 report.
+  (Pass 2: request F03, ChapterLog display-only rows - see `INTEGRATION_WAVE_D.md`.)
 * The runner's isolation (R09) repairs leaks every full run (stray projectiles / particles from enemy, wand and companion suites,
   `Game._bosses` from the boss suites, zone flags from two progression audits, world items from `test_reach_west_orchard`); the
-  suites named in the `ISOLATION` lines should clean up after themselves.
+  suites named in the `ISOLATION` lines should clean up after themselves. (Pass 2, F04: kept as a test-hygiene item in
+  KNOWN_ISSUES; the runner's isolation stays the safety net.)
 
 ## 8. Integration test run (2026-09-28 03:44-04:35; evidence in QA_REPORT.md §9.1)
 * The wardrobe test's Echo Trial expectation now follows R17 ("Leave the trial"; the requirement changed on purpose, one assert).
@@ -139,5 +143,6 @@ spawns need cheats; X18).
   suites are busy files, and none of them fails a test.
 * R38 is still open: `ch2_quarry` shows only "Light the quarry lamp". Not applied here: ChapterLog has no display-only objective
   row, and adding the Warden / winch flags as real objectives would change completion (the decision says it must not). Needs a small
-  ChapterLog "display rows" API plus the two rows (and tracker / journal tests).
+  ChapterLog "display rows" API plus the two rows (and tracker / journal tests). (Resolved in pass 2 as F03: objective key
+  `"display": true` - see `INTEGRATION_WAVE_D.md`.)
 * Final full suite: 2407 tests, 0 failed.

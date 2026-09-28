@@ -9,6 +9,10 @@ extends RefCounted
 ## so loading, re-evaluating or repairing a save never grants anything twice.
 ## GameState calls evaluate() from its coalesced quest evaluation and its 1 s poll.
 ## The static check_objective() is shared with src/core/optional_log.gd.
+## Display rows: an objective with "display": true is a signpost only. check_objective() / objective_status()
+## list it with its real done state (the result carries "display": true), but step_done() and
+## has_pending_completion() ignore it, so it can never stall or trigger a completion; a step needs at least
+## one non-display objective to complete. Honoured by this layer only (optional_log.gd does not read it).
 
 const Data := preload("res://data/quests_ch2.gd")
 const MAX_CASCADE := 64
@@ -94,7 +98,8 @@ func step_string(step: Dictionary, field: String) -> String:
 	return String(step.get(field, ""))
 
 
-## [{label, done, progress, target}] for a step (default: the first current step).
+## [{label, done, progress, target}] for a step (default: the first current step), display rows included
+## (they also carry "display": true).
 func objective_status(step: Dictionary = {}) -> Array:
 	if step.is_empty():
 		var cur := current_steps()
@@ -113,16 +118,18 @@ func is_skipped(step: Dictionary) -> bool:
 	return f != "" and _truthy(GameState.get_flag(f))
 
 
+## Skipped, or every non-display objective is met (display rows never count; no counted objective = never).
 func step_done(step: Dictionary) -> bool:
 	if is_skipped(step):
 		return true
-	var objs: Array = step.get("objectives", [])
-	if objs.is_empty():
-		return false
+	var counted := 0
 	for st in objective_status(step):
+		if bool(st.get("display", false)):
+			continue
+		counted += 1
 		if not st["done"]:
 			return false
-	return true
+	return counted > 0
 
 
 ## True when evaluate() would complete something now (used by GameState's 1 s poll).
@@ -246,8 +253,8 @@ func from_dict(d: Dictionary) -> void:
 
 # --- Shared objective semantics (also used by optional_log.gd) -------------------------------------------
 
-## Evaluates one objective against GameState: {label, done, progress, target}.
-## `baseline` is {counter: value at step start} for "since_start" counters.
+## Evaluates one objective against GameState: {label, done, progress, target} (+ "display": true for a
+## display-only row, see the header). `baseline` is {counter: value at step start} for "since_start" counters.
 static func check_objective(o: Dictionary, baseline: Dictionary = {}) -> Dictionary:
 	var progress := 0
 	var target := 1
@@ -306,7 +313,15 @@ static func check_objective(o: Dictionary, baseline: Dictionary = {}) -> Diction
 	var label := String(o.get("label", ""))
 	if o.has("alt_label") and bool(Settings.get_value("arachnophobia")):
 		label = String(o["alt_label"])
-	return {"label": label, "done": progress >= target, "progress": clampi(progress, 0, maxi(target, 0)), "target": target}
+	var out := {"label": label, "done": progress >= target, "progress": clampi(progress, 0, maxi(target, 0)), "target": target}
+	if is_display_objective(o):
+		out["display"] = true
+	return out
+
+
+## A display-only row: shown with its done state, never required for completion.
+static func is_display_objective(o: Dictionary) -> bool:
+	return _truthy(o.get("display", false))
 
 
 ## Backpack + key pouch + equipped copies of an item.

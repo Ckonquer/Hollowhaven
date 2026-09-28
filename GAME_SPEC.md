@@ -119,8 +119,9 @@ M map · G companion follow/wait · 1–8 hotbar · Wheel zoom · Esc pause · F
 ## Chapter Two: "The Lanterns of Hallowmere" (a continuation of the same save)
 Design: `Hollowhaven_Part2_Master_Prompt.md`. Implementation contract (wins where they differ):
 `docs/CHAPTER_TWO_SPEC.md`. Save schema v2 and rollback: `docs/SAVE_MIGRATION.md`. Player note:
-`docs/player/Chapter Two - What's New.txt`. Everything above stays true; Chapter Two only adds. Build status
-(what is still being built or verified): the Chapter Two section of `KNOWN_ISSUES.md`.
+`docs/player/Chapter Two - What's New.txt`. Everything above stays true; Chapter Two only adds. Status: every
+Chapter Two system is built and covered by headless tests; what is still to be checked on screen, by ear or with real
+input is the Chapter Two section of `KNOWN_ISSUES.md`.
 
 **Continuity.** Continue loads the Chapter One save unchanged: house, chests, crops, companions, flags, quest
 index, lore and clock. Migration only adds sections; the untouched v1 file is copied once to
@@ -151,8 +152,8 @@ Candleyard, Quarry, Manor grounds, Bellhouse), `moonveil_manor` (five rooms), `h
 travel between arches and to the Haven; also from the Ward Stone), never while chased or in a boss fight.
 
 **Expression.** New Game opens "Meet Krystal" (hair style and colour, skin, eyes, outfits, single pieces,
-colours). Existing saves get a one-time "Your wardrobe is ready" card; later the Wardrobe is in the pause
-menu, at a built Wardrobe or Vanity Mirror, at the Ward Stone and at the Commons festival mirror. Three
+colours). Existing saves get a one-time "Your wardrobe is ready" card; later the Wardrobe is on the O key, in the
+pause menu, at a built Wardrobe or Vanity Mirror, at the Ward Stone and at the Commons festival mirror. Three
 presets. Clothes are cosmetic only; armor protects whether or not "Show equipped armor" is ticked.
 
 **Companions fight.** Each friend has a passive, a basic attack and a signature skill on a shared cooldown:
@@ -180,18 +181,24 @@ Pale Sprout), elite Knotted Elder; the Weaver Matron fight has three phases. Cha
 Patchwalker, Velvet Wing, Bellcap Sentry, Borrowed Wisp, elite Quarry Warden; bosses Count Velour, the
 Matron at Weaver's Crossing and the Borrowed Choir. Design rule for all: readable tells, fair recovery windows.
 
-**Replay & optional.** Optional goals for both chapters (Journal > Optional; the Expedition Board, a Workbench
-recipe after the Choir, opens them at home). Echo Trials replay a won boss fight as a memory from its checkpoint,
-never touching story flags (first clear: a unique pattern; later clears: renewable resources); built so far:
-the Weaver Matron's, by the lantern before the Heartseed Chamber. Velour / Choir trials (`data/trials.gd`) and
-hand-authored Lanternwake Expeditions (`data/expeditions.gd`) are in progress. The optional fourth friend
-Pipkin is not implemented.
+**Replay & optional.** Optional goals for both chapters (Journal > Optional). **Echo Trials** (`data/trials.gd`,
+area `echo_trial`) replay a won boss fight as a memory: the Weaver Matron (echo stone by the lantern before the
+Heartseed Chamber), Count Velour (the manor ballroom's rest candles) and the Borrowed Choir (the Bell Throat). Each
+opens right after its boss is defeated (no other gate), never touches story flags, and always returns to its stone;
+the first clear sews a unique Loom pattern (Moon Moth Shawl, Moonlit Masquerade, Chime Chorister), later clears pay
+modest renewable resources on the way back at the stone. **Lanternwake Expeditions** (`data/expeditions.gd`): the
+Expedition Board, a Workbench recipe after the Choir, offers three hand-authored routes through the Reach (Orchard
+Patrol, Quarry Circuit, Manor Afterglow; a seed only picks which authored group waits at each stop), ending in a
+cache of renewable materials, candy and sometimes a keepsake (a dye colour or a festival decoration); no timers, no
+daily limits, never a story item or flag. The optional fourth friend Pipkin is not implemented.
 
 **Music & comfort.** 27 cues (`data/music.gd`, m01-m27) chosen by area, zone, time of day, combat and bosses,
-keeping the Chapter One favourites. New comfort options: high-visibility cues, timing assist; gameplay options:
+keeping the Chapter One favourites. The **Music Box** (Workbench) plays the songs Krystal has heard in calm places at
+home and keeps favourites (a little extra weight in the Haven rotation); any fight, boss, horror or authored music
+ends a preview. New comfort options: high-visibility cues, timing assist; gameplay options:
 friends join fights, friends use skills on their own, seasonal decorations (off by default, never indoors).
 Onboarding tips for the new systems appear once per save (`src/world/story_ch2/onboarding_hints.gd`), one at a
 time, never in cutscenes, boss fights, Echo Trials, ordinary fights or horror moments, and respect "Show hints".
 
-**Chapter Two controls (defaults).** T companion skill · E on a friend: their menu · Build mode: Z undo,
-P recolour, N pumpkin face (these three build-mode keys are not rebindable yet; T is).
+**Chapter Two controls (defaults, all rebindable in Settings > Controls).** T companion skill · O wardrobe ·
+E on a friend: their menu · Build mode: Z undo (press twice), P recolour, N pumpkin face.

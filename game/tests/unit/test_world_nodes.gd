@@ -8,6 +8,7 @@ const MineEntrance := preload("res://src/world/surface/mine_entrance.gd")
 const WardStone := preload("res://src/world/surface/ward_stone.gd")
 const GatherSparkle := preload("res://src/world/common/gather_sparkle.gd")
 const MasteryData := preload("res://data/mastery.gd")
+const ReachVegetation := preload("res://src/world/reach/reach_vegetation.gd")
 
 var _holder: Node3D
 
@@ -207,6 +208,133 @@ func test_drop_table_ranges() -> void:
 	for i in 400:
 		seeds += int(bush.roll_drops().get("sweetroot_seeds", 0))
 	assert_true(seeds > 50 and seeds < 160, "~25%% seed chance (%d / 400)" % seeds)
+
+
+## One-shot particle bursts (fx.gd) currently under the test holder: the hit / felling feedback of its nodes.
+func _bursts() -> int:
+	var n := 0
+	for c in _holder.get_children():
+		if c is CPUParticles3D:
+			n += 1
+	return n
+
+
+## Angle (radians) between a node's local up axis and straight up: 0 = standing, ~1.5 = lying on the ground.
+func _tilt(n: Node3D) -> float:
+	return n.transform.basis.y.normalized().angle_to(Vector3.UP)
+
+
+## CH2-002: every Hallowmere Reach tree has a custom Node3D visual (reach_flora.gd). String() on that visual raised a
+## SCRIPT ERROR on every hit (no leaf / chip bursts) and on the felling (the top never fell and `_busy` stayed set, so
+## the tree also never respawned until the area reloaded). Built with the exact params the Reach uses.
+func test_reach_tree_fells_falls_and_respawns() -> void:
+	var d := {"id": "test_hr_tree_1", "species": "amber", "seed": 1, "yaw": 40.0, "scale": 1.1}
+	var t := _node(ReachVegetation.node_params("trees", d))
+	var visual: Node3D = t.get_node("Visual")
+	var top := visual.get_node_or_null("Top") as Node3D
+	var stump := visual.get_node_or_null("Stump") as Node3D
+	assert_not_null(top, "a Reach tree has a Top")
+	assert_not_null(stump, "a Reach tree has a Stump")
+	if top == null or stump == null:
+		return
+	assert_true(top.visible and not stump.visible, "a standing tree")
+	var player := Node3D.new()
+	_holder.add_child(player)
+	player.position = Vector3(0, 0, 3)
+	GameState.give_item("stone_axe", 1)
+	var wood := GameState.count_item("wood")
+	t.harvest_hit(player, "stone_axe")
+	assert_eq(_bursts(), 2, "a chop shows the leaf and the chip burst")
+	for i in 3:
+		t.harvest_hit(player, "stone_axe")
+	assert_true(t.depleted, "the 4th stone-axe hit fells it")
+	assert_true(GameState.count_item("wood") - wood >= 3, "wood granted")
+	assert_true(GameState.is_depleted("test_hr_tree_1"), "the felling persists")
+	assert_true(stump.visible, "the stump shows")
+	assert_true(bool(t.get("_busy")), "the top is falling")
+	await wait_seconds(1.3)
+	assert_true(_tilt(top) > 1.2, "the top has fallen over (tilt %.2f rad)" % _tilt(top))
+	await wait_seconds(1.2)
+	assert_false(top.visible, "the fallen top is gone")
+	assert_true(stump.visible, "the stump remains")
+	assert_false(bool(t.get("_busy")), "the fall finished")
+	assert_true(_bursts() >= 4, "the landing burst leaves and dust (%d bursts)" % _bursts())
+	var solid := t.get_node("Solid/CollisionShape3D") as CollisionShape3D
+	assert_almost(float((solid.shape as CylinderShape3D).height), 0.55, 0.01, "only the stump collides")
+	# The respawn check (every RESPAWN_CHECK_SECONDS of _process) brings it back once its time has passed.
+	GameState.total_minutes += 1441.0
+	t._process(ResourceNode.RESPAWN_CHECK_SECONDS + 0.1)
+	assert_false(t.depleted, "the tree respawns on its timer in the same session")
+	assert_true(top.visible and not stump.visible, "the tree stands again")
+	assert_true(_tilt(top) < 0.01, "upright again")
+	assert_true(float((solid.shape as CylinderShape3D).height) > 3.0, "the full trunk collides again")
+	assert_true(t.is_in_group("harvestable"), "harvestable again")
+
+
+## CH2-002 (every kind on the same path): each Reach harvestable - trees, boulders, sticks, stones and fiber tufts,
+## custom visuals or NodeVisuals ids - harvests, finishes its depletion animation and respawns in the same session.
+func test_every_reach_node_kind_harvests_animates_and_respawns() -> void:
+	GameState.give_item("stone_axe", 1)
+	GameState.give_item("stone_pickaxe", 1)
+	var tools := {"axe": "stone_axe", "pickaxe": "stone_pickaxe", "hand": ""}
+	var nodes: Array = []
+	for list in ["trees", "rocks", "sticks", "stones", "fibers"]:
+		var d := {"id": "test_hr_%s" % list, "species": "pine", "seed": 2, "yaw": 15.0, "scale": 1.0}
+		var n := _node(ReachVegetation.node_params(list, d))
+		n.position = Vector3(float(nodes.size()) * 4.0, 0, 0)
+		nodes.append(n)
+		var tool_id := String(tools[String(n.get("tool"))])
+		for i in 8:
+			if n.depleted:
+				break
+			n.harvest_hit(null, tool_id)
+		assert_true(n.depleted, "%s: harvested" % list)
+	await wait_seconds(2.5)
+	GameState.total_minutes += 1441.0
+	for n in nodes:
+		var label := String(n.get("kind"))
+		assert_false(bool(n.get("_busy")), "%s: the depletion animation finished" % label)
+		n._process(ResourceNode.RESPAWN_CHECK_SECONDS + 0.1)
+		assert_false(n.depleted, "%s: respawned" % label)
+		assert_true((n.get_node("Visual") as Node3D).visible, "%s: visible again" % label)
+
+
+## A depletion animation that never finished (killed, or aborted by an error) must not block the respawn: the
+## respawn check settles the depleted look itself, so every kind comes back (legacy string visuals and custom ones).
+func test_an_interrupted_depletion_animation_never_blocks_the_respawn() -> void:
+	GameState.give_item("stone_axe", 1)
+	GameState.give_item("stone_pickaxe", 1)
+	var tree := _node({"node_id": "test_stuck_tree", "kind": "tree", "visual": "oak"})
+	var reach_tree := _node(ReachVegetation.node_params("trees", {"id": "test_stuck_hr_tree", "species": "gold", "seed": 0, "yaw": 0.0, "scale": 1.0}))
+	var rock := _node({"node_id": "test_stuck_rock", "kind": "rock"})
+	var stick := _node({"node_id": "test_stuck_stick", "kind": "stick"})
+	for n in [tree, reach_tree, rock, stick]:
+		for i in 6:
+			if n.depleted:
+				break
+			n.harvest_hit(null, "stone_axe" if String(n.get("tool")) == "axe" else "stone_pickaxe")
+		assert_true(n.depleted and bool(n.get("_busy")), "%s: depleted and animating" % n.get("node_id"))
+		n.call("_kill_anim")        # the animation dies half-way (as the aborted Reach felling did)
+	# Leave the looks half-way: a tree top tipped and shrunk, a boulder squashed.
+	for t in [tree, reach_tree]:
+		var top: Node3D = t.get_node("Visual/Top")
+		top.transform.basis = Basis(Vector3.RIGHT, 1.1).scaled(Vector3.ONE * 0.3)
+	var rock_visual: Node3D = rock.get_node("Visual")
+	var rock_scale := rock_visual.scale
+	rock_visual.scale = rock_scale * 0.3
+	GameState.total_minutes += 1441.0
+	for n in [tree, reach_tree, rock, stick]:
+		n._process(ResourceNode.RESPAWN_CHECK_SECONDS + 0.1)
+		assert_false(n.depleted, "%s: respawns although its animation never finished" % n.get("node_id"))
+		assert_false(bool(n.get("_busy")), "%s: not busy" % n.get("node_id"))
+	await wait_seconds(1.3)   # the grow-in tween
+	for t in [tree, reach_tree]:
+		var top: Node3D = t.get_node("Visual/Top")
+		assert_true(top.visible, "%s: the top is back" % t.get("node_id"))
+		assert_true(_tilt(top) < 0.01, "%s: upright" % t.get("node_id"))
+		assert_true(top.scale.distance_to(Vector3.ONE) < 0.02, "%s: full size (%s)" % [t.get("node_id"), str(top.scale)])
+	assert_true(rock_visual.visible, "the boulder is back")
+	assert_true(rock_visual.scale.distance_to(rock_scale) < 0.02, "the boulder at full size")
 
 
 func test_world_item_persistence_and_pickup() -> void:

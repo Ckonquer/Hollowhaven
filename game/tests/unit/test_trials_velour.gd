@@ -2,11 +2,13 @@ extends "res://tests/unit/test_trials_harness.gd"
 ## Echo Trial "The Last Waltz" (Count Velour; data/trials.gd "velour", src/world/trial/velour_trial.gd, module D1):
 ## a remembered copy of the Count's Gallery with the REAL boss script in trial mode and fresh ward candles; the
 ## entry pad is safe and beyond his stand-down line; a win pays the first-clear bundle once (only its pattern flag),
-## then modest renewable resources through the trial's own ledger; a win or a loss never changes a story flag, never
-## emits boss_defeated (even on a save whose story fight is NOT won); arachnophobia: nothing spider-like.
+## then modest renewable resources through the trial's own ledger (paid on arrival back at the ballroom candles); a
+## win or a loss never changes a story flag, never emits boss_defeated (even on a save whose story fight is NOT won);
+## arachnophobia: nothing spider-like.
 
 const ManorLayout := preload("res://data/manor_layout.gd")
 const VelourTrial := preload("res://src/world/trial/velour_trial.gd")
+const VelourBoss := preload("res://src/enemies/count_velour.gd")
 
 
 func test_the_real_count_spawns_in_trial_mode_in_a_faithful_gallery() -> void:
@@ -44,7 +46,7 @@ func test_the_real_count_spawns_in_trial_mode_in_a_faithful_gallery() -> void:
 	assert_false(bool(a.is_safe_zone(Vector3.ZERO)), "the Gallery is not")
 	assert_eq(String(a.get_zone_at(Vector3.ZERO)), "trial")
 	var r := float(boss.get("arena_radius"))
-	var leave_margin := 6.0
+	var leave_margin: float = VelourBoss.LEAVE_MARGIN          # his stand-down margin (count_velour.gd)
 	for k in 12:
 		var p := start + Vector3(cos(TAU * k / 12.0), 0, sin(TAU * k / 12.0)) * 2.8
 		assert_true(Vector2(p.x, p.z).length() > r + leave_margin, "every point of the pad is past his stand-down line")
@@ -99,10 +101,19 @@ func test_a_win_pays_the_first_clear_once_then_bounded_repeats_and_no_story_flag
 	var rec := EchoTrial.record("velour")
 	assert_eq(int(rec["clears"]), 2)
 	assert_eq(GameState.ledger.size(), ledger_n, "the first-clear bundle never pays twice")
+	# The repeat gift waits for the trip home (lead decision L08), then the arrival at the origin pays it once.
+	assert_eq(GameState.count_item("lantern_wax"), wax, "nothing is given inside the echo")
+	assert_eq(rec.get("pending", {}), {"lantern_wax": 2, "moonpetal": 2}, "the gift waits in the trial's record")
+	assert_eq(int(rec.get("repeat_paid", 0)), 0, "not paid yet")
+	assert_eq(EchoTrial.pay_pending("echo_trial"), {}, "never paid inside a trial")
+	assert_eq(EchoTrial.pay_pending("moonveil_manor"), {"lantern_wax": 2, "moonpetal": 2}, "paid on arrival at the origin")
+	assert_eq(EchoTrial.pay_pending("moonveil_manor"), {}, "once")
+	rec = EchoTrial.record("velour")
 	assert_eq(GameState.count_item("lantern_wax"), wax + 2, "modest lantern wax")
 	assert_eq(GameState.count_item("moonpetal"), petal + 2, "and moonpetals")
 	assert_eq(int(rec.get("repeat_paid", 0)), 1, "the trial ledger counts the paid repeat")
 	assert_eq(rec.get("paid", {}), {"lantern_wax": 2, "moonpetal": 2})
+	assert_false(rec.has("pending"), "nothing waits any more")
 	before["ch2_trial_velour"] = true
 	assert_eq(GameState.flags, before, "a repeat clear writes no flag at all")
 	assert_eq(defeats, [], "still no boss_defeated")

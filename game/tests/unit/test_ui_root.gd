@@ -111,6 +111,10 @@ func test_every_panel_builds_and_closes() -> void:
 	GameState.befriend("mochi")
 	GameState.discover_lore("test_note")
 	var args := {"storage": {"uid": "s_test"}, "companion": {"id": "mochi"}, "confirm": {"title": "T", "text": "x"}}
+	# Chapter Two panels opened by furniture are registered too, and build without args (the Expedition Board's
+	# panel and the Music Box's, whose window is 780 wide).
+	for n in ["expedition", "music_box"]:
+		assert_true(UiRootScript.PANELS.has(n), "%s is a registered panel" % n)
 	for name in UiRootScript.PANELS:
 		if name == "comfort":
 			continue
@@ -121,6 +125,9 @@ func test_every_panel_builds_and_closes() -> void:
 		assert_true(p.window != null and p.window.size.x > 100.0, "%s has a laid-out window" % name)
 		var vp: Vector2 = ui.root.size
 		assert_true(p.window.size.x <= vp.x + 1.0 and p.window.size.y <= vp.y + 1.0, "%s fits on screen (%s in %s)" % [name, p.window.size, vp])
+		assert_eq(get_tree().paused, UiRootScript.FULLSCREEN.has(name), "%s pauses the world only when full-screen" % name)
+		if name == "music_box":
+			assert_true(p.window.size.x >= 779.0, "music box window is 780 wide (%s)" % p.window.size)
 		ui.close(String(name))
 		await wait_frames(1)
 		assert_false(ui.is_open(String(name)))
@@ -508,3 +515,108 @@ func test_pause_leaves_an_echo_trial_through_the_trial() -> void:
 	Game.area_id = old_id
 	trial.queue_free()
 	await wait_frames(1)
+
+
+## The Expedition Board's panel is full-screen (pauses); the Music Box's never pauses (a paused tree would silence
+## its song preview), holds Krystal like the companion menu, and the gameplay hotkeys may switch away from both.
+func test_expedition_and_music_box_panels_are_registered() -> void:
+	assert_true(ui.has_panel("expedition"), "the board finds its panel")
+	assert_true(ui.has_panel("music_box"), "the music box finds its panel")
+	assert_true(UiRootScript.FULLSCREEN.has("expedition"), "expeditions pause the world")
+	assert_false(UiRootScript.FULLSCREEN.has("music_box"), "the music box never pauses")
+	for n in ["expedition", "music_box"]:
+		assert_true(UiRootScript.GAMEPLAY_PANELS.has(n), "hotkeys may switch away from %s" % n)
+	ui.open("expedition")
+	await wait_frames(2)
+	assert_true(ui.is_open("expedition"))
+	assert_true(get_tree().paused, "the expedition panel pauses")
+	ui._input(_key("map"))
+	assert_false(ui.is_open("expedition"), "a hotkey switches away from it")
+	assert_true(ui.is_open("map"))
+	ui.close_all()
+	await wait_frames(1)
+	ui.open("music_box")
+	await wait_frames(2)
+	assert_true(ui.is_open("music_box"))
+	assert_false(get_tree().paused, "the music box keeps the world (and its preview) running")
+	assert_true(Game.is_ui_open(), "Krystal is held still while it is open")
+	ui._input(_key("inventory"))
+	assert_false(ui.is_open("music_box"), "a hotkey switches away from it")
+	assert_true(ui.is_open("inventory"))
+	ui.close_all()
+	await wait_frames(1)
+	assert_false(get_tree().paused)
+	assert_false(Game.is_ui_open())
+
+
+## Wardrobe hotkey (lead decision D02): action "wardrobe", O by default and rebindable; the same rules as the
+## pause menu's Wardrobe button - full-screen, pauses, and only opens in ordinary play.
+func test_wardrobe_hotkey_follows_the_pause_menu_rules() -> void:
+	assert_eq(String(UiRootScript.HOTKEYS.get("wardrobe", "")), "wardrobe", "the wardrobe action opens the wardrobe panel")
+	assert_true(InputMap.has_action("wardrobe"), "the action is installed")
+	ui._input(_key("wardrobe"))
+	assert_true(ui.is_open("wardrobe"), "the key opens the wardrobe")
+	assert_true(get_tree().paused, "and pauses like the pause-menu Wardrobe")
+	ui._input(_key("wardrobe"))
+	await wait_frames(1)
+	assert_false(ui.is_open("wardrobe"), "the same key closes it")
+	assert_false(get_tree().paused)
+	ui._input(_key("inventory"))
+	ui._input(_key("wardrobe"))
+	assert_false(ui.is_open("inventory"), "switching closes the backpack")
+	assert_true(ui.is_open("wardrobe"), "and opens the wardrobe")
+	ui._input(_key("journal"))
+	assert_false(ui.is_open("wardrobe"), "other hotkeys switch away from it")
+	assert_true(ui.is_open("journal"))
+	ui.close_all()
+	ui.open("pause")
+	ui._input(_key("wardrobe"))
+	assert_false(ui.is_open("wardrobe"), "not over the pause menu (it has its own Wardrobe button)")
+	ui.close_all()
+	await ui.fade_out(0.0)
+	ui._input(_key("wardrobe"))
+	assert_false(ui.is_open("wardrobe"), "never during a fade")
+	await ui.fade_in(0.0)
+	for m in ["cutscene", "dead", "loading"]:
+		Game.mode = String(m)
+		ui._input(_key("wardrobe"))
+		assert_false(ui.is_open("wardrobe"), "only in ordinary play (not while %s)" % m)
+	Game.mode = "playing"
+	ui._input(_key("wardrobe"))
+	assert_true(ui.is_open("wardrobe"), "back in play it opens again")
+
+
+## The F1 overlay lists every UI hotkey and every build-mode key, each group shown exactly once.
+func test_controls_overlay_lists_the_hotkeys_and_build_keys() -> void:
+	var CP: Script = load("res://src/ui/panels/controls_panel.gd")
+	var listed := {}
+	for g in CP.GROUPS:
+		for item in g[1]:
+			listed[String(item[0])] = String(g[0])
+	for action in UiRootScript.HOTKEYS:
+		assert_true(listed.has(String(action)), "hotkey %s is listed" % action)
+	assert_eq(String(listed.get("wardrobe", "")), "Menus", "the wardrobe key sits with the menus")
+	for action in ["build", "build_rotate", "build_dismantle", "build_undo", "build_recolor", "build_variant"]:
+		assert_eq(String(listed.get(action, "")), "Building", "%s is listed with the building keys" % action)
+	var seen: Array = []
+	for col in CP.COLUMNS:
+		for gi in col:
+			assert_false(seen.has(int(gi)), "group %d shown once" % int(gi))
+			seen.append(int(gi))
+	assert_eq(seen.size(), (CP.GROUPS as Array).size(), "every group has a column")
+	ui._input(_key("help"))
+	await wait_frames(2)
+	var p: Control = ui.panels.get("controls")
+	assert_not_null(p, "overlay open")
+	if p != null:
+		assert_true(_has_label_text(p, "Wardrobe") and _has_label_text(p, "Undo last piece") and _has_label_text(p, "Pumpkin face"), "rows built")
+		assert_true(_has_label_text(p, Settings.action_label("build_undo")), "the undo key cap shows its key")
+
+
+func _has_label_text(n: Node, text: String) -> bool:
+	if n is Label and (n as Label).text == text:
+		return true
+	for c in n.get_children():
+		if _has_label_text(c, text):
+			return true
+	return false

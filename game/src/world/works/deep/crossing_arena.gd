@@ -12,6 +12,11 @@ extends Node3D
 ## paid by the quest layer), burns the threads off the exit, and the service gate shuts the Matron's route.
 ## Without the boss script (content still completable): the three line-braziers burn the Matron's threads
 ## away and clear the crossing. debug_mark_cleared() (debug builds / tests) clears it directly.
+## Victory timing: the flag, the reward, the save and the gate's collider are immediate; while the Matron's retreat
+## plays (boss.retreat_seconds()) the gate's bars, its sound, the shake and the "retreats behind the old service gate"
+## line wait until she is almost through (retreat_seconds() - GATE_LEAD), so the gate never shuts in front of her.
+## check(p) does nothing while Krystal is down (her health dead, or Game.mode != "playing" for the real player): no
+## fight flag and no authored horror event while she lies on the bridge.
 ##
 ## API for the crossing_matron boss module (all positions global):
 ##   arena_center() -> Vector3, arena_radius() -> float, deck_y() -> float, bridge_rect() -> Rect2 (x, z)
@@ -43,6 +48,7 @@ const REWARD_ID := "rw_ch2_crossing"
 const CLEAR_FLAG := "ch2_crossing_cleared"
 const BRAZIER_SCRIPT := "res://src/enemies/boss_brazier.gd"
 const BRAZIER_CLEARANCE := 1.4
+const GATE_LEAD := 0.8           # the bars start to fall this long before her retreat ends (the drop tween is 0.8 s)
 
 var area: Node3D = null
 var controller: Node = null
@@ -62,6 +68,7 @@ var exit_veil: Node3D = null
 var route_veil: Node3D = null
 var route_gate: Node3D = null
 var _route_body: StaticBody3D = null
+var _gate_pending: bool = false  # the bars wait for the Matron's retreat (see _apply_cleared)
 
 
 func setup(p: Dictionary) -> void:
@@ -187,7 +194,7 @@ func landing_points() -> Array:
 func boss_params() -> Dictionary:
 	return {"arena_center": arena_center(), "arena_radius": arena_radius(), "anchors": anchor_points(),
 		"braziers": braziers(), "crack": crack_point(), "arena": self, "bridge": bridge_rect(), "deck_y": deck_y(),
-		"landing_points": landing_points(), "alert": true}
+		"rail": float(Layout.CROSSING["rail"]), "landing_points": landing_points(), "alert": true}
 
 
 ## True when EnemyFactory knows crossing_matron AND its script exists and compiles (never spawns a broken one).
@@ -199,13 +206,24 @@ static func boss_available() -> bool:
 
 ## Called by the controller ~10x per second with the player.
 func check(p: Node3D) -> void:
-	if cleared or p == null:
+	if cleared or p == null or player_down(p):
 		return
 	var pos := p.global_position
 	if not active and is_on_bridge(pos) and pos.x > float(Layout.CROSSING["trigger_x"]):
 		start_encounter()
 	elif active and pos.x < 68.0 and absf(pos.y - deck_y()) < 3.0:
 		stop_encounter("left")
+
+
+## Krystal is down (her health is dead, or the real player while Game.mode is not "playing": the death screen, a
+## respawn, a cutscene): the arena neither starts nor stops anything until she is back.
+func player_down(p: Node3D) -> bool:
+	var h: Variant = p.get("health")
+	if h is Object and is_instance_valid(h):
+		var dead: Variant = (h as Object).get("dead")
+		if dead is bool and dead:
+			return true
+	return p == Game.player and Game.mode != "playing"
 
 
 func start_encounter() -> void:
@@ -314,6 +332,45 @@ func _apply_cleared(animate: bool) -> void:
 	for b in _braziers:
 		if b != null and is_instance_valid(b) and b.has_method("light") and not bool(b.call("is_lit")):
 			b.call("light")
+	var delay := _gate_delay() if animate else 0.0
+	if delay > 0.0 and is_inside_tree():
+		# The route is closed at once (collider); the bars, sound, shake and line follow her retreat. A timer
+		# connection (not an await): if the area unloads first, nothing resumes on a freed node.
+		Art.set_collision(_route_body, true)
+		_gate_pending = true
+		get_tree().create_timer(delay).timeout.connect(_on_gate_delay, CONNECT_ONE_SHOT)
+	else:
+		_close_route(animate)
+
+
+## Seconds the gate waits for the Matron's retreat: max(retreat_seconds() - GATE_LEAD, 0) while a real retreat plays
+## (a boss that is gone already - a quiet withdrawal, fast_defeat, no boss - gets none).
+func _gate_delay() -> float:
+	if boss == null or not is_instance_valid(boss) or not boss.has_method("retreat_seconds"):
+		return 0.0
+	if boss.has_method("is_gone") and bool(boss.call("is_gone")):
+		return 0.0
+	var fast: Variant = boss.get("fast_defeat")
+	if fast is bool and fast:
+		return 0.0
+	return maxf(float(boss.call("retreat_seconds")) - GATE_LEAD, 0.0)
+
+
+func _on_gate_delay() -> void:
+	if not _gate_pending:
+		return
+	_gate_pending = false
+	if not is_inside_tree() or is_queued_for_deletion():
+		return
+	if area != null and Game.area != null and is_instance_valid(Game.area) and Game.area != area:
+		_shut_route_gate(false)     # she left meanwhile: just the end state, no sound / shake / line
+		return
+	_close_route(true)
+
+
+## The service gate shuts over the Matron's deeper route (+ the caption and her line when animated).
+func _close_route(animate: bool) -> void:
+	_gate_pending = false
 	_shut_route_gate(animate)
 	if animate:
 		var a := Art.arachno()
@@ -481,6 +538,7 @@ func _shut_route_gate(animate: bool) -> void:
 		bars.position.y = 0.0
 
 
+## True once the route is closed for good (the collider is on at once after a win; the bars may still be falling).
 func route_gate_shut() -> bool:
 	if route_gate == null:
 		return false

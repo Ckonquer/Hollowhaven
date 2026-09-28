@@ -39,6 +39,9 @@ const FULLSCREEN := [inventory, crafting, storage, journal, map, pause, settings
 const GAMEPLAY_PANELS := [inventory, crafting, storage, journal, map, companion, controls]  # hotkeys may switch away
 const HOTKEYS := {"inventory":"inventory", "craft":"crafting", "journal":"journal", "map":"map", "help":"controls"}
 ```
+*Current (after integration pass 2):* `PANELS` also has `"wardrobe"` (B2), `"expedition"` (D2) and `"music_box"` (D3);
+`FULLSCREEN` adds `wardrobe`, `expedition` (NOT `music_box`); `GAMEPLAY_PANELS` adds `wardrobe`, `expedition`, `music_box`; `HOTKEYS`
+adds `"wardrobe": "wardrobe"` (Settings action `wardrobe`, default O, rebindable; D02). Details in §11 / §12.
 The UI root is the only registry: `Game.open_panel(name, args)` (`game.gd:449`) calls `ui.open(name, args)`.
 
 **`open(panel_name, args={})`** (:154):
@@ -240,8 +243,8 @@ returns to the comfort screen with the draft look kept; Esc there returns to the
 (integration R01; `CreationScreen.arm_new_journey_marks()` sets the same two marks through `Events.appearance_changed`, a
 harmless second path). The title footer and the Continue line follow the save's chapter (`static footer_text(save_data)`).
 
-**Panel registry additions (B2).** `"wardrobe"` is in `PANELS`, `FULLSCREEN` and `GAMEPLAY_PANELS` (no hotkey yet: deferred D02,
-needs `Settings.DEFAULT_BINDINGS`). `ui_root.has_panel(name) -> bool` says whether a panel is registered (the Ward Stone asks for
+**Panel registry additions (B2).** `"wardrobe"` is in `PANELS`, `FULLSCREEN` and `GAMEPLAY_PANELS` (hotkey O since pass 2, see
+§12; it was deferred D02 in pass 1). `ui_root.has_panel(name) -> bool` says whether a panel is registered (the Ward Stone asks for
 "wardrobe" before offering it). Openers: pause menu "Wardrobe", Ward Stone option, the wardrobe / vanity mirror furniture
 (`src/building/structures/wardrobe.gd`, owned by B2: `Game.open_panel("wardrobe", {"source": structure_id})`).
 `wardrobe_panel.gd`: args `{"category", "source"}`; inner classes `Looks` (pure look / ownership / preset logic:
@@ -292,7 +295,8 @@ the tab when already open. Story: current objective + both chapters' progress (c
 grouped by chapter, pending before done, legacy free_play goals included. Lore: `LoreDB` (arachnophobia-aware), grouped by
 `lore_chapter(id)` = `LoreDB.chapter_of(id)` (by source file: Tobin's annex notes are Chapter One although their ids start with
 `lore_ch2_`; integration R24). Mastery: rank, XP to next, every rank reward, names from `ItemDB.mastery_track_info(track)` (R21).
-Pages rebuild only when their content signature changes. The expedition board opens `{"tab": "optional"}`.
+Pages rebuild only when their content signature changes. The Expedition Board opens the `"expedition"` panel (§12); only when that
+panel is not registered does it fall back to the journal with `{"tab": "optional"}` (`expedition_board.panel_args()`).
 
 **Map (B11 + integration).** `MapView.map_kind(area_id)` → `"surface"` (the Woods drawing, unchanged and pinned by a test; a waygate
 pin once `ch2_accepted`, lit after `ch2_waygate_repaired`) | `"reach"` (Hallowmere Reach: only DISCOVERED landmarks, arches — lit
@@ -321,7 +325,56 @@ skill cooldown ring + ready flash (B4, `reduce_flashing` respected). Settings ro
 `area_info` {area, zone, safe, map, discovered}, `chapter2` {available, active, finished, chapter, current, title, done}, `tracker`
 {kind, title, step, targets}, `optional` {done, pending, done_count}, `equipment`, `companion_skills` (per befriended companion:
 skill, cooldown, ready_at, left, ready, active, mode[, node]) and `music` {cue, director}; message kinds `quest` (Chapter Two step
-started/completed, optional goal completed), `discover`, `music`, `skill`, `equip`. The QA bot does not read them yet (deferred D11).
+started/completed, optional goal completed), `discover`, `music`, `skill`, `equip`. The QA bot's Chapter Two scenarios read them
+(`tools/qa/ch2/`, pass 2 D11).
+
+## 12. Wave D + integration pass 2 — as built
+
+Code headers are the source of truth (`ui_root.gd`, `autoload/settings.gd`, `panels/controls_panel.gd`, `ui_util.gd`,
+`panels/expedition_panel.gd`, `panels/music_box_panel.gd`, `hud/tracker.gd`, `widgets/map_view.gd`, `panels/map_panel.gd`,
+`src/world/trial/trial_entry.gd`, `src/world/story_ch2/onboarding_hints.gd`). Decisions: `docs/ch2/INTEGRATION_WAVE_D.md`.
+
+**New panels (P33).**
+| panel | script | FULLSCREEN (pauses) | GAMEPLAY_PANELS | opened by | args |
+|---|---|---|---|---|---|
+| `"expedition"` | `panels/expedition_panel.gd` (D2) | yes | yes | the Expedition Board (`expedition_board.gd`: `target_panel()`, `expedition_args()`) | `{"template": id (preselect), "source": structure id}` |
+| `"music_box"` | `panels/music_box_panel.gd` (D3) | **no** - a paused tree silences the preview; the world keeps running (like the Friends menu) and the panel closes itself when Krystal is hurt (`Events.player_damaged`) or its box is dismantled | yes | the Music Box furnishing (`src/building/structures/music_box.gd`) | `{"uid", "source": the box node}` (also opens without args, e.g. the every-panel test: no house check then) |
+The expedition panel: left the three routes (difficulty in words AND lantern pips, never colour alone; locked ones greyed with the
+reason), right the chosen route before starting (blurb, difficulty, rough length, stops in order, who may be met - arachnophobia-aware
+names -, the reward TYPES, completions); bottom "Set out" (`Expeditions.start`), while a run is going its progress line, "Lantern
+Road to <arch>" when that arch is lit (`travel()`), "Set it aside" (two presses; in the cache phase the confirm says the cache stays
+closed) and "Optional journal". No countdowns or streaks. Rebuilt on `Events.objectives_changed`. The music box panel lists the
+discovered songs by title with where each belongs, Play / Stop, a Favourite toggle per song, "Now playing", a note when the sound is
+muted and a found / favourites count; "That song can't play right now." when higher music has the director. Text only: works with
+the sound off.
+
+**Hotkeys and bindings (D02 / D03).** `ui_root.HOTKEYS` gains `"wardrobe": "wardrobe"`: Settings action `wardrobe`, default **O**
+(free: not Q/E, which switch wardrobe categories, not the build keys), rebindable; it follows the pause-menu Wardrobe's rules
+(full-screen, pauses, only in ordinary play). The build-mode keys are Settings actions too: `build_undo` Z, `build_recolor` P,
+`build_variant` N (REBINDABLE rows "Build: Undo last piece", "Build: Recolour", "Build: Pumpkin face"; `build_mode.gd` prefers the
+InputMap action, `FALLBACK_KEYS` stay as the safety net). HUD tokens in `UiUtil.TOKEN_ACTIONS`: `{wardrobe}`, `{undo}`, `{recolor}`,
+`{variant}` (the onboarding hints switch to them automatically). The F1 controls overlay (`controls_panel.gd`) groups Moving / Doing
+/ Menus (with Wardrobe) / Building (build, rotate, dismantle, undo, recolour, pumpkin face) in three columns. A settings file saved
+before these actions existed gets their default keys (nothing is written back until the player saves settings).
+
+**Tracker and map (P35 / P36).** `tracker.objective_view()` gains kind `"expedition"` (`Expeditions.tracker_view()`), used ONLY
+where the view would otherwise be `signpost` / `done` / `hidden` - never over a chapter, legacy or pointer step; `where_text()` uses the
+view's `"where"`. The Reach map draws a running expedition's route (`MapView.expedition_pins(area)`: numbered paper pins, a candy pin
+for the cache, done stops faded and ticked, a steady ring on the current one - no flashing), `exp_*` ids resolve through
+`MapView.expedition_disc(id)` / `Expeditions.place_disc(id)`, and `map_panel` always marks the current stop / cache (one extra
+"Expedition:" line when another objective owns the card) with a legend row "Expedition stop". Nothing is drawn without a run.
+
+**Echo stones (D1 + pass 2).** `trial_entry.gd` (manor ballroom, Bell Throat) and the Below's stone (`below_world.gd`, P28) open the
+same confirm: `echo_trial.menu_text(id)` = title, memory text, record ("Cleared n times - best time m:ss" / "Not cleared yet.") and
+what a clear leaves (the first-clear pattern, else "Each clear leaves a little: ..."), buttons "Enter the echo" / "Not now". A won
+repeat clear toasts "The echo's gift waits for you back at <origin_name>." and the arrival there "The echo's gift: ..." (L08;
+`data/trials.gd` `origin_name`). A refusal says "The echo stays quiet while a fight is on." only while a boss is active, else "The echo stays quiet
+for now." (P30). Pause "Leave the trial" inside a trial (R17).
+
+**Onboarding hints (D4 + pass 2 P49).** `onboarding_hints.gd` emits once-per-save tips through `Events.hint` (the HUD hint card shows
+them one at a time). Pass 2: one generic `ob_echo_trial` tip for every echo stone (armed on arrival where a won fight's stone stands,
+live when Velour or the Choir falls; dropped once any trial has a clear) and `ob_expedition_board` names the Lanternwake Expeditions.
+Pacing unchanged until a real play session (P50).
 
 ## Extension recipes
 

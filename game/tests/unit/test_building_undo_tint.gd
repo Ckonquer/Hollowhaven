@@ -277,13 +277,21 @@ func test_pumpkin_face_is_chosen_before_placing_and_can_be_recarved() -> void:
 ## bindings (T is the companion skill, F the lantern), and a real key press reaches its build action.
 func test_build_keys_never_shadow_other_actions() -> void:
 	var fallback: Dictionary = load("res://src/building/build_mode.gd").FALLBACK_KEYS
+	# Since D03 (pass 2) the build keys are rebindable Settings actions on exactly these keys: each key may be
+	# bound to its OWN action, never to another one.
 	var used := {}
 	for other in Settings.DEFAULT_BINDINGS:
 		for b in Settings.DEFAULT_BINDINGS[other]:
-			used[String(b)] = String(other)
+			if not used.has(String(b)):
+				used[String(b)] = []
+			(used[String(b)] as Array).append(String(other))
 	for action in fallback:
 		var code := "key:%d" % int(fallback[action])
-		assert_false(used.has(code), "%s's key is free (bound to %s)" % [action, String(used.get(code, ""))])
+		var owners: Array = used.get(code, [])
+		var others: Array = owners.filter(func(a: String) -> bool: return a != String(action))
+		assert_true(others.is_empty(), "%s's key is not shared with another action (%s)" % [action, str(others)])
+		if Settings.DEFAULT_BINDINGS.has(action):
+			assert_true(owners.has(String(action)), "%s's default binding is its fallback key" % action)
 	_make_area()
 	var bm := _build_mode()
 	for action in fallback:

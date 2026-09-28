@@ -15,6 +15,8 @@ const EndingScreen := preload("res://src/ui/screens/ending_screen.gd")
 const WardStone := preload("res://src/world/surface/ward_stone.gd")
 const LoreDB := preload("res://src/core/lore_db.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
+const ChapterLog := preload("res://src/core/chapter_log.gd")
+const ReachEast := preload("res://data/reach_east.gd")
 
 ## spec §7.2 Works zone ids (the Works has no landmark table of its own).
 const WORKS_ZONES := ["hw_landing", "hw_lockers", "hw_rails", "hw_sluice", "hw_bells", "hw_eyes", "hw_refuge", "hw_lightwell",
@@ -137,6 +139,27 @@ func test_step_rewards_follow_mp_11() -> void:
 			f1.sort()
 			f2.sort()
 			assert_eq(f1, f2, rid + " flags")
+
+
+## R38 / F03: the quarry step signposts what its lamp needs with two display rows BEFORE the lamp row; they
+## read the Reach east module's own flags and are never required (every step keeps a real objective).
+func test_quarry_step_signposts_the_lamp_prerequisites() -> void:
+	var rows: Array = []
+	for o in _step("ch2_quarry")["objectives"]:
+		rows.append([String(o["flag"]), String(o["label"]), ChapterLog.is_display_objective(o)])
+	assert_eq(rows, [
+		[ReachEast.FLAG_WARDEN, "Calm the Quarry Warden", true],
+		[ReachEast.FLAG_WINCH, "Mend the mineral winch", true],
+		["ch2_quarry_lamp_lit", "Light the quarry lamp", false]])
+	for s in Quests.STEPS:
+		var real := 0
+		for o in s["objectives"]:
+			if ChapterLog.is_display_objective(o):
+				assert_eq(String(o["type"]), "flag", "%s: display rows are flag checks" % s["id"])
+				assert_false(_spidery(String(o["label"])) and not (o as Dictionary).has("alt_label"), "%s display row spider-free" % s["id"])
+			else:
+				real += 1
+		assert_true(real > 0, "%s keeps at least one real objective" % s["id"])
 
 
 func test_lanternwake_reward_list() -> void:

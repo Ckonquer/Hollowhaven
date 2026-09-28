@@ -5,10 +5,11 @@ extends CanvasLayer
 ## is_open(panel), show_death() (awaitable), show_ending() (awaitable), show_chapter_card(title, sub),
 ## show_comfort(first_time) (awaitable). Extra: confirm(title, text, buttons) (awaitable -> choice id),
 ## top_panel(), close_all().
-## Handles the UI input actions: inventory, craft, journal, map, pause (Esc closes the top panel
+## Handles the UI input actions: inventory, craft, journal, map, wardrobe, pause (Esc closes the top panel
 ## first), help (F1 controls overlay). Panels call Game.push_ui/pop_ui through here, and full-screen
 ## panels pause the tree via Game.set_paused.
-## Chapter Two: the "wardrobe" panel (pause menu, Ward Stone, wardrobe / mirror furniture), has_panel(name),
+## Chapter Two: the "wardrobe" panel (hotkey, pause menu, Ward Stone, wardrobe / mirror furniture), the
+## "expedition" panel (Expedition Board; full-screen) and the "music_box" panel (Music Box; never pauses), has_panel(name),
 ## the one-time "Your wardrobe is ready" notice for older saves (tick_wardrobe_notice / show_wardrobe_notice),
 ## and show_chapter_two_ending() (awaitable; Game._show_chapter_two_ending() prefers it).
 
@@ -36,12 +37,20 @@ const PANELS := {
 	"comfort": "res://src/ui/screens/comfort_screen.gd",
 	"confirm": "res://src/ui/screens/confirm_dialog.gd",
 	"wardrobe": "res://src/ui/panels/wardrobe_panel.gd",
+	"expedition": "res://src/ui/panels/expedition_panel.gd",
+	"music_box": "res://src/ui/panels/music_box_panel.gd",
 }
-## Panels that freeze the world while open.
-const FULLSCREEN := ["inventory", "crafting", "storage", "journal", "map", "pause", "settings", "controls", "comfort", "confirm", "wardrobe"]
+## Panels that freeze the world while open. Not the Music Box: its song preview must be heard while it is open,
+## and a paused tree would silence it (like the companion menu, it keeps the world running).
+const FULLSCREEN := ["inventory", "crafting", "storage", "journal", "map", "pause", "settings", "controls", "comfort", "confirm",
+	"wardrobe", "expedition"]
 ## Panels the gameplay hotkeys may switch between.
-const GAMEPLAY_PANELS := ["inventory", "crafting", "storage", "journal", "map", "companion", "controls", "wardrobe"]
-const HOTKEYS := {"inventory": "inventory", "craft": "crafting", "journal": "journal", "map": "map", "help": "controls"}
+const GAMEPLAY_PANELS := ["inventory", "crafting", "storage", "journal", "map", "companion", "controls", "wardrobe", "expedition",
+	"music_box"]
+## Input action -> panel. "wardrobe" (O by default, rebindable) follows the pause-menu Wardrobe's rules: full-screen,
+## pauses, and only opens in ordinary play (_hotkey: mode "playing", no fade, over no menu but a gameplay panel).
+const HOTKEYS := {"inventory": "inventory", "craft": "crafting", "journal": "journal", "map": "map", "help": "controls",
+	"wardrobe": "wardrobe"}
 ## One-time notice for saves from before the wardrobe existed (MP §4 "Existing save").
 const WARDROBE_NOTICE_TITLE := "Your Wardrobe"
 const WARDROBE_NOTICE_TEXT := "Your wardrobe is ready. You can change your look without starting over."

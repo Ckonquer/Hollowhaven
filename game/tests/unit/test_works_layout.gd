@@ -3,9 +3,12 @@ extends "res://tests/test_case.gd"
 ## hub east door), the merged table with and without the deep rooms, spawns on the floor with capsule
 ## clearance, openings / headroom, no-escape rays, walkable connectivity along every authored route (critical
 ## path 1 -> 7, loop A, the three line branches, the shortcut home, the ward door), no fall-through, gates that
-## block until opened, determinism and the build-time budget.
+## block until opened, determinism and the build-time budget; the Hall of Closed Eyes' single Borrowed Wisp
+## (hw_sp_eyes_wisp: registered enemy, placed, on free floor out of every safe zone, clear of the hook, the
+## carvings and the openings).
 
 const Layout := preload("res://data/works_layout.gd")
+const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Geo := preload("res://src/world/works/works_geo.gd")
 const HorrorData := preload("res://data/horror_events.gd")
 const WORLD := "res://src/world/areas_ch2/hushed_works_world.gd"
@@ -379,6 +382,105 @@ func test_interactables_are_reachable() -> void:
 				break
 		assert_true(ok, "interactable %s at %s is reachable" % [n.name, str(p.snapped(Vector3.ONE * 0.1))])
 	assert_true(count >= 25, "interactables checked (%d)" % count)
+
+
+## Integration pass 2 (P13): one small fixed Borrowed Wisp encounter in the Hall of Closed Eyes teaches the lantern
+## reveal before the Choir (on Gentle the director's hw_wisp_drift never runs).
+func test_eyes_wisp_spawner_is_valid_and_out_of_safe_zones() -> void:
+	var id := "hw_sp_eyes_wisp"
+	assert_true(Layout.SPAWNERS.has(id), "the Hall of Closed Eyes has its wisp spawner")
+	if not Layout.SPAWNERS.has(id):
+		return
+	var d: Dictionary = Layout.SPAWNERS[id]
+	assert_eq(String(d["enemy"]), "borrowed_wisp")
+	assert_eq(int(d["count"]), 1, "one wisp, never a group")
+	assert_almost(float(d["radius"]), 1.0, 0.001)
+	assert_almost(float(d["respawn_minutes"]), 1440.0, 0.001, "a renewable encounter")
+	assert_eq(String(d["quest_flag_on_clear"]), "", "nothing depends on it")
+	assert_almost(float(d["wander_radius"]), 3.0, 0.001)
+	assert_eq(String(d["clear_message"]), "")
+	# registered and spawnable, and data/enemies.gd places it in this zone
+	assert_true(Factory.SCRIPTS.has("borrowed_wisp") and Factory.can_spawn("borrowed_wisp"), "borrowed_wisp is registered and compiles")
+	assert_true((ItemDB.enemy("borrowed_wisp").get("zones", []) as Array).has("hw_eyes"), "data zones name hw_eyes")
+	# clear of the lantern hook, the carvings and every opening of the hall (nearest point of each span)
+	var pos: Vector3 = d["pos"]
+	var flat := Vector2(pos.x, pos.z)
+	var hook := Layout.EYES_LANTERN_HOOK
+	assert_true(flat.distance_to(Vector2(hook.x, hook.z)) >= 6.0, "6 m from the eyes_route lantern hook")
+	for lore in ["lore_ch2_closed_eyes", "lore_ch2_eyes_route"]:
+		var lp: Vector3 = Layout.LORE_SPOTS[lore]["pos"]
+		assert_true(flat.distance_to(Vector2(lp.x, lp.z)) >= 6.0, "6 m from %s" % lore)
+	var eyes: Dictionary = Layout.ROOMS["eyes"]
+	var openings := Geo.openings(eyes)
+	assert_eq(openings.size(), 4, "the hall's four openings (north way, wrong door, bells way, carvers' rest)")
+	for o in openings:
+		var near := Vector2.ZERO
+		match String(o[0]):
+			"n":
+				near = Vector2(clampf(pos.x, float(o[1]), float(o[2])), float(eyes["z0"]))
+			"s":
+				near = Vector2(clampf(pos.x, float(o[1]), float(o[2])), float(eyes["z1"]))
+			"w":
+				near = Vector2(float(eyes["x0"]), clampf(pos.z, float(o[1]), float(o[2])))
+			"e":
+				near = Vector2(float(eyes["x1"]), clampf(pos.z, float(o[1]), float(o[2])))
+		assert_true(flat.distance_to(near) >= 6.0, "6 m from the %s opening %s (%.1f m)" % [String(o[0]), str(near), flat.distance_to(near)])
+	assert_true(flat.distance_to(Vector2(Layout.FAKE_LUMI_POS.x, Layout.FAKE_LUMI_POS.z)) >= 6.0, "away from the Wrong Door cell")
+	assert_true(pos.z - Layout.WRONG_DOOR_TRIGGER_Z > float(ItemDB.enemy("borrowed_wisp")["aggro_radius"]),
+		"it does not notice her before the Wrong Door moment has begun")
+	# the built area places it on free, walkable floor inside the hall, never in a safe zone
+	area = await _make_area()
+	assert_true((area.spawners as Dictionary).has(id), "the area placed it (data-driven)")
+	assert_false((area.skipped_spawners as Array).has(id), "not skipped")
+	var sp: Node3D = area.spawners.get(id)
+	if sp != null:
+		assert_true(sp.global_position.is_equal_approx(pos), "at its layout position")
+		assert_eq(String(sp.get("enemy_id")), "borrowed_wisp")
+	assert_eq(area.room_at(pos + Vector3.UP * 0.3), "eyes", "inside the Hall of Closed Eyes")
+	assert_eq(area.get_zone_at(pos + Vector3.UP * 0.3), "hw_eyes")
+	assert_true(area.validate_position(pos) is Vector3, "a valid position")
+	var hit := _ray(pos + Vector3.UP * 0.5, pos + Vector3.DOWN * 1.5)
+	assert_false(hit.is_empty(), "floor below")
+	if not hit.is_empty():
+		assert_almost(float(hit["position"].y), pos.y, 0.3, "floor height")
+	assert_true(_ray(pos + Vector3.UP * 0.2, pos + Vector3.UP * 3.6).is_empty(), "headroom for its veiled float (2.9 m)")
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = cap
+	q.collision_mask = MASK
+	var reach: float = float(d["radius"]) + float(d["wander_radius"])
+	for k in 9:
+		var p := pos
+		if k > 0:
+			var a := TAU * float(k - 1) / 8.0
+			p = pos + Vector3(cos(a), 0.0, sin(a)) * float(d["radius"])
+		q.transform = Transform3D(Basis.IDENTITY, _center(p))
+		assert_true(_space().intersect_shape(q, 4).is_empty(), "spawn point %s is free" % str(p))
+		assert_true(_floor_below(p), "spawn point %s has floor" % str(p))
+	for k in 16:
+		var a := TAU * float(k) / 16.0
+		for r in [0.0, float(d["radius"]), reach]:
+			var p := pos + Vector3(cos(a), 0.0, sin(a)) * float(r)
+			assert_false(area.is_safe_zone(p), "%s is not safe" % str(p))
+	# and one real wisp appears there when Krystal walks down the hall
+	if sp == null:
+		return
+	var probe := Node3D.new()
+	area.add_child(probe)
+	probe.global_position = pos + Vector3(0.0, 0.0, -9.0)
+	sp.set("player_override", probe)
+	var saved_mode := Game.mode
+	Game.mode = "playing"
+	sp.call("update_spawner")
+	Game.mode = saved_mode
+	var alive: Array = sp.get("alive")
+	assert_eq(alive.size(), 1, "one Borrowed Wisp spawned")
+	if alive.size() == 1:
+		var w: Node3D = alive[0]
+		assert_eq(String(w.get("enemy_id")), "borrowed_wisp")
+		assert_eq(area.room_at(w.global_position + Vector3.UP * 0.3), "eyes", "inside the hall")
+		assert_true(w.global_position.distance_to(pos) <= float(d["radius"]) + 0.3, "within its spawn radius")
+	sp.call("despawn_all")
+	await wait_frames(2)
 
 
 func test_director_anchors_are_valid() -> void:

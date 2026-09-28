@@ -140,6 +140,8 @@ const SPECIAL_RECIPES := {
 	"pattern_velvet_cape": {"result": "", "count": 0, "station": "loom", "ingredients": {"woven_cloth": 2}, "unlock": "ch2_count_wardrobe", "pattern": "pat_velvet_cape"},
 	"pattern_ghostlight_party": {"result": "", "count": 0, "station": "loom", "ingredients": {"woven_cloth": 3, "lantern_wax": 1}, "unlock": "ch2_candleyard_pattern", "pattern": "pat_ghostlight_party"},
 	"pattern_moon_moth": {"result": "", "count": 0, "station": "loom", "ingredients": {"woven_cloth": 3, "moonpetal": 2}, "unlock": "ch2_trial_matron", "pattern": "pat_moon_moth"},
+	"pattern_echo_masquerade": {"result": "", "count": 0, "station": "loom", "ingredients": {"woven_cloth": 3, "lantern_wax": 2}, "unlock": "ch2_trial_velour", "pattern": "pat_echo_masquerade"},
+	"pattern_echo_chime": {"result": "", "count": 0, "station": "loom", "ingredients": {"woven_cloth": 3, "echo_shard": 2}, "unlock": "ch2_trial_choir", "pattern": "pat_echo_chime"},
 	"pattern_lanternwake": {"result": "", "count": 0, "station": "loom", "ingredients": {"woven_cloth": 3, "sunflax": 2}, "unlock": "ch2_feast", "pattern": "pat_lanternwake"},
 }
 

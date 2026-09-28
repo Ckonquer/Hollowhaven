@@ -1,9 +1,11 @@
 extends "res://src/ui/panels/panel_base.gd"
-## Lanternwake Expeditions (panel "expedition", module D2; MP §15), opened by the Expedition Board once ui_root
-## registers "expedition" in PANELS (integrator request; until then the board opens the Optional journal).
+## Lanternwake Expeditions (panel "expedition", module D2; MP §15), registered in ui_root.PANELS (full-screen) and
+## opened by the Expedition Board (a UI root without it makes the board open the Optional journal instead).
 ## Left: the three hand-authored routes (difficulty in words AND lantern pips, never colour alone; locked ones
 ## greyed with the reason). Right: the chosen route BEFORE starting - blurb, difficulty, rough length, the
-## stops in order, who may be met (arachnophobia-aware names), the reward TYPES and how often it was done.
+## stops in order, who may be met (arachnophobia-aware names), the reward TYPES and how often it was done. A dye
+## keepsake is named as what she gets - "a new dye colour" (its Loom palette, unlocked directly as a gift) - never
+## "a recipe" she would still have to craft.
 ## Bottom: "Set out" (starts a run: Expeditions.start), and while a run is going its progress line,
 ## "Lantern Road to <arch>" (when that arch is lit) and "Set it aside" (two presses; free - nothing she carries is lost;
 ## in the cache phase the confirm says that the earned cache stays closed).
@@ -77,8 +79,8 @@ func _build() -> void:
 		selected = _default_selection()
 	Events.objectives_changed.connect(_on_state_changed)
 	Events.settings_changed.connect(_on_settings_changed)
-	# Idempotent: wires the Reach runner hook (Game does it at start-up once integrated) and, when the board
-	# stands in the Reach, gives this area its runner right away.
+	# Idempotent safety net: Game.wire_session_systems() already wires the Reach runner hook at start-up; when the
+	# board stands in the Reach this also gives the area its runner right away.
 	Ex.init()
 	Ex.attach_to_current_area()
 
@@ -222,10 +224,11 @@ func _fill_status() -> void:
 			for id in items:
 				parts.append("%s x%d" % [ItemDB.display_name(String(id)), int(items[id])])
 		var k: Variant = last.get("keepsake", {})
-		if k is Dictionary and String((k as Dictionary).get("kind", "")) == "dye":
-			parts.append("the %s recipe" % String(ItemDB.dye_palette(String(k["id"])).get("name", "dye")))
-		elif k is Dictionary and String((k as Dictionary).get("kind", "")) == "decor":
-			parts.append(ItemDB.display_name(String(k["item"])))
+		if k is Dictionary:
+			# same words as the completion toast: "a new dye colour (Pumpkin)" / "Pumpkin Lights x2"
+			var ks := Ex.keepsake_text(k as Dictionary)
+			if ks != "":
+				parts.append(ks)
 		status_l.text = "Last outing: %s brought home %s." % [String(Ex.template(String(last.get("template", ""))).get("name", "an expedition")),
 			", ".join(parts) if not parts.is_empty() else "a good walk"]
 		return

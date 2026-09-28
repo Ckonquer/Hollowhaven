@@ -192,6 +192,43 @@ func test_death_resets_cleanly_to_the_phase_checkpoint() -> void:
 	assert_eq(int(b.wisps_alive()), 2, "wisps within the cap again")
 
 
+## Integration pass 2 (P57): the retry hint names the real way to a full recovery - leaving the Hushed Works in the
+## story, the pale door inside the Echo Trial (its own hint id, so the story hint still teaches once in the Works).
+func test_retry_hint_names_the_way_out_per_mode() -> void:
+	make_arena()
+	var hints: Array = []
+	var cb := func(id: String, text: String) -> void:
+		if id.begins_with("choir_retry"):
+			hints.append([id, text])
+	Events.hint.connect(cb)
+	for mode in ["story", "trial"]:
+		hints.clear()
+		var d := dummy(Vector3(0, 0, -9), false, HP)
+		var b := make_boss(d, 1, {"mode": mode})
+		b.start_fight()
+		assert_true(until(b, "a_wait") >= 0.0)
+		assert_eq(hints.size(), 0, "%s: no retry hint on the first attempt" % mode)
+		Events.player_died.emit()
+		assert_eq(String(b.state), "dormant", "%s: she fell, the encounter reset" % mode)
+		b.start_fight()
+		assert_true(bool(b.retry))
+		assert_eq(hints.size(), 1, "%s: one retry hint" % mode)
+		if hints.size() == 1:
+			var id := String(hints[0][0])
+			var text := String(hints[0][1])
+			if mode == "trial":
+				assert_eq(id, "choir_retry_trial", "the Echo Trial has its own hint id")
+				assert_true(text.contains("pale door") and text.contains("afresh"), "trial wording: %s" % text)
+				assert_false(text.contains("Hushed Works"), "never sends her out of the Works from inside a memory")
+			else:
+				assert_eq(id, "choir_retry")
+				assert_true(text.contains("Leaving the Hushed Works"), "story wording: %s" % text)
+		b.queue_free()
+		d.queue_free()
+		await wait_frames(1)
+	Events.hint.disconnect(cb)
+
+
 func test_leaving_the_vault_stands_down() -> void:
 	make_arena()
 	var d := dummy(Vector3(0, 0, -9))

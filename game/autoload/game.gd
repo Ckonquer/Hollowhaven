@@ -59,11 +59,19 @@ const DIRECTOR_SCRIPT := "res://src/horror/director.gd"
 const TEST_AREAS := {"arena": "res://tests/preview/arena.tscn"}   # debug builds only
 const FALLBACK_PLAYER := "res://tests/preview/fallback_player.gd"
 const FALLBACK_UI := "res://tests/preview/fallback_ui.gd"
-## Session-wide listeners wired once in _ready(): small masteries (static Events listeners, src/core/mastery.gd)
-## and the Chapter Two story / cross-area activity tracker (one node under this autoload).
+## Session-wide listeners wired once in _ready() (wire_session_systems): small masteries (static Events listeners,
+## src/core/mastery.gd), the Chapter Two story / cross-area activity tracker (one node under this autoload), the
+## Lanternwake Expeditions (static), the Music Box's song discovery (static), the Chapter Two onboarding hints (one
+## node under this autoload) and the Echo Trial's arrival hook (static).
 const MASTERY_SCRIPT := "res://src/core/mastery.gd"
 const STORY_TRACKER_SCRIPT := "res://src/world/story_ch2/activity_tracker.gd"
 const STORY_TRACKER_NODE := "StoryCh2Tracker"
+const EXPEDITIONS_SCRIPT := "res://src/expeditions/expeditions.gd"
+const MUSIC_BOX_SCRIPT := "res://src/audio/music_box.gd"
+const ONBOARDING_SCRIPT := "res://src/world/story_ch2/onboarding_hints.gd"
+const ECHO_TRIAL_SCRIPT := "res://src/world/areas_ch2/echo_trial.gd"
+## Static modules whose init() wire_session_systems() calls (in this order; each is idempotent).
+const SESSION_INIT_SCRIPTS := [MASTERY_SCRIPT, EXPEDITIONS_SCRIPT, MUSIC_BOX_SCRIPT, ECHO_TRIAL_SCRIPT]
 ## "A Look of Your Own" (data/optional_goals.gd): a look confirmed at creation counts as chosen.
 const LOOK_CHOSEN_FLAG := "c1x_look_chosen"
 ## A saved position this far above where it validated before the structures existed was on an upper storey.
@@ -71,13 +79,25 @@ const UPPER_STOREY_RESTORE := 1.0
 ## Cold-load warm-up (prefetch_area): scripts an area builds or spawns soon after arriving, compiled on loader
 ## threads behind the fade together with the area scene. The Reach districts warm themselves up (district
 ## warm_up()); other modules may pass extra paths to prefetch_area(). EnemyFactory is loaded on the main thread
-## BEFORE any worker could compile a script that preloads it (the quarry's deadlock-avoidance rule).
+## BEFORE any worker could compile a script that preloads it (the quarry's deadlock-avoidance rule: the Chapter Two
+## bosses and trial builders below preload it). Timing only: a path that is missing or already compiled is skipped.
+## Pass 2 (P38): the Reach's expedition + district enemies (every enemy id data/expeditions.gd can send there,
+## brambling / brambleback included, so a Continue straight into the Reach is covered), the Chapter Two bosses in
+## their areas and every trial boss / arena builder the Echo Trial may host (the Matron's weaver_boss.gd is normally
+## compiled in the Below already and is then skipped).
 const ENEMY_FACTORY_SCRIPT := "res://src/enemies/enemy_factory.gd"
 const AREA_WARMUP := {
 	"surface": ["res://src/enemies/brambleback.gd", "res://src/enemies/knotted_elder.gd", "res://src/enemies/lantern_moth.gd"],
 	"tobin_annex": ["res://src/enemies/hollow_drudge.gd"],
-	"hushed_works": ["res://src/world/works/rooms_deep.gd", "res://src/enemies/hollow_drudge.gd", "res://src/enemies/bellcap_sentry.gd"],
-	"moonveil_manor": ["res://src/enemies/velvet_wing.gd"],
+	"hallowmere_reach": ["res://src/enemies/pumpkin_mimic.gd", "res://src/enemies/patchwalker.gd",
+		"res://src/enemies/hollow_drudge.gd", "res://src/enemies/velvet_wing.gd", "res://src/enemies/bellcap_sentry.gd",
+		"res://src/enemies/quarry_warden.gd", "res://src/enemies/lantern_moth.gd",
+		"res://src/enemies/brambling.gd", "res://src/enemies/brambleback.gd"],
+	"hushed_works": ["res://src/world/works/rooms_deep.gd", "res://src/enemies/hollow_drudge.gd", "res://src/enemies/bellcap_sentry.gd",
+		"res://src/enemies/borrowed_wisp.gd", "res://src/enemies/crossing_matron.gd", "res://src/enemies/borrowed_choir.gd"],
+	"moonveil_manor": ["res://src/enemies/velvet_wing.gd", "res://src/enemies/count_velour.gd"],
+	"echo_trial": ["res://src/enemies/count_velour.gd", "res://src/enemies/borrowed_choir.gd",
+		"res://src/world/trial/velour_trial.gd", "res://src/world/trial/choir_trial.gd", "res://src/enemies/weaver_boss.gd"],
 }
 
 var mode: String = "boot"          # boot | title | playing | dead | cutscene | loading
@@ -130,12 +150,22 @@ func _ready() -> void:
 ##   * small masteries (src/core/mastery.gd init(): its static Events listeners award mastery xp);
 ##   * the Chapter Two story / cross-area activity tracker (src/world/story_ch2/activity_tracker.gd), one node
 ##     under this autoload: ch2_returned_to_reach, the cross-area goal mirrors, the acceptance chapter card and
-##     the Haven keepsake after a reload.
-## A missing or broken module is skipped (with an error from _safe_load), never a crash.
+##     the Haven keepsake after a reload;
+##   * Lanternwake Expeditions (src/expeditions/expeditions.gd init()): a save made mid-run resumes in the Reach
+##     (the Reach gets its runner on arrival only while a run is active; no node otherwise);
+##   * the Music Box (src/audio/music_box.gd init()): songs are discovered from the first cue heard in play
+##     (writes GameState.extra["music_box"] once an eligible cue starts);
+##   * the Chapter Two onboarding hints (src/world/story_ch2/onboarding_hints.gd attach(self)): one node under
+##     this autoload; it never steps by itself in headless runs (tests drive tick());
+##   * the Echo Trial arrival hook (src/world/areas_ch2/echo_trial.gd init(), when the module provides it): pays a
+##     pending trial gift on arrival.
+## Every hook is optional: a missing or broken module is skipped (with an error from _safe_load) and a module
+## without the method is left alone, never a crash.
 func wire_session_systems() -> void:
-	var mastery: Script = _safe_load(MASTERY_SCRIPT)
-	if mastery != null and mastery.has_method("init"):
-		mastery.call("init")
+	for path in SESSION_INIT_SCRIPTS:
+		var s: Script = _safe_load(String(path))
+		if s != null and s.has_method("init"):
+			s.call("init")
 	var tracker: Node = get_node_or_null(STORY_TRACKER_NODE)
 	if tracker == null or tracker.is_queued_for_deletion():
 		var st: Script = _safe_load(STORY_TRACKER_SCRIPT)
@@ -143,6 +173,9 @@ func wire_session_systems() -> void:
 			tracker = st.new()
 			tracker.name = STORY_TRACKER_NODE
 			add_child(tracker)
+	var hints: Script = _safe_load(ONBOARDING_SCRIPT)
+	if hints != null and hints.has_method("attach"):
+		hints.call("attach", self)
 
 
 ## The session's story tracker node (null if the story module is missing).

@@ -210,6 +210,39 @@ static func build_hair_acc(ctx: Dictionary) -> Dictionary:
 			var hang := AKit.node(hc, Vector3(0.21, 0.1, -0.08), "PaperLantern")
 			AKit.part(hang, Kit.capsule(0.003, 0.05, AKit.flat(AKit.shade(rib_c, 0.3))), Vector3(0, -0.02, 0), Vector3.ZERO, Vector3.ONE, false)
 			AKit.part(hang, Kit.sphere(0.024, Mat.glow(LookColors.fixed(id, "lantern", Color("ffc978")), 1.2), 8, 10), Vector3(0, -0.06, 0), Vector3.ZERO, Vector3(1, 1.2, 1), false)
+		"masquerade_mask":
+			# A little domino mask pushed up into the hair on her left side, facing outward, its back tip raised
+			# (worn like a hair ornament, never over the face; tests check it stays beside / above the ear).
+			var mask_c := LookColors.channel(id, "mask", col)
+			var mask := AKit.m(mask_c, true, 0.006)
+			var n := AKit.node(hc, Vector3(0.28, 0.11, -0.03) if hat_on else Vector3(0.266, 0.16, -0.024), "MasqueradeMask")
+			n.rotation_degrees = Vector3(-15, 75, 20)
+			n.scale = Vector3.ONE * 0.75
+			var hole := AKit.flat(AKit.shade(mask_c, 0.6))
+			var trim := AKit.m(LookColors.fixed(id, "trim", AKit.BRASS), false)
+			for side in 2:
+				var s := 1.0 if side == 0 else -1.0
+				AKit.part(n, Kit.sphere(0.045, mask, 8, 12), Vector3(0.043 * s, 0, 0), Vector3(0, 0, 14 * s), Vector3(1.3, 0.85, 0.4))
+				AKit.part(n, Kit.sphere(0.018, hole, 6, 8), Vector3(0.045 * s, 0.002, 0.016), Vector3(0, 0, 14 * s), Vector3(1.35, 0.7, 0.3), false)
+				AKit.part(n, Kit.sphere(0.012, trim, 6, 8), Vector3(0.1 * s, 0.022, 0.006), Vector3.ZERO, Vector3.ONE, false)
+			AKit.part(n, Kit.sphere(0.03, trim, 6, 8), Vector3(0, 0.012, 0.008), Vector3.ZERO, Vector3(0.6, 0.5, 0.3), false)
+			# a soft plume tucked into the hair behind the raised back tip
+			var plume := AKit.m(LookColors.channel(id, "plume", col), true, 0.005)
+			AKit.part(n, Kit.sphere(0.03, plume, 8, 10), Vector3(0.11, 0.05, -0.012), Vector3(0, 0, -28), Vector3(0.5, 1.9, 0.3))
+		"chime_ribbons":
+			# A ribbon bow on her right side with three short streamers (tilted out, clear of the hair), each ending
+			# in a tiny chime bell.
+			var rib_c := LookColors.channel(id, "ribbons", col)
+			var rib := AKit.m(rib_c, true, 0.006)
+			var bow := _bow(hc, "ChimeBow", Vector3(-0.27, 0.12, -0.12) if hat_on else Vector3(-0.26, 0.17, -0.12), Vector3(-30, -62, 0), 0.6, rib)
+			var bell := AKit.metal(LookColors.fixed(id, "chimes", Color("e8c66a")), 0.005)
+			for k in 3:
+				var x := (float(k) - 1.0) * 0.045
+				var ln := 0.13 + 0.035 * float(1 - absi(k - 1))
+				AKit.part(bow, Kit.box(Vector3(0.028, ln, 0.01), rib), Vector3(x, -0.05 - ln * 0.5, -0.004), Vector3(0, 0, -6.0 * (float(k) - 1.0)))
+				var b := AKit.node(bow, Vector3(x * 1.15, -0.06 - ln, -0.004), "Chime%d" % k)
+				AKit.part(b, Kit.sphere(0.03, bell, 6, 10), Vector3(0, 0.004, 0), Vector3.ZERO, Vector3(1.0, 1.15, 1.0), false)
+				AKit.part(b, Kit.cylinder(0.02, 0.034, 0.024, bell, 10), Vector3(0, -0.018, 0), Vector3.ZERO, Vector3.ONE, false)
 		_:
 			return {"hull": ""}
 	return {"hull": "all"}
@@ -287,7 +320,7 @@ static func build_back(ctx: Dictionary) -> Dictionary:
 				AKit.part(p, Kit.sphere(0.014, dots, 6, 8), Vector3(cos(a) * 0.1, 0.13, sin(a) * 0.08), Vector3.ZERO, Vector3(1, 0.5, 1), false)
 			_front_straps(spine, cap)
 			res["belt"] = _belt_clip(spine)
-		"leaf_cape", "little_cape", "moth_shawl":
+		"leaf_cape", "little_cape", "moth_shawl", "opera_cloak", "chorister_capelet":
 			res["chains"].append(_cape(ctx, id))
 			res["belt"] = _belt_clip(spine)
 		"ghostlight_wings":
@@ -373,6 +406,20 @@ static func _cape(ctx: Dictionary, id: String) -> Dictionary:
 			w0 = 0.38
 			w1 = 0.5
 			seg_len = 0.21
+		"opera_cloak":
+			# long and wide, a pale lining (lining channel) and a stand collar behind the neck
+			outer_c = LookColors.channel(id, "cloak", col)
+			lining_c = LookColors.channel(id, "lining", col)
+			w0 = 0.36
+			w1 = 0.56
+			seg_len = 0.25
+		"chorister_capelet":
+			# a short round capelet with a choir collar
+			outer_c = LookColors.channel(id, "capelet", col)
+			lining_c = AKit.shade(outer_c, 0.12)
+			w0 = 0.36
+			w1 = 0.46
+			seg_len = 0.12
 		_:
 			outer_c = LookColors.channel(id, "cape", col)
 			lining_c = AKit.shade(outer_c, 0.15)
@@ -382,6 +429,18 @@ static func _cape(ctx: Dictionary, id: String) -> Dictionary:
 	if id == "little_cape":
 		AKit.part(chest, Kit.box(Vector3(0.22, 0.09, 0.02), outer), Vector3(0, 0.08, -0.13), Vector3(-18, 0, 0))
 		AKit.part(chest, Kit.sphere(0.018, AKit.flat(AKit.BRASS), 8, 10), Vector3(0, 0.0, 0.14), Vector3.ZERO, Vector3.ONE, false)
+	elif id == "opera_cloak":
+		for side in 2:
+			var s := 1.0 if side == 0 else -1.0
+			AKit.part(chest, Kit.sphere(0.07, outer, 8, 12), Vector3(0.065 * s, 0.08, -0.14), Vector3(-18, -22 * s, -12 * s), Vector3(1.15, 1.1, 0.25))
+			AKit.part(chest, Kit.sphere(0.062, lining, 8, 12), Vector3(0.063 * s, 0.08, -0.13), Vector3(-18, -22 * s, -12 * s), Vector3(1.1, 1.0, 0.2), false)
+		AKit.part(chest, Kit.sphere(0.022, AKit.metal(LookColors.fixed(id, "clasp", AKit.BRASS), 0.006), 8, 10), Vector3(0, 0.0, 0.145), Vector3.ZERO, Vector3(1.0, 1.0, 0.6), false)
+	elif id == "chorister_capelet":
+		var collar := AKit.m(LookColors.channel(id, "collar", col))
+		AKit.part(chest, Kit.torus(0.13, 0.2, collar), Vector3(0, 0.035, 0.0), Vector3.ZERO, Vector3(1.08, 0.7, 1.0))
+		var bell := AKit.metal(LookColors.fixed(id, "chime", Color("e8c66a")), 0.006)
+		AKit.part(chest, Kit.sphere(0.024, bell, 6, 10), Vector3(0, -0.03, 0.16), Vector3.ZERO, Vector3(1.0, 1.15, 1.0), false)
+		AKit.part(chest, Kit.cylinder(0.016, 0.028, 0.02, bell, 10), Vector3(0, -0.052, 0.16), Vector3.ZERO, Vector3.ONE, false)
 	elif id == "leaf_cape":
 		var leaf := AKit.m(LookColors.fixed(id, "leaves", Color("7fa35a")), true, 0.006)
 		for k in 6:
@@ -416,4 +475,10 @@ static func _cape(ctx: Dictionary, id: String) -> Dictionary:
 		for k in 5:
 			var x := lerpf(-w1 * 0.4, w1 * 0.4, float(k) / 4.0)
 			AKit.part(seg, Kit.sphere(0.035, leaf2, 8, 10), Vector3(x, -seg_len - 0.01, -x * x * 1.2), Vector3(0, 0, 90), Vector3(1.6, 0.5, 0.9))
+	elif id == "chorister_capelet":
+		# a scalloped choir hem in the collar colour
+		var hem := AKit.m(LookColors.channel(id, "collar", col), false)
+		for k in 4:
+			var x := lerpf(-w1 * 0.36, w1 * 0.36, float(k) / 3.0)
+			AKit.part(seg, Kit.sphere(0.032, hem, 8, 10), Vector3(x, -seg_len, -x * x * 1.2), Vector3.ZERO, Vector3(1.3, 0.6, 0.45))
 	return AKit.chain("cape", [root, seg], rest, 45.0, 6.0)

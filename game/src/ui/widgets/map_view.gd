@@ -17,6 +17,10 @@ extends Control
 ##                 (Mastery.known_spots; same-kind spots closer than PIN_MERGE_M share one pin)
 ##   Wayfinding 4  a soft, steady "?" (no pulse) at unfound optional caches in discovered districts (Mastery.cache_hints)
 ## The woods map also names Bramblewatch (data/c1x_layout.gd BRAMBLEWATCH_ZONES[0]) once its zone is discovered.
+## A Lanternwake Expedition under way (src/expeditions/expeditions.gd, safe-loaded) puts its route on the Reach
+## map, read in prepare(): numbered paper pins for its stops, a candy pin for its cache (done stops faded and
+## ticked) and a steady ring on the current one; "exp_*" ids resolve through Expeditions.place_disc() so the
+## tracker / map panel can target them. Nothing is drawn while no run is going (lead decision P35).
 ## The static helpers below (map kinds, area / place names, room lists) are shared with the tracker, the
 ## journal and the map panel so every screen names places the same way.
 
@@ -101,6 +105,11 @@ const HINT_R := 13.0              # cache hint disc radius (px)
 ## Bramblewatch (Chapter One optional area, module B7): named once its zone is discovered. Read through the
 ## layout's constant map (a missing layout just shows nothing).
 const C1X_LAYOUT_PATH := "res://data/c1x_layout.gd"
+## Lanternwake Expeditions (safe-loaded: a missing or broken module draws and resolves nothing).
+const EXPEDITIONS_PATH := "res://src/expeditions/expeditions.gd"
+const EXP_PREFIX := "exp_"
+const EXP_PIN_R := 12.0           # expedition pin disc radius (px)
+const EXP_RING_R := 19.0          # steady ring around the current stop / cache (px)
 const BRAMBLEWATCH_NAME := "Bramblewatch"
 const BRAMBLEWATCH_ZONE_DEFAULT := "c1x_bramblewatch"
 const BRAMBLEWATCH_LABEL_SIZE := 20
@@ -193,6 +202,8 @@ var resource_pins: Array = []
 var cache_hint_points: Array = []
 ## Bramblewatch on the woods map once discovered (world Vector2), else null (read in prepare()).
 var bramblewatch_at: Variant = null
+## The running expedition's pins on the Reach map (Expeditions.map_marks, read in prepare(); [] elsewhere / no run).
+var expedition_marks: Array = []
 var _bramble_label := Vector2.ZERO
 var _bramble_size := Vector2(-1, -1)
 var frames_drawn := 0             # _draw calls (tests: the drawing code really ran)
@@ -226,6 +237,8 @@ static func rooms(area_id: String) -> Array:
 static func area_of(place_id: String) -> String:
 	if place_id == "":
 		return ""
+	if place_id.begins_with(EXP_PREFIX):
+		return REACH_ID if _expeditions() != null else ""
 	if Layout.LANDMARKS.has(place_id) or place_id == WAYGATE_ID:
 		return "surface"
 	if Reach.LANDMARKS.has(place_id) or Reach.POINTS.has(place_id):
@@ -253,6 +266,8 @@ static func place_name(place_id: String, area_id: String = "") -> String:
 				return String(Reach.LANDMARKS[place_id]["name"])
 			if place_id == REACH_WAYGATE or place_id == "waygate_arrival":
 				return REACH_WAYGATE_NAME
+			if place_id.begins_with(EXP_PREFIX):
+				return String(expedition_disc(place_id).get("name", ""))
 			return ""
 		"rooms":
 			for r in rooms(area_id):
@@ -263,10 +278,13 @@ static func place_name(place_id: String, area_id: String = "") -> String:
 	return ""
 
 
-## {"pos": Vector2, "radius": float} of an outdoor landmark / point ({} for rooms and unknown ids).
+## {"pos": Vector2, "radius": float} of an outdoor landmark / point ({} for rooms and unknown ids). A running
+## expedition's "exp_*" stop / cache ids resolve on the Reach map (Expeditions.place_disc; {} without a run).
 static func place_disc(place_id: String, area_id: String = "") -> Dictionary:
 	if area_id == "":
 		area_id = area_of(place_id)
+	if place_id.begins_with(EXP_PREFIX):
+		return expedition_disc(place_id) if map_kind(area_id) == "reach" else {}
 	match map_kind(area_id):
 		"surface":
 			if Layout.LANDMARKS.has(place_id):
@@ -318,6 +336,73 @@ static func surface_waygate_lit() -> bool:
 
 static func map_pins_upgraded() -> bool:
 	return true if GameState.get_flag(PINS_UPGRADE_FLAG) else false
+
+
+## The expeditions script, safe-loaded (null when missing or broken).
+static func _expeditions() -> Script:
+	if not ResourceLoader.exists(EXPEDITIONS_PATH):
+		return null
+	var s: Variant = load(EXPEDITIONS_PATH)
+	if not (s is Script) or not (s as Script).can_instantiate():
+		return null
+	return s
+
+
+## Expeditions.place_disc(id) for an "exp_*" id of the running route ({"pos", "radius", "name"}; {} otherwise).
+static func expedition_disc(place_id: String) -> Dictionary:
+	var ex := _expeditions()
+	if ex == null or not ex.has_method("place_disc"):
+		return {}
+	var d: Variant = ex.call("place_disc", place_id)
+	return d if d is Dictionary else {}
+
+
+## Expeditions.current_target(): {"id", "name", "pos", "area", "kind"} of the running route's next place ({} without
+## a run or without the module).
+static func expedition_target() -> Dictionary:
+	var ex := _expeditions()
+	if ex == null or not ex.has_method("current_target"):
+		return {}
+	var t: Variant = ex.call("current_target")
+	return t if t is Dictionary else {}
+
+
+## Expeditions.map_marks(area_id): the running route's stops + cache for that map ([] elsewhere or without a run).
+static func expedition_pins(area_id: String) -> Array:
+	var ex := _expeditions()
+	if ex == null or not ex.has_method("map_marks"):
+		return []
+	var m: Variant = ex.call("map_marks", area_id)
+	return m if m is Array else []
+
+
+## Draws one expedition pin on any CanvasItem (map and legend): a paper disc in the ribbon colour with the stop
+## number (the cache: a candy icon); a done stop is faded with a tick; `current` adds a steady ring. `k` scales it.
+static func draw_expedition_pin(ci: CanvasItem, c: Vector2, k: float, mark: Dictionary) -> void:
+	var done := bool(mark.get("done", false))
+	var cache := String(mark.get("kind", "")) == "cache"
+	var a := 0.55 if done else 1.0
+	var ribbon := ThemeFactory.ACCENT.darkened(0.15)
+	if bool(mark.get("current", false)):
+		ci.draw_arc(c, EXP_RING_R * k, 0.0, TAU, 32, Color(ThemeFactory.GOLD, 0.95), 3.5 * k, true)
+	ci.draw_circle(c + Vector2(1.0, 1.5) * k, EXP_PIN_R * k, Color(0.2, 0.1, 0.1, 0.22 * a), true, -1.0, true)
+	ci.draw_circle(c, EXP_PIN_R * k, Color(ThemeFactory.PAPER_LIGHT, a), true, -1.0, true)
+	ci.draw_arc(c, EXP_PIN_R * k, 0.0, TAU, 24, Color(ThemeFactory.GOLD.darkened(0.2) if cache else ribbon, a), 2.4 * k, true)
+	if done:
+		var ck := IconFactory.icon("ui_check", Color.WHITE, 48)
+		var cs := EXP_PIN_R * 1.5 * k
+		ci.draw_texture_rect(ck, Rect2(c - Vector2(cs, cs) * 0.5, Vector2(cs, cs)), false, Color(1, 1, 1, 0.8))
+	elif cache:
+		var tex := IconFactory.item_icon("candy", 48)
+		var sz := PIN_ICON * k
+		if tex != null:
+			ci.draw_texture_rect(tex, Rect2(c - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), false)
+	else:
+		var f := ThemeFactory.font("heading")
+		var fs := int(round(17.0 * k))
+		var txt := str(int(mark.get("n", 0)))
+		var tw := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		ci.draw_string(f, c + Vector2(-tw * 0.5, 6.0 * k), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ThemeFactory.INK)
 
 
 ## A constant of data/hallowmere_layout.gd by name (`fallback` when the layout has no such constant).
@@ -486,6 +571,7 @@ func prepare() -> void:
 	_prepared = map_area if map_area == REACH_ID else "surface"
 	_targets_dirty = true
 	_prepare_mastery()
+	expedition_marks = expedition_pins(REACH_ID) if map_area == REACH_ID else []
 
 
 ## Mastery pins / hints and the Bramblewatch name for this map (never per frame).
@@ -812,8 +898,18 @@ func _draw_reach() -> void:
 		draw_texture_rect(IconFactory.icon(place_icon(String(id), REACH_ID), Color.WHITE, 96), Rect2(c - Vector2(isz, isz) * 0.5, Vector2(isz, isz)), false)
 		# names are placed clear of every sticker / arch / other name (reach_label_at)
 		_name_label(f, String(lm["name"]), reach_label_at(String(id)), REACH_LABEL_SIZE, r)
+	_draw_expedition(r)
 	_draw_player(r)
 	_compass(r, f)
+
+
+## The running expedition's route (read in prepare(); nothing without a run), over the stickers so it stays
+## readable, under Krystal's arrow; each pin only inside the map rectangle.
+func _draw_expedition(r: Rect2) -> void:
+	for m in expedition_marks:
+		var c := to_map((m as Dictionary).get("pos", Vector2.ZERO))
+		if r.grow(-EXP_PIN_R).has_point(c):
+			draw_expedition_pin(self, c, 1.0, m)
 
 
 const REACH_LABEL_SIZE := 21

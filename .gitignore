@@ -11,3 +11,4 @@ game/**/*.import.tmp
 qa/tmp/
 qa/tmp/
 __pycache__/
+game/override.cfg

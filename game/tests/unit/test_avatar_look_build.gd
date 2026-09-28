@@ -177,6 +177,65 @@ func test_every_part_has_its_own_geometry() -> void:
 	assert_eq(shapes.size(), 8)
 
 
+## Echo Trial patterns (Moonlit Masquerade, Chime Chorister; data/appearance.gd): the mask is worn in the hair at
+## her side, never over the face (with or without a hat, any hairstyle); the chime bells hang clear of the hair cap;
+## the opera cloak and chorister capelet are real capes (cloth chain, jacket back patch hidden).
+func test_echo_trial_accessories_sit_in_the_hair_and_capes_drape() -> void:
+	var av := _avatar()
+	var hc: Node3D = av.get("_head_c")
+	for hat in ["", "sun_hat", "witch_hat", "flower_crown"]:
+		for hair in ["side_braid", "long_waves", "space_buns", "high_ponytail"]:
+			var look := ItemDB.legacy_look()
+			look["hair"] = hair
+			look["hat"] = hat
+			look["hair_acc"] = "masquerade_mask"
+			av.call("apply_look", look)
+			assert_eq(av.call("missing_ids"), [], "masquerade_mask with %s / %s" % [hair, hat])
+			var geo := _unit_geometry(av, "hair_acc", hc)
+			assert_true(int(geo["verts"]) > 0, "the mask is built")
+			var box: AABB = geo["aabb"]
+			assert_true(box.position.x > 0.12, "the mask sits entirely at her left side (%s / %s): %s" % [hair, hat, box])
+			assert_true(box.end.z < 0.15, "the mask is never in front of her face (%s / %s): %s" % [hair, hat, box])
+			look["hair_acc"] = "chime_ribbons"
+			av.call("apply_look", look)
+			assert_eq(av.call("missing_ids"), [], "chime_ribbons with %s / %s" % [hair, hat])
+			var bells := 0
+			for b in av.get("_unit_boxes")["hair_acc"]:
+				for k in 3:
+					var bell := (b as Node).find_child("Chime%d" % k, true, false) as Node3D
+					if bell == null:
+						continue
+					bells += 1
+					var p := (hc.global_transform.affine_inverse() * bell.global_transform).origin
+					# the shared hair cap (hair_builder.gd _cap): centre (0, 0.052, -0.057), radii 0.281 / 0.268 / 0.268
+					var q := p - Vector3(0, 0.052, -0.057)
+					var r := Vector3(q.x / 0.281, q.y / 0.268, q.z / 0.268).length()
+					assert_true(r > 1.0, "chime %d hangs clear of the hair cap (%s / %s): %.3f" % [k, hair, hat, r])
+			assert_eq(bells, 3, "three chime bells")
+	var channels := {"opera_cloak": ["accent", "primary"], "chorister_capelet": ["primary", "secondary"]}
+	for pid in ["opera_cloak", "chorister_capelet"]:
+		var cl := _look_with("back", pid)
+		cl["palette"] = {"primary": "rose", "secondary": "mint", "accent": "sky"}
+		av.call("apply_look", cl)
+		assert_eq(av.call("missing_ids"), [], pid)
+		var cols: Array = _unit_geometry(av, "back", av.get("_hosts")["hips"])["colors"]
+		for ch_name in channels[pid]:
+			assert_true(_near(cols, ItemDB.swatch_color(String(cl["palette"][ch_name]))), "%s uses the %s channel" % [pid, ch_name])
+		assert_true(bool((av.get("_unit_res")["back"] as Dictionary).get("cape", false)), pid + " is a cape")
+		var capes := 0
+		for ch in av.get("_chains"):
+			if String(ch["kind"]) == "cape":
+				capes += 1
+		assert_eq(capes, 1, pid + " drapes as one cloth chain")
+		var patch: Variant = av.get("_patch")
+		if patch is Node3D and is_instance_valid(patch):
+			assert_false((patch as Node3D).visible, pid + " covers the jacket's back patch")
+		var scarf_ends: Array = av.get("_scarf_ends")
+		assert_eq(scarf_ends.size(), 2, "explorer jacket under " + pid)
+		for ends in scarf_ends:
+			assert_false(((ends as Array)[0] as Node3D).is_visible_in_tree(), pid + " covers the scarf ends")
+
+
 func _look_with(slot: String, id: String) -> Dictionary:
 	var look := ItemDB.legacy_look()
 	look[slot] = id

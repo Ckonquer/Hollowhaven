@@ -153,6 +153,10 @@ func make_boss(target: Node3D, intensity: int = 1, extra: Dictionary = {}) -> No
 		"resonators": resonators, "symbols": Layout.bell_symbols(), "seed": 7}
 	for k in extra:
 		p[k] = extra[k]
+	# Every boss made here is a fresh encounter: the shared attack-token table starts clean (the Choir claims it
+	# through Base.claim_attack_token, whose wind-up stagger runs on the real clock while these fights run on
+	# simulated ticks - a boss made right after another one's claim would otherwise wait out the stagger).
+	Base.reset_attack_tokens()
 	var b: Node = Factory.create(BOSS_ID, p, CENTER)
 	add_child(b)
 	b.set_process(false)

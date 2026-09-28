@@ -31,7 +31,8 @@ extends Node3D
 ##   kept-flame exposures in C - never a sponge (tuned for ~4-6 engaged first-encounter minutes, pending real play).
 ## Every committed attack has a recovery beat after it, every exposure a recovery rise. Only one Choir attack at a
 ##   time, and (MP §12 caps) it only starts one while the wisps' own wind-ups stay within Rules.MAX_COMMITTED
-##   (Gentle: never overlapping); while committed it also holds a slot of enemy_base's shared attack-token table.
+##   (Gentle: never overlapping); while committed it also holds a slot of enemy_base's shared attack-token table
+##   (Base.claim_attack_token / release_attack_token: MAX_ATTACKERS and the wind-up stagger apply to it too).
 ##   Rings <= 2, strike zones <= 3, no projectiles. Every hit: player group only (never companions, pets, decor),
 ##   line of sight from its source (no hits through walls / ceilings), ONE apply_damage through her health path.
 ##   The warm perimeter walk (radius >= perimeter_radius) is safe from EVERY Choir attack: the sweep and the hush
@@ -480,7 +481,10 @@ func start_fight() -> void:
 	Art.sfx("shade_whisper", get_aim_point(), -8.0)
 	Art.caption("[a hundred borrowed welcomes echo round the empty centre - none of them quite right]")
 	if retry:
-		_hint("choir_retry", "The Choir picks up its song where you left it. Leaving the Hushed Works lets it recover fully.")
+		if mode == "trial":
+			_hint("choir_retry_trial", "The Choir picks up its song where you left it. Leave through the pale door and the echo starts afresh.")
+		else:
+			_hint("choir_retry", "The Choir picks up its song where you left it. Leaving the Hushed Works lets it recover fully.")
 	_notice_companions()
 	_enter("intro", Rules.T_INTRO_RETRY if retry else Rules.T_INTRO)
 
@@ -706,15 +710,16 @@ func _enter(s: String, length: float = 0.0) -> void:
 	_state_len = length
 	health.invulnerable = not (s in VULNERABLE_STATES)
 	if s in COMMITTED_STATES:
-		Base._attackers[get_instance_id()] = true
+		# enemy_base's shared table (MAX_ATTACKERS, stagger). Phase B already claimed it in _may_commit(); the scripted
+		# phase A / C attacks (no wisps then) claim here and still run if an unrelated attacker holds the slots.
+		Base.claim_attack_token(get_instance_id())
 	else:
 		_release_token()
 	state_changed.emit(s)
 
 
 func _release_token() -> void:
-	if Base._attackers.has(get_instance_id()):
-		Base._attackers.erase(get_instance_id())
+	Base.release_attack_token(get_instance_id())
 
 
 func _begin_phase_loop() -> void:
@@ -952,8 +957,11 @@ func _on_layer_down(_resonator_id: String, count: int) -> void:
 		Art.caption("[one ring of borrowed bells falls silent - one more resonator to wake]")
 
 
+## Phase B: may it start a committed attack now? Its own cap (wisp wind-ups count, Rules.may_commit) AND a slot of
+## enemy_base's shared attack-token table (MAX_ATTACKERS 2, with the stagger after a wisp's wind-up begins); the
+## token is claimed here and kept by the committed state that follows (released with the next non-committed one).
 func _may_commit() -> bool:
-	return Rules.may_commit(intensity(), committed_wisps())
+	return Rules.may_commit(intensity(), committed_wisps()) and Base.claim_attack_token(get_instance_id())
 
 
 func committed_wisps() -> int:
@@ -1051,7 +1059,7 @@ func _resolve_strikes(p: Node3D) -> void:
 	var from := _nearest_point(strikes.get("points"), p.global_position) + Vector3.UP * 3.0
 	if not _los(from, p):
 		return
-	_hit(p, _attack_damage("rings"), Rules.bearing(arena_center, p.global_position), _knock(), true)
+	_hit(p, _attack_damage("strikes"), Rules.bearing(arena_center, p.global_position), _knock(), true)
 
 
 func _expose_b() -> void:

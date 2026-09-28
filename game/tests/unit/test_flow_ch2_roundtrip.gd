@@ -9,7 +9,8 @@ extends "res://tests/test_case.gd"
 ##     rest point, the trial never saving and always returning to its origin;
 ##   * the Lantern Road: arches light once, same-area hops and trips home to the ORIGINAL Haven.
 ## Only fields that legitimately move with time are left out of the comparison (clock, play time, crop
-## tending by Mochi, bond XP from new zones) and the player's position/area bookkeeping.
+## tending by Mochi, bond XP from new zones) and the player's position/area bookkeeping; the Music Box's song
+## discovery may only grow (GROWING_SECTIONS).
 ## The runner scene is protected like test_audit_lifecycle_flow: current_scene is swapped for a
 ## placeholder so scene changes free the placeholder/area instead of the runner.
 
@@ -191,17 +192,47 @@ func _snapshot() -> Dictionary:
 	return s
 
 
+## Sections that legitimately GROW while she travels (compared by _grows_only, never strictly): the Music Box's
+## song discovery (GameState.extra "music_box", wired for the whole session by Game.wire_session_systems(): every
+## new area's music is a new song) - what was known before must still be known, favourites unchanged.
+const GROWING_SECTIONS := ["music_box"]
+
+
 func _assert_same(now: Dictionary, before: Dictionary, what: String) -> void:
 	var bad: Array = []
 	for k in before:
-		if not now.has(k) or JSON.stringify(now[k]) != JSON.stringify(before[k]):
+		if GROWING_SECTIONS.has(k):
+			if not _grows_only(now.get(k), before[k]):
+				bad.append(k)
+		elif not now.has(k) or JSON.stringify(now[k]) != JSON.stringify(before[k]):
 			bad.append(k)
 	for k in now:
-		if not before.has(k):
+		if not before.has(k) and not GROWING_SECTIONS.has(k):
 			bad.append(k)
 	assert_eq(bad, [], "%s: preserved state differs in %s" % [what, str(bad)])
 	for k in bad:
 		print("    DIFF %s\n      before %s\n      now    %s" % [k, JSON.stringify(before.get(k)), JSON.stringify(now.get(k))])
+	# the session's song discovery really is saved and restored (the Reach's music was heard on the way)
+	var mb: Variant = now.get("music_box")
+	if mb is Dictionary:
+		assert_true((mb as Dictionary).get("discovered") is Dictionary, "%s: the music box section is well formed" % what)
+
+
+## A music box section that only grew: every song discovered before is still discovered (same first-heard record),
+## the favourites list is unchanged.
+func _grows_only(now: Variant, before: Variant) -> bool:
+	if not (before is Dictionary):
+		return true
+	if not (now is Dictionary):
+		return false
+	var b: Dictionary = before
+	var n: Dictionary = now
+	var bd: Dictionary = b.get("discovered", {}) if b.get("discovered") is Dictionary else {}
+	var nd: Dictionary = n.get("discovered", {}) if n.get("discovered") is Dictionary else {}
+	for cue in bd:
+		if not nd.has(cue) or JSON.stringify(nd[cue]) != JSON.stringify(bd[cue]):
+			return false
+	return JSON.stringify(n.get("favourites", [])) == JSON.stringify(b.get("favourites", []))
 
 
 # --- the Chapter One home survives the trip ---------------------------------------------------------------

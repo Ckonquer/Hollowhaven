@@ -129,7 +129,9 @@ func _rebuild(a: Dictionary) -> void:
 	beacon.call("place", _centre, "cache" if _stop >= _stop_count else "stop")
 
 
-## Forgets the run's world nodes (no run any more: abandoned or completed).
+## Forgets the run's world nodes (no run any more: abandoned or completed). A run set aside mid-fight (from the
+## Reach outpost's board) sends the living group home at once, in front of her: kept on purpose (lead decision
+## P43: player-chosen, harmless, nothing is lost).
 func clear_all() -> void:
 	despawn_all()
 	if beacon != null and is_instance_valid(beacon):

@@ -8,6 +8,8 @@ extends "res://tests/test_case.gd"
 ##  * guards: while EnemyFactory has no quarry_warden / bellcap_sentry script the spawners neither spawn nor
 ##    error; stepping into the empty arena clears it (completable), the debug hook clears it in debug builds,
 ##    and a real defeat (spawner clear / Events.boss_defeated / enemy_killed) sets hr_warden_defeated once
+##  * the first clear shows TEXT["warden_clear"] exactly once (Events.notify "success", whichever path clears
+##    first - the real Warden's boss_defeated reaches the arena before its spawner); a reload shows nothing
 ##  * the spawner hands the Warden its arena: centre, radius and the pillar nodes
 
 const Q := preload("res://data/reach_east.gd")
@@ -16,10 +18,14 @@ const PillarScript := preload("res://src/world/reach/east/quarry_pillar.gd")
 const SpawnerScript := preload("res://src/world/reach/east/guarded_spawner.gd")
 
 var _holder: Node3D
+var _toasts: Array = []
 
 
 func before_each() -> void:
 	fresh_state()
+	_toasts.clear()
+	if not Events.notify.is_connected(_on_notify):
+		Events.notify.connect(_on_notify)
 	SpawnerScript.availability_override = {}
 	Settings.set_value("timing_assist", false)
 	Settings.set_value("high_visibility_cues", false)
@@ -28,12 +34,23 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	if Events.notify.is_connected(_on_notify):
+		Events.notify.disconnect(_on_notify)
 	SpawnerScript.availability_override = {}
 	Settings.set_value("timing_assist", false)
 	Settings.set_value("high_visibility_cues", false)
 	if _holder != null and is_instance_valid(_holder):
 		_holder.queue_free()
 	await wait_frames(2)
+
+
+func _on_notify(text: String, kind: String) -> void:
+	_toasts.append([text, kind])
+
+
+## How many times the Warden's clear message was shown (as a "success" toast).
+func _clear_toasts() -> int:
+	return _toasts.filter(func(t: Array) -> bool: return String(t[0]) == String(Q.TEXT["warden_clear"]) and String(t[1]) == "success").size()
 
 
 func _arena() -> Node3D:
@@ -192,6 +209,7 @@ func test_real_warden_gets_the_arena_and_its_defeat_clears_it() -> void:
 	assert_true(bool(GameState.get_flag(Q.FLAG_WARDEN)), "hr_warden_defeated")
 	assert_true(bool(sp.is_cleared()), "the spawner is cleared")
 	assert_eq(cleared.size(), 1, "cleared exactly once")
+	assert_eq(_clear_toasts(), 1, "a real defeat shows the Warden's clear message exactly once")
 	assert_eq(int(a.intact_pillars()), a.pillars.size(), "the pillars re-knit after the fight")
 	Game.mode = "playing"
 	sp.update_spawner()
@@ -234,7 +252,31 @@ func test_defeat_sets_the_flag_once() -> void:
 	assert_eq(int(a.intact_pillars()), 3, "the arena re-knits after the fight")
 	Events.enemy_killed.emit(Q.WARDEN_ID, a.position)
 	a.spawner.cleared.emit("hr_sp_quarry_warden")
+	a.spawner._on_wave_cleared()          # the spawner's own clear after the arena's (a real defeat's order)
 	assert_eq(cleared.size(), 1, "announced once")
+	assert_eq(_clear_toasts(), 1, "the clear message once, although the spawner cleared after the arena")
+
+
+## Order-independent: a spawner-first clear shows its clear_message and the arena stays quiet; a save that already
+## has the Warden cleared (a reload) never shows it again, whatever event arrives.
+func test_clear_message_once_on_any_path_and_never_after_a_reload() -> void:
+	var a := _arena()
+	a.spawner._on_wave_cleared()
+	assert_eq(_clear_toasts(), 1, "spawner first: its clear_message, once")
+	Events.boss_defeated.emit(Q.WARDEN_ID)
+	Events.enemy_killed.emit(Q.WARDEN_ID, a.position)
+	assert_eq(_clear_toasts(), 1, "the arena does not repeat it")
+	a.queue_free()
+	await wait_frames(1)
+	_toasts.clear()
+	var b := _arena()            # a reload: the flags are in the save
+	assert_true(bool(b.is_cleared()), "cleared on load")
+	Events.boss_defeated.emit(Q.WARDEN_ID)
+	Events.enemy_killed.emit(Q.WARDEN_ID, b.position)
+	b.spawner._on_wave_cleared()
+	b.check_player(b.position)
+	assert_eq(_clear_toasts(), 0, "nothing on a reload")
+	assert_eq(_toasts.size(), 0, "no toast at all")
 
 
 func test_spawner_clear_and_debug_hook() -> void:

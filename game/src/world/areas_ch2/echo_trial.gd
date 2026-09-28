@@ -11,7 +11,9 @@ extends "res://src/world/areas_ch2/placeholder_area.gd"
 ##   * its own state: GameState.trials[<id>] = {"clears", "best_seconds"} (the trial-scoped counter);
 ##   * first clear: the content reward bundle rw_trial_matron_first through GameState.grant_once (the
 ##     Moon Moth Shawl pattern unlock flag); every later clear: modest renewable resources (REPEAT, plus a
-##     small bonus every BONUS_EVERY clears) - never a story flag, no daily limit;
+##     small bonus every BONUS_EVERY clears) - never a story flag, no daily limit. They are NOT given inside
+##     the echo (a full backpack would drop them in the arena, and every trial shares this area id): they wait
+##     in the trial's record ("pending", saved) and are paid on arrival back at the origin (pay_pending);
 ##   * Events.trial_started(id) on arrival, Events.trial_ended(id, won) once per visit.
 ## Flow: begin(id, origin_area, origin_spawn) remembers the origin by making it the respawn point
 ## (Game.set_respawn) and travels here (Game.change_area never saves on arrival in a trial, and never
@@ -27,8 +29,15 @@ extends "res://src/world/areas_ch2/placeholder_area.gd"
 ## boss scripts in "trial" mode with fresh, isolated props (no persist flags, no story listeners). Same flow, same
 ## pale door, same rules. The Matron keeps her own room below (_build_room / _build_encounter), exactly as before.
 ## Trial-scoped ledger: GameState.trials[id] also keeps "last_seconds", "repeat_paid" (repeat clears paid) and
-## "paid" ({item: total} from repeat clears). The trial menu (src/world/trial/trial_entry.gd) shows menu_text(id):
-## the memory text, the record (clears, best time) and what a clear leaves.
+## "paid" ({item: total} from repeat clears), plus - between a won repeat clear and the arrival home - "pending"
+## ({item: n}, merged when several wait) and "pending_clears" (how many clears it holds). The trial menu
+## (src/world/trial/trial_entry.gd, and the Below's stone) shows menu_text(id): the memory text, the record
+## (clears, best time) and what a clear leaves.
+## THE ECHO'S GIFT (lead decision L08): init() (idempotent; Game.wire_session_systems calls it at session start and
+## record_clear() calls it too) connects Events.area_loaded to pay_pending(area_id): on arrival in any non-transient
+## area - the origin: leaving, falling and Continue all land there - every pending item goes through
+## GameState.give_item (overflow drops at the safe origin checkpoint), moves into "paid" / "repeat_paid", and
+## "pending" is erased; one toast. Same path for all three trials; the first-clear ledger grant is unchanged.
 
 const Brazier := preload("res://src/enemies/boss_brazier.gd")
 const BelowLayout := preload("res://src/world/below/below_layout.gd")
@@ -50,6 +59,8 @@ const RETURN_DELAY := 6.0
 
 ## Which trial the next load of this area hosts (set by begin(); consumed in _ready()).
 static var pending_trial: String = ""
+## True once init() wired the echo's gift payer (Events.area_loaded -> pay_pending).
+static var _gift_wired: bool = false
 
 var trial_id: String = TRIAL_MATRON
 var boss: Node = null
@@ -104,6 +115,103 @@ static func record(id: String) -> Dictionary:
 	return (r as Dictionary) if r is Dictionary else {"clears": 0, "best_seconds": 0.0}
 
 
+## Wires the echo's gift payer (Events.area_loaded -> pay_pending). Idempotent; cheap (no node, no per-frame work).
+static func init() -> void:
+	_gift_wired = true
+	if not Events.area_loaded.is_connected(pay_pending):
+		Events.area_loaded.connect(pay_pending)
+
+
+## Disconnects the payer (tests; the next session wiring or record_clear() connects it again).
+static func shutdown() -> void:
+	_gift_wired = false
+	if Events.area_loaded.is_connected(pay_pending):
+		Events.area_loaded.disconnect(pay_pending)
+
+
+static func is_listening() -> bool:
+	return _gift_wired and Events.area_loaded.is_connected(pay_pending)
+
+
+## Where the trial's origin is, for the toast ("the ballroom candles"; data/trials.gd origin_name).
+static func origin_name(id: String) -> String:
+	var n := String(trial_info(id).get("origin_name", ""))
+	return n if n != "" else "the echo stone"
+
+
+## What waits for Krystal back at the origin: {item: n} summed over every trial ({} when nothing waits).
+static func pending_gifts() -> Dictionary:
+	var out: Dictionary = {}
+	for id in GameState.trials:
+		var r: Variant = GameState.trials[id]
+		if not (r is Dictionary) or not ((r as Dictionary).get("pending") is Dictionary):
+			continue
+		var pend: Dictionary = (r as Dictionary)["pending"]
+		for k in pend:
+			if int(pend[k]) > 0:
+				out[String(k)] = int(out.get(String(k), 0)) + int(pend[k])
+	return out
+
+
+## Pays every echo's gift waiting in GameState.trials[*]["pending"] on arrival in `area_id` (Events.area_loaded).
+## Never inside a trial (Game.TRANSIENT_AREAS): leaving, falling and Continue all land at the origin, which pays.
+## The trial's ledger is written first ("paid" / "repeat_paid" grow, "pending" is erased, so a re-entrant call never
+## pays twice), then each item goes through GameState.give_item; whatever does not fit drops at the safe origin
+## checkpoint as a persistent pickup of THIS area. One toast for everything paid. Returns {item: n} paid.
+static func pay_pending(area_id: String) -> Dictionary:
+	var total: Dictionary = {}
+	if area_id == "" or Game.TRANSIENT_AREAS.has(area_id):
+		return total
+	for id in GameState.trials.keys():
+		var r: Variant = GameState.trials[id]
+		if not (r is Dictionary) or not (r as Dictionary).has("pending"):
+			continue
+		var rec: Dictionary = (r as Dictionary).duplicate(true)
+		var pend: Dictionary = rec["pending"] if rec["pending"] is Dictionary else {}
+		var n_clears := maxi(int(rec.get("pending_clears", 1)), 1)
+		rec.erase("pending")
+		rec.erase("pending_clears")
+		var paid: Dictionary = (rec.get("paid") as Dictionary).duplicate() if rec.get("paid") is Dictionary else {}
+		var give: Dictionary = {}
+		for k in pend:
+			var n := int(pend[k])
+			if n <= 0 or not ItemDB.has_item(String(k)):
+				continue
+			give[String(k)] = n
+			paid[String(k)] = int(paid.get(String(k), 0)) + n
+		rec["paid"] = paid
+		rec["repeat_paid"] = int(rec.get("repeat_paid", 0)) + n_clears
+		GameState.trials[id] = rec
+		if give.is_empty():
+			continue
+		var drop: Variant = _gift_drop_pos(area_id)
+		for k in give:
+			GameState.give_item(String(k), int(give[k]), drop)
+			total[k] = int(total.get(k, 0)) + int(give[k])
+	if not total.is_empty():
+		var parts: Array = []
+		for k in total:
+			parts.append("%s x%d" % [ItemDB.display_name(String(k)), int(total[k])])
+		Events.notify.emit("The echo's gift: " + ", ".join(parts), "item")
+	return total
+
+
+## The safe origin checkpoint in the area just loaded (the respawn spawn, which a trial sets to its origin), else
+## null (GameState.give_item then drops at Krystal's feet, where she arrived).
+static func _gift_drop_pos(area_id: String) -> Variant:
+	var a: Node = Game.area
+	if a == null or not is_instance_valid(a) or Game.area_id != area_id:
+		return null
+	if String(GameState.player.get("respawn_area", "")) != area_id:
+		return null
+	var rs := String(GameState.player.get("respawn_spawn", ""))
+	var sp: Variant = a.get("spawns")
+	if rs == "" or not (sp is Dictionary) or not (sp as Dictionary).has(rs) or not a.has_method("get_spawn"):
+		return null
+	var xf: Variant = a.call("get_spawn", rs)
+	return (xf as Transform3D).origin if xf is Transform3D else null
+
+
 ## The first-clear content bundle of a trial: data/sources.gd REWARDS (ItemDB) when catalogued there, else the
 ## trial table's own copy (data/trials.gd FIRST_REWARDS). {} when the trial has none.
 static func first_bundle(id: String) -> Dictionary:
@@ -130,9 +238,11 @@ static func pattern_name(id: String) -> String:
 
 
 ## Records a clear in the trial's own state and pays its reward: the first clear grants the content
-## bundle (once, through the reward ledger); later clears give modest renewable resources (recorded in the
-## trial's own ledger: repeat_paid, paid).
-## Returns {"first": bool, "clears": int, "best_seconds": float, "items": {id: n}}.
+## bundle (once, through the reward ledger); later clears earn modest renewable resources, which WAIT in the
+## trial's record ("pending", merged with any gift still waiting) and are paid on arrival back at the origin
+## (pay_pending moves them into the trial's own ledger: repeat_paid, paid). Nothing is given or dropped here.
+## Returns {"first": bool, "clears": int, "best_seconds": float, "items": {id: n}, "pending": bool}
+## ("items": what this clear earned; "pending": true when it waits for the trip home).
 static func record_clear(id: String, seconds: float) -> Dictionary:
 	var t := trial_info(id)
 	var r := record(id).duplicate(true)
@@ -144,7 +254,7 @@ static func record_clear(id: String, seconds: float) -> Dictionary:
 	r["best_seconds"] = best
 	r["last_seconds"] = maxf(seconds, 0.0)
 	GameState.trials[id] = r
-	var out := {"first": false, "clears": clears, "best_seconds": best, "items": {}}
+	var out := {"first": false, "clears": clears, "best_seconds": best, "items": {}, "pending": false}
 	var rid := String(t.get("first_reward", ""))
 	if rid != "" and not GameState.has_reward(rid):
 		var bundle := first_bundle(id)
@@ -162,21 +272,23 @@ static func record_clear(id: String, seconds: float) -> Dictionary:
 	var given: Dictionary = {}
 	for k in give:
 		if ItemDB.has_item(String(k)) and int(give[k]) > 0:
-			GameState.give_item(String(k), int(give[k]))
 			given[String(k)] = int(give[k])
 	out["items"] = given
-	# The trial-scoped ledger: how many repeat clears were paid, and what they paid in total.
-	var paid: Dictionary = (r.get("paid") as Dictionary).duplicate() if r.get("paid") is Dictionary else {}
+	if given.is_empty():
+		# Nothing to carry home: the repeat clear is settled at once (the trial-scoped ledger still counts it).
+		r["repeat_paid"] = int(r.get("repeat_paid", 0)) + 1
+		GameState.trials[id] = r
+		return out
+	# The echo's gift waits in the trial's record until she is back at the origin (pay_pending).
+	var pend: Dictionary = (r.get("pending") as Dictionary).duplicate() if r.get("pending") is Dictionary else {}
 	for k in given:
-		paid[k] = int(paid.get(k, 0)) + int(given[k])
-	r["paid"] = paid
-	r["repeat_paid"] = int(r.get("repeat_paid", 0)) + 1
+		pend[k] = int(pend.get(k, 0)) + int(given[k])
+	r["pending"] = pend
+	r["pending_clears"] = int(r.get("pending_clears", 0)) + 1
 	GameState.trials[id] = r
-	if not given.is_empty():
-		var parts: Array = []
-		for k in given:
-			parts.append("%s x%d" % [ItemDB.display_name(String(k)), int(given[k])])
-		Events.notify.emit("The echo leaves something behind: " + ", ".join(parts), "item")
+	out["pending"] = true
+	init()
+	Events.notify.emit("The echo's gift waits for you back at %s." % origin_name(id), "item")
 	return out
 
 

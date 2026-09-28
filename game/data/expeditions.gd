@@ -22,9 +22,10 @@ extends RefCounted
 ##                         keepsake_chance, keepsakes: [{kind: "dye", id} | {kind: "decor", item, count}]}
 ##   reward_types          the reward TYPES shown before starting (never the exact roll)
 ## Rewards are renewable materials, candy and, sometimes (always on a route's first completion), a keepsake:
-## a dye recipe (the Loom palette, i.e. data/appearance.gd DYE_PALETTES; also a furniture finish) or a festival
-## decoration. Never a story item, never a flag, never anything only an expedition can give (every keepsake
-## is also made at the Loom / workbench), no daily limit, no timer.
+## a new dye colour (its Loom palette, data/appearance.gd DYE_PALETTES, unlocked directly as a gift - no Loom
+## cost; it colours clothes and furniture) or a festival decoration. Never a story item, never a flag, never
+## anything only an expedition can give (every keepsake is also made at the Loom / workbench), no daily limit,
+## no timer. A route's first completion also gives FIRST_ROUTE_WAYFINDING_XP Wayfinding mastery xp (once per route).
 ## Rules the tests enforce: enemy ids exist (data/enemies.gd + EnemyFactory), group sizes respect the enemy's
 ## max_group, no spider-like enemy (no alt_name) so nothing needs an arachnophobia swap, spawn points are
 ## walkable, dry, outside every safe zone and at least ARCH_CLEARANCE from every Lantern Road arch and the
@@ -50,6 +51,9 @@ const SPAWNER_CLEARANCE := 16.0
 const POINT_SPREAD := 9.0           # every spawn point within this of its stop's lantern
 const MIN_STOPS := 2
 const MAX_STOPS := 4
+## Wayfinding mastery xp for a route's FIRST completion (Mastery.award "expedition:<route>", deduped per route;
+## the size of the other first-time Wayfinding rules such as "shortcut" / "arch").
+const FIRST_ROUTE_WAYFINDING_XP := 20
 
 const DIFFICULTIES := {
 	"gentle": {"name": "Gentle", "pips": 1,
@@ -90,7 +94,7 @@ const TEMPLATES := {
 				{"kind": "decor", "item": "pumpkin_lights", "count": 2}, {"kind": "decor", "item": "candy_bowl", "count": 1}],
 		},
 		"reward_types": ["Orchard produce: pumpkins, roseberries, sunflax, resin, seeds", "Lanternwake candy",
-			"Sometimes: the Pumpkin or Rose dye recipe, or a festival decoration"],
+			"Sometimes: a new dye colour (Pumpkin or Rose) for clothes and furniture, or a festival decoration"],
 	},
 	"quarry_circuit": {
 		"name": "Quarry Circuit",
@@ -124,7 +128,7 @@ const TEMPLATES := {
 				{"kind": "decor", "item": "crescent_window", "count": 1}, {"kind": "decor", "item": "gothic_trim", "count": 2}],
 		},
 		"reward_types": ["Quarry materials: iron ore, copper and iron bars, resin, sometimes moon crystal or an echo shard",
-			"Lanternwake candy", "Sometimes: the Ember or Cream dye recipe, or a festival decoration"],
+			"Lanternwake candy", "Sometimes: a new dye colour (Ember or Cream) for clothes and furniture, or a festival decoration"],
 	},
 	"manor_afterglow": {
 		"name": "Manor Afterglow",
@@ -158,16 +162,17 @@ const TEMPLATES := {
 				{"kind": "decor", "item": "bat_bunting", "count": 2}, {"kind": "decor", "item": "crescent_window", "count": 1}],
 		},
 		"reward_types": ["Festival supplies: lantern wax, moonpetals, cloth, sugarcaps, sometimes an echo shard",
-			"Lanternwake candy", "Sometimes: the Lavender or Midnight dye recipe, or a festival decoration"],
+			"Lanternwake candy", "Sometimes: a new dye colour (Lavender or Midnight) for clothes and furniture, or a festival decoration"],
 	},
 }
 
-## Board / tracker / map text. {name} {stop} {n} {total} {cache} are filled in by the logic.
+## Board / tracker / map text. {name} {stop} {n} {total} {cache} {colour} are filled in by the logic.
 const TEXT := {
 	"started": "Expedition begun: {name}. Follow the ribbon lantern to {stop}.",
 	"stop_clear": "{stop} is quiet again ({n}/{total}). Next: {next}.",
 	"route_clear": "The route is clear! A Lanternwake cache waits at {cache}.",
 	"complete": "Expedition complete: {name}.",
+	"dye_keepsake": "a new dye colour ({colour})",
 	"abandoned": "Expedition set aside. Nothing is lost; start again whenever you like.",
 	"abandoned_cache": "Expedition set aside. Its cache stays closed, but nothing you carry is lost; start again whenever you like.",
 	"abandon_confirm": "Really set it aside? (nothing is lost)",

@@ -12,7 +12,11 @@ lead integrated them (below). Source of truth for signatures is the code; this i
   * `"content"` — the content module named in `who` grants it itself: `GameState.grant_once(id,
     bundle.items, bundle.flags)` (or read it with `ItemDB.reward_bundle(id)`). These are:
     `rw_c1x_gardener`, `rw_c1x_tailor_cache`, `rw_c1x_elder`, `rw_c1x_tobin`, `rw_ch2_crossing`,
-    `rw_ch2_candleyard_pattern`, `rw_trial_matron_first`.
+    `rw_ch2_candleyard_pattern`, `rw_trial_matron_first`; added later: `rw_hr_chime_trail`,
+    `rw_hw_lightwell_alcove`, `rw_hw_throat_supplies` (integration pass 1, R30-R32) and the echo trial first
+    clears `rw_trial_velour_first`, `rw_trial_choir_first` (Wave D1; catalogued in pass 2, L09 - exact mirrors of
+    `data/trials.gd` `FIRST_REWARDS`, each setting only its trial's pattern-unlock flag `ch2_trial_<id>`). The
+    authoritative list is the header of `data/sources.gd`.
   * `"chapter_log"` / `"optional_log"` — paid AUTOMATICALLY by the quest layer / optional log when the step or
     goal completes (`"rw_" + step/goal id`). Content modules NEVER grant these (seals, seeds, Wardlight,
     Thread Veil, patterns...). They only set the objective flags.

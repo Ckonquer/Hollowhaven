@@ -1,6 +1,6 @@
 extends "res://tests/test_case.gd"
-## Lanternwake Expeditions board + panel (module D2), instanced directly (the panel is not registered in the UI
-## root yet): the board opens the expedition panel when the UI offers it and keeps the Optional journal as its
+## Lanternwake Expeditions board + panel (module D2), instanced directly (ui_root's own registration is tested in
+## test_ui_root): the board opens the expedition panel when the UI offers it and keeps the Optional journal as its
 ## second option (and as the fallback); the panel lists the three routes, shows difficulty (words + pips),
 ## route, who may be met and reward types BEFORE starting, refuses closed routes, starts a run, offers the
 ## Lantern Road to a lit arch, sets a run aside in two presses (free) and shows the last outing.
@@ -126,6 +126,9 @@ func test_panel_shows_difficulty_route_foes_and_reward_types_before_starting() -
 		assert_true(txt.contains(String(t["cache"]["name"])))
 		for r in t["reward_types"]:
 			assert_true(txt.contains(String(r)), "reward type shown: %s" % r)
+		# P42: the dye keepsake is a gift (the palette is unlocked directly), so it is never promised as a recipe
+		assert_true(txt.contains("a new dye colour"), "%s names its dye keepsake as a new dye colour" % id)
+		assert_false(txt.to_lower().contains("recipe"), "%s promises no recipe" % id)
 		for e in Ex.enemy_types(id):
 			assert_true(txt.contains(ItemDB.enemy_display_name(String(e))), "%s may be met" % e)
 		assert_false(p.start_btn.disabled)
@@ -200,9 +203,15 @@ func test_panel_shows_the_last_outing_and_follows_state_changes() -> void:
 		for e in s["enemies"]:
 			Ex.record_defeat("orchard_patrol", int(a["run"]), int(a["stop"]), String(e))
 	assert_true(p.status_text().contains("open the harvest crate"))
-	assert_false(Ex.complete().is_empty())
+	var res := Ex.complete()
+	assert_false(res.is_empty())
 	assert_true(p.status_text().contains("Last outing"))
 	assert_true(p.status_text().contains(ItemDB.display_name("candy")))
+	# the first completion always brings a keepsake (a dye while one is left): same words as the toast
+	assert_eq(String(res["keepsake"]["kind"]), "dye")
+	assert_true(p.status_text().contains(Ex.keepsake_text(res["keepsake"])), "names the new colour: %s" % p.status_text())
+	assert_true(p.status_text().contains("a new dye colour"))
+	assert_false(p.status_text().to_lower().contains("recipe"))
 	p.select("orchard_patrol")
 	assert_true(p.detail_text().contains("Completed 1 time"))
 

@@ -18,9 +18,6 @@ const Visual := preload("res://src/enemies/bellcap_sentry_visual.gd")
 const PULSE_TIME := 0.35
 const PULSE_AT := 0.06
 const PULSE_START_FRACTION := 0.8
-const GENTLE_COOLDOWN := 1.35
-const INTENSE_COOLDOWN := 0.8
-const GENTLE_TELEGRAPH_BONUS := 0.2
 const SPORES := Color(0.95, 0.86, 0.7, 0.7)
 const TOLL_CAPTION_GAP_MS := 4000     # the toll caption is shared by every sentry (no caption spam from a pocket)
 
@@ -83,7 +80,7 @@ func attack_reach() -> float:
 
 
 func _can_start_attack() -> bool:
-	return _shot_clear and not _gentle_blocked()
+	return _shot_clear and not overlap_blocked()
 
 
 func _choose_attack() -> void:
@@ -91,7 +88,7 @@ func _choose_attack() -> void:
 
 
 func telegraph_duration() -> float:
-	return attack_telegraph(_def) + _telegraph_bonus()
+	return attack_telegraph(_def) + intensity_telegraph_bonus()
 
 
 func recover_duration() -> float:
@@ -152,33 +149,9 @@ func can_stagger(amount: float, source: Node) -> bool:
 
 func _on_state_changed(prev: String, new_state: String) -> void:
 	if new_state == "recover":
-		_cooldown *= _cooldown_mult()
+		_cooldown *= intensity_cooldown_mult()
 		if prev == "pulse":
 			Audio.play_3d("dir_creak", global_position + Vector3.UP * 1.2, -6.0, 0.1)
-
-
-# --- Intensity (Gentle / Intense) ---------------------------------------------------------------------------------
-
-func _cooldown_mult() -> float:
-	match Combat.current_intensity():
-		0:
-			return GENTLE_COOLDOWN
-		2:
-			return INTENSE_COOLDOWN
-	return 1.0
-
-
-func _telegraph_bonus() -> float:
-	return GENTLE_TELEGRAPH_BONUS if Combat.current_intensity() == 0 else 0.0
-
-
-func _gentle_blocked() -> bool:
-	if Combat.current_intensity() != 0:
-		return false
-	for id in _attackers.keys():
-		if int(id) != get_instance_id() and is_instance_id_valid(int(id)):
-			return true
-	return false
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

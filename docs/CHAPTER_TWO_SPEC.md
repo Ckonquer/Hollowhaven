@@ -59,8 +59,16 @@ Travel (all through `Game.change_area(area, spawn)`, which autosaves on arrival)
   Interacting with a lit arch (or the Ward Stone "Lantern road" option once any Reach arch is lit)
   opens the travel list. Not while `Game.can_fast_travel()` is false (enemy threatening within 20 m,
   boss active, cutscene). Haven destination = surface `haven_respawn`.
-* echo trial: entered from its origin checkpoint (below `arena_gate` checkpoint for Matron; manor
-  ballroom for Velour; works bell throat for Choir) and always returns there.
+* echo trials (`data/trials.gd` `TRIALS`; area script `src/world/areas_ch2/echo_trial.gd`; arena builders
+  `src/world/trial/velour_trial.gd` / `choir_trial.gd`; echo stone + trial menu `src/world/trial/trial_entry.gd`, shared
+  look `trial_fx.gd`): entered at a pale echo stone beside the origin checkpoint and always returning there (the pale
+  door, a fall and Continue all land at the origin) - Matron: the Below's `cp_arena` lantern before the Heartseed
+  Chamber (stone placed by `below_world.gd`); Velour: the manor ballroom rest candles (`manor_ballroom`, stone at
+  `data/manor_layout.gd` `ECHO_ENTRY`); Choir: the Hushed Works Bell Throat (`bell_throat`, stone at
+  `TRIALS.choir.entry`). **Opening rule (lead decision L07, integration pass 2):** each trial opens right after its
+  boss is defeated (`weaver_defeated`, `ch2_velour_defeated`, `ch2_choir_defeated` = the trial's `requires_flag`);
+  there is no other gate - `ch2_trials_open` is only a story marker (its step message is flavour); nothing gates on it (`story_ch2.gd` only
+  repairs it for a save whose `ch2_routes_restored` step is done).
 
 `Game.AREAS` gains the new ids. `Game.SAFE_SAVE_AREAS := ["surface", "hallowmere_reach"]` replaces the
 hard-coded surface checks: manual save + 5-minute quiet autosave + save-on-close are allowed there (same
@@ -92,10 +100,16 @@ New top-level keys in `state` (all optional on read; defaults below are what `mi
             "seen": {"gathering": [], "hearthcraft": [], "wayfinding": []}, "legacy_credit": false}
 "discovered": {area_id: [landmark ids]}      # map landmarks discovered
 # (arches lit are flags ch2_arch_<id>, see §8)
-"trials": {trial_id: {"clears": 0, "best_seconds": 0.0}}
+"trials": {trial_id: {"clears": 0, "best_seconds": 0.0,     # + the trial-scoped ledger (Wave D, pass 2):
+             "last_seconds": 0.0, "repeat_paid": 0, "paid": {item: total},
+             "pending": {item: n}, "pending_clears": 1}}   # repeat gift waiting for the origin (L08)
 "orphans": [{"where": "inventory"|"storage:<uid>"|"equipment", "slot": int, "stack": {...}}]
 "stations": {}                               # reserved; station queues live in structures[uid].data
 ```
+Top-level keys added by Wave D modules without a GameState section: they live in `GameState.extra` (every unknown
+top-level key is kept and written back verbatim): `"expeditions"` (Lanternwake Expeditions, `src/expeditions/
+expeditions.gd`) and `"music_box"` (discovered songs + favourites, `src/audio/music_box.gd`); shapes in
+`docs/SAVE_MIGRATION.md` §2. Both are optional on read, repaired when damaged and reset by New Game.
 Companion records gain (defaults added by migrate/_load_companion, extra keys already survive):
 `"combat_mode": "assist"` ("assist" | "close"), `"skill_ready_at": 0.0` (value of
 `GameState.stats.play_seconds` when the signature skill is ready), `"home_spot": null` ([x,y,z] or

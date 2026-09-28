@@ -456,6 +456,17 @@ func test_reward_bundles_set_every_story_unlock_once() -> void:
 		if WORLD_FLAGS.has(flag):
 			continue
 		assert_true(set_by_reward.has(flag), "unlock flag %s is set by a reward bundle" % flag)
+	# Echo Trial first clears (lead decision L09): each trial's pattern-unlock flag is set by its own content bundle
+	# only, so the pattern stays unique to that trial (MP 15).
+	for tf in ["ch2_trial_matron", "ch2_trial_velour", "ch2_trial_choir"]:
+		var setters: Array = []
+		for rw2 in ItemDB.all_reward_ids():
+			if (ItemDB.reward_bundle(String(rw2))["flags"] as Array).has(tf):
+				setters.append(String(rw2))
+		var own_rw: String = "rw_" + String(tf).trim_prefix("ch2_") + "_first"
+		assert_eq(setters, [own_rw], "%s is set only by %s" % [tf, own_rw])
+		assert_eq(String((SourcesData.REWARDS.get(own_rw, {}) as Dictionary).get("by", "")), "content", own_rw + " is granted by the echo trial module")
+		assert_true((ItemDB.reward_bundle(own_rw).get("items", {"missing": 1}) as Dictionary).is_empty(), own_rw + ": a pattern, not loot")
 	assert_eq(ItemDB.reward_bundle("rw_ch2_orchard")["items"]["garden_seal"], 1)
 	assert_eq(ItemDB.reward_bundle("nope"), {})
 	assert_true(ItemDB.is_story_required("manor_seal"))

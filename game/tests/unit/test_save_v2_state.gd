@@ -462,10 +462,18 @@ func test_current_objective_combines_both_layers() -> void:
 	assert_eq(o["title"], "Three Roads, Three Lamps")
 	assert_eq(o["steps"].size(), 3)
 	assert_eq([o["target"], o["target_area"]], ["hr_orchard", "hallowmere_reach"])
+	# One status row per objective, tagged with its step: a step may show several rows (pass 2: the quarry's
+	# Warden / winch signposts are display rows, never required), always at least one real objective each.
 	var step_ids: Array = []
+	var counted := {}
 	for row in o["status"]:
-		step_ids.append(row["step"])
-	assert_eq(step_ids, ["ch2_orchard", "ch2_quarry", "ch2_manor"])
+		if not step_ids.has(row["step"]):
+			step_ids.append(row["step"])
+		if not bool(row.get("display", false)):
+			counted[row["step"]] = int(counted.get(row["step"], 0)) + 1
+	assert_eq(step_ids, ["ch2_orchard", "ch2_quarry", "ch2_manor"], "the three lamp steps, in order")
+	for id in step_ids:
+		assert_true(int(counted.get(id, 0)) >= 1, "%s has a real (non-display) objective row" % id)
 
 
 func test_quest_evaluation_includes_chapter_two_and_optional_goals() -> void:

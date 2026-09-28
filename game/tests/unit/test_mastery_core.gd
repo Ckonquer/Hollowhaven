@@ -230,6 +230,35 @@ func test_listeners_award_play_but_not_exploits() -> void:
 	assert_true(Mastery.has_seen("hearthcraft", "first_station_use:loom"))
 
 
+## The Chapter Two bosses whose areas commit a flag (the Quarry Warden's hr_warden_defeated, Count Velour's
+## ch2_velour_defeated) count ONCE whichever route reports the defeat first: the flag and Events.boss_defeated
+## share the canonical encounter id, which is the boss's own id (integration pass 2, P05).
+func test_ch2_boss_flag_and_signal_are_one_encounter() -> void:
+	var warden_id := String(load("res://src/enemies/quarry_warden.gd").get_script_constant_map()["BAR_ID"])
+	var velour_id := String(load("res://src/enemies/count_velour.gd").get_script_constant_map()["BOSS_ID"])
+	var warden_flag := String(preload("res://data/reach_east.gd").FLAG_WARDEN)
+	var velour_flag := String(preload("res://data/manor_layout.gd").FLAG_VELOUR_DEFEATED)
+	assert_eq(String(Mastery.ENCOUNTER_FLAGS.get(warden_flag, "")), warden_id, "hr_warden_defeated -> quarry_warden")
+	assert_eq(String(Mastery.ENCOUNTER_FLAGS.get(velour_flag, "")), velour_id, "ch2_velour_defeated -> count_velour")
+	var enc := int(MasteryData.XP["wayfinding"]["encounter"]["xp"])
+	# Warden, the real order: the fight emits boss_defeated, then the arena's listener sets the flag.
+	Events.boss_defeated.emit(warden_id)
+	GameState.set_flag(warden_flag, true)
+	assert_eq(Mastery.xp("wayfinding"), enc, "the Warden's signal and flag are one encounter")
+	assert_true(Mastery.has_seen("wayfinding", "encounter:" + warden_id))
+	# Velour, the flag first (a defeat_flag / fallback route), then the signal.
+	GameState.set_flag(velour_flag, true)
+	assert_eq(Mastery.xp("wayfinding"), enc * 2, "the flag route alone counts")
+	Events.boss_defeated.emit(velour_id)
+	assert_eq(Mastery.xp("wayfinding"), enc * 2, "the Count's flag and signal are one encounter")
+	# Repeats (a re-set flag, a trial re-fight's signal) never pay again.
+	GameState.set_flag(warden_flag, false)
+	GameState.set_flag(warden_flag, true)
+	Events.boss_defeated.emit(warden_id)
+	Events.boss_defeated.emit(velour_id)
+	assert_eq(Mastery.xp("wayfinding"), enc * 2, "deduped for good")
+
+
 ## Queueing a furnace job gives nothing (a job refunded by dismantling never pays); the finished job gives the
 ## first-recipe and first-station xp through the Events.crafted listener.
 func test_furnace_xp_only_when_a_job_finishes() -> void:

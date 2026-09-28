@@ -214,10 +214,85 @@ alternates drifting root / veil / pale pods) carry **meta `boss_hazard`** (R89):
 threat scans (R61), the director's threat scan (R71) and ranked low by wand auto-aim (R101). The hazard field's zone slow is tagged
 `"source": "matron_field"`, erases only its own slow, starts its break-free window after a cleanse, and the fan sheet never slows her
 mid-jump (R88). Gentle: the Matron's drop gate ignores a minion out > `MINION_DROP_GATE` 20 s or unreachable (R90); Gentle minions keep
-both damage reductions (intensity ×0.6 × minion ×0.8 ≈ 3.4 damage; intended, R136 c). The Chapter Two bosses (Velour, Crossing
-Matron, Borrowed Choir) were still being built during the integration pass (contracts: deferred D07).
+both damage reductions (intensity ×0.6 × minion ×0.8 ≈ 3.4 damage; intended, R136 c). The Chapter Two ordinary enemies, the
+Quarry Warden and the three Chapter Two bosses are mapped in §12.
+
+## 12. Chapter Two enemies and bosses (C5, C6a-c + integration pass 2) — as built
+
+Source of truth: the headers of the scripts named below (each lists its setup keys, tells, reset policy and sounds) and
+`data/enemies.gd`. Decisions: `docs/ch2/INTEGRATION_WAVE_D.md` (ids in brackets).
+
+**Shared helpers added in pass 2 (`enemy_base.gd`, `telegraph_fx.gd`; additive, legacy enemies unchanged).**
+* Horror intensity, OPT-IN (P01): `intensity_cooldown_mult()` (Gentle ×1.35, Standard 1, Intense ×0.8 on the rest after an
+  attack), `intensity_telegraph_bonus()` (Gentle +0.2 s on a wind-up; Intense never shortens a tell), `overlap_blocked()` (Gentle
+  only: true while another enemy holds an attack token, so no overlapping wind-ups). The six C5 scripts use them (their private
+  copies are gone); Chapter One and Chapter One-extra enemies never call them. Committed wind-ups stay ≥ `MIN_COMMITTED_TELEGRAPH`
+  1.0 s.
+* `fire_projectile(from, t, params)` passes `dir` (a non-zero Vector3: fly straight along it, e.g. a throw along a locked lane; `t`
+  then only gates the shot), `on_hit` (Callable(target, dealt), dealt 0 = blocked) and `kind` through to `src/combat/projectile.gd`
+  (P02; the Patchwalker's clod uses it instead of calling the projectile directly).
+* Attack-token table (P23): statics `attack_token_available_for(id)`, `claim_attack_token(id) -> bool` (same `MAX_ATTACKERS` 2 cap
+  and `ATTACK_STAGGER_MS` 850 stagger as an enemy's wind-up; a new claim starts the stagger clock), `release_attack_token(id)`,
+  `reset_attack_tokens()`; for attackers that are not enemy_base nodes (the Borrowed Choir holds a slot while it is committed).
+* `telegraph_fx.move_ring(at)` (P04): moves a shown ring / disc with its fill, rim and high-visibility outline, no new meshes or
+  materials (the Velvet Wing's drain mark follows Krystal with it). Tracking wind-ups use `move_lane` / `move_arc` / `move_ring`.
+* `expose(seconds)` (D04): Lumi's Glimmerstep calls it on enemies inside its light pulse. Only the ordinary light-fearing enemies
+  implement it - Velvet Wing (breaks a drain in progress, reason "light") and Borrowed Wisp (a forced reveal held for at least
+  `seconds`, dazzled unless inside its dazzle cooldown). The bosses deliberately do not: their light rule is the arena mechanic
+  (braziers, ward candles, lantern anchors), which pets and gear never bypass (MP 13).
+
+**Ordinary enemies (C5; `src/enemies/<id>.gd` + `<id>_visual.gd`; sounds: existing names only - new voices are the open D10 item).**
+| id | setup keys (besides the spawner's) | rules worth knowing |
+|---|---|---|
+| `pumpkin_mimic` | `dormant` (bool), `seed` (int, deterministic RNG for tests; L06) | Dormant = decor that twitches its stem twice: NOT in group "enemy" (companions, travel / save gates and swings ignore it), an interactable ("Inspect twitching pumpkin"), wakes on inspect or when Krystal lingers `WAKE_NEAR` 2 m for 0.5 s; `spot_allowed()` retires a dormant spawn in a safe zone or beside a crop plot / planter. **Spawners must not pass `dormant`** (P12): the orchard pocket twitches its own props and spawns awake mimics. Bite (wedge), roll (lane, unlocked after the first bite / below 70 %). |
+| `patchwalker` | - | Rake sweep (wedge, staggerable wind-up) and a mud clod thrown STRAIGHT along its locked lane (`fire_projectile` `dir`), one per Patchwalker; a hit slows through `apply_slow` (bounded, never chained). Tells 1.1 / 1.6 s (longer tells kept, P11). |
+| `velvet_wing` | - | Height is the reach tell (hangs / flies out of reach, dashes down, rests at 1.4 m). Drain tether: broken by ward-light only - lit ward candles, lamps / lantern posts / placed light structures, braziers, the Glimmerstep pulse, Krystal's raised lantern while she stands inside the drain mark (`DRAIN_MARK_RADIUS` 0.7) - or a line-of-sight break, range or a hit; **never by Lumi's passive glow** (lead decision L01; `ward_light_at()` skips groups "player" and "companion"). Intense: the only ordinary enemy with a feint (P11). |
+| `bellcap_sentry` | - | One pulse ring (radius 4 m) with arrows, line of sight from the bell; the heavy wind-up is never staggered. |
+| `borrowed_wisp` | - | Veiled (a false light: emissive only, not a `light_source`, every hit passes through) until real light reveals it (lantern within ~4.5 m, lamps, braziers, wards) - then reachable and hurtable; the first reveal dazzles it, later reveals within `DAZZLE_COOLDOWN` 6 s reveal without dazzling or cancelling a wind-up (P08). A one-time hint when Krystal is within ~4 m of a veiled, visible wisp while threatened (P10). The marked, delayed sweep (0.8 s) is kept (P09). One fixed wisp in the Hall of Closed Eyes (`data/works_layout.gd` `hw_sp_eyes_wisp`, P13), besides the director's `hw_wisp_drift` and the Choir's helpers. |
+| `quarry_warden` (elite) | `arena` (node), `arena_center` (Vector3), `arena_radius` (float, ≥ 4; data default), `pillars` ([quarry_pillar nodes]; else group "quarry_pillar" within `arena_radius` + 3) | Spawned by the arena's guarded spawner `hr_sp_quarry_warden`. Slam (wedge, punish window), three spaced pulses (phase 2), a charge into a pillar = cracked pillar + EXPOSED window. **Leash**: the base leash AND within `arena_radius` + `ARENA_LEASH_MARGIN` 6 m of the centre AND within `ARENA_LEASH_DY` 3 m of its height (never engaged below the crystal shelf); leaving it or falling = a clean reset (pillars re-knit, full health). **Timing assist**: every wind-up, recovery and the pulse spacing ×`TIMING_ASSIST_MULT` 1.5 (elites count as boss mechanics, L03), exposure `EXPOSE_TIME_ASSIST` 7.5 s instead of 6. **Charge edge clip (D06)**: the lane end stays within `arena_radius` - `ARENA_EDGE_MARGIN` 1 m of the centre (the red lane shows the clipped length), and no floor within `LEDGE_PROBE_DEPTH` 1 m below its next step is a ledge = a wall bonk (stun while a pillar stands, exposed when none: never unwinnable), so a charge baited at the L2 edge never carries it down to L1. Encounter events `boss_encounter_changed("quarry_warden")` / bar / `boss_defeated("quarry_warden")` -> the arena sets `hr_warden_defeated` and toasts `TEXT["warden_clear"]` on the first clear (L02); counted once as a mastery encounter (P05). Not in `data/music.gd` BOSSES: ordinary combat music (P06). |
+
+**Bosses (C6a-c).** Each is spawned by its arena through `EnemyFactory`; each emits `boss_encounter_changed` / `boss_phase_changed` /
+`boss_health_changed` and, in story mode only, `boss_defeated(id)` exactly once, COMMITTED before any presentation. Setup key
+`"mode": "story" | "trial"` - trial = no flags, no `boss_defeated`, no drops; the Echo Trial listens to `defeated`. Settings
+`timing_assist` stretches warnings, openings and recoveries ×1.5; `reduce_flashing` / `high_visibility_cues` are honoured.
+* **`count_velour`** (`count_velour.gd`, `velour_visual.gd`, `velour/*`; the manor's `moonveil_manor_world.gd` `_place_boss`). Setup
+  `arena_center`, `arena_radius` (12), `candles` [ward_candle], `teach_candle`, `curtains` [Marker3D], `fixture`, `cover` [Vector3],
+  `helper_points` [Vector3], `entry`, `area`, `no_drops`; optional `mode`, `auto_start` (default: true only without an `area`),
+  `say_after_line`, `seed`. **In group "enemy" only while the encounter runs** (dormant he is Gallery scenery; removed again on
+  defeat and on reset). API `start_fight()`, `reset_fight()`, `is_vulnerable()`, `is_reachable()`, static `phase_for(hp, max)`;
+  signals `phase_changed`, `drain_resolved`, `candle_darkened`. Height is the reach tell; phase C's borrowed mask holds him above
+  `MASK_FLOOR` until light has staggered him once. **Reset policy**: Krystal falls or leaves the Gallery = a clean reset (bats,
+  tether, marks, channel and helper removed, every candle back to the fight's start state); wounds and phase are kept while the
+  manor stays loaded; quitting / reloading = a fresh encounter; a won encounter is never reset. Trial mode: the retry hint has its
+  own id `velour_retry_trial` with trial wording (P15). The manor shows the freed resident after the 1.4 s dispersal
+  (`DEFEAT_PRESENT`, P14; instant on load). Counted once as a mastery encounter via `ch2_velour_defeated` (P05).
+* **`crossing_matron`** (`crossing_matron.gd`, `crossing/*`; arena `src/world/works/deep/crossing_arena.gd` `boss_params()`). Setup
+  `arena`, `arena_center`, `arena_radius`, `anchors` [5 ceiling Vector3, lines 0..2 first], `braziers` [3 line-braziers, index =
+  line], `crack`, `bridge` (Rect2 in x, z), `deck_y`, `landing_points`, `alert`, **`rail`** (the guardrails' inner |z|; the arena
+  passes `Layout.CROSSING["rail"]` since pass 2 (P19); the default is the bridge half depth - 0.2), `mode`, `minion_id`. Own id and
+  state: never reads or writes `weaver_defeated`. **HP floor** `Rules.HP_FLOOR` [0.6, 0.25]: blows alone never take her below 60 %
+  before the first exposure or 25 % before the second (the flare's scorch still can), so every win needs at least two exposures.
+  `retreat_path()` / **`retreat_seconds()`**: the arena commits flags, reward and save at once but delays the gate's bars, sound,
+  shake and line by max(`retreat_seconds()` - 0.8, 0) (P17), and ignores the bridge while Krystal is down (P18). **Geometry
+  assumption (P21)**: `crossing_rules.gd` expects the bridge to run along X with its centre line at **z = 0** (lanes north z < 0,
+  south z > 0, deck |z| ≤ rail); `data/works_layout_deep.gd` `CROSSING` matches - moving the bridge off z = 0 needs an offset in the
+  rules. She never pounces while a minion lives (the release replaces the pounce). Arachnophobia: the Hollow Mother (look, anchors,
+  threads, marks, sacs, minions, sounds and captions swap live).
+* **`borrowed_choir`** (`borrowed_choir.gd`, `choir/*`; arena `choir_arena.gd` `boss_params()`). Setup `arena_center`,
+  `arena_radius` 12.4, `perimeter_radius` 10.4, `anchor_nodes` [lantern_anchor ×3], `anchors` [Vector3 ×3], `resonators`
+  [resonator ×2], `symbols` [{id, name, caption}], `arena`, `alert`, `mode`, `seed`. Hurt only while exposed: three correct reveals
+  end phase A (false welcome), one or two resonator cycles phase B (stolen rhythm), **three kept-flame exposures** phase C - each
+  exposure capped and floored (`choir_health.gd`), never a sponge. While committed it holds a slot of the shared **attack-token
+  table** (`claim_attack_token` / `release_attack_token`, P23), so it never overlaps the wisps' wind-ups beyond `MAX_ATTACKERS`. The
+  warm perimeter walk is safe from every Choir attack. Trial mode: retry hint `choir_retry_trial` (P57). The `data/enemies.gd` rows
+  are descriptive and honest (P22: `arena_radius` 12.4, telegraphs = the `choir_rules.gd` Standard values, a `strikes` zone row);
+  `choir_rules.gd` stays the source of truth.
 
 ## Extension recipes
+
+*Status:* (a) and (b) are built as the Chapter One extras and the C5 enemies / C6 bosses (§11, §12); (c) is built as the Echo
+Trial (`echo_trial.gd` + `data/trials.gd`, the bosses' `"mode": "trial"`; world_areas.md §8); (d) and (e) as §11 describes. The
+recipes below are the original pre-build notes.
 
 ### (a) New ordinary enemy with distinct telegraphs
 1. Integrator: add `ENEMIES["<id>"]` in `data/enemies.gd` (all keys of section 8; `area` decides intensity scaling).

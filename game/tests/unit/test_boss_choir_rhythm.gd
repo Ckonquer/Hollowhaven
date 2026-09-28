@@ -182,6 +182,42 @@ func test_committed_cap_counts_wisp_windups_and_holds_a_token() -> void:
 		assert_true(Rules.picki(Rules.MAX_COMMITTED, i) <= Base.MAX_ATTACKERS, "never past the shared attack-token table (%d)" % i)
 
 
+## Integration pass 2 (P23): the Choir goes through enemy_base's claim_attack_token / release_attack_token - never a
+## third attacker in the MAX_ATTACKERS table, and a new claim waits out the stagger after another attacker's wind-up.
+func test_the_choir_claims_the_shared_token_table_through_enemy_base() -> void:
+	make_arena()
+	var b := _phase_b()
+	_freeze_wisps(b)
+	assert_true(until(b, "b_idle") >= 0.0)
+	var id: int = b.get_instance_id()
+	Base.clock_override_ms = 200000
+	var a1 := Node.new()
+	var a2 := Node.new()
+	add_child(a1)
+	add_child(a2)
+	assert_true(Base.claim_attack_token(a1.get_instance_id()), "a first attacker claims a slot")
+	assert_true(Base.claim_attack_token(a1.get_instance_id()), "re-claiming a held token is fine")
+	assert_false(Base.claim_attack_token(a2.get_instance_id()), "a different attacker waits out the stagger")
+	Base.clock_override_ms += Base.ATTACK_STAGGER_MS
+	assert_true(Base.claim_attack_token(a2.get_instance_id()), "after the stagger: the second slot")
+	Base.clock_override_ms += Base.ATTACK_STAGGER_MS
+	assert_false(Base.attack_token_available_for(id), "MAX_ATTACKERS (2) reached")
+	run(b, 6.0)
+	assert_eq(String(b.state), "b_idle", "no Choir attack while two others hold the table (never a third)")
+	assert_false(Base._attackers.has(id))
+	assert_eq(Base._attackers.size(), Base.MAX_ATTACKERS)
+	Base.release_attack_token(a1.get_instance_id())
+	Base.release_attack_token(a1.get_instance_id())               # releasing twice is a no-op
+	assert_true(until(b, "b_ring_tele", 1.0) >= 0.0, "a slot is free: the Choir claims it and winds up")
+	assert_true(Base._attackers.has(id), "it holds the slot while committed")
+	assert_eq(Base._attackers.size(), Base.MAX_ATTACKERS, "still never more than MAX_ATTACKERS")
+	assert_false(Base.claim_attack_token(a1.get_instance_id()), "and the table is full for anyone else")
+	assert_true(until(b, "b_idle") >= 0.0)
+	assert_false(Base._attackers.has(id), "released after the attack")
+	Base.release_attack_token(a2.get_instance_id())
+	Base.clock_override_ms = -1
+
+
 func _ring_case(offset_from_gap: float, dist: float, iframes: bool = false, walled: bool = false) -> Array:
 	var d := dummy(Vector3(0, 0, -6), false, HP)
 	var b := make_boss(d, 1)

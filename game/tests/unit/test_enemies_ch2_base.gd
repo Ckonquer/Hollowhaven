@@ -338,6 +338,47 @@ func test_pack_cap_and_gentle_never_overlaps() -> void:
 	assert_eq(_pack(0), 1, "Gentle: never two wind-ups at once")
 
 
+## Integration pass 2 (P01): the shared opt-in helpers in enemy_base carry exactly the C5 rules - Gentle: wind-ups
+## +0.2 s, rests x1.35, no wind-up while another enemy holds a token; Intense: rests x0.8, never a shorter tell; the
+## committed floor (1.0 s) stays under the bonus. Legacy enemies do not use them (their numbers are unchanged).
+func test_shared_intensity_helpers_keep_the_c5_rules() -> void:
+	var d := _krystal(Vector3(0, 0, -30))
+	var e := _enemy("patchwalker", d, Vector3(0, 0, 10))
+	var other := _enemy("bellcap_sentry", d, Vector3(10, 0, 10))
+	var legacy := _enemy("brambling", d, Vector3(-10, 0, 10))
+	var want := {0: [1.35, 0.2], 1: [1.0, 0.0], 2: [0.8, 0.0]}
+	for level in [0, 1, 2]:
+		Settings.set_value("horror_intensity", level)
+		assert_almost(float(e.intensity_cooldown_mult()), float(want[level][0]), 0.0001, "rest mult at %d" % level)
+		assert_almost(float(e.intensity_telegraph_bonus()), float(want[level][1]), 0.0001, "tell bonus at %d" % level)
+		e.next_attack = "rake"
+		e._choose_attack()
+		assert_almost(float(e.telegraph_duration()), 1.1 + float(want[level][1]), 0.0001, "rake wind-up at %d" % level)
+		assert_true(float(e.telegraph_duration()) >= Base.MIN_COMMITTED_TELEGRAPH, "never under the committed floor")
+		assert_almost(float(legacy.telegraph_duration()), 0.7, 0.0001, "legacy Brambling keeps its data tell at %d" % level)
+		assert_false(bool(e.overlap_blocked()), "nobody else winds up: never blocked (%d)" % level)
+	Base.reset_attack_tokens()
+	Base._attackers[other.get_instance_id()] = true            # another enemy holds a token (winds up)
+	Settings.set_value("horror_intensity", 0)
+	assert_true(bool(e.overlap_blocked()), "Gentle: no wind-up while another enemy winds up")
+	assert_false(bool(e._can_start_attack()), "so it may not start one")
+	Settings.set_value("horror_intensity", 1)
+	assert_false(bool(e.overlap_blocked()), "Standard: only the MAX_ATTACKERS cap applies")
+	Settings.set_value("horror_intensity", 2)
+	assert_false(bool(e.overlap_blocked()), "Intense: likewise")
+	Settings.set_value("horror_intensity", 0)
+	Base._attackers.clear()
+	Base._attackers[e.get_instance_id()] = true               # its own token never blocks itself
+	assert_false(bool(e.overlap_blocked()))
+	Base.reset_attack_tokens()
+	Settings.set_value("horror_intensity", 1)
+	# The six scripts no longer carry their own copies.
+	for id in IDS:
+		var src := FileAccess.get_file_as_string(Factory.script_path(id))
+		for dup in ["func _cooldown_mult", "func _telegraph_bonus", "func _gentle_blocked", "const GENTLE_COOLDOWN"]:
+			assert_false(src.contains(dup), "%s: no private copy (%s)" % [id, dup])
+
+
 func test_intensity_changes_rest_not_tells() -> void:
 	var rests := {}
 	var tells := {}

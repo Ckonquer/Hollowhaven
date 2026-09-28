@@ -234,6 +234,11 @@ const PARTS := {
 		"channels": {"band": "accent"}, "fixed": {"tips": Color("d9dcf5")}},
 	"lantern_ribbon": {"name": "Lantern Ribbon", "slot": "hair_acc", "mesh": "acc_lantern_ribbon", "starter": false, "pattern": "pat_lanternwake", "skirt": false, "hides_hair": false,
 		"channels": {"ribbon": "accent"}, "fixed": {"lantern": Color("ffc978")}},
+	# worn pushed up into the hair at the side of the head, never over the face
+	"masquerade_mask": {"name": "Moonlit Masquerade Mask", "slot": "hair_acc", "mesh": "acc_masquerade_mask", "starter": false, "pattern": "pat_echo_masquerade", "skirt": false, "hides_hair": false,
+		"channels": {"mask": "primary", "plume": "secondary"}, "fixed": {"trim": Color("e0b85a")}},
+	"chime_ribbons": {"name": "Chime Ribbons", "slot": "hair_acc", "mesh": "acc_chime_ribbons", "starter": false, "pattern": "pat_echo_chime", "skirt": false, "hides_hair": false,
+		"channels": {"ribbons": "accent"}, "fixed": {"chimes": Color("e8c66a")}},
 	# visible back accessories (capes / shawls hide the jacket patch; the satchel keeps the belt lantern)
 	"satchel": {"name": "Explorer Satchel", "slot": "back", "mesh": "back_satchel", "starter": true, "pattern": "", "skirt": false, "hides_hair": false,
 		"channels": {}, "fixed": {"bag": Color("b07a4f")}, "legacy": true},
@@ -255,6 +260,10 @@ const PARTS := {
 		"channels": {"shawl": "primary", "spots": "accent"}, "fixed": {}, "cape": true},
 	"lantern_backpack": {"name": "Paper Lantern Pack", "slot": "back", "mesh": "back_lantern_backpack", "starter": false, "pattern": "pat_lanternwake", "skirt": false, "hides_hair": false,
 		"channels": {"paper": "secondary"}, "fixed": {"glow": Color("ffc978")}},
+	"opera_cloak": {"name": "Moonlit Opera Cloak", "slot": "back", "mesh": "back_opera_cloak", "starter": false, "pattern": "pat_echo_masquerade", "skirt": false, "hides_hair": false,
+		"channels": {"cloak": "accent", "lining": "primary"}, "fixed": {"clasp": Color("e0b85a")}, "cape": true},
+	"chorister_capelet": {"name": "Chorister Capelet", "slot": "back", "mesh": "back_chorister_capelet", "starter": false, "pattern": "pat_echo_chime", "skirt": false, "hides_hair": false,
+		"channels": {"capelet": "primary", "collar": "secondary"}, "fixed": {"chime": Color("e8c66a")}, "cape": true},
 }
 
 ## Ownership patterns: which parts each grants and how it is earned. `recipe` = the Loom pattern recipe
@@ -278,6 +287,10 @@ const PATTERNS := {
 		"source": "Find the dress pattern hidden in the Candleyard; sew it at the Loom."},
 	"pat_moon_moth": {"name": "Moon Moth Shawl", "parts": ["moth_blouse", "moth_long_skirt", "moth_antennae_band", "moth_shawl"], "recipe": "pattern_moon_moth", "flag": "ch2_trial_matron",
 		"source": "First clear of the Matron echo trial; sew it at the Loom."},
+	"pat_echo_masquerade": {"name": "Moonlit Masquerade", "parts": ["masquerade_mask", "opera_cloak"], "recipe": "pattern_echo_masquerade", "flag": "ch2_trial_velour",
+		"source": "First clear of the Count Velour echo trial; sew it at the Loom."},
+	"pat_echo_chime": {"name": "Chime Chorister", "parts": ["chime_ribbons", "chorister_capelet"], "recipe": "pattern_echo_chime", "flag": "ch2_trial_choir",
+		"source": "First clear of the Borrowed Choir echo trial; sew it at the Loom."},
 	"pat_lanternwake": {"name": "Lanternwake Festival", "parts": ["festival_bodice", "lanternwake_dress", "lantern_ribbon", "flower_crown", "lantern_backpack"], "recipe": "pattern_lanternwake", "flag": "ch2_feast",
 		"source": "Celebrate the Lanternwake at the end of Chapter Two; sew it at the Loom."},
 }

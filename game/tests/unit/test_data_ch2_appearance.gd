@@ -206,6 +206,46 @@ func test_patterns_and_dye_palettes() -> void:
 	assert_eq(ItemDB.dye_palette("nope"), {})
 
 
+## Echo Trial first-clear patterns (MP 15 "unique cosmetic patterns"; lead decision L09): Moonlit Masquerade (Count
+## Velour) and Chime Chorister (Borrowed Choir), each a hair accessory + a cape, sewn at the Loom once the trial's
+## first-clear flag is set. The mask is a hair ornament (hair_acc), never a hat or face covering.
+func test_echo_trial_patterns() -> void:
+	var want := {
+		"pat_echo_masquerade": {"name": "Moonlit Masquerade", "parts": ["masquerade_mask", "opera_cloak"],
+			"recipe": "pattern_echo_masquerade", "flag": "ch2_trial_velour", "cost": {"woven_cloth": 3, "lantern_wax": 2},
+			"meshes": ["acc_masquerade_mask", "back_opera_cloak"], "trial": "Count Velour"},
+		"pat_echo_chime": {"name": "Chime Chorister", "parts": ["chime_ribbons", "chorister_capelet"],
+			"recipe": "pattern_echo_chime", "flag": "ch2_trial_choir", "cost": {"woven_cloth": 3, "echo_shard": 2},
+			"meshes": ["acc_chime_ribbons", "back_chorister_capelet"], "trial": "Borrowed Choir"},
+	}
+	for pat_id in want:
+		var w: Dictionary = want[pat_id]
+		var pat := ItemDB.pattern(String(pat_id))
+		assert_eq(String(pat.get("name", "")), String(w["name"]), pat_id + " name")
+		assert_eq(pat.get("parts", []), w["parts"], pat_id + " parts")
+		assert_eq(String(pat.get("recipe", "")), String(w["recipe"]), pat_id + " recipe")
+		assert_eq(String(pat.get("flag", "")), String(w["flag"]), pat_id + " flag")
+		assert_eq(String(pat.get("source", "")), "First clear of the %s echo trial; sew it at the Loom." % w["trial"], pat_id + " source")
+		assert_eq(RecipesData.SPECIAL_RECIPES.get(String(w["recipe"]), {}), {"result": "", "count": 0, "station": "loom",
+			"ingredients": w["cost"], "unlock": w["flag"], "pattern": pat_id}, pat_id + " Loom recipe")
+		assert_true(UnlocksData.UNLOCK_FLAGS.has(String(w["flag"])), String(w["flag"]) + " declared in data/unlocks.gd")
+		var slots: Array = []
+		for i in (w["parts"] as Array).size():
+			var pid := String(w["parts"][i])
+			var p := ItemDB.appearance_part(pid)
+			slots.append(String(p.get("slot", "")))
+			assert_eq(String(p.get("mesh", "")), String(w["meshes"][i]), pid + " mesh builder id")
+			assert_false(bool(p.get("starter", true)), pid + " is earned")
+			assert_eq(String(p.get("pattern", "")), pat_id, pid + " is owned through its pattern")
+			assert_false((p.get("channels", {}) as Dictionary).is_empty(), pid + " follows the palette")
+			assert_false(bool(p.get("hides_hair", true)) or bool(p.get("skirt", true)), pid + " flags")
+			if String(p.get("slot", "")) == "back":
+				assert_true(bool(p.get("cape", false)), pid + " is a cape (hides the jacket back patch)")
+		assert_eq(slots, ["hair_acc", "back"], pat_id + ": a hair accessory and a cape")
+	assert_true(ItemDB.parts_for_slot("hair_acc").has("masquerade_mask"), "the mask is a hair accessory")
+	assert_false(ItemDB.parts_for_slot("hat").has("masquerade_mask"))
+
+
 func test_sanitize_look_keeps_a_safe_visible_default() -> void:
 	var ok := ItemDB.sanitize_look(AppearanceData.LEGACY_LOOK)
 	assert_eq(ok["look"], SPEC_LEGACY_LOOK)

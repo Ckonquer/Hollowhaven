@@ -190,13 +190,16 @@ func test_build_messages_use_the_arachnophobia_name() -> void:
 	assert_eq(String(P.validate("stool", Vector3(3.5, 0, 0.5), 0, ctx)["reason"]), "The Table is in the way")
 
 
-## The Expedition Board opens the journal on its Optional tab (the "goals" alias would be the Story tab).
-func test_expedition_board_opens_the_optional_goals() -> void:
+## The Expedition Board opens the Lanternwake Expeditions panel, which the UI root registers as "expedition"
+## (tests/unit/test_expeditions_ui.gd); panel_args() stays its journal fallback / second option: the journal on
+## its Optional tab (the "goals" alias would be the Story tab).
+func test_expedition_board_journal_fallback_is_the_optional_tab() -> void:
 	var Journal := load("res://src/ui/panels/journal_panel.gd")
 	var n := Factory.spawn_structure(_area, GameState.add_structure("expedition_board", Vector3(1, 0, 0.5), 0))
 	assert_true(n.has_method("panel_args"))
 	var tab := String(n.panel_args()["tab"])
-	assert_eq(String(Journal.TAB_ALIASES.get(tab, tab)), "optional", "the board shows optional discoveries, not the story")
+	assert_eq(String(Journal.TAB_ALIASES.get(tab, tab)), "optional",
+		"the board's journal fallback (panel_args) is the Optional tab of optional discoveries, not the story")
 	assert_true(bool(n.get_interaction(null)["enabled"]))
 
 

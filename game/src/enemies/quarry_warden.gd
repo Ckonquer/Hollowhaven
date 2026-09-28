@@ -11,11 +11,13 @@ extends "res://src/enemies/enemy_base.gd"
 ##            recover (data 2.0 s, shell open). Step out of the ring, or roll each beat.
 ##   charge   (after its first slam, when Krystal stands beyond slam reach) telegraph (data 1.6 s): it scrapes the
 ##            ground and lowers its head (red tint), a red LANE (LANE_WIDTH, data distance 12 m, clipped at walls
-##            and pillars) tracks her for 60% then locks -> a committed straight charge (one hit at most):
+##            and pillars, and at the arena: its end stays within arena_radius - ARENA_EDGE_MARGIN of arena_center, the
+##            mark shows the clipped length) tracks her for 60% then locks -> a committed straight charge (one hit):
 ##              * into an INTACT mineral pillar: the pillar cracks (quarry_pillar.crack()) and the Warden is EXPOSED
 ##                for EXPOSE_TIME: its shell splits open around the glowing bell, it takes EXPOSED_MULT damage and
 ##                companions may join in;
-##              * into a plain wall: a bonk and a stun (shell open);
+##              * into a plain wall - or up to a LEDGE (no floor within LEDGE_PROBE_DEPTH below its next step, so a
+##                charge baited at the L2 edge never carries it down to L1): a bonk and a stun (shell open);
 ##              * nothing in the way: it skids to a stop and recovers for data recover (3.5 s, shell open).
 ## Shell: outside those windows the shell takes SHELL_MULT of every hit (never nothing: early tools still work).
 ## Never unwinnable: pillars come from the arena (3, re-knitting by themselves) or group "quarry_pillar" near the
@@ -32,8 +34,10 @@ extends "res://src/enemies/enemy_base.gd"
 ## to the arena (ring + ARENA_LEASH_MARGIN, same level within ARENA_LEASH_DY), so it never stays engaged below the
 ## crystal shelf. The arena additionally despawns a living Warden on her defeat. Permanent progress
 ## (hr_warden_defeated, the winch) is never touched here.
-## Intensity: Gentle = longer wind-ups / rests / pulse spacing; Intense = shorter rests. Settings timing_assist: every
-## wind-up, recovery and the pulse spacing x TIMING_ASSIST_MULT (as the bosses), the exposure EXPOSE_TIME_ASSIST.
+## Intensity (enemy_base intensity_* / overlap_blocked): Gentle = longer wind-ups / rests / pulse spacing; Intense =
+## shorter rests only (no feint; the 1.6 s pulse / charge wind-ups stay above the 1.0-1.4 s guideline on purpose:
+## longer tells are fairer, never shorter - integration pass 2, P11). Settings timing_assist (elites count as boss
+## mechanics): every wind-up, recovery and the pulse spacing x TIMING_ASSIST_MULT, the exposure EXPOSE_TIME_ASSIST.
 ## Stats: data/enemies.gd "quarry_warden". Sounds (existing names only): dir_pebbles (alert), dir_creak (slam tell),
 ## rock_break (slam / bonk), ward_hum (pulse tell), mine_hit (each pulse), dig (charge tell), mine_cart (charging),
 ## heartseed_pulse (exposed), hit_soft (shell glance), enemy_hurt, tree_fall (defeat).
@@ -59,6 +63,9 @@ const EXPOSE_TIME_ASSIST := 7.5      # Settings timing_assist
 const TIMING_ASSIST_MULT := 1.5      # Settings timing_assist: wind-ups, recoveries and pulse spacing (as the bosses)
 const ARENA_LEASH_MARGIN := 6.0      # the fight follows Krystal this far past its arena ring, no further
 const ARENA_LEASH_DY := 3.0          # ... and only on about the arena's own level (never up on the crystal shelf)
+const ARENA_EDGE_MARGIN := 1.0       # a charge lane ends at least this far inside the arena ring
+const LEDGE_PROBE_DEPTH := 1.0       # no floor within this below its next charge step = a ledge: bonk
+const LEDGE_PROBE_LEAD := 0.45       # ... probed this far ahead of that step (its front half stays on the floor)
 const SHELL_MULT := 0.5
 const OPEN_MULT := 1.0
 const EXPOSED_MULT := 1.6
@@ -68,9 +75,6 @@ const POISE := 45.0
 const POISE_WINDOW := 5.0
 const POISE_STUN := 1.0
 const POISE_IMMUNITY := 8.0
-const GENTLE_COOLDOWN := 1.35
-const INTENSE_COOLDOWN := 0.8
-const GENTLE_TELEGRAPH_BONUS := 0.2
 const LANE_REFRESH := 0.1
 const STONE := Color("b8674a")
 const CRYSTAL := Color("cfe0ff")
@@ -89,6 +93,7 @@ var pulses_fired: int = 0
 var exposures: int = 0
 var pillars_cracked: int = 0
 var last_charge_result: String = ""  # "hit" | "missed" | "pillar" | "wall" | "wall_exposed"
+var ledge_stops: int = 0             # charges stopped by a ledge (no floor ahead) - they bonk like a wall
 var _arena_set := false
 var _radius_set := false
 var _def: Dictionary = {}
@@ -265,6 +270,43 @@ func charge_distance() -> float:
 	return float(attack_def("charge").get("distance", 12.0))
 
 
+## The charge length from `from` along `dir` before walls: data distance, clipped so the lane's end stays within
+## arena_radius - ARENA_EDGE_MARGIN of arena_center (flat). The lane mark and the charge use the same number.
+func charge_reach(from: Vector3, dir: Vector3) -> float:
+	return minf(charge_distance(), arena_lane_limit(from, dir))
+
+
+## How far a flat lane from `from` along `dir` may run before leaving the circle of radius
+## arena_radius - ARENA_EDGE_MARGIN around arena_center (0 when it starts outside heading further out).
+func arena_lane_limit(from: Vector3, dir: Vector3) -> float:
+	var d := Vector2(dir.x, dir.z)
+	if d.length_squared() < 0.000001:
+		return 0.0
+	d = d.normalized()
+	var r := maxf(arena_radius - ARENA_EDGE_MARGIN, 0.5)
+	var f := Vector2(from.x - arena_center.x, from.z - arena_center.z)
+	var b := f.dot(d)
+	var disc := b * b - (f.length_squared() - r * r)
+	if disc < 0.0:
+		return 0.0
+	return maxf(-b + sqrt(disc), 0.0)
+
+
+## Is there floor (world | structure) within LEDGE_PROBE_DEPTH below the point `step` metres ahead along `dir`
+## (+ LEDGE_PROBE_LEAD)? One short ray. Outside the tree (pure tests) the floor is assumed.
+func floor_ahead(dir: Vector3, step: float) -> bool:
+	if not is_inside_tree():
+		return true
+	var d := Vector3(dir.x, 0.0, dir.z)
+	if d.length_squared() < 0.0001:
+		return true
+	var p := global_position + d.normalized() * (maxf(step, 0.0) + LEDGE_PROBE_LEAD)
+	var q := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 0.5, p - Vector3.UP * LEDGE_PROBE_DEPTH, Combat.LOS_MASK)
+	var ex: Array[RID] = [get_rid()]
+	q.exclude = ex
+	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+
 func pulse_radius() -> float:
 	return float(attack_def("pulses").get("radius", 5.0))
 
@@ -310,7 +352,7 @@ func attack_reach() -> float:
 
 
 func _can_start_attack() -> bool:
-	return _shot_clear and not _gentle_blocked()
+	return _shot_clear and not overlap_blocked()
 
 
 func _choose_attack() -> void:
@@ -336,7 +378,7 @@ func _choose_attack() -> void:
 
 
 func telegraph_duration() -> float:
-	return (attack_telegraph(_def) + _telegraph_bonus()) * assist_mult()
+	return (attack_telegraph(_def) + intensity_telegraph_bonus()) * assist_mult()
 
 
 func recover_duration() -> float:
@@ -397,7 +439,7 @@ func _update_mark(reclip: bool) -> void:
 		"charge":
 			if reclip:
 				_lane_clip_t = LANE_REFRESH
-				_lane_len = float(lane_clip(global_position, fwd, charge_distance())["length"])
+				_lane_len = float(lane_clip(global_position, fwd, charge_reach(global_position, fwd))["length"])
 			if not m.is_showing():
 				m.show_lane(global_position, global_position + fwd * _lane_len, LANE_WIDTH, TelegraphFx.DANGER)
 			elif not locked:
@@ -416,7 +458,7 @@ func _telegraph_finished() -> void:
 	match attack_kind:
 		"charge":
 			_enter("charge", 0.0)
-			_lane_len = charge_begin(_attack_dir, charge_distance(), CHARGE_SPEED)
+			_lane_len = charge_begin(_attack_dir, charge_reach(global_position, _attack_dir), CHARGE_SPEED)
 			var m := mark()
 			m.show_lane(global_position, charge_lane_end(), LANE_WIDTH, TelegraphFx.DANGER)
 			m.set_progress(1.0, true)
@@ -460,6 +502,11 @@ func _st_custom(state_name: String, delta: float) -> void:
 			if state_time >= _state_len:
 				_enter("recover", recover_duration())
 		"charge":
+			if _charge_active and not floor_ahead(_charge_dir, CHARGE_SPEED * delta):
+				_charge_active = false                 # a ledge ahead (e.g. the L2 edge): it bonks, never falls to L1
+				ledge_stops += 1
+				_charge_stopped_at_wall()
+				return
 			var r := charge_step(delta, HIT_AHEAD, LANE_WIDTH * 0.5, attack_damage_for(_def), float(data.get("knockback", 8.0)))
 			match r:
 				"hit":
@@ -473,7 +520,7 @@ func _st_custom(state_name: String, delta: float) -> void:
 						_end_charge("missed")
 		"exposed":
 			if state_time >= _state_len:
-				_cooldown = float(data.get("cooldown", 3.0)) * _cooldown_mult()
+				_cooldown = float(data.get("cooldown", 3.0)) * intensity_cooldown_mult()
 				_resume_after_interrupt()
 
 
@@ -598,7 +645,7 @@ func _on_state_changed(prev: String, new_state: String) -> void:
 	_update_armor()
 	match new_state:
 		"recover":
-			_cooldown *= _cooldown_mult()
+			_cooldown *= intensity_cooldown_mult()
 		"chase":
 			_engage()
 		"return":
@@ -623,30 +670,6 @@ func _on_player_died() -> void:
 	else:
 		super._on_player_died()
 	reset_encounter()
-
-
-# --- Intensity (Gentle / Intense) ---------------------------------------------------------------------------------
-
-func _cooldown_mult() -> float:
-	match Combat.current_intensity():
-		0:
-			return GENTLE_COOLDOWN
-		2:
-			return INTENSE_COOLDOWN
-	return 1.0
-
-
-func _telegraph_bonus() -> float:
-	return GENTLE_TELEGRAPH_BONUS if Combat.current_intensity() == 0 else 0.0
-
-
-func _gentle_blocked() -> bool:
-	if Combat.current_intensity() != 0:
-		return false
-	for id in _attackers.keys():
-		if int(id) != get_instance_id() and is_instance_id_valid(int(id)):
-			return true
-	return false
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

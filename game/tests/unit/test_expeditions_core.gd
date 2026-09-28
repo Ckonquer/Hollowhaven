@@ -3,10 +3,13 @@ extends "res://tests/test_case.gd"
 ## board shows difficulty and reward types before starting, locked routes are refused, start / progress /
 ## complete / abandon, the rewards come once per run (not twice, not after a reload), keepsakes, one run at a
 ## time, save / load mid-run through the real SaveSystem (GameState.extra), damaged state repair, the tracker /
-## map views - and expeditions never write a flag, never touch the reward ledger or the quest layers.
+## map views (read-only: they never create the saved section) - and expeditions never write a flag, never touch the
+## reward ledger or the quest layers. A route's first completion gives Wayfinding mastery xp once (P39); a dye
+## keepsake reads as "a new dye colour", never a recipe (P42).
 
 const Ex := preload("res://src/expeditions/expeditions.gd")
 const Data := preload("res://data/expeditions.gd")
+const Mastery := preload("res://src/core/mastery.gd")
 
 const UNLOCKS := ["ch2_orchard_restored", "ch2_quarry_restored", "ch2_manor_restored"]
 
@@ -317,10 +320,18 @@ func test_tracker_map_and_summary_views() -> void:
 	assert_eq((v["rows"] as Array).size(), Ex.stop_count("orchard_patrol") + 1, "every stop + the cache")
 	assert_eq(String(v["current"]), "exp_op_meadow")
 	assert_true(String(v["where"]).contains("Scarecrow Meadow"))
+	assert_eq(String(v["group"]), "", "not a group card: the journal lists its rows")
+	var tg: Array = v["targets"]
+	assert_eq(tg.size(), 1, "only the current place is a target (one pulse, one head-to line)")
+	assert_eq(String(tg[0]["id"]), "exp_op_meadow")
+	assert_eq(String(tg[0]["area"]), Data.AREA_ID)
+	assert_false(bool(tg[0]["done"]))
 	var marks := Ex.map_marks(Data.AREA_ID)
 	assert_eq(marks.size(), 4)
 	assert_true(bool(marks[0]["current"]))
+	assert_eq(int(marks[0]["n"]), 1)
 	assert_eq(String(marks[3]["kind"]), "cache")
+	assert_false(bool(marks[3]["current"]))
 	assert_eq(Ex.map_marks("surface"), [], "pins only on the Reach map")
 	assert_eq(Ex.place_disc("exp_op_hedgerow")["pos"], Data.TEMPLATES["orchard_patrol"]["stops"][1]["pos"])
 	assert_eq(Ex.place_disc("hr_orchard"), {})
@@ -328,6 +339,110 @@ func test_tracker_map_and_summary_views() -> void:
 	_clear_stop()
 	assert_true(bool(Ex.tracker_view()["rows"][0]["done"]))
 	assert_eq(String(Ex.current_target()["id"]), "exp_op_hedgerow")
+	assert_eq(String(Ex.tracker_view()["targets"][0]["id"]), "exp_op_hedgerow", "the target moves on")
+	var m2 := Ex.map_marks(Data.AREA_ID)
+	assert_true(bool(m2[0]["done"]) and not bool(m2[0]["current"]))
+	assert_true(bool(m2[1]["current"]))
+	for i in Ex.stop_count("orchard_patrol") - 1:
+		_clear_stop()
+	var m3 := Ex.map_marks(Data.AREA_ID)
+	assert_true(bool(m3[3]["current"]), "the cache is current once every stop is quiet")
+	assert_eq(String(Ex.tracker_view()["targets"][0]["id"]), "exp_op_cache")
+	assert_eq(Ex.place_disc("exp_op_cache")["pos"], Data.TEMPLATES["orchard_patrol"]["cache"]["pos"])
+	assert_true(Ex.abandon())
+	assert_eq(Ex.map_marks(Data.AREA_ID), [], "nothing once the run is set aside")
+	assert_eq(Ex.place_disc("exp_op_meadow"), {})
+
+
+## The HUD polls these views every second from New Game on: without a saved run they answer "none" WITHOUT adding
+## an "expeditions" section to a save that never used the board.
+func test_views_are_read_only_without_a_run() -> void:
+	GameState.extra.erase(Data.STATE_KEY)
+	assert_false(Ex.is_active())
+	assert_eq(Ex.current_plan(), {})
+	assert_eq(Ex.current_target(), {})
+	assert_eq(Ex.tracker_view(), {})
+	assert_eq(Ex.map_marks(Data.AREA_ID), [])
+	assert_eq(Ex.place_disc("exp_op_meadow"), {})
+	assert_eq(Ex.summary_line(), "")
+	assert_false(GameState.extra.has(Data.STATE_KEY), "polling the views never creates the saved section")
+	# a saved run with JSON floats is normalised by the first read, never a crash
+	GameState.extra[Data.STATE_KEY] = {"active": {"template": "orchard_patrol", "seed": 3.0, "stop": 0.0, "defeated": 0.0, "run": 1.0, "down": {}}}
+	assert_true(Ex.is_active())
+	assert_eq(String(Ex.current_target()["id"]), "exp_op_meadow")
+
+
+# --- Mastery (P39) and keepsake words (P42) ------------------------------------------------------------------------
+
+func _walk(template_id: String, seed_value: int) -> Dictionary:
+	assert_true(Ex.start(template_id, seed_value))
+	for i in Ex.stop_count(template_id):
+		_clear_stop()
+	return Ex.complete()
+
+
+## MP 5.3: masteries grow with ordinary play. A route's FIRST completion gives Wayfinding xp once (deduped per route
+## through Mastery's first-time kinds, so a second run or a reload never repeats it); nothing else changes.
+func test_first_completion_of_a_route_gives_wayfinding_xp_once() -> void:
+	_unlock_all()
+	var xp0 := Mastery.xp("wayfinding")
+	var g0 := Mastery.xp("gathering")
+	var h0 := Mastery.xp("hearthcraft")
+	assert_false(_walk("orchard_patrol", 21).is_empty())
+	assert_eq(Mastery.xp("wayfinding"), xp0 + Data.FIRST_ROUTE_WAYFINDING_XP, "first completion of the route")
+	assert_true(Mastery.has_seen("wayfinding", "expedition:orchard_patrol"), "remembered per route")
+	assert_eq(Mastery.xp("gathering"), g0, "only Wayfinding")
+	assert_eq(Mastery.xp("hearthcraft"), h0)
+	assert_false(_walk("orchard_patrol", 22).is_empty())
+	assert_eq(Mastery.xp("wayfinding"), xp0 + Data.FIRST_ROUTE_WAYFINDING_XP, "a second run of the same route gives none")
+	# ...not after a reload either
+	assert_true(SaveSystem.save_game(true))
+	GameState.reset()
+	assert_true(SaveSystem.load_game())
+	assert_false(_walk("orchard_patrol", 23).is_empty())
+	assert_eq(Mastery.xp("wayfinding"), xp0 + Data.FIRST_ROUTE_WAYFINDING_XP, "the dedupe survives a reload")
+	# another route is another first
+	assert_false(_walk("quarry_circuit", 24).is_empty())
+	assert_eq(Mastery.xp("wayfinding"), xp0 + 2 * Data.FIRST_ROUTE_WAYFINDING_XP)
+	# an abandoned run gives nothing
+	assert_true(Ex.start("manor_afterglow", 25))
+	_clear_stop()
+	assert_true(Ex.abandon())
+	assert_eq(Mastery.xp("wayfinding"), xp0 + 2 * Data.FIRST_ROUTE_WAYFINDING_XP)
+	assert_false(Mastery.has_seen("wayfinding", "expedition:manor_afterglow"))
+
+
+## The dye keepsake unlocks the Loom palette directly (a gift): every text says "a new dye colour", never a recipe.
+func test_dye_keepsake_reads_as_a_new_dye_colour() -> void:
+	_unlock_all()
+	assert_eq(Ex.keepsake_text({"kind": "dye", "id": "pumpkin"}), "a new dye colour (Pumpkin)")
+	assert_eq(Ex.keepsake_text({"kind": "dye", "id": "midnight"}), "a new dye colour (Midnight)")
+	assert_eq(Ex.keepsake_text({"kind": "decor", "item": "pumpkin_lights", "count": 2}),
+		"%s x2" % ItemDB.display_name("pumpkin_lights"))
+	assert_eq(Ex.keepsake_text({}), "")
+	for id in Data.ORDER:
+		var said := false
+		for r in Data.TEMPLATES[id]["reward_types"]:
+			assert_false(String(r).to_lower().contains("recipe"), "%s: no recipe promise (%s)" % [id, r])
+			said = said or String(r).contains("a new dye colour")
+		assert_true(said, "%s names its dye keepsake as a new dye colour" % id)
+		# the colours named are the route's own dye keepsakes
+		for k in Data.TEMPLATES[id]["rewards"]["keepsakes"]:
+			if String(k["kind"]) == "dye":
+				var nm := String(ItemDB.dye_palette(String(k["id"]))["name"]).trim_suffix(" Dye")
+				assert_true(str(Data.TEMPLATES[id]["reward_types"]).contains(nm), "%s names %s" % [id, nm])
+	var toasts: Array = []
+	var rec := func(t: String, _k: String) -> void: toasts.append(t)
+	Events.notify.connect(rec)
+	GameState.wardrobe["palettes"] = []
+	var r := _walk("orchard_patrol", 11)
+	Events.notify.disconnect(rec)
+	assert_eq(String(r["keepsake"]["kind"]), "dye", "first completion: a dye")
+	var done: Array = toasts.filter(func(t: String) -> bool: return t.begins_with("Expedition complete"))
+	assert_eq(done.size(), 1)
+	assert_true(String(done[0]).contains(Ex.keepsake_text(r["keepsake"])), "the toast names the new colour: %s" % done[0])
+	assert_false(String(done[0]).to_lower().contains("recipe"))
+	assert_true((GameState.wardrobe["palettes"] as Array).has(String(r["keepsake"]["id"])), "the palette is hers at once")
 
 
 func test_the_reach_listener_wires_once() -> void:

@@ -32,4 +32,6 @@ const UNLOCK_FLAGS := {
 	"ch2_groundskeeper_candle": "optional goal 'A Candle for the Groundskeeper' completed; Ghost Lantern recipe",
 	"ch2_harvest_table": "optional goal 'The Harvest Table' completed (two different seasonal recipes cooked); festival candy and Lanternwake Table",
 	"ch2_trial_matron": "echo trial module: first clear of the Matron echo trial (isolated trial state); Moon Moth shawl pattern",
+	"ch2_trial_velour": "echo trial module: first clear of the Count Velour echo trial (isolated trial state, reward rw_trial_velour_first); Moonlit Masquerade pattern",
+	"ch2_trial_choir": "echo trial module: first clear of the Borrowed Choir echo trial (isolated trial state, reward rw_trial_choir_first); Chime Chorister pattern",
 }

@@ -7,6 +7,9 @@ extends PanelContainer
 ##   * Chapter Two accepted -> its current step; the three lamp branches (group "lamps") are shown TOGETHER,
 ##     done lamps ticked, in any order.
 ##   * Chapter Two finished -> one pending optional goal as a signpost ("SOMETHING TO DO"), else hidden.
+##   * A Lanternwake Expedition under way (src/expeditions/expeditions.gd tracker_view(), kind "expedition") takes
+##     the card ONLY where it would otherwise be a signpost / done / hidden: never over a chapter, legacy or
+##     pointer step (lead decision P36).
 ## Shows where to head ("Head to X") for the target landmark / room of the area Krystal is in, or which
 ## area the goal is in. All text goes through step_string / alt labels (arachnophobia).
 ## objective_view() and where_text() are static and shared with the journal and the map panel.
@@ -17,6 +20,9 @@ const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
 const MapView := preload("res://src/ui/widgets/map_view.gd")
 const ChapterData := preload("res://data/quests_ch2.gd")
+## Safe-loaded (a missing or broken expeditions module simply shows no expedition card).
+const EXPEDITIONS_SCRIPT := "res://src/expeditions/expeditions.gd"
+const REACH_ID := "hallowmere_reach"
 
 const HEADER_GOAL := "CURRENT GOAL"
 const HEADER_OPTIONAL := "OPTIONAL GOALS"        # legacy free_play step only (Chapter One saves)
@@ -78,11 +84,12 @@ func _ready() -> void:
 # --- View model (static: shared with journal_panel.gd and map_panel.gd) ------------------------------------
 
 ## What the objective card should say right now:
-## {"kind": "legacy" | "pointer" | "chapter2" | "signpost" | "done" | "hidden", "header", "title", "text", "hint",
+## {"kind": "legacy" | "pointer" | "chapter2" | "signpost" | "expedition" | "done" | "hidden", "header", "title", "text", "hint",
 ##  "rows": [{label, done, progress, target, step?}], "parts": [{id, title, text, done, rows, target, area}],
 ##  "step_id", "group", "optional": bool, "targets": [{id, area, done, step, name}]}.
 ## "parts" has one entry per step shown (the whole group for the lamps); "targets" are the places the map
-## marks (the legacy step's landmark; each Chapter Two step's target + target_area; the Haven for the pointer).
+## marks (the legacy step's landmark; each Chapter Two step's target + target_area; the Haven for the pointer; the
+## running expedition's current stop / cache). "expedition" views also carry "where" (see where_text).
 ## Built on GameState.current_objective() (spec §8); does not check GameState.active (callers do).
 static func objective_view() -> Dictionary:
 	var v := {"kind": "hidden", "header": "", "title": "", "text": "", "hint": "", "rows": [], "parts": [],
@@ -94,8 +101,29 @@ static func objective_view() -> Dictionary:
 	if log.is_available():
 		if not log.is_active():
 			return _pointer_view(v)
-		return _signpost_view(v)
-	return _legacy_view(v, obj)
+		return _or_expedition(_signpost_view(v))
+	return _or_expedition(_legacy_view(v, obj))
+
+
+## The running expedition's card in place of a signpost / done / hidden view (anything else is returned as is).
+static func _or_expedition(v: Dictionary) -> Dictionary:
+	if not (String(v.get("kind", "")) in ["signpost", "done", "hidden"]):
+		return v
+	var ex := expedition_view()
+	return ex if not ex.is_empty() else v
+
+
+## Expeditions.tracker_view() ({} without a run or without the module). Read-only.
+static func expedition_view() -> Dictionary:
+	if not ResourceLoader.exists(EXPEDITIONS_SCRIPT):
+		return {}
+	var s: Variant = load(EXPEDITIONS_SCRIPT)
+	if not (s is Script) or not (s as Script).has_method("tracker_view"):
+		return {}
+	var ev: Variant = (s as Script).call("tracker_view")
+	if not (ev is Dictionary) or String((ev as Dictionary).get("kind", "")) != "expedition":
+		return {}
+	return ev
 
 
 static func _legacy_view(v: Dictionary, obj: Dictionary) -> Dictionary:
@@ -275,6 +303,13 @@ static func where_text(view: Dictionary, area_id: String, player_pos: Variant, z
 			if name == "":
 				return "In %s" % MapView.area_name(area) if MapView.area_name(area) != "" else ""
 			return "Head to %s, in %s" % [name, MapView.area_name(area)]
+		"expedition":
+			# the view's own line ("Head to <stop> (Hallowmere Reach)"); hidden while she stands at that stop
+			var w := String(view.get("where", ""))
+			var et := pending_targets(view)
+			if w == "" or (not et.is_empty() and is_at(et[0], area_id, player_pos, zone)):
+				return ""
+			return w + (map_suffix if area_id == REACH_ID else "")
 	return ""
 
 

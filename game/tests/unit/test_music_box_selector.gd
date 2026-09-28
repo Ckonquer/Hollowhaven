@@ -85,8 +85,39 @@ func test_preview_context_sits_between_the_base_and_everything_else() -> void:
 		assert_true(pp > int(MusicData.CONTEXTS[base]["priority"]), "above the regional base %s" % base)
 	for high in ["combat1", "combat2", "silence", "boss_matron", "velour", "crossing", "choir", "restoration", "celebration", "title"]:
 		assert_true(pp < int(MusicData.CONTEXTS[high]["priority"]), "below %s" % high)
-	assert_false(MusicData.CONTEXTS.has(Selector.PREVIEW_CONTEXT), "the shared catalogue is untouched")
+	# P46 (integration pass 2): the context lives in data/music.gd CONTEXTS with every other music context
+	assert_true(MusicData.CONTEXTS.has(Selector.PREVIEW_CONTEXT), "one data table for every music context")
+	assert_eq(p, MusicData.CONTEXTS[Selector.PREVIEW_CONTEXT], "the selector uses the data's definition")
+	assert_eq(MusicData.CONTEXTS[Selector.PREVIEW_CONTEXT], Selector.PREVIEW_DEF, "the fallback matches the data")
 	assert_eq(String(p["mode"]), "once", "one pass")
+	assert_eq(String(s.preview_playlist()), String(p["playlist"]), "the preview fills the context's own playlist")
+	assert_true(MusicData.PLAYLISTS.has(String(p["playlist"])), "that playlist is declared in the data")
+
+
+## Older data (a catalogue without the "musicbox" context): the selector adds its built-in definition, so the
+## Music Box still previews, and the shared catalogue is never written.
+func test_older_catalogue_without_the_context_still_previews() -> void:
+	var data := MusicData.catalogue()
+	var cxs: Dictionary = (data["contexts"] as Dictionary).duplicate()
+	cxs.erase(Selector.PREVIEW_CONTEXT)
+	var pls: Dictionary = (data["playlists"] as Dictionary).duplicate()
+	pls.erase(Selector.PREVIEW_PLAYLIST)
+	data["contexts"] = cxs
+	data["playlists"] = pls
+	var s: RefCounted = Selector.new()
+	s.setup(data, 5, FAST)
+	s.set_available({})
+	assert_eq(s.contexts[Selector.PREVIEW_CONTEXT], Selector.PREVIEW_DEF, "the built-in fallback is added")
+	assert_false(cxs.has(Selector.PREVIEW_CONTEXT), "the caller's table is left alone")
+	var c := _ctx("surface", "haven")
+	var d: Dictionary = s.update(c, 0.2)
+	_feed(c, d)
+	assert_eq(String(d["context"]), "haven", "setup: the Haven plays")
+	d = _preview(s, c, "m17")
+	assert_eq(String(d["action"]), "play", "the preview starts")
+	assert_eq(String(d["cue"]), "m17")
+	assert_eq(String(d["context"]), Selector.PREVIEW_CONTEXT)
+	assert_eq((MusicData.PLAYLISTS[Selector.PREVIEW_PLAYLIST] as Dictionary)["cues"], [], "the data's placeholder stays empty")
 
 
 func test_preview_plays_at_once_then_the_haven_returns() -> void:

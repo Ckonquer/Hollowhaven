@@ -3,9 +3,10 @@ extends "res://src/building/structure.gd"
 ## Lanternwake Expeditions panel ("expedition", src/ui/panels/expedition_panel.gd: three hand-authored replay
 ## routes, difficulty and reward types shown before starting, MP §15). Its second option - the journal on its
 ## Optional tab (optional discoveries, trials, crafting possibilities) - is the panel's "Optional journal"
-## button; while the UI root has no "expedition" panel registered the board opens that journal page directly
-## (the pre-expedition behaviour). Nothing here is a daily chore. ("goals" would be the journal's Chapter One
-## alias for the Story tab, so the tab is named exactly.)
+## button. ui_root registers "expedition" (PANELS); only where a UI root has no such panel (an older UI root, a
+## test stand-in) the board opens that journal page directly - panel_args() (the pre-expedition behaviour).
+## Nothing here is a daily chore. ("goals" would be the journal's Chapter One alias for the Story tab, so the tab
+## is named exactly.)
 
 const PANEL := "journal"
 const TAB := "optional"
@@ -39,7 +40,9 @@ func target_panel() -> String:
 
 
 func interact(_player: Node) -> void:
-	# Until Game wires Expeditions.init() at start-up, reading the board wires it (the Reach then gets its runner).
+	# Game.wire_session_systems() wires Expeditions.init() at start-up; calling it again here is an idempotent
+	# safety net. (Setting a run aside in the panel of a board at the Reach outpost sends the stop's living group
+	# home at once, even mid-fight: lead decision P43 keeps that - player-chosen and harmless.)
 	Ex.init()
 	if target_panel() == EXPEDITION_PANEL:
 		Game.open_panel(EXPEDITION_PANEL, expedition_args())

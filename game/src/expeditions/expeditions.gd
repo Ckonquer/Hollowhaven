@@ -20,22 +20,29 @@ extends RefCounted
 ##
 ## RULES: expeditions never write a flag (they only READ the template's `requires` flag), never touch the
 ## Chapter One / Chapter Two quest layers, the reward ledger or the tracker's chapter steps; rewards are
-## renewable materials, candy and sometimes a keepsake (a dye recipe = a Loom palette, or a festival
-## decoration) - never a story item. complete() records the completion BEFORE it gives anything, so a run
-## pays once. Abandoning is free. No daily limit, no timer. (The one-time intro tip goes out through
-## Events.hint; the HUD hint card then remembers it in its own UI flag "hint_expedition_intro", as it does for
-## every tip. That is never a story flag, and nothing here writes one.)
+## renewable materials, candy and sometimes a keepsake (a new dye colour - its Loom palette is unlocked directly,
+## a gift that skips the Loom cost - or a festival decoration) - never a story item. A route's FIRST completion
+## also gives a little Wayfinding mastery xp (Mastery.award, deduped per route; MP 5.3). complete() records the
+## completion BEFORE it gives anything, so a run pays once. Abandoning is free (the stop's living group goes
+## home at once, even mid-fight: lead decision P43, player-chosen and harmless). No daily limit, no timer.
+## (The one-time intro tip goes out through Events.hint; the HUD hint card then remembers it in its own UI flag
+## "hint_expedition_intro", as it does for every tip. That is never a story flag, and nothing here writes one.)
 ##
 ## API: init()/shutdown()/is_listening() (Events.area_loaded -> the Reach gets its runner while a run is going), template_ids(),
 ## template(id), is_unlocked(id), lock_reason(id), preview(id), enemy_types(id), roll_seed(), plan(id, seed),
 ## state(), active(), is_active(), start(id, seed := -1) -> bool, abandon() -> bool, current_stop_index(),
 ## stop_count(id), in_cache_phase(), current_plan(), current_target(), record_defeat(id, run, stop, enemy := "") -> bool,
-## complete() -> Dictionary, keepsake_for(id, plan, first), completions(id), last_result(), tracker_view(), map_marks(area_id),
-## place_disc(place_id), summary_line(), attach_to_current_area().
+## complete() -> Dictionary, keepsake_for(id, plan, first), keepsake_text(keepsake), completions(id), last_result(),
+## tracker_view(), map_marks(area_id), place_disc(place_id), summary_line(), attach_to_current_area().
+## The views the HUD / map poll (is_active, current_plan, current_target, tracker_view, map_marks, place_disc)
+## never create the saved section: without a saved run they answer "none", read-only.
 
 const Data := preload("res://data/expeditions.gd")
 const RUNNER_SCRIPT := "res://src/expeditions/expedition_runner.gd"
 const RUNNER_NODE := "Expeditions"          # expedition_runner.gd NODE_NAME
+const MASTERY_SCRIPT := "res://src/core/mastery.gd"
+## "At the stop" radius for the tracker's where line / map discs (the spawn points ring the lantern at 3-9 m).
+const PLACE_RADIUS := 8.0
 
 static var _wired := false
 static var _plan_key: String = ""
@@ -45,9 +52,9 @@ static var _plan_cache: Dictionary = {}
 # --- Wiring ---------------------------------------------------------------------------------------------------
 
 ## Connects the Events listener that gives Hallowmere Reach its runner on every load while a run is going
-## (idempotent). Meant for Game.wire_session_systems() (integrator request: until it is wired there, a fresh
-## session resumes a saved run only after the board or the panel has called it - start(), the board's
-## interact() and the panel do).
+## (idempotent). Game.wire_session_systems() calls it at start-up (its SESSION_INIT_SCRIPTS), so a saved run
+## resumes on the first Reach load of a session; start(), the board's interact() and the panel call it again as
+## a harmless safety net (idempotent).
 static func init() -> void:
 	_wired = true
 	if not Events.area_loaded.is_connected(_on_area_loaded):
@@ -289,7 +296,17 @@ static func active() -> Dictionary:
 
 
 static func is_active() -> bool:
-	return not active().is_empty()
+	return _has_saved_run() and not active().is_empty()
+
+
+## True when the save holds a (possibly damaged) run, read WITHOUT creating the saved section, so the views the
+## HUD and the map poll never add an "expeditions" section to a save that never used the board.
+static func _has_saved_run() -> bool:
+	var s: Variant = GameState.extra.get(Data.STATE_KEY)
+	if not (s is Dictionary):
+		return false
+	var a: Variant = (s as Dictionary).get("active")
+	return a is Dictionary and not (a as Dictionary).is_empty()
 
 
 static func current_stop_index() -> int:
@@ -304,6 +321,8 @@ static func in_cache_phase() -> bool:
 
 
 static func current_plan() -> Dictionary:
+	if not _has_saved_run():
+		return {}
 	var a := active()
 	if a.is_empty():
 		return {}
@@ -405,7 +424,8 @@ static func complete() -> Dictionary:
 	for id in p["rewards"]:
 		if ItemDB.has_item(String(id)) and not ItemDB.is_story_required(String(id)) and not ItemDB.is_quest_item(String(id)):
 			items[String(id)] = int(p["rewards"][id])
-	var keepsake := keepsake_for(tid, p, completions(tid) == 0)
+	var first := completions(tid) == 0
+	var keepsake := keepsake_for(tid, p, first)
 	# Record FIRST (like the reward ledger): whatever happens below, this run can never pay twice.
 	var st := state()
 	st["active"] = {}
@@ -420,18 +440,49 @@ static func complete() -> Dictionary:
 		parts.append("%s x%d" % [ItemDB.display_name(String(id)), int(items[id])])
 	match String(keepsake.get("kind", "")):
 		"dye":
+			# A gift: the Loom palette is unlocked directly, skipping its Loom cost (post-Choir only; lead decision P42).
 			_unlock_palette(String(keepsake["id"]))
-			parts.append("the %s recipe" % String(ItemDB.dye_palette(String(keepsake["id"])).get("name", "dye")))
 		"decor":
 			GameState.give_item(String(keepsake["item"]), int(keepsake.get("count", 1)))
-			parts.append("%s x%d" % [ItemDB.display_name(String(keepsake["item"])), int(keepsake.get("count", 1))])
+	var ks := keepsake_text(keepsake)
+	if ks != "":
+		parts.append(ks)
 	Events.notify.emit(_fmt("complete", {"name": String(template(tid).get("name", tid))}) + " " + ", ".join(parts), "item")
+	if first:
+		_award_first_route(tid)
 	Events.objectives_changed.emit()
 	return {"template": tid, "items": items, "keepsake": keepsake}
 
 
+## A route's first completion is a new outing walked: a little Wayfinding mastery xp (MP 5.3: masteries grow
+## with ordinary play). Mastery dedupes on "expedition:<route>", so it never repeats (not after a reload either);
+## safe-loaded: a missing or broken mastery module simply gives nothing. No other side effect. Returns the xp added.
+static func _award_first_route(template_id: String) -> int:
+	if not ResourceLoader.exists(MASTERY_SCRIPT):
+		return 0
+	var m: Variant = load(MASTERY_SCRIPT)
+	if not (m is Script) or not (m as Script).has_method("award"):
+		return 0
+	var got: Variant = (m as Script).call("award", "wayfinding", "expedition:" + template_id, Data.FIRST_ROUTE_WAYFINDING_XP)
+	return int(got) if (got is int or got is float) else 0
+
+
+## How a keepsake reads in the completion toast and the panel's "last outing" line ("" for none):
+## "a new dye colour (Pumpkin)" or "Pumpkin Lights x2".
+static func keepsake_text(keepsake: Dictionary) -> String:
+	match String(keepsake.get("kind", "")):
+		"dye":
+			var id := String(keepsake.get("id", ""))
+			var nm := String(ItemDB.dye_palette(id).get("name", "")).trim_suffix(" Dye").strip_edges()
+			return String(Data.TEXT["dye_keepsake"]).format({"colour": nm if nm != "" else id.capitalize()})
+		"decor":
+			return "%s x%d" % [ItemDB.display_name(String(keepsake.get("item", ""))), int(keepsake.get("count", 1))]
+	return ""
+
+
 ## The keepsake a finished run of `p` brings: always on a route's first completion, otherwise when the seed's
-## roll is under keepsake_chance. Dye recipes already owned are skipped; with none left a decoration comes.
+## roll is under keepsake_chance. Dye colours (Loom palettes) already owned are skipped; with none left a
+## decoration comes.
 ## {} = none this time.
 static func keepsake_for(template_id: String, p: Dictionary, first: bool) -> Dictionary:
 	var rw: Dictionary = template(template_id).get("rewards", {})
@@ -449,7 +500,7 @@ static func keepsake_for(template_id: String, p: Dictionary, first: bool) -> Dic
 					pool.append(kd)
 	if pool.is_empty():
 		return {}
-	# Prefer a recipe she doesn't have yet; decorations when every dye of the route is already hers.
+	# Prefer a dye colour she doesn't have yet; decorations when every dye of the route is already hers.
 	var dyes: Array = pool.filter(func(k: Dictionary) -> bool: return String(k["kind"]) == "dye")
 	var from: Array = dyes if not dyes.is_empty() else pool
 	return (from[int(p.get("keepsake_pick", 0)) % from.size()] as Dictionary).duplicate(true)
@@ -491,8 +542,11 @@ static func current_target() -> Dictionary:
 
 
 ## A tracker card for the running expedition, shaped like Tracker.objective_view() ({} without a run):
-## {"kind": "expedition", "header", "title", "rows": [{label, done, progress, target}], "where", "targets"}.
-## It is an OPTIONAL card: the HUD shows it only where no chapter step is shown (integrator request).
+## {"kind": "expedition", "header", "title", "text", "hint", "rows": [{label, done, progress, target}] (every stop +
+##  the cache), "parts", "step_id", "group": "", "optional": true, "targets": [the CURRENT stop / cache only, so the
+##  map pulses and the "where to" lines name just the next place], "where", "current"}.
+## It is an OPTIONAL card: Tracker.objective_view() returns it only where the view would otherwise be a signpost /
+## done / hidden (never over a chapter, legacy or pointer step; lead decision P36).
 static func tracker_view() -> Dictionary:
 	var p := current_plan()
 	if p.is_empty():
@@ -500,53 +554,56 @@ static func tracker_view() -> Dictionary:
 	var a := active()
 	var i := int(a["stop"])
 	var rows: Array = []
-	var targets: Array = []
 	var stops: Array = p["stops"]
 	for k in stops.size():
 		var s: Dictionary = stops[k]
 		var done := k < i
 		rows.append({"label": String(s["name"]), "done": done, "progress": int(s["needed"]) if done else (int(a["defeated"]) if k == i else 0),
 			"target": int(s["needed"])})
-		targets.append({"id": String(s["id"]), "area": Data.AREA_ID, "done": done, "name": String(s["name"]), "pos": s["pos"]})
 	var c: Dictionary = p["cache"]
-	var cache_done := false
-	rows.append({"label": "Open %s" % String(c.get("name", "the cache")), "done": cache_done, "progress": 0, "target": 1})
-	targets.append({"id": String(c.get("id", "")), "area": Data.AREA_ID, "done": cache_done, "name": String(c.get("name", "")), "pos": c.get("pos", Vector2.ZERO)})
+	rows.append({"label": "Open %s" % String(c.get("name", "the cache")), "done": false, "progress": 0, "target": 1})
 	var tgt := current_target()
-	for t in targets:
-		t["step"] = String(tgt.get("id", ""))
-	return {"kind": "expedition", "header": "EXPEDITION", "title": String(template(String(a["template"])).get("name", "")),
-		"text": "Follow the ribbon lantern to %s." % String(tgt.get("name", "")), "hint": "", "rows": rows, "parts": [],
-		"step_id": String(tgt.get("id", "")), "group": "expedition", "optional": true, "targets": targets,
-		"where": "Head to %s (Hallowmere Reach)" % String(tgt.get("name", "")), "current": String(tgt.get("id", ""))}
+	var tid := String(tgt.get("id", ""))
+	var tname := String(tgt.get("name", ""))
+	var title := String(template(String(a["template"])).get("name", ""))
+	var text := "Follow the ribbon lantern to %s." % tname
+	var targets: Array = [{"id": tid, "area": Data.AREA_ID, "done": false, "step": tid, "name": tname, "pos": tgt.get("pos", Vector2.ZERO)}]
+	return {"kind": "expedition", "header": "EXPEDITION", "title": title, "text": text, "hint": "", "rows": rows,
+		"parts": [{"id": tid, "title": title, "text": text, "done": false, "rows": rows, "target": tid, "area": Data.AREA_ID}],
+		"step_id": tid, "group": "", "optional": true, "targets": targets,
+		"where": "Head to %s (Hallowmere Reach)" % tname, "current": tid}
 
 
-## Pins for the map of `area_id`: every stop of the running expedition and its cache
-## [{"id", "name", "pos": Vector2 (Reach metres), "done", "current", "kind"}] ([] elsewhere or without a run).
+## Pins for the map of `area_id`: every stop of the running expedition and its cache, in route order
+## [{"id", "name", "pos": Vector2 (Reach metres), "done", "current", "kind": "stop" | "cache", "n": stop number
+##  (1..; 0 for the cache)}] ([] elsewhere or without a run). map_view draws them on the Reach map.
 static func map_marks(area_id: String) -> Array:
 	if area_id != Data.AREA_ID:
 		return []
-	var v := tracker_view()
-	if v.is_empty():
+	var p := current_plan()
+	if p.is_empty():
 		return []
+	var i := current_stop_index()
+	var stops: Array = p["stops"]
 	var out: Array = []
-	var cur := String(v["current"])
-	var n := (v["targets"] as Array).size()
-	for k in n:
-		var t: Dictionary = v["targets"][k]
-		out.append({"id": String(t["id"]), "name": String(t["name"]), "pos": t["pos"], "done": bool(t["done"]),
-			"current": String(t["id"]) == cur, "kind": "cache" if k == n - 1 else "stop"})
+	for k in stops.size():
+		var s: Dictionary = stops[k]
+		out.append({"id": String(s["id"]), "name": String(s["name"]), "pos": s["pos"], "done": k < i, "current": k == i,
+			"kind": "stop", "n": k + 1})
+	var c: Dictionary = p["cache"]
+	out.append({"id": String(c.get("id", "")), "name": String(c.get("name", "")), "pos": c.get("pos", Vector2.ZERO), "done": false,
+		"current": i >= stops.size(), "kind": "cache", "n": 0})
 	return out
 
 
 ## Map lookup for an expedition place id of the running route ({"pos": Vector2, "radius", "name"}; {} otherwise),
-## so map_view's place_disc() can resolve "exp_*" target ids like landmarks (integrator request).
+## so map_view's place_disc() can resolve "exp_*" target ids like landmarks (lead decision P35).
 static func place_disc(place_id: String) -> Dictionary:
 	if not place_id.begins_with("exp_"):
 		return {}
 	for m in map_marks(Data.AREA_ID):
 		if String(m["id"]) == place_id:
-			return {"pos": m["pos"], "radius": 8.0, "name": String(m["name"])}
+			return {"pos": m["pos"], "radius": PLACE_RADIUS, "name": String(m["name"])}
 	return {}
 
 

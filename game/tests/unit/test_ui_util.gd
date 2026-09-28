@@ -49,6 +49,21 @@ func test_every_quest_hint_token_is_known() -> void:
 		assert_false(out.contains("{"), "unreplaced token in hint: " + out)
 
 
+## Tokens for the wardrobe and the Chapter Two build keys (D02 / D03); every token names a real, bound action, so
+## onboarding's build tips switch from "Z" wording to the live {undo} / {recolor} tokens by themselves.
+func test_wardrobe_and_build_tokens() -> void:
+	var out := UiUtil.fill_tokens("{undo} {recolor} {variant} {wardrobe}", Callable(self, "_fake_label"))
+	assert_eq(out, "<build_undo> <build_recolor> <build_variant> <wardrobe>")
+	for tok in UiUtil.TOKEN_ACTIONS:
+		var action := String(UiUtil.TOKEN_ACTIONS[tok])
+		assert_true(Settings.DEFAULT_BINDINGS.has(action), "{%s} -> %s has a default key" % [tok, action])
+		assert_true(InputMap.has_action(action), "{%s} -> %s is installed" % [tok, action])
+	assert_eq(UiUtil.fill_tokens("{undo}", Callable(UiUtil, "settings_label")), Settings.action_label("build_undo"))
+	var ob: Script = load("res://src/world/story_ch2/onboarding_hints.gd")
+	assert_eq(String(ob.call("build_key", "build_undo", "undo")), "{undo}", "the undo tip uses the live token")
+	assert_eq(String(ob.call("build_key", "build_recolor", "recolor")), "{recolor}", "the recolour tip uses the live token")
+
+
 func test_real_labels_come_from_settings() -> void:
 	var out := UiUtil.fill_tokens("{interact}", Callable(UiUtil, "settings_label"))
 	assert_eq(out, Settings.action_label("interact"))

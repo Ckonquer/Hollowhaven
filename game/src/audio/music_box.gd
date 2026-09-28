@@ -24,10 +24,22 @@ extends RefCounted
 ## out and the Haven rotation returns after a short rest. Without an active director (legacy fallback) the
 ## track is played through Audio.request_music's fallback and stopped with release_music.
 ## Sound muted: nothing breaks; the panel shows the title and a caption names the song (captions setting).
+## Deliberate behaviours (kept by the integration lead, docs/ch2/INTEGRATION_PASS2.md P47 - safe, bounded, cozy):
+##   * Master / Music bus muted: the director makes no music decisions at all (a muted bus loads nothing), so no
+##     cue starts and NOTHING IS DISCOVERED until the sound is back; a preview started while muted still counts as
+##     playing ("Now playing", caption, the dancer turns) until Stop, leaving the house, or - once sound returns -
+##     other music ends it.
+##   * a preview ended by combat / horror / a boss / authored music is not resumed afterwards (press Play again);
+##   * previewing the piece that is already sounding continues it (no restart);
+##   * favourites may add any discovered safe / explore / ending piece to the Haven rotation - e.g. m11 "The Last
+##     Shift" from the mine - bounded to music_selector.gd FAV_BONUS_PER_ROUND (2) extra entries per round, each
+##     favourite at most once per round.
+## Session wiring: Game.wire_session_systems() calls init() at boot (and the test runner re-wires between suites),
+## so discovery works from the first cue in play, before any box is built.
 ##
 ## API
-##   init() / shutdown() / is_listening()        Events wiring (idempotent). Game.wire_session_systems() should
-##                                                call init() (integrator); the structure also calls it.
+##   init() / shutdown() / is_listening()        Events wiring (idempotent). Game.wire_session_systems() calls
+##                                                init(); the structure also calls it.
 ##   is_eligible(cue), eligible_cues() -> Array, title(cue) -> String, home_of(cue) -> {context, area, zone, night}
 ##   note_heard(cue, area := "", zone := "") -> bool   (true = newly discovered), is_discovered(cue),
 ##   discovered() -> Array (catalogue order), heard_at(cue) -> {area, zone, at} ({} for starters / unknown)

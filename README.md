@@ -4,7 +4,8 @@ A small 3D cozy survival-adventure with creature companions and a restrained hor
 a gift for Krystal. Chapter One: *The Dimming Ward* (about 45–90 minutes), then free-play in your own
 little haven. Chapter Two: *The Lanterns of Hallowmere* continues the same save: a lantern road to an
 autumn festival town, a wardrobe, companions that fight beside you, new gear, two-storey building,
-Halloween decorations and a lot of new music (still being built and checked: see `KNOWN_ISSUES.md`).
+Halloween decorations, echo trials, expeditions, a music box and a lot of new music (built; the on-screen
+and real-play checks still to do are listed in `KNOWN_ISSUES.md`).
 
 ## Just want to play?
 1. Open `dist/` and extract `Hollowhaven-<version>-Windows.zip` anywhere (e.g. your Desktop).
@@ -18,7 +19,7 @@ No installation, accounts, internet or game engine needed. Saves live in `%APPDA
 Controls and comfort settings: see `How to Play.txt` next to the game (or press **F1** in game).
 
 **Already played Chapter One?** Press **Continue**, not New Game: the same house, friends and story carry
-on. What changed is in `Chapter Two - What's New.txt` (`docs/player/`). The first Chapter Two save keeps an
+on. What changed is in `Chapter Two - What's New.txt` (next to the game, and in `docs/player/`). The first Chapter Two save keeps an
 untouched copy of the Chapter One save in `saves\pre_v2_backup\`; an older build cannot open the new save
 (rollback steps: `docs/SAVE_MIGRATION.md`, section 8).
 
@@ -29,7 +30,7 @@ untouched copy of the Chapter One save in `saves\pre_v2_backup\`; an older build
 | `dist/` | The ZIP of the playable game + SHA-256 checksum (the build script moves older zips to `builds/superseded/`) |
 | `game/` | Editable Godot 4.7.2 project (source code, shaders, data, audio) |
 | `tools/` | Build, test, toolchain and asset-generation scripts |
-| `docs/` | Architecture contract, Chapter Two contract (`CHAPTER_TWO_SPEC.md`), save migration, install log |
+| `docs/` | Architecture contract, Chapter Two contract (`CHAPTER_TWO_SPEC.md`), save migration, install log, Chapter Two build records (`docs/ch2/`) |
 | `docs/player/` | `How to Play.txt` and `Chapter Two - What's New.txt` (the player update note) |
 | `qa/` | Test evidence (screenshots, logs) |
 | `GAME_SPEC.md` | Game design (concise) |

@@ -8,6 +8,7 @@ extends "res://tests/test_case.gd"
 
 const Layout := preload("res://data/manor_layout.gd")
 const SCENE := "res://scenes/moonveil_manor.tscn"
+const ManorWorld := preload("res://src/world/areas_ch2/moonveil_manor_world.gd")
 
 var _area: Node3D = null
 var _said: Array = []
@@ -127,6 +128,7 @@ func test_missing_boss_fallback_and_debug_hook_never_softlock() -> void:
 	assert_true(bool(GameState.get_flag(Layout.FLAG_VELOUR_DEFEATED)), "all three break the enchantment")
 	await wait_physics(2)
 	assert_true(bool((_area.get("balcony_door") as Node).call("is_open")), "balcony doors open")
+	await wait_seconds(ManorWorld.RESIDENT_DELAY + 0.3)          # a live win: he appears after the dispersal beat
 	assert_not_null(_area.get("resident"), "the Count is a resident now")
 	# The debug hook (debug builds only) is idempotent.
 	assert_false(bool(_area.call("debug_mark_velour_defeated")), "already cleared")
@@ -189,6 +191,8 @@ func test_boss_hook_start_pause_and_defeat_event() -> void:
 	Events.boss_defeated.emit("count_velour")
 	assert_true(bool(GameState.get_flag(Layout.FLAG_VELOUR_DEFEATED)), "ch2_velour_defeated")
 	assert_false(bool(_area.get("fight_active")), "encounter over")
+	assert_null(_area.get("resident"), "not while his enchantment disperses")
+	await wait_seconds(ManorWorld.RESIDENT_DELAY + 0.3)
 	var res: Node3D = _area.get("resident")
 	assert_not_null(res, "the resident appears")
 	assert_false(res.is_in_group("enemy"), "never hostile")
@@ -241,6 +245,7 @@ func test_a_vanished_count_falls_back_and_a_foreign_defeat_flag_opens_the_house(
 	_area.call("update_encounter")
 	await wait_physics(2)
 	assert_true(bool((_area.get("balcony_door") as Node).call("is_open")), "balcony open without a reload")
+	await wait_seconds(ManorWorld.RESIDENT_DELAY + 0.3)
 	assert_not_null(_area.get("resident"), "the resident appears")
 	assert_false(bool(_area.get("fight_active")))
 	for wc in _area.get("arena_candles"):

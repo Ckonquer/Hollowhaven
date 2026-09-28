@@ -4,6 +4,8 @@ extends Node3D
 ## spawner hr_sp_quarry_warden (enemy quarry_warden, never respawns, quest_flag_on_clear hr_warden_defeated).
 ## Retry rules: pillars and combat state reset (player death -> the living Warden is despawned so it returns
 ## fresh, every pillar re-knits); permanent progress (hr_warden_defeated, the winch) never resets.
+## First clear: caption TEXT["warden_quiet"] + toast TEXT["warden_clear"] (Events.notify "success", the channel the
+## spawner uses for its clear_message), exactly once per save - whichever path clears first; a reload shows nothing.
 ## The Warden script arrives in a later wave. Until EnemyFactory knows "quarry_warden" the encounter stays
 ## completable: when Krystal steps into the empty arena the stand-in clears it (warning in the log), and debug /
 ## test builds can call debug_clear_encounter().
@@ -144,6 +146,11 @@ func _clear_encounter() -> void:
 	set_process(false)
 	if first:
 		Events.caption.emit(Q.TEXT["warden_quiet"])
+		# The spawner's own clear_message never fires on a real defeat: the Warden's boss_defeated reaches this
+		# arena first, which sets the spawner's cleared flag, so its wave clear no longer counts as the first.
+		# The arena announces it itself, once, through the same channel (a spawner-first clear already showed it
+		# and makes `first` false here).
+		Events.notify.emit(Q.TEXT["warden_clear"], "success")
 		if GameState.has_method("request_quest_eval"):
 			GameState.request_quest_eval()
 		encounter_cleared.emit()

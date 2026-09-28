@@ -520,6 +520,50 @@ func test_enemy_data_matches_runtime_rules_and_real_ids() -> void:
 	assert_almost(float(EnemiesData.ENEMIES["quarry_warden"]["arena_radius"]), 10.0, 0.001, "warden fallback arena 10 m")
 
 
+## Integration pass 2 (P20 / P22): the boss rows describe what the fights really do (descriptive data; the rules
+## files stay the source of truth for timings, the bosses read only the damage of each row).
+func test_boss_rows_describe_their_rules() -> void:
+	const ChoirRules := preload("res://src/enemies/choir/choir_rules.gd")
+	const CrossingRules := preload("res://src/enemies/crossing/crossing_rules.gd")
+	const Deep := preload("res://data/works_layout_deep.gd")
+	# P22: the Borrowed Choir - the vault's radius, each warning = the rules' Standard value, strikes get their row.
+	var ch: Dictionary = EnemiesData.ENEMIES["borrowed_choir"]
+	assert_almost(float(ch["arena_radius"]), float(Deep.VAULT["radius"]), 0.001, "Choir arena_radius = the vault (12.4)")
+	var want := {"false_welcome": float(ChoirRules.T_SWEEP_TELE[1]), "rings": float(ChoirRules.T_RING_TELE[1]),
+		"strikes": float(ChoirRules.T_STRIKE_DELAY[1]), "kept_flame": float(ChoirRules.T_HUSH_TELE[1])}
+	var rows := {}
+	for a in ch["attacks"]:
+		rows[String(a["id"])] = a
+	for id in want:
+		assert_true(rows.has(id), "Choir row %s" % id)
+		if rows.has(id):
+			assert_almost(float(rows[id]["telegraph"]), float(want[id]), 0.001, "Choir %s warning = choir_rules Standard" % id)
+	if rows.has("strikes"):
+		var st: Dictionary = rows["strikes"]
+		assert_eq(String(st["kind"]), "zone", "strike zones are their own kind")
+		assert_almost(float(st["damage"]), 16.0, 0.001, "strike damage (as before, when they read the rings row)")
+		assert_almost(float(st["radius"]), float(ChoirRules.STRIKE_RADIUS), 0.001, "marked radius = rules radius")
+		assert_eq(String(st["tell"]), "Short delayed strike zones are marked on the floor; step out before they chime.")
+	# P20: the Crossing Matron's delayed pounce - the Standard warning, a tell that names both final cues, an
+	# arachnophobia tell without silk / spider words, and the "burned twice" floor in the bestiary text.
+	var mt: Dictionary = EnemiesData.ENEMIES["crossing_matron"]
+	var dp: Dictionary = {}
+	var pn: Dictionary = {}
+	for a in mt["attacks"]:
+		if String(a["id"]) == "delayed_pounce":
+			dp = a
+		elif String(a["id"]) == "pounce":
+			pn = a
+	assert_almost(float(dp["telegraph"]), float(CrossingRules.T_DELAYED_TELE[1]), 0.001, "delayed pounce = rules Standard 1.9 s")
+	assert_almost(float(pn["telegraph"]), float(CrossingRules.T_POUNCE_TELE[1]), 0.001, "pounce = rules Standard 1.3 s")
+	assert_true(String(dp["tell"]).contains("double ring") and String(dp["tell"]).contains("rattle") and String(dp["tell"]).contains("strand"))
+	var alt := String(dp["alt_tell"]).to_lower()
+	assert_true(alt.contains("whisper") and alt.contains("pale root"), "alt tell: whisper + pale root")
+	for word in ["silk", "spider", "web", "strand", "thread", "rattle"]:
+		assert_false(alt.contains(word), "arachnophobia tell avoids '%s'" % word)
+	assert_true(String(mt["desc"]).contains("burned her twice") and String(mt["alt_desc"]).contains("burned her twice"))
+
+
 # --- icons ---------------------------------------------------------------------------------------------------
 
 func test_every_icon_id_has_a_real_drawing() -> void:

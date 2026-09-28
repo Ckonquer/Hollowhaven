@@ -4,7 +4,8 @@ extends "res://tests/test_case.gd"
 ##   * Count Velour: from the manor's ballroom rest candles into the echo; entering never saves and keeps the origin as
 ##     the respawn; the pale door (leave) returns to the ballroom candles; a fall in the echo wakes Krystal there too
 ##     (a loss: nothing changes); a save written inside the echo continues at the origin, never in the trial;
-##   * the Borrowed Choir: from the Bell Throat into the echo and back through the pale door.
+##   * the Borrowed Choir: from the Bell Throat into the echo and back through the pale door;
+##   * a repeat clear's gift (lead decision L08) is paid on arrival back at the origin, never inside the echo.
 ## Story flags are identical before and after every trip. The runner scene is protected like
 ## test_flow_ch2_roundtrip (current_scene swapped for a placeholder).
 
@@ -105,6 +106,19 @@ func _saved_area() -> String:
 	return String(((st as Dictionary).get("player", {}) as Dictionary).get("area", "")) if st is Dictionary else ""
 
 
+## _saved_area(), re-read for a few frames while it comes back empty: a freshly renamed save file can be briefly
+## unreadable on Windows (a scanner holding it; seen once in a loaded parallel run). Only "" is retried, so a save
+## written for another area still fails the assertion at once.
+func _saved_area_settled() -> String:
+	var a := _saved_area()
+	for i in 30:
+		if a != "":
+			break
+		await get_tree().process_frame
+		a = _saved_area()
+	return a
+
+
 func _respawn() -> Array:
 	return [String(GameState.player.get("respawn_area", "")), String(GameState.player.get("respawn_spawn", ""))]
 
@@ -143,7 +157,7 @@ func test_velour_echo_returns_to_the_ballroom_candles() -> void:
 	assert_true(boss != null and String(boss.get("mode")) == "trial", "the real Count in trial mode")
 	assert_true(_near_spawn("trial_start"), "on the entry pad")
 	assert_true(bool(Game.area.is_safe_zone(Game.player.global_position)), "the pad is safe")
-	assert_eq(_saved_area(), "moonveil_manor", "entering a trial doesn't save")
+	assert_eq(await _saved_area_settled(), "moonveil_manor", "entering a trial doesn't save")
 	assert_eq(_respawn(), ["moonveil_manor", "manor_ballroom"], "the origin is the respawn")
 	assert_false(bool(Game.can_manual_save()["ok"]), "no saving in a trial")
 	# The pale door: back to the candles.
@@ -166,12 +180,79 @@ func test_velour_echo_returns_to_the_ballroom_candles() -> void:
 	(Game.area.get("echo_entry") as Node).call("enter")
 	assert_true(await _arrived("echo_trial"), "in the echo a third time")
 	assert_true(SaveSystem.save_game(true), "forced save inside the trial")
-	assert_eq(_saved_area(), "echo_trial")
+	assert_eq(await _saved_area_settled(), "echo_trial")
 	fresh_state()
 	Game.continue_game()
 	assert_true(await _arrived("moonveil_manor"), "Continue leaves the echo for the manor")
 	assert_true(_near_spawn("manor_ballroom"), "at the ballroom candles after Continue")
 	assert_eq(_story(), story, "story flags as saved")
+
+
+## Lead decision L08, through the real flow: with a full backpack a repeat win drops nothing inside the echo; the
+## gift waits in the trial's record and the arrival back at the ballroom candles pays it once (what does not fit drops
+## there, a pickup of the manor). A save written between a win and the arrival, then Continue, pays it exactly once.
+func test_a_repeat_gift_is_paid_on_arrival_at_the_origin() -> void:
+	_completed_journey()
+	EchoTrial.record_clear("velour", 200.0)           # the first clear is already in the ledger
+	Game.load_area("moonveil_manor", "manor_ballroom", false)
+	assert_true(await _arrived("moonveil_manor"), "in the manor")
+	Game.set_respawn("moonveil_manor", "manor_ballroom")
+	for i in GameState.inventory.size:
+		GameState.inventory.set_slot(i, {"id": "wood", "count": 99})
+	var notes: Array = []
+	var on_note := func(t: String, _k: String) -> void: notes.append(t)
+	Events.notify.connect(on_note)
+	var story := _story()
+	var entry: Node = Game.area.get("echo_entry")
+	assert_not_null(entry, "the echo stone stands by the ballroom candles")
+	if entry == null:
+		Events.notify.disconnect(on_note)
+		return
+	assert_true(bool(entry.call("enter")))
+	assert_true(await _arrived("echo_trial"), "in the echo")
+	var dropped_before := GameState.dropped.size()
+	Game.area.call("_on_boss_defeated")                # a win (the fight itself: test_trials_velour)
+	assert_eq(EchoTrial.record("velour").get("pending", {}), {"lantern_wax": 2, "moonpetal": 2}, "the gift waits")
+	assert_eq(GameState.dropped.size(), dropped_before, "a full backpack drops nothing inside the echo")
+	assert_eq(GameState.dropped_in_area("echo_trial"), [])
+	assert_true(notes.has("The echo's gift waits for you back at the ballroom candles."), "she is told where it waits")
+	notes.clear()
+	# Home through the pale door (the win arms it; leave() is what its timer calls).
+	Game.area.call("leave")
+	assert_true(await _arrived("moonveil_manor"), "back at the ballroom candles")
+	assert_eq(GameState.dropped_in_area("echo_trial"), [], "still nothing inside the echo")
+	var sp: Vector3 = (Game.area.get_spawn("manor_ballroom") as Transform3D).origin
+	var got := {}
+	for d in GameState.dropped_in_area("moonveil_manor"):
+		got[String(d["item"])] = int(got.get(String(d["item"]), 0)) + int(d["count"])
+		var p: Array = d["pos"]
+		assert_true(Vector3(float(p[0]), float(p[1]), float(p[2])).distance_to(sp) < 1.5, "dropped at the safe origin checkpoint")
+	assert_eq(got, {"lantern_wax": 2, "moonpetal": 2}, "the overflow waits at the origin")
+	var rec := EchoTrial.record("velour")
+	assert_false(rec.has("pending"), "paid")
+	assert_eq(int(rec.get("repeat_paid", 0)), 1)
+	assert_eq(notes.filter(func(t: Variant) -> bool: return String(t).begins_with("The echo's gift: ")).size(), 1, "one toast")
+	assert_true(await _until(func() -> bool: return _saved_area() == "moonveil_manor", 240), "the arrival saved (with the gift paid)")
+	# A save written between a win and the arrival (by some other system), then Continue: paid exactly once.
+	(Game.area.get("echo_entry") as Node).call("enter")
+	assert_true(await _arrived("echo_trial"), "in the echo again")
+	Game.area.call("_on_boss_defeated")                # the third clear: + the bonus
+	assert_true(SaveSystem.save_game(true), "forced save inside the trial")
+	fresh_state()
+	Game.continue_game()
+	assert_true(await _arrived("moonveil_manor"), "Continue leaves the echo for the manor")
+	got = {}
+	for d in GameState.dropped_in_area("moonveil_manor"):
+		got[String(d["item"])] = int(got.get(String(d["item"]), 0)) + int(d["count"])
+	assert_eq(got, {"lantern_wax": 4, "moonpetal": 4, "woven_cloth": 1}, "the second gift paid once on arrival")
+	rec = EchoTrial.record("velour")
+	assert_false(rec.has("pending"), "nothing waits any more")
+	assert_eq(int(rec.get("repeat_paid", 0)), 2)
+	assert_eq(int(rec.get("clears", 0)), 3)
+	assert_eq(EchoTrial.pay_pending("moonveil_manor"), {}, "a later arrival pays nothing more")
+	assert_eq(GameState.dropped_in_area("echo_trial"), [])
+	assert_eq(_story(), story, "story flags untouched")
+	Events.notify.disconnect(on_note)
 
 
 func test_choir_echo_returns_to_the_bell_throat() -> void:

@@ -39,6 +39,17 @@ class Dummy extends CharacterBody3D:
 		pass
 
 
+## Stands in for ui_root.confirm(): records what the stone asked and answers "cancel" after a couple of frames.
+class FakeUi extends Node:
+	var asked: Array = []
+
+	func confirm(title: String, text: String, buttons: Array = []) -> String:
+		asked.append([title, text, buttons])
+		await get_tree().process_frame
+		await get_tree().process_frame
+		return "cancel"
+
+
 func before_each() -> void:
 	fresh_state()
 	_nodes.clear()
@@ -232,6 +243,10 @@ func test_first_clear_pays_the_bundle_once_then_renewable_resources_and_no_story
 	assert_eq(_ended, [["matron", true]])
 	assert_eq(int(EchoTrial.record("matron")["clears"]), 2)
 	assert_eq(GameState.ledger.size(), ledger_n, "the first-clear reward is never paid twice")
+	# The repeat gift waits for the way home (lead decision L08); the arrival at the origin pays it.
+	assert_eq(GameState.count_item("silk"), silk, "nothing is given inside the echo")
+	assert_eq(EchoTrial.record("matron").get("pending", {}), {"silk": 3, "glowcap": 2}, "the gift waits in the trial's record")
+	EchoTrial.pay_pending("below")
 	assert_eq(GameState.count_item("silk"), silk + 3, "modest renewable silk")
 	assert_eq(GameState.count_item("glowcap"), caps + 2, "and glowcaps")
 	assert_false(GameState.has_item("heartseed"), "never a Heartseed")
@@ -252,9 +267,53 @@ func test_record_clear_tracks_best_time_and_a_small_bonus() -> void:
 	var r3 := EchoTrial.record_clear("matron", 200.0)
 	assert_almost(float(r3["best_seconds"]), 120.0, 0.001, "a slower clear keeps the best")
 	assert_eq(int((r3["items"] as Dictionary).get("echo_shard", 0)), 1, "every third clear adds a small bonus")
+	assert_eq(EchoTrial.record("matron")["pending"], {"silk": 6, "glowcap": 4, "echo_shard": 1}, "two waiting gifts merge")
 	var round_trip: Dictionary = GameState.to_dict()
 	GameState.from_dict(round_trip)
 	assert_eq(int(EchoTrial.record("matron")["clears"]), 3, "the trial record survives a save round trip")
+	assert_eq(EchoTrial.record_line("matron"), "Cleared 3 times - best time 2:00", "the record text is unchanged")
+	assert_eq(EchoTrial.pay_pending("below"), {"silk": 6, "glowcap": 4, "echo_shard": 1}, "the waiting gift survives it and is paid once")
+	assert_eq(int(EchoTrial.record("matron")["repeat_paid"]), 2, "both repeat clears in the trial's ledger")
+
+
+## Lead decision L08: with a full backpack a repeat win drops NOTHING inside the echo (every trial shares that
+## area, so a drop there would reappear inside another arena later); the gift is paid once on arrival at the
+## origin, where whatever does not fit drops (a persistent pickup of the origin area).
+func test_a_full_backpack_win_drops_nothing_in_the_echo_and_the_gift_waits_for_the_origin() -> void:
+	_completed_save()
+	EchoTrial.record_clear("matron", 150.0)          # the first clear is already in the ledger
+	for i in GameState.inventory.size:
+		GameState.inventory.set_slot(i, {"id": "wood", "count": 99})
+	GameState.player["area"] = "echo_trial"
+	var dropped_before := GameState.dropped.size()
+	var notes: Array = []
+	var on_note := func(t: String, _k: String) -> void: notes.append(t)
+	Events.notify.connect(on_note)
+	var a: Node3D = await _trial_area()
+	await _win(a)
+	assert_eq(String(a.get("result")), "won")
+	assert_eq(GameState.dropped.size(), dropped_before, "nothing dropped")
+	assert_eq(GameState.dropped_in_area("echo_trial"), [], "never a pickup inside the echo")
+	assert_eq(a.find_children("*", "", true, false).filter(func(n: Node) -> bool: return n.is_in_group("pickup") or n.is_in_group("world_item")), [], "no pickup node in the arena")
+	assert_true(notes.has("The echo's gift waits for you back at the chamber door."), "she is told where it waits: %s" % str(notes))
+	assert_true(EchoTrial.is_listening(), "the win wires the payer")
+	# Arriving inside a trial pays nothing; arriving at the origin pays once (overflow drops there).
+	assert_eq(EchoTrial.pay_pending("echo_trial"), {}, "never paid inside a trial")
+	GameState.player["area"] = "below"
+	notes.clear()
+	assert_eq(EchoTrial.pay_pending("below"), {"silk": 3, "glowcap": 2}, "paid at the origin")
+	var got := {}
+	for d in GameState.dropped_in_area("below"):
+		got[String(d["item"])] = int(got.get(String(d["item"]), 0)) + int(d["count"])
+	assert_eq(got, {"silk": 3, "glowcap": 2}, "the overflow waits at the origin")
+	assert_eq(GameState.dropped_in_area("echo_trial"), [])
+	assert_eq(notes.filter(func(t: Variant) -> bool: return String(t).begins_with("The echo's gift: ")).size(), 1, "one toast")
+	assert_eq(EchoTrial.pay_pending("below"), {}, "and only once")
+	var rec := EchoTrial.record("matron")
+	assert_false(rec.has("pending"), "nothing waits any more")
+	assert_eq(int(rec["repeat_paid"]), 1)
+	assert_eq(rec["paid"], {"silk": 3, "glowcap": 2})
+	Events.notify.disconnect(on_note)
 
 
 func test_a_loss_ends_the_trial_and_changes_nothing() -> void:
@@ -313,3 +372,48 @@ func test_the_below_offers_the_echo_only_after_victory_at_the_arena_checkpoint()
 	for c in entry.find_children("*", "StaticBody3D", true, false):
 		solid = solid or ((c as StaticBody3D).collision_layer & 1) != 0
 	assert_false(solid, "it blocks nobody (no collision)")
+
+
+## The Below's stone opens the same trial menu as the other echo stones (echo_trial.gd menu_text("matron"): the
+## memory, the trial's own record - clears and best time - and what a clear leaves), with "Enter the echo" /
+## "Not now"; "Not now" starts no trip and leaves the respawn point alone.
+func test_the_below_stone_opens_the_trial_menu_with_record_and_reward() -> void:
+	_completed_save()
+	EchoTrial.record_clear("matron", 151.2)
+	var b: Node3D = load(BELOW).new()
+	add_child(b)
+	_nodes.append(b)
+	await wait_physics(2)
+	assert_not_null(b.get("echo_entry"), "the echo stone is there")
+	var ui := FakeUi.new()
+	add_child(ui)
+	_nodes.append(ui)
+	var saved_ui: Node = Game.ui
+	var saved_mode: String = Game.mode
+	var respawn_before := [String(GameState.player.get("respawn_area", "")), String(GameState.player.get("respawn_spawn", ""))]
+	Game.ui = ui
+	Game.mode = "playing"
+	b.call("_enter_echo_trial", null)
+	await wait_frames(4)
+	Game.ui = saved_ui
+	Game.mode = saved_mode
+	assert_eq(ui.asked.size(), 1, "one menu")
+	if ui.asked.size() != 1:
+		return
+	var m := EchoTrial.menu_text("matron")
+	assert_eq(String(ui.asked[0][0]), String(m["title"]), "titled with the trial")
+	assert_eq(String(ui.asked[0][1]), String(m["body"]), "the memory, the record and the reward")
+	var body := String(ui.asked[0][1])
+	assert_true(body.contains("An echo of your battle with %s" % ItemDB.enemy_display_name("weaver_matron")), "the memory text as before")
+	assert_true(body.contains("memory, not undone history"))
+	assert_true(body.contains("Cleared 1 time - best time 2:31"), "clears and best time")
+	assert_true(body.contains("Each clear leaves a little: "), "what a repeat clear leaves")
+	var ids: Array = []
+	var labels: Array = []
+	for bt in ui.asked[0][2]:
+		ids.append(String((bt as Array)[0]))
+		labels.append(String((bt as Array)[1]))
+	assert_eq(ids, ["enter", "cancel"])
+	assert_eq(labels, ["Enter the echo", "Not now"])
+	assert_eq(EchoTrial.pending_trial, "", "Not now: no trip")
+	assert_eq([String(GameState.player.get("respawn_area", "")), String(GameState.player.get("respawn_spawn", ""))], respawn_before, "the respawn is untouched")

@@ -3,17 +3,26 @@ extends "res://src/enemies/enemy_base.gd"
 ## warm light in a little wooden mask. Its glow is emissive only - no Light3D, not in group "light_source" - so it
 ## lights NOTHING around it (Combat.light_at never counts it), which is exactly the clue.
 ##   veiled    (default) the false light floats at VEIL_HEIGHT and cannot be harmed: every hit passes through
-##             (health invulnerable, can_be_hit_by false -> on_hit_blocked: a spark and a one-time hint).
+##             (health invulnerable, can_be_hit_by false -> on_hit_blocked: a spark and a one-time hint). A sword
+##             swing up there gives no contact, so the same one-time hint ("hint_borrowed_wisp_blocked") also shows
+##             the first time Krystal comes within BLOCKED_HINT_DIST (flat) of a veiled, visible wisp that is
+##             threatening her (no attack detection, no damage change).
 ##   revealed  real light on it (Krystal's raised lantern within ~4.5 m, or a lamp / brazier / ward: Combat.light_at
-##             at its body >= REVEAL_ON) shows its true form: the light shrinks to a small cold flicker, a hooded
-##             masked shape drops to REVEAL_HEIGHT (sword reach) and can be hurt. On being revealed it is DAZZLED for
-##             DAZZLE_TIME (a free punish window before it can cast; a wind-up in progress is cancelled). It veils
-##             again after REVEAL_HOLD s with the light below REVEAL_OFF.
+##             at its body >= REVEAL_ON), or Lumi's Glimmerstep (expose(seconds): revealed for at least `seconds`)
+##             shows its true form: the light shrinks to a small cold flicker, a hooded masked shape drops to
+##             REVEAL_HEIGHT (sword reach) and can be hurt. On being revealed it is DAZZLED for DAZZLE_TIME (a free
+##             punish window before it can cast; a wind-up in progress is cancelled) - at most once per
+##             DAZZLE_COOLDOWN: a reveal inside the cooldown still reveals (reachable, vulnerable) but neither dazzles
+##             nor cancels the wind-up, so toggling the lantern can never stun-lock it. It veils again after
+##             REVEAL_HOLD s with the light below REVEAL_OFF (and the Glimmerstep exposure over).
 ##   sweep     telegraph (data 1.4 s): its ribbons lift to one side (amber tint) and an amber WEDGE (data arc_deg
 ##             120, radius data attack_range) is drawn, tracking for 60% then locked -> a DELAYED sweep: the locked mark
 ##             stays and brightens for data delay (0.8 s) -> one sweep (line of sight, player group only) -> recover.
+##             A VEILED wisp may sweep too (kept on purpose, integration pass 2 P09): the sweep is a marked, delayed
+##             one and the tell teaches the counter (raise the lantern).
 ## There is only ever ONE wisp body per spawn: it never splits into, or hides among, identical lethal clones.
-## Intensity: Gentle = longer wind-ups / rests and no overlap with other wind-ups; Intense = shorter rests. Data
+## Intensity (enemy_base intensity_* / overlap_blocked): Gentle = longer wind-ups / rests and no overlap with other
+## wind-ups; Intense = shorter rests. Data
 ## "underground": damage scales with the horror intensity like the other deep threats.
 ## Stats: data/enemies.gd "borrowed_wisp". Sounds (existing names only): fake_lumi_chime (idle: a borrowed chime),
 ## shade_whisper (alert), gloomling_flinch (revealed), shade_telegraph (sweep tell), shade_drift (the sweep),
@@ -29,11 +38,12 @@ const REVEAL_ON := 0.4
 const REVEAL_OFF := 0.25
 const REVEAL_HOLD := 2.0
 const DAZZLE_TIME := 1.0
+const DAZZLE_COOLDOWN := 6.0         # a reveal this soon after the last dazzle reveals it but does not dazzle again
+const BLOCKED_HINT_DIST := 4.0       # flat distance at which a veiled wisp teaches "raise your lantern" once
+const HINT_BLOCKED := "hint_borrowed_wisp_blocked"
+const HINT_BLOCKED_TEXT := "Your blow passes straight through the false light. Raise your lantern ({lantern}) to reveal what hides in it."
 const SWEEP_TIME := 0.3
 const SWEEP_START_FRACTION := 0.8
-const GENTLE_COOLDOWN := 1.35
-const INTENSE_COOLDOWN := 0.8
-const GENTLE_TELEGRAPH_BONUS := 0.2
 const EMBERS := Color(1.0, 0.78, 0.5, 0.7)
 const REVEAL_CAPTION_GAP_MS := 6000
 
@@ -46,8 +56,12 @@ var light_level: float = 0.0
 var reveals: int = 0
 var sweeps_done: int = 0
 var blocked_hits: int = 0
+var dazzles: int = 0
+var near_hint_shown := false          # the proximity "raise your lantern" hint was emitted by this wisp
 var _def: Dictionary = {}
 var _unlit_t: float = 0.0
+var _dazzle_cd: float = 0.0
+var _expose_t: float = 0.0
 var _resolved := false
 
 
@@ -117,7 +131,7 @@ func attack_reach() -> float:
 
 func _perceive_extra() -> void:
 	light_level = light_override if light_override >= 0.0 else Combat.light_at(global_position + Vector3.UP * LIGHT_SAMPLE_Y)
-	if light_level >= REVEAL_ON:
+	if light_level >= REVEAL_ON or _expose_t > 0.0:
 		_unlit_t = 0.0
 		if not revealed:
 			_reveal()
@@ -129,6 +143,33 @@ func _perceive_extra() -> void:
 				_apply_reveal(false)
 		else:
 			_unlit_t = 0.0
+	_check_near_hint()
+
+
+## Lumi's Glimmerstep (companion_combat.gd calls expose(seconds) on enemies inside its light pulse): a forced
+## reveal, exactly like a lantern reveal - it drops to REVEAL_HEIGHT and can be hurt, dazzled unless inside
+## DAZZLE_COOLDOWN - that holds for at least `seconds`; then the usual veil rule (REVEAL_HOLD s without light).
+func expose(seconds: float) -> void:
+	if is_dead() or seconds <= 0.0:
+		return
+	_expose_t = maxf(_expose_t, seconds)
+	_unlit_t = 0.0
+	if not revealed:
+		_reveal()
+
+
+## The veiled wisp floats above sword reach, so a swing at it gives no contact feedback: the first time Krystal
+## is within BLOCKED_HINT_DIST (flat) of a veiled, visible wisp that threatens her, show the "raise your lantern"
+## hint once (the HUD also keeps hints once per save). Called from perception (5 Hz).
+func _check_near_hint() -> void:
+	if near_hint_shown or revealed or is_dead() or not _can_hunt or not _player_visible or not is_threatening():
+		return
+	if _player == null or not is_instance_valid(_player) or _flat_dist_to_player() > BLOCKED_HINT_DIST:
+		return
+	if is_inside_tree() and not is_visible_in_tree():
+		return
+	near_hint_shown = true
+	Events.hint.emit(HINT_BLOCKED, HINT_BLOCKED_TEXT)
 
 
 func _reveal() -> void:
@@ -142,6 +183,10 @@ func _reveal() -> void:
 	Events.hint.emit("hint_borrowed_wisp_reveal", "Your lantern shows a Borrowed Wisp's true form. Strike it now, before it casts.")
 	if state in ["dead", "sweep_wait", "sweep"]:
 		return
+	if _dazzle_cd > 0.0:
+		return                           # revealed (reachable, vulnerable) but no re-dazzle: never stun-locked
+	_dazzle_cd = DAZZLE_COOLDOWN
+	dazzles += 1
 	stun(DAZZLE_TIME)                    # dazzled: a free punish window (cancels a wind-up in progress)
 
 
@@ -161,10 +206,12 @@ func can_be_hit_by(source: Node) -> bool:
 func on_hit_blocked(_attacker: Node, _dir: Vector3) -> void:
 	blocked_hits += 1
 	HitFx.spark(get_aim_point())
-	Events.hint.emit("hint_borrowed_wisp_blocked", "Your blow passes straight through the false light. Raise your lantern ({lantern}) to reveal what hides in it.")
+	Events.hint.emit(HINT_BLOCKED, HINT_BLOCKED_TEXT)
 
 
 func _tick_extra(delta: float) -> void:
+	_dazzle_cd = maxf(_dazzle_cd - delta, 0.0)
+	_expose_t = maxf(_expose_t - delta, 0.0)
 	var want := REVEAL_HEIGHT if revealed else VEIL_HEIGHT
 	if state == "dead":
 		want = hover_y
@@ -176,7 +223,7 @@ func _tick_extra(delta: float) -> void:
 # --- The delayed sweep ---------------------------------------------------------------------------------------------
 
 func _can_start_attack() -> bool:
-	return _shot_clear and not _gentle_blocked()
+	return _shot_clear and not overlap_blocked()
 
 
 func _choose_attack() -> void:
@@ -184,7 +231,7 @@ func _choose_attack() -> void:
 
 
 func telegraph_duration() -> float:
-	return attack_telegraph(_def) + _telegraph_bonus()
+	return attack_telegraph(_def) + intensity_telegraph_bonus()
 
 
 func recover_duration() -> float:
@@ -234,31 +281,7 @@ func _st_custom(state_name: String, _delta: float) -> void:
 
 func _on_state_changed(_prev: String, new_state: String) -> void:
 	if new_state == "recover":
-		_cooldown *= _cooldown_mult()
-
-
-# --- Intensity (Gentle / Intense) ---------------------------------------------------------------------------------
-
-func _cooldown_mult() -> float:
-	match Combat.current_intensity():
-		0:
-			return GENTLE_COOLDOWN
-		2:
-			return INTENSE_COOLDOWN
-	return 1.0
-
-
-func _telegraph_bonus() -> float:
-	return GENTLE_TELEGRAPH_BONUS if Combat.current_intensity() == 0 else 0.0
-
-
-func _gentle_blocked() -> bool:
-	if Combat.current_intensity() != 0:
-		return false
-	for id in _attackers.keys():
-		if int(id) != get_instance_id() and is_instance_id_valid(int(id)):
-			return true
-	return false
+		_cooldown *= intensity_cooldown_mult()
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

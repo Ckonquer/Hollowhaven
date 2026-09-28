@@ -7,7 +7,9 @@ extends "res://tests/test_case.gd"
 ## back to the gate reset arena + boss together (same boss, no second spawn); the victory commits through the
 ## arena's listener exactly once (rw_ch2_crossing -> ch2_crossing_cleared, way on open, gate shut; Chapter One
 ## flags untouched); the capped release spawns real Brood Skitters (Pale Sprouts); arachnophobia on the
-## bridge. Headless; the arena never saves here (no real player).
+## bridge; the rail from the layout reaches her setup; the service gate's bars / sound / line wait for her retreat
+## (the collider, flag, reward are immediate); nothing starts while Krystal is down. Headless; the arena never
+## saves here (no real player).
 
 const Host := preload("res://src/world/works/deep/deep_preview_host.gd")
 const CrossingArena := preload("res://src/world/works/deep/crossing_arena.gd")
@@ -151,6 +153,8 @@ func test_the_arena_spawns_her_through_the_factory_with_its_params() -> void:
 	assert_eq((b.get("line_anchors") as Array).size(), 3, "three line anchors over the three braziers")
 	assert_eq((b.get("braziers") as Array).size(), 3)
 	assert_true((b.get("landing_points") as Array).size() >= 12, "the arena's validated landing grid")
+	assert_almost(float((a.call("boss_params") as Dictionary)["rail"]), float(Layout.CROSSING["rail"]), 0.001, "boss_params() hands over the rail")
+	assert_almost(float(b.get("rail")), float(Layout.CROSSING["rail"]), 0.001, "she uses the layout's rail, not a recomputed one")
 	assert_true(b.is_in_group("enemy"))
 	assert_eq(String(b.get("state")), "intro")
 	# a second step on the bridge never spawns a second boss
@@ -365,13 +369,21 @@ func test_a_fall_on_the_bridge_never_restarts_her_on_the_death_screen() -> void:
 		if id == ID:
 			enc.append(on)
 	Events.boss_encounter_changed.connect(ecb)
+	var horror: Array = []
+	var hcb := func(id: String, _d: Dictionary) -> void:
+		if id == "authored:hw_crossing":
+			horror.append(id)
+	Events.horror_event.connect(hcb)
 	# Krystal falls on the bridge: both stand down...
 	dummy.health.hp = 0.0
 	dummy.health.dead = true
 	Events.player_died.emit()
 	assert_eq(String(b.get("state")), "dormant")
-	# ...and while she lies there the controller keeps checking (the arena may come back on) - the boss must not
-	_ctl().call("check", 0.1)
+	# ...and while she lies there the controller keeps checking - neither the arena nor the boss comes back on
+	for i in 5:
+		_ctl().call("check", 0.1)
+	assert_false(bool(a.get("active")), "the arena stays down while she lies on the bridge")
+	assert_eq(horror.size(), 0, "no authored horror event on the death screen")
 	for i in 10:
 		b.call("tick", 0.1)
 	assert_false(bool(b.get("fight_started")), "no encounter, bar, captions or music on the death screen")
@@ -388,4 +400,68 @@ func test_a_fall_on_the_bridge_never_restarts_her_on_the_death_screen() -> void:
 	assert_true(bool(b.get("fight_started")))
 	assert_eq(a.get("boss"), b, "no second spawn")
 	Events.boss_encounter_changed.disconnect(ecb)
+	Events.horror_event.disconnect(hcb)
 	assert_eq(enc, [false, true], "one clean stand-down, one clean restart - no flicker")
+	assert_eq(horror.size(), 1, "the authored moment again only for the real restart")
+
+
+## The real player: nothing starts while Game.mode is not "playing" (death screen, respawn); a test stand-in is
+## never gated by Game.mode, only by its health.
+func test_the_arena_waits_while_the_real_player_is_not_playing() -> void:
+	await _make()
+	var a := _arena()
+	dummy.global_position = Vector3(76.0, -18.0, 2.0)
+	var saved_player: Node3D = Game.player
+	var saved_mode := Game.mode
+	Game.player = dummy
+	Game.mode = "dead"
+	var down := bool(a.call("player_down", dummy))
+	a.call("check", dummy)
+	var started := bool(a.get("active"))
+	Game.mode = "playing"
+	var up := not bool(a.call("player_down", dummy))
+	Game.player = saved_player
+	Game.mode = saved_mode
+	assert_true(down, "the real player is down while Game.mode is not playing")
+	assert_false(started, "no encounter from the death screen")
+	assert_true(up, "back to playing: the arena works again")
+	assert_false(bool(a.call("player_down", dummy)), "a stand-in with living health is never down")
+
+
+## The victory is committed at once (flag, reward, the gate's collider); the gate's bars, its sound, the shake and
+## the "retreats behind the old service gate" line wait for her retreat (retreat_seconds() - 0.8 s).
+func test_the_service_gate_waits_for_her_retreat() -> void:
+	await _make()
+	var b := _engage()
+	var a := _arena()
+	b.set("fast_defeat", false)                 # the real retreat presentation
+	var says: Array = []
+	var scb := func(_s: String, t: String, _d: float) -> void:
+		if t.contains("retreats behind the old service gate"):
+			says.append(t)
+	Events.say.connect(scb)
+	assert_true(_to_state(b, "cling", 10.0))
+	(a.call("brazier_for_anchor", int(b.get("held_line"))) as Node).call("light")
+	assert_true(_to_state(b, "exposed", 2.0))
+	b.get("health").call("set_hp", 5.0)
+	var retreat := float(b.call("retreat_seconds"))
+	b.get("health").call("apply_damage", 20.0, dummy, Vector3.ZERO)
+	assert_true(bool(a.get("cleared")), "committed at once")
+	assert_true(bool(GameState.get_flag("ch2_crossing_cleared")), "flag at once")
+	assert_true(GameState.has_reward("rw_ch2_crossing"), "reward at once")
+	assert_true(bool(a.call("route_gate_shut")), "the route counts as shut")
+	var gate: Node3D = a.get("route_gate")
+	var bars: Node3D = gate.get_node("Bars")
+	var shape := gate.get_node("GateBody").get_child(0) as CollisionShape3D
+	await wait_physics(2)
+	assert_false(shape.disabled, "the gate's collider closes the route at once")
+	assert_true(retreat - 0.8 > 1.0, "a real retreat plays (%.2f s)" % retreat)
+	assert_true(bars.position.y > 2.0, "the bars wait while she retreats")
+	assert_false(_caps.has("[an old service gate grinds shut over the deeper route]"), "no gate caption yet")
+	assert_eq(says.size(), 0, "no line yet")
+	await wait_seconds(retreat - 0.8 + 1.0)
+	assert_almost(bars.position.y, 0.0, 0.01, "the bars dropped as she slipped through")
+	assert_true(_caps.has("[an old service gate grinds shut over the deeper route]"), "the gate caption")
+	assert_eq(says.size(), 1, "her retreat line once")
+	assert_true(bool(b.call("is_gone")), "she is gone behind it")
+	Events.say.disconnect(scb)

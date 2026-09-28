@@ -459,7 +459,9 @@ func test_prefetch_area_is_idempotent_and_never_blocks() -> void:
 	for p in [scene] + warm:
 		assert_true(Game.is_prefetching(String(p)) or ResourceLoader.has_cached(String(p)), "%s is loading or loaded" % p)
 	assert_true(ms < 1000, "it never waits for the loads (%d ms)" % ms)
-	for i in 900:
+	# The manor now also warms up Count Velour (P38): allow the loader threads real time, not a frame count.
+	var deadline := Time.get_ticks_msec() + 20000
+	while Time.get_ticks_msec() < deadline:
 		Game._collect_warmups()
 		if not warm.any(func(p: Variant) -> bool: return Game.is_prefetching(String(p))):
 			break
@@ -472,3 +474,148 @@ func test_prefetch_area_is_idempotent_and_never_blocks() -> void:
 		Game._prefetching.erase(scene)
 		var ps: Variant = ResourceLoader.load_threaded_get(scene)
 		assert_true(ps is PackedScene, "the prefetched scene is the area's PackedScene")
+
+
+## P38 (integration pass 2): the warm-up table covers every Chapter Two area with enemies or bosses: the Reach's
+## expedition + district enemies, the Chapter Two bosses where they are fought and every Echo Trial boss / arena
+## builder. Every entry is an existing script of a registered area, and EnemyFactory itself is never a loader-thread
+## request (prefetch_area loads it on the main thread first).
+func test_area_warmup_covers_the_chapter_two_enemies_and_bosses() -> void:
+	var Factory: Script = load(Game.ENEMY_FACTORY_SCRIPT)
+	for a in Game.AREA_WARMUP:
+		assert_true(Game.AREAS.has(String(a)), "%s is a registered area" % a)
+		var seen := {}
+		for p in (Game.AREA_WARMUP[a] as Array):
+			var path := String(p)
+			assert_true(path.ends_with(".gd") and ResourceLoader.exists(path), "%s: %s exists" % [a, path])
+			assert_ne(path, Game.ENEMY_FACTORY_SCRIPT, "%s: the factory is never a thread request" % a)
+			assert_false(seen.has(path), "%s: %s listed once" % [a, path])
+			seen[path] = true
+	var want := {
+		"hallowmere_reach": ["pumpkin_mimic", "patchwalker", "hollow_drudge", "velvet_wing", "bellcap_sentry",
+			"quarry_warden", "lantern_moth"],
+		"moonveil_manor": ["velvet_wing", "count_velour"],
+		"hushed_works": ["hollow_drudge", "bellcap_sentry", "borrowed_wisp", "crossing_matron", "borrowed_choir"],
+		"echo_trial": ["count_velour", "borrowed_choir", "weaver_matron"],
+	}
+	for a in want:
+		var warm: Array = Game.AREA_WARMUP.get(a, [])
+		for id in (want[a] as Array):
+			var path := String(Factory.call("script_path", String(id)))
+			assert_true(path != "" and warm.has(path), "%s warms up %s (%s)" % [a, id, path])
+	for path in ["res://src/world/trial/velour_trial.gd", "res://src/world/trial/choir_trial.gd"]:
+		assert_true((Game.AREA_WARMUP["echo_trial"] as Array).has(path), "the trial arena builder %s" % path)
+	# every enemy an expedition can send into the Reach
+	var Ex: Script = load(Game.EXPEDITIONS_SCRIPT)
+	var reach_warm: Array = Game.AREA_WARMUP["hallowmere_reach"]
+	for t in (Ex.call("template_ids") as Array):
+		for id in (Ex.call("enemy_types", String(t)) as Array):
+			var path := String(Factory.call("script_path", String(id)))
+			assert_true(reach_warm.has(path), "expedition %s enemy %s is warmed up in the Reach" % [t, id])
+
+
+## P38: the Echo Trial's warm-up (the trial bosses and arena builders) starts without waiting and is collected.
+func test_prefetch_of_the_echo_trial_never_blocks() -> void:
+	var scene := String(Game.AREAS["echo_trial"])
+	var warm: Array = Game.AREA_WARMUP["echo_trial"]
+	var t0 := Time.get_ticks_msec()
+	Game.prefetch_area("echo_trial")
+	var ms := Time.get_ticks_msec() - t0
+	assert_true(ms < 1000, "it never waits for the loads (%d ms)" % ms)
+	assert_eq(Game.prefetch_area("echo_trial"), 0, "idempotent")
+	var deadline := Time.get_ticks_msec() + 20000
+	while Time.get_ticks_msec() < deadline:
+		Game._collect_warmups()
+		if not warm.any(func(p: Variant) -> bool: return Game.is_prefetching(String(p))):
+			break
+		await get_tree().process_frame
+	for p in warm:
+		assert_false(Game.is_prefetching(String(p)), "%s collected" % p)
+		assert_true(ResourceLoader.has_cached(String(p)), "%s stays compiled" % p)
+	if Game.is_prefetching(scene):
+		Game._prefetching.erase(scene)
+		var ps: Variant = ResourceLoader.load_threaded_get(scene)
+		assert_true(ps is PackedScene, "the prefetched scene is the trial's PackedScene")
+
+
+## P34 (integration pass 2): Game.wire_session_systems() wires every session-wide module: small masteries, the story
+## tracker, the Lanternwake Expeditions (a mid-run save resumes in the Reach), the Music Box's song discovery, the
+## onboarding hints (ONE node under Game that never steps in headless runs) and the Echo Trial's gift payer.
+## Idempotent (the runner re-wires between suites), and a static module that was shut down is wired again.
+func test_session_systems_are_wired_once_and_again_after_a_shutdown() -> void:
+	var Mastery: Script = load(Game.MASTERY_SCRIPT)
+	var Ex: Script = load(Game.EXPEDITIONS_SCRIPT)
+	var Box: Script = load(Game.MUSIC_BOX_SCRIPT)
+	var Hints: Script = load(Game.ONBOARDING_SCRIPT)
+	var Trial: Script = load(Game.ECHO_TRIAL_SCRIPT)
+	var group := String(Hints.get_script_constant_map().get("GROUP", "onboarding_hints"))
+	Game.wire_session_systems()
+	var loaded_n := Events.area_loaded.get_connections().size()
+	var cue_n := Events.music_cue_changed.get_connections().size()
+	var children_n := Game.get_child_count()
+	Game.wire_session_systems()
+	Game.wire_session_systems()
+	assert_eq(Events.area_loaded.get_connections().size(), loaded_n, "no listener is connected twice")
+	assert_eq(Events.music_cue_changed.get_connections().size(), cue_n, "the discovery listener once")
+	assert_eq(Game.get_child_count(), children_n, "no second session node")
+	if Mastery.has_method("is_listening"):
+		assert_true(bool(Mastery.call("is_listening")), "masteries")
+	assert_not_null(Game.story_tracker(), "the story tracker")
+	assert_true(bool(Ex.call("is_listening")), "expeditions: the Reach listener")
+	assert_true(bool(Box.call("is_listening")), "music box: song discovery")
+	if Trial.has_method("init") and Trial.has_method("is_listening"):
+		assert_true(bool(Trial.call("is_listening")), "echo trial: the gift payer")
+	var hints: Array = Game.get_children().filter(func(n: Node) -> bool: return n.is_in_group(group) and not n.is_queued_for_deletion())
+	assert_eq(hints.size(), 1, "one onboarding hints node under Game")
+	if hints.size() == 1:
+		assert_false((hints[0] as Node).is_processing(), "it never steps by itself in a headless run")
+		assert_eq((hints[0] as Node).process_mode, Node.PROCESS_MODE_PAUSABLE, "and pauses with the game")
+	# a suite that shut the static listeners down: the next wiring brings them back
+	Ex.call("shutdown")
+	Box.call("shutdown")
+	if Trial.has_method("shutdown"):
+		Trial.call("shutdown")
+	assert_false(bool(Ex.call("is_listening")))
+	assert_false(bool(Box.call("is_listening")))
+	Game.wire_session_systems()
+	assert_true(bool(Ex.call("is_listening")), "expeditions wired again")
+	assert_true(bool(Box.call("is_listening")), "music box wired again")
+	if Trial.has_method("init") and Trial.has_method("is_listening"):
+		assert_true(bool(Trial.call("is_listening")), "echo trial wired again")
+	assert_eq(Events.area_loaded.get_connections().size(), loaded_n, "and still connected once")
+
+
+## P34: the Music Box learns songs from the first cue heard in play - before any box is built - through the session
+## wiring alone (never on the title screen, never combat / boss / horror music).
+func test_the_music_box_discovers_songs_from_the_first_cue_in_play() -> void:
+	var Box: Script = load(Game.MUSIC_BOX_SCRIPT)
+	Game.wire_session_systems()
+	GameState.active = true
+	Game.mode = "title"
+	Events.music_cue_changed.emit("m15")
+	assert_false(bool(Box.call("is_discovered", "m15")), "the title screen discovers nothing")
+	Game.mode = "playing"
+	Game.area_id = "hallowmere_reach"
+	Events.music_cue_changed.emit("m15")
+	assert_true(bool(Box.call("is_discovered", "m15")), "heard in play: discovered (no music box built yet)")
+	assert_eq(String((Box.call("heard_at", "m15") as Dictionary).get("area", "")), "hallowmere_reach", "where it was heard")
+	assert_true(GameState.extra.get("music_box") is Dictionary, "saved in the music box section of GameState.extra")
+	Events.music_cue_changed.emit("m22")
+	assert_false(bool(Box.call("is_discovered", "m22")), "combat music never")
+
+
+## P34: arriving in the Reach adds no expedition runner node unless a run is saved (the D2 review fix).
+func test_arriving_in_the_reach_without_a_run_adds_no_runner() -> void:
+	var Ex: Script = load(Game.EXPEDITIONS_SCRIPT)
+	Game.wire_session_systems()
+	assert_false(bool(Ex.call("is_active")), "no run in a fresh journey")
+	var reach := Node3D.new()
+	reach.name = "ReachStandIn"
+	add_child(reach)
+	_tmp.append(reach)
+	Game.area = reach
+	Game.area_id = "hallowmere_reach"
+	Events.area_loaded.emit("hallowmere_reach")
+	var names: Array = reach.get_children().map(func(n: Node) -> String: return "%s (%s)" % [n.name, n.get_script().resource_path if n.get_script() != null else n.get_class()])
+	assert_null(reach.get_node_or_null(String(Ex.get_script_constant_map().get("RUNNER_NODE", "Expeditions"))), "no runner node without a run: %s" % str(names))
+	Game.area = null

@@ -186,6 +186,8 @@ func test_mud_clod_long_tell_marked_line_and_one_hit_with_slow() -> void:
 	var clod: Node3D = e.clod
 	assert_not_null(clod, "a clod was thrown")
 	assert_eq(int(e.clods_thrown), 1)
+	assert_eq(String(clod.get("kind")), "mud_clod", "thrown through enemy_base.fire_projectile (kind passes through)")
+	assert_eq(clod.get("shooter"), e)
 	assert_false(bool(e.clod_ready()), "one clod at a time / cooldown")
 	var captions: Array = []
 	var cb := func(text: String) -> void: captions.append(text)
@@ -242,6 +244,48 @@ func test_slow_is_bounded_and_never_chains() -> void:
 	assert_true(GameState.buffs.has("slow"), "slow buff applied")
 	assert_true(float(GameState.buffs["slow"]["mult"]) >= Base.SLOW_MIN_MULT, "never below the floor")
 	assert_true(float(GameState.buffs["slow"]["remaining"]) <= Base.SLOW_MAX_SECONDS, "never longer than the cap")
+
+
+## Integration pass 2 (P02): enemy_base.fire_projectile passes "dir" (fly straight along it; the target only gates
+## the shot) and "on_hit" through to the shared projectile; without them it still aims at the target.
+func test_fire_projectile_passes_dir_and_on_hit() -> void:
+	var k := _krystal(Vector3(0, 0, -6.0))
+	var e := _walker(k)
+	var got: Array = []
+	var cb := func(t: Node, dealt: float) -> void: got.append([t, dealt])
+	var from: Vector3 = e.attack_origin()
+	# "dir" away from her: it flies that way and never hits her.
+	var p1: Node3D = e.fire_projectile(from, k, {"dir": Vector3(1, 0, 0), "on_hit": cb, "damage": 5.0, "speed": 9.0, "range": 8.0})
+	assert_not_null(p1, "fired")
+	if p1 != null:
+		var v: Vector3 = p1.get("velocity")
+		assert_true(v.normalized().dot(Vector3(1, 0, 0)) > 0.99, "launched along dir, not at her (%s)" % str(v))
+		_fly(p1)
+		assert_ne(String(p1.get("result")), "hit", "it went along dir, not at her")
+	assert_almost(float(k.health.hp), 100.0, 0.001)
+	assert_eq(got.size(), 0, "no hit, no callback")
+	# "dir" at her + on_hit: the callback hears the real damage.
+	if ResourceLoader.exists(SHARED_PROJECTILE):
+		load(SHARED_PROJECTILE).call("stop_all")
+	var p2: Node3D = e.fire_projectile(from, k, {"dir": Vector3(0, 0, -1), "on_hit": cb, "damage": 5.0, "speed": 9.0, "range": 10.0})
+	assert_not_null(p2)
+	if p2 != null:
+		_fly(p2)
+		assert_eq(String(p2.get("result")), "hit")
+	assert_eq(got.size(), 1, "on_hit called once")
+	if got.size() == 1:
+		assert_eq(got[0][0], k)
+		assert_almost(float(got[0][1]), 5.0, 0.001, "with the damage dealt")
+	# Default (no dir): aims at her, as before.
+	if ResourceLoader.exists(SHARED_PROJECTILE):
+		load(SHARED_PROJECTILE).call("stop_all")
+	k.global_position = Vector3(3, 0, -6.0)
+	var p3: Node3D = e.fire_projectile(from, k, {"damage": 5.0, "speed": 9.0, "range": 12.0})
+	assert_not_null(p3)
+	if p3 != null:
+		_fly(p3)
+		assert_eq(String(p3.get("result")), "hit", "the default still aims at the target")
+	assert_eq(String(p3.get("kind")) if p3 != null else "", "patchwalker", "kind defaults to the enemy id")
 
 
 func test_no_throw_through_a_wall_and_companions_untouched() -> void:

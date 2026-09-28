@@ -22,8 +22,10 @@ Read first: `GAME_SPEC.md` (design) and `docs/ARCHITECTURE.md` (code contracts).
 * Preview one visual script:        `... -- --preview=res://src/companions/mochi.gd --shot-dir=<abs dir>`
 * Release build + zip:              `powershell -ExecutionPolicy Bypass -File tools/build_release.ps1`
 * Chapter Two visual-QA commands (debug builds only; `...` = `tools/godot.sh --path game --resolution 1600x900`; always
-  bound them with `--quit-at` / `--max-seconds` or `timeout`; look at the PNGs afterwards). Suggested by the Wave B/C
-  modules, not yet run on screen (the pending checks are listed in `KNOWN_ISSUES.md`):
+  bound them with `--quit-at` / `--max-seconds` or `timeout`; look at the PNGs afterwards). Suggested by the Wave B-D
+  modules and the integration passes, not yet run on screen (the pending checks are listed in `KNOWN_ISSUES.md`). Any run
+  that can save (a checkpoint, an area change, an Echo Trial round trip, "Set out" on an expedition) must also pass
+  `--save-dir=<abs scratch dir>` so the real saves in `%APPDATA%\Hollowhaven\saves` are never touched:
   * Avatar looks (preview stage, non-driven avatar): `... -- --windowed --preview=res://src/player/krystal_avatar.gd
     --avatar-outfit=<outfit id> [--avatar-hair=<id> --avatar-hair-color=<id> --avatar-skin=<id> --avatar-eyes=<id>
     --avatar-hat=<id> --avatar-armor=<armor set id>] --preview-anim=walk --shot-dir=<abs dir>` (ids: `data/appearance.gd`,
@@ -38,6 +40,22 @@ Read first: `GAME_SPEC.md` (design) and `docs/ARCHITECTURE.md` (code contracts).
     (tabs: story, optional, friends, lore, mastery).
   * Hushed Works deep rooms: `... -- --windowed --area=hushed_works --spawn=crossing_gate
     --flags=ch2_line_water,ch2_line_bell,ch2_line_light --give=lantern` (other spawns: `bell_throat`, `vault_exit`, see spec §1).
+  * Expedition panel (Wave D2; the routes open after the Choir and their district's restored flag, else they show locked with the
+    reason): `... -- --windowed --area=surface --flags=ch2_choir_defeated,ch2_orchard_restored,ch2_quarry_restored,ch2_manor_restored
+    --ui-open=expedition --ui-args={"template":"orchard_patrol"} --shots=<abs dir> --shot-times=4 --quit-at=6` (template ids:
+    `orchard_patrol`, `quarry_circuit`, `manor_afterglow`, `data/expeditions.gd`). The ribbon lantern, the end cache, the Reach map
+    pins (`--ui-open=map`) and the tracker card need a started run: press "Set out" in that panel (with `--save-dir`), then boot
+    the saved run with `--load-save --save-dir=<same dir>`.
+  * Music Box panel (Wave D3; not full-screen, the world keeps running behind it): `... -- --windowed --area=surface
+    --ui-open=music_box --shots=<abs dir> --shot-times=4 --quit-at=6` (opened without a box: no house check; only discovered songs
+    are listed - m01 always, more after `--hour=` / walking around in the same run).
+  * Echo Trial arenas (Wave D1): the Matron's trial is what the area hosts by default: `... -- --windowed --area=echo_trial
+    --flags=weaver_defeated --save-dir=<abs dir> --shots=<abs dir> --shot-times=3,8 --quit-at=10`. Count Velour's and the
+    Choir's arenas are only entered through their echo stones (no direct switch): boot at the stone - `--area=moonveil_manor
+    --spawn=manor_ballroom --flags=ch2_velour_defeated` or `--area=hushed_works --spawn=bell_throat
+    --flags=ch2_choir_defeated,ch2_line_water,ch2_line_bell,ch2_line_light --give=lantern` (both with `--save-dir`) - screenshot
+    the stone (Bell Throat position check: lead decision L10), then press E and "Enter the echo" with `tools/winctl.ps1` or the
+    QA bot.
 * Drive a running build with real OS input: `tools/winctl.ps1 -ProcId <pid> -Action seq -Seq "W:800,E:80"`
 * Second-monitor QA playthrough (the owner keeps full use of monitor 1; virtual input, no SendInput, no focus):
   `python tools/qa/playthrough.py --second-monitor --mute --out qa/tmp/e2e/sm1` (packaged build; same flags for

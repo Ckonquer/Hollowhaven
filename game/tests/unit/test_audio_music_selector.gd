@@ -122,6 +122,13 @@ func test_catalogue_has_27_cues_and_consistent_tables() -> void:
 	assert_true(int(p["boss_matron"]["priority"]) > int(p["silence"]["priority"]), "boss > horror suppression")
 	assert_true(int(p["silence"]["priority"]) > int(p["combat1"]["priority"]), "horror suppression > combat")
 	assert_true(int(p["combat1"]["priority"]) > int(p["haven"]["priority"]), "combat > safe refuge")
+	# the Music Box preview (P46: in the data table too) sits between ordinary combat and the safe refuges
+	assert_true(int(p["combat1"]["priority"]) > int(p["musicbox"]["priority"]), "combat > music box preview")
+	assert_true(int(p["musicbox"]["priority"]) > int(p["haven"]["priority"]), "music box preview > safe refuge")
+	for a in MusicData.AREAS:
+		var ad: Dictionary = MusicData.AREAS[a]
+		assert_true(String(ad["default"]) != "musicbox" and not (ad["zones"] as Dictionary).values().has("musicbox"),
+			"the preview is never an area / zone base (%s)" % a)
 	assert_true(int(p["haven"]["priority"]) > int(p["woods"]["priority"]), "safe refuge > exploration")
 	assert_true(int(p["woods"]["priority"]) > int(p["silk"]["priority"]), "exploration > ambience only")
 
@@ -270,6 +277,25 @@ func test_combat_hysteresis_enter_and_release() -> void:
 		flick.append_array(_run(s, c, 0.3, 0.1))
 	for f in flick:
 		assert_ne(String(f[1]["context"]), "combat1", "flickering threat under 1 s never enters combat")
+
+
+## P06 (integration pass 2, kept): the Quarry Warden is an elite, not one of the four bosses. data/music.gd BOSSES
+## does not map it, so the selector treats it as an unknown boss: a Warden fight in the quarry plays the Reach's
+## ordinary combat music (m22, following the threat), never a boss context.
+func test_the_quarry_warden_fight_uses_ordinary_combat_music() -> void:
+	assert_false(MusicData.BOSSES.has("quarry_warden"), "no boss mapping for the Warden")
+	var s := _sel(4)
+	s.update(_ctx("hallowmere_reach", "hr_quarry"), 0.2)
+	# the quarry's own piece (m18) hands over on a beat boundary, so allow one beat past the 1 s combat entry
+	var on := _run(s, _ctx("hallowmere_reach", "hr_quarry", {"threat": true, "boss": "quarry_warden"}), 2.4, 0.2)
+	assert_eq(on.size(), 1, "one change: into ordinary combat")
+	if on.size() == 1:
+		assert_eq(String(on[0][1]["context"]), "combat2", "the Reach's combat context")
+		assert_eq(String(on[0][1]["cue"]), "m22", "Harvest Trouble follows the threat")
+	var calm := _run(s, _ctx("hallowmere_reach", "hr_quarry", {"boss": "quarry_warden"}), 3.0, 0.2)
+	for e in calm:
+		assert_ne(String(MusicData.CONTEXTS.get(String((e[1] as Dictionary).get("context", "")), {}).get("kind", "")), "boss",
+			"an unknown boss id never selects boss music")
 
 
 func test_combat_music_per_chapter() -> void:

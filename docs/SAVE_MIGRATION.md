@@ -38,7 +38,7 @@ the same defaults (`GameState.v2_section_defaults()`).
 | `ledger` | `{}` | `{reward_id: total_minutes}` - rewards granted exactly once |
 | `mastery` | three tracks at 0, `seen` lists, `legacy_credit: false` | owned by the mastery module; a recorded credit is never reset |
 | `discovered` | `{}` | `{area_id: [landmark ids]}` |
-| `trials` | `{}` | `{trial_id: {"clears", "best_seconds"}}` |
+| `trials` | `{}` | `{trial_id: {"clears", "best_seconds"}}` + the trial-scoped ledger written by the echo trials (Wave D1 / pass 2): `last_seconds`, `repeat_paid` (repeat clears paid), `paid` {item: total}, and - only between a won repeat clear and the arrival back at the trial's origin - `pending` {item: n} and `pending_clears` (the gift waiting to be paid there; lead decision L08). Trial ids: `matron`, `velour`, `choir` (`data/trials.gd`) |
 | `orphans` | `[]` | player-owned stacks with an item id this build does not know (see §4) |
 | `stations` | `{}` | reserved (station queues live in `structures[uid].data`) |
 
@@ -51,6 +51,15 @@ past the end).
 Any top-level state key this build does not know is kept in `GameState.extra` and written back unchanged, so a
 later patch never loses data by being loaded in this one. Unknown keys inside companion records, structures,
 appearance, wardrobe, mastery, trials and capacity are kept the same way.
+
+Two Wave D modules store their state as such top-level keys through `GameState.extra` (no GameState section, no
+migration step: absent = nothing yet; `GameState.reset()` / New Game clears them; a build without the module keeps
+them verbatim):
+
+| extra key | shape | notes |
+|---|---|---|
+| `expeditions` | `{"v": 1, "active": {} or {"template", "seed" (1..9999), "stop", "defeated", "down": {enemy: n}, "started_at", "run"}, "runs", "completed": {template: n}, "abandoned", "last": {} or {"template", "run", "items", "keepsake", "at"}}` | Lanternwake Expeditions (`src/expeditions/expeditions.gd`). JSON floats are normalised on every read; a damaged section is repaired and an unknown template / out-of-range stop drops the run, never a crash. Never a flag or ledger entry: `completed` is written before a cache pays, so a run pays once. The Reach gets its runner node (`"Expeditions"`) only while a run is active |
+| `music_box` | `{"discovered": {cue: {"area", "zone", "at"}}, "favourites": [cue]}` | the Music Box (`src/audio/music_box.gd`): songs first heard in play (safe / explore / ending cues only) and the favourite toggles. A cue id the catalogue no longer knows is kept but never listed, played or weighted; a malformed section reads as empty and is repaired on the next write |
 
 ## 3. Migration rules (`SaveSystem.migrate`, v1 -> v2)
 
@@ -149,6 +158,9 @@ Tests (headless, bounded, only in `user://test_saves/`), from the repo root in G
   discovery, tolerant loading, combined objective), `test_save_v2_chapter_log`, `test_save_v2_optional_log`,
   `test_save_v2_title`, `test_save_v2_matrix`.
 * `tools/test.sh save`, `tools/test.sh core`, `tools/test.sh quests`, `tools/test.sh persistence`, `tools/test.sh parse_all`.
+* Wave D state: `tools/test.sh trials` (the trial ledger survives save / load; a pending gift is paid once, also across
+  a reload), `tools/test.sh expeditions` (a run resumes through the real SaveSystem, damaged sections are repaired),
+  `tools/test.sh music_box` (discoveries / favourites survive save / load, renamed cues and damaged sections).
 
 Migration matrix (MP §20.2): committed synthetic fixtures in `game/tests/fixtures/saves/` (`<name>.json` = slot1.json,
 `<name>.bak.json` = slot1.bak.json; list in its `README.txt`), built from real GameState calls by

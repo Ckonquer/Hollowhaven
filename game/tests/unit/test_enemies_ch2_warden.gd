@@ -7,6 +7,8 @@ extends "res://tests/test_case.gd"
 ## reset policy (Krystal's defeat or leaving the leash: every pillar whole, the Warden whole) and the real arena
 ## (warden_arena.gd): the spawner hands over the pillars, defeat commits hr_warden_defeated + the spawner flag
 ## BEFORE any presentation, and a retry after Krystal's defeat starts fresh.
+## Integration pass 2 (D06): the charge lane ends within arena_radius - 1 m of the arena centre (the mark shows the
+## clipped length) and a ledge ahead (no floor within 1 m below) bonks it like a wall - it never falls to L1.
 
 const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Base := preload("res://src/enemies/enemy_base.gd")
@@ -272,6 +274,101 @@ func test_missed_charge_is_a_long_open_window() -> void:
 	assert_eq(String(e.last_charge_result), "missed")
 	assert_almost(float(e.armor_mult()), Warden.OPEN_MULT, 0.001, "open")
 	assert_almost(_until(e, "chase", 5.0, true) + DT, 3.5, DT * 3.0, "data charge recover 3.5 s")
+
+
+# --- The charge stays in its arena (integration pass 2, D06) ----------------------------------------------------------
+
+func _warden_in(target: Node3D, pos: Vector3, center: Vector3, radius: float, pillars: Array = []) -> Node:
+	var e: Node = Factory.create("quarry_warden", {"home": pos, "no_drops": true, "arena_center": center, "arena_radius": radius, "pillars": pillars})
+	(e as Node3D).position = pos
+	add_child(e)
+	e.set_physics_process(false)
+	e.target_override = target
+	_nodes.append(e)
+	return e
+
+
+func test_arena_lane_limit_geometry() -> void:
+	var d := _dummy(Vector3(0, 0, -30))
+	var e := _warden_in(d, Vector3.ZERO, Vector3.ZERO, 10.0)
+	var r := 10.0 - Warden.ARENA_EDGE_MARGIN
+	assert_almost(float(e.arena_lane_limit(Vector3.ZERO, Vector3(1, 0, 0))), r, 0.001, "from the centre: arena_radius - 1 m")
+	assert_almost(float(e.arena_lane_limit(Vector3(5, 0, 0), Vector3(1, 0, 0))), r - 5.0, 0.001, "heading out")
+	assert_almost(float(e.arena_lane_limit(Vector3(5, 0, 0), Vector3(-1, 0, 0))), r + 5.0, 0.001, "heading across")
+	assert_almost(float(e.arena_lane_limit(Vector3(9.5, 0, 0), Vector3(1, 0, 0))), 0.0, 0.001, "already past the inner ring, heading out: no lane")
+	assert_almost(float(e.charge_reach(Vector3.ZERO, Vector3(0, 0, -1))), r, 0.001, "data 12 m clipped to 9 m")
+	var wide := _warden_in(d, Vector3(50, 0, 50), Vector3(50, 0, 50), 20.0)
+	assert_almost(float(wide.charge_reach(Vector3(50, 0, 50), Vector3(0, 0, -1))), 12.0, 0.001, "a big arena keeps the data distance")
+
+
+func test_a_charge_lane_ends_inside_the_arena() -> void:
+	_floor()
+	var d := _dummy(Vector3(0, 0, -10.0))
+	var e := _warden_in(d, Vector3(0, 0, -4.0), Vector3.ZERO, 10.0)      # 4 m from the centre, arena ring 10 m
+	await wait_physics(2)
+	_baited_charge(e, d)
+	var want := 10.0 - Warden.ARENA_EDGE_MARGIN - 4.0
+	assert_almost(float(e.lane_length()), want, 0.1, "the lane is clipped to the arena (%.2f m)" % e.lane_length())
+	var p: Vector3 = (e as Node3D).global_position
+	assert_true(Vector2(p.x, p.z).length() <= 10.0 - Warden.ARENA_EDGE_MARGIN + 0.3, "it stopped inside the arena (%.2f m out)" % Vector2(p.x, p.z).length())
+	assert_eq(String(e.last_charge_result), "missed", "nothing in the way: it skids to a stop at the lane's end")
+	assert_almost(float(d.health.hp), 300.0, 0.001)
+
+
+func test_the_lane_mark_shows_the_clipped_length() -> void:
+	_floor()
+	var d := _dummy(Vector3(0, 0, -10.0))
+	var e := _warden_in(d, Vector3(0, 0, -4.0), Vector3.ZERO, 10.0)
+	await wait_physics(2)
+	e.slams_done = 1
+	e.next_attack = "charge"
+	_until(e, "telegraph", 5.0, true)
+	for i in 10:
+		_step(e, true)
+	var fp: Dictionary = e.mark().footprint()
+	var marked := Vector2((fp["to"] as Vector3).x - (fp["from"] as Vector3).x, (fp["to"] as Vector3).z - (fp["from"] as Vector3).z).length()
+	assert_eq(String(fp["kind"]), "lane")
+	assert_true(marked <= 10.0 - Warden.ARENA_EDGE_MARGIN - 4.0 + 0.3, "the red lane shows the clipped length (%.2f m)" % marked)
+	assert_almost(marked, float(e.lane_length()), 0.01, "mark = charge lane")
+
+
+func _ledge_floor() -> void:
+	# L2 (y 0) up to the edge at z = -3, then a 1.4 m step down to L1 (like the quarry's L1|L2 bench edge).
+	_box(Vector3(0, -0.5, 18.5), Vector3(80, 1, 43))
+	_box(Vector3(0, -1.9, -23.0), Vector3(80, 1, 40))
+
+
+func test_a_charge_baited_off_the_ledge_bonks_at_the_edge() -> void:
+	_ledge_floor()
+	var far := _pillar(Vector3(12, 0, 12))
+	var d := _dummy(Vector3(0, -1.4, -6.5))          # she stands down on L1, just past the edge
+	var e := _warden(d, Vector3.ZERO, [far])
+	await wait_physics(3)
+	assert_true(bool(e.floor_ahead(Vector3(0, 0, -1), 0.1)), "floor ahead where it stands")
+	_baited_charge(e, d)
+	assert_eq(int(e.ledge_stops), 1, "the ledge stopped the charge")
+	assert_eq(e.state, "stunned", "a pillar still stands: a bonk and a stun (%s)" % e.state)
+	assert_eq(String(e.last_charge_result), "wall")
+	assert_true(bool(far.is_intact()), "the far pillar is untouched")
+	for i in 30:
+		_step(e, true)
+	var p: Vector3 = (e as Node3D).global_position
+	assert_true(p.z > -3.0, "it stays on L2 (z %.2f)" % p.z)
+	assert_true(p.y > -0.3, "it never dropped to L1 (y %.2f)" % p.y)
+	assert_almost(float(d.health.hp), 300.0, 0.001)
+
+
+func test_with_no_intact_pillar_the_ledge_exposes_it() -> void:
+	_ledge_floor()
+	var gone := _pillar(Vector3(12, 0, 12))
+	gone.crack()
+	var d := _dummy(Vector3(0, -1.4, -6.5))
+	var e := _warden(d, Vector3.ZERO, [gone])
+	await wait_physics(3)
+	_baited_charge(e, d)
+	assert_eq(int(e.ledge_stops), 1)
+	assert_eq(e.state, "exposed", "never unwinnable: with every pillar down the ledge exposes it like a wall")
+	assert_eq(String(e.last_charge_result), "wall_exposed")
 
 
 # --- Phase 2: three spaced pulses -------------------------------------------------------------------------------------

@@ -346,6 +346,56 @@ func test_area_bound_hints_wait_for_their_area() -> void:
 	assert_eq(_run(), "ob_echo_trial", "shown there")
 
 
+## Pass 2 (P49): ONE echo trial hint for every echo stone - it arms on arrival where a won fight's stone stands
+## (the Below after weaver_defeated, the manor after ch2_velour_defeated, the Hushed Works after ch2_choir_defeated).
+func test_the_echo_trial_hint_arms_at_every_stone() -> void:
+	for c in [["below", "weaver_defeated"], ["moonveil_manor", "ch2_velour_defeated"], ["hushed_works", "ch2_choir_defeated"]]:
+		fresh_state()
+		GameState.active = true
+		GameState.stats["play_seconds"] = 5000.0
+		shown.clear()
+		var area := String(c[0])
+		Game.area_id = area
+		ob.call("_reset_session")
+		Events.area_loaded.emit(area)
+		assert_false(ob.armed_ids().has("ob_echo_trial"), "%s: no stone before its fight is won" % area)
+		GameState.set_flag(String(c[1]), true)
+		ob.call("_reset_session")                       # only the arrival under test arms it
+		Events.area_loaded.emit(area)
+		assert_true(ob.armed_ids().has("ob_echo_trial"), "%s: armed on arrival once %s is set" % [area, c[1]])
+		assert_eq(_run(), "ob_echo_trial", "%s: shown there" % area)
+		assert_true(String(shown[shown.size() - 1][1]).contains("echo stone"), "the generic echo stone text")
+		assert_eq(_count("ob_echo_trial"), 1, "%s: once" % area)
+
+
+## The Chapter Two bosses arm it live (the stone appears at once); it waits for a stone's area. Chapter One's
+## weaver_defeated never arms it live (the return home is not interrupted: it waits for the next Below visit).
+func test_the_echo_trial_hint_waits_for_a_stone_and_is_armed_live_by_chapter_two_bosses() -> void:
+	Game.area_id = "surface"
+	GameState.set_flag("weaver_defeated", true)
+	assert_false(ob.armed_ids().has("ob_echo_trial"), "Chapter One's win does not arm it live")
+	GameState.set_flag("ch2_velour_defeated", true)
+	assert_true(ob.armed_ids().has("ob_echo_trial"), "Count Velour's defeat arms it")
+	Game.area_id = "hallowmere_reach"
+	assert_eq(_run(80), "", "no echo stone in the Reach: it waits")
+	assert_true(ob.armed_ids().has("ob_echo_trial"), "still armed")
+	Game.area_id = "hushed_works"
+	assert_eq(_run(40), "", "the Works' stone only stands after the Choir")
+	Game.area_id = "moonveil_manor"
+	assert_eq(_run(), "ob_echo_trial", "shown in the manor, where his stone stands")
+
+
+func test_the_echo_trial_hint_is_dropped_once_any_trial_is_cleared() -> void:
+	GameState.set_flag("weaver_defeated", true)
+	GameState.trials["choir"] = {"clears": 1, "best_seconds": 250.0}
+	Game.area_id = "below"
+	Events.area_loaded.emit("below")
+	assert_true(ob.armed_ids().has("ob_echo_trial"), "armed at the Below stone")
+	assert_eq(_run(40), "", "she already knows the stones (a trial was cleared)")
+	assert_false(ob.armed_ids().has("ob_echo_trial"), "dropped")
+	assert_false(bool(GameState.get_flag("hint_ob_echo_trial")), "not marked as shown")
+
+
 func test_new_journeys_hear_about_the_wardrobe_later() -> void:
 	GameState.stats["play_seconds"] = 20.0
 	GameState.wardrobe["notice_shown"] = true      # styled on the creation screen

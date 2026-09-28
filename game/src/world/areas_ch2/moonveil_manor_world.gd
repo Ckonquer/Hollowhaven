@@ -24,6 +24,9 @@ extends "res://src/world/area_base.gd"
 ## or a Count node that vanishes without a defeat): the fallback lets the three ward candles break the
 ## enchantment (never a softlock); debug_mark_velour_defeated() for tests/QA. A ch2_velour_defeated flag set by
 ## anyone else is picked up on the next encounter tick. The boss must keep ONE node for the whole encounter.
+## After the win the flag, the candles, the doors and the echo stone change at once; the freed resident appears
+## RESIDENT_DELAY s later (= count_velour.gd DEFEAT_PRESENT: his enchantment has finished dispersing where he fell;
+## a pause-aware timer, dropped if the area is left / freed first, never a second resident). On load: at once, quiet.
 ## Ambience per zone (Layout.AMBIENCE): the house is quiet, the balcony hears the night. Echo Trial hook: after
 ## the Count is freed, an echo stone by the ballroom rest candles offers his trial once echo_trial.gd has one.
 
@@ -50,6 +53,9 @@ const Palette := preload("res://src/art/palette.gd")
 const SPAWNER_SCRIPT := "res://src/enemies/enemy_spawner.gd"
 const ECHO_TRIAL_SCRIPT := "res://src/world/areas_ch2/echo_trial.gd"
 const START_METHODS := ["start_fight", "begin_fight", "start", "activate"]
+## Seconds between a live win and the resident's arrival: count_velour.gd DEFEAT_PRESENT (not preloaded here: a won
+## save never loads the boss script; test_boss_velour_manor keeps the two equal).
+const RESIDENT_DELAY := 1.4
 const STOP_METHODS := ["reset_fight", "stop_fight", "end_fight"]
 
 # Colours (storybook, velvet, candlelit).
@@ -104,6 +110,7 @@ var player_override: Node3D = null   # tests
 var ambience_zone: String = ""       # zone whose ambience was last applied
 var _first_bow_said := false
 var _after_applied := false          # the after-the-Count state (balcony open, resident) is in place
+var _resident_pending := false       # a live win's resident is waiting for the Count's dispersal to finish
 var _fallback_told := false
 var _teach_told := false
 var _tick := 0.0
@@ -1128,9 +1135,38 @@ func _apply_after_velour(live: bool) -> void:
 		wc.call("restore", true)
 	if lantern != null:
 		lantern.call("refresh")
-	if resident == null or not is_instance_valid(resident):
-		resident = _node(ResidentScript, {"greet": live}, Layout.ARENA["resident"], 20.0)
+	if live and is_inside_tree():
+		_schedule_resident()
+	else:
+		_spawn_resident(live)
 	_place_echo_trial()
 	if live:
 		Events.caption.emit("[the violet shimmer on the glass doors fades away]")
 		Events.screen_flash.emit(Color(1.0, 0.8, 0.9, 0.15), 0.8)
+
+
+## A live win: the freed Count appears once his dispersal (count_velour DEFEAT_PRESENT) has played where he fell.
+## One timer at most; a timer connection (not an await), so a freed area never resumes; pause-aware.
+func _schedule_resident() -> void:
+	if _resident_pending or (resident != null and is_instance_valid(resident)):
+		return
+	_resident_pending = true
+	get_tree().create_timer(RESIDENT_DELAY, false).timeout.connect(_on_resident_delay, CONNECT_ONE_SHOT)
+
+
+func _on_resident_delay() -> void:
+	if not _resident_pending:
+		return
+	_resident_pending = false
+	if not is_inside_tree() or is_queued_for_deletion() or Game.mode == "loading":
+		return          # she already left (the next visit places him quietly on load)
+	if Game.area != null and is_instance_valid(Game.area) and Game.area != self:
+		return
+	_spawn_resident(true)
+
+
+func _spawn_resident(greet: bool) -> void:
+	if resident != null and is_instance_valid(resident):
+		return
+	_resident_pending = false
+	resident = _node(ResidentScript, {"greet": greet}, Layout.ARENA["resident"], 20.0)

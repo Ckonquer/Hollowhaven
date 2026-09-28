@@ -525,16 +525,43 @@ survive load):
 | `GameState.structures[uid].data` | `queue`, `output`, `held_jobs` (furnace); `slots`, `upgrade_refunded` (chest); `tint`, `face`, `level` (building) | B5/B6 |
 | `GameState.stations` | `use_chests` (bool), `table_decor` (festival table choice) | B5 |
 | `GameState.mastery` | track xp, `seen`, `daily` {day, xp}, `legacy_credit`, `spots` {area: {kind: [[x, z]...]}} (bounded) | B5 + R22 |
+| `GameState.trials[id]` | `clears`, `best_seconds` (spec §3) + the trial-scoped ledger `last_seconds`, `repeat_paid`, `paid` {item: total} (D1) and, between a won repeat clear and the arrival back at the origin, `pending` {item: n} + `pending_clears` (pass 2, L08: paid by `echo_trial.pay_pending`, then erased) | D1 + G3 |
+| `GameState.extra["expeditions"]` | `{v: 1, active: {} \| {template, seed 1..9999, stop, defeated, down {enemy: n}, started_at, run}, runs, completed {template: n}, abandoned, last {} \| {template, run, items, keepsake, at}}` (see below) | D2 |
+| `GameState.extra["music_box"]` | `{discovered: {cue: {area, zone, at}}, favourites: [cue]}` (see below) | D3 |
 | flags | story/objective flags per `data/quests_ch2.gd` header + `data/optional_goals.gd` table (the rewards & flags rule, WAVE_A_REPORT); local flags (`hr_*`, `hw_*`, `mm_*`, `ta_*`, `cp_lit_*`, `spawner_cleared_*`); moment flags `ch2_moment_pumpkin_*`, `ch2_moment_empty_waltz`, `ta_moment_echo`, `moment_hw_*` (names kept, R136 r); `c1x_look_chosen`, `c1x_mochi_courage`, `c1x_upstairs_reachable` (repaired on load, R36), `<gate flag>_tried` (R74) | modules |
 `GameState.player["max_hp"]` stays the BASE 100 (effective max = `Stats.effective_max_hp()`); the shield and slows' immunity are
 transient (not saved); slows are timed buffs (`add_buff`, saved, ticked while unpaused).
+
+**Wave D state in `GameState.extra` (pass 2, P37).** `extra` holds every top-level state key GameState does not own and writes it back
+verbatim, so these two sections survive save / load / migration / an older build untouched, need no migration and are reset by New
+Game; neither is in `GameState.STATE_KEYS` (only add a key there together with loading it there).
+* `extra["expeditions"]` (`src/expeditions/expeditions.gd`, `Data.STATE_KEY`): `v` 1; `active` = {} or the running route
+  (`template` id, `seed` 1..9999 - it only picks which authored group waits at each stop, the spawn-point order and the reward amounts
+  -, `stop` index (== the stop count: the cache waits), `defeated` / `down` {enemy id: n} at the current stop, `started_at`
+  (`GameState.total_minutes`), `run` number); `runs` started, `completed` {template: completions}, `abandoned`, `last` result. Every
+  read normalises JSON floats; a damaged section is repaired, an unknown template or an out-of-range stop drops the run (never a crash).
+  Expeditions never write a flag, the ledger or a quest layer; `complete()` records the completion before paying (once). The Reach gets
+  the runner node (`Expeditions.RUNNER_NODE` "Expeditions") only while a run is active.
+* `extra["music_box"]` (`src/audio/music_box.gd`, `STATE_KEY`): `discovered` {cue id: {area, zone, at (total_minutes)}} for cues of kind
+  safe / explore / ending first heard in play (`STARTER_CUES` m01 is always known), `favourites` [cue id]. A cue id the catalogue no
+  longer knows is kept but never listed, previewed or weighted; a malformed section reads as empty and is repaired on the next write.
+
+**Display-only quest rows (pass 2, F03).** A `data/quests_ch2.gd` objective with `"display": true` is listed by
+`ChapterLog.check_objective()` / `objective_status()` with its real done state (the row carries `"display": true`; other rows keep their
+exact shape) but `step_done()` - and so `has_pending_completion()` / `evaluate()` - ignores it; a step needs at least one non-display
+objective. `ChapterLog.is_display_objective(o)`. Used by `ch2_quarry` ("Calm the Quarry Warden" `hr_warden_defeated`, "Mend the mineral
+winch" `ch2_winch_repaired`, then the lamp that completes it). Telemetry `current_objective().status` rows may carry the key.
 
 **Rewards (unchanged rule, WAVE_A_REPORT).** Content modules grant only their `"by": "content"` bundles with `grant_once`; the
 integration pass added the missing bundles to `data/sources.gd` REWARDS: `rw_hr_chime_trail` (Pools pouch, R30),
 `rw_hw_throat_supplies` (Bell Throat supplies, R31), `rw_hw_lightwell_alcove` (Light Well keepsake: decor `bat_bunting` ×2 +
 `crescent_window`, no pattern — every pattern already has its own unique source, R32), and made `rw_ch2_feast` honest (candy 6 +
 pumpkin 4, lantern_wax 4, sugarcap 3, moonpetal 3, identical in the `ch2_feast` step and REWARDS; totals paid unchanged, R33). Game's
-Chapter Two grant passes no message, so the ending shows one toast (R06).
+Chapter Two grant passes no message, so the ending shows one toast (R06). Pass 2 (L09) catalogued the echo trial first clears
+`rw_trial_velour_first` / `rw_trial_choir_first` (content bundles, exact mirrors of `data/trials.gd` `FIRST_REWARDS`; flags
+`ch2_trial_velour` / `ch2_trial_choir` in `data/unlocks.gd`, which unlock the Loom patterns `pat_echo_masquerade` "Moonlit Masquerade"
+and `pat_echo_chime` "Chime Chorister" in `data/appearance.gd` / `data/recipes.gd`). Trial repeat clears and expedition caches are
+NOT ledger rewards: they are renewable and recorded in their own state (trials `paid` / `repeat_paid`, expeditions `completed`).
 
 **Lore.** `src/core/lore_db.gd` (static): `get_lore(id) -> {title, text}` (arachnophobia-aware), `has_lore(id)`, `ids()`,
 **`chapter_of(id) -> 1 | 2`** (by source file: legacy `lore.gd` and `data/lore_ch2_annex.gd` = 1 — Tobin's annex is Chapter One
@@ -553,5 +580,8 @@ automatic notice off; also every arg in `ui_root.NOTICE_OFF_ARGS`). Commands: AG
 ANY matches; for bisecting order-dependent failures). Isolation between test FILES: after each file the runner frees stray nodes it
 left, restores Game's flow state (mode, area, player, UI root, director, companions, boss encounters, a Chapter Two ending or trip in
 flight), unpauses, restores Settings and re-wires the session listeners (`Game.wire_session_systems()`); each repair is printed as
-`ISOLATION <suite>: ...` so the leaking suite can be fixed. The full suite (~2,200 tests) takes 15-25 min (`tools/test.sh`, limit
-`HH_TEST_SECONDS`, default 2400 s).
+`ISOLATION <suite>: ...` so the leaking suite can be fixed. The full suite (~2,400 tests) takes 15-25 min (`tools/test.sh`, limit
+`HH_TEST_SECONDS`, default 2400 s). Known leaks the runner repairs on every full run (stray projectiles / particles, `Game._bosses`,
+zone flags, Reach world items) stay a test-hygiene item (pass 2 decision F04, KNOWN_ISSUES): no per-suite cleanup yet, the runner's
+isolation is the safety net. Since pass 2 the session wiring also starts the Music Box discovery listener, so a suite that plays
+safe music in play may leave `GameState.extra["music_box"]` behind (reset by `fresh_state()` / New Game).

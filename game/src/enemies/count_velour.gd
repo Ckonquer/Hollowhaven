@@ -122,7 +122,7 @@ const LEAVE_TIME := 4.0
 # Rules
 const PHASE_AT := [1.0, 0.66, 0.33]
 const WINDOW_CAP := 0.16
-const MASK_FLOOR := 0.08
+const MASK_FLOOR := 0.08          # lifted by the first light stagger; a companion's blow on the channel counts too (kept: lead decision P16)
 const STAGGER_MULT := 1.5
 const REVEAL_MULT := 1.25
 const DRAIN_HEAL_MULT := 2.0
@@ -630,7 +630,11 @@ func start_fight() -> void:
 	Audio.play_3d("shade_drift", get_aim_point(), -2.0, 0.03, 50.0)
 	Events.caption.emit("[a velvet cape sweeps the air: the host bows low]")
 	if _retry:
-		Events.hint.emit("velour_retry", "The Count keeps his wounds while you stay in the manor, and every candle is lit afresh.")
+		if is_story():
+			Events.hint.emit("velour_retry", "The Count keeps his wounds while you stay in the manor, and every candle is lit afresh.")
+		else:
+			# Separate id: the Echo Trial's rule has its own wording, and the story hint still shows once later.
+			Events.hint.emit("velour_retry_trial", "The echo keeps his wounds while you stay in the memory. Leave through the pale door and it starts afresh.")
 	if state == "dormant":
 		_enter("intro", T_INTRO if encounter_starts == 1 else 1.2)
 	if Debug.is_cheat_allowed() and Debug.has_arg("velour-phase"):

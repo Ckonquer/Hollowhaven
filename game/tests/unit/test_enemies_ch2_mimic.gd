@@ -115,9 +115,28 @@ func _until(e: Node, s: String, max_t: float = 10.0, move: bool = false) -> floa
 	return t
 
 
+## The twitch schedule comes from the mimic's RNG: a fixed setup "seed" makes it deterministic (integration pass 2,
+## L06), and the window runs until three pairs are complete plus 1 s - always between pairs (a new pair never starts
+## sooner than TWITCH_REST_MIN after the last one), so the count is never cut in half.
+func _twitch_times(e: Node, pairs: int, max_t: float = 40.0) -> Array:
+	var times: Array = []
+	var last := int(e.stem_twitches)
+	var t := 0.0
+	var tail := -1.0
+	while t < max_t and (tail < 0.0 or t < tail):
+		e.tick(DT)
+		t += DT
+		if int(e.stem_twitches) != last:
+			last = int(e.stem_twitches)
+			times.append(t)
+			if times.size() == pairs * 2:
+				tail = t + 1.0
+	return times
+
+
 func test_dormant_is_decor_that_twitches_in_pairs() -> void:
 	var d := _dummy(Vector3(0, 0, -30))
-	var e := _mimic(d, Vector3.ZERO, {"dormant": true})
+	var e := _mimic(d, Vector3.ZERO, {"dormant": true, "seed": 1234})
 	assert_eq(e.state, "dormant", "starts dormant")
 	assert_false(e.is_in_group("enemy"), "a dormant mimic is not an enemy (companions / swings / save gates ignore it)")
 	assert_true(e.is_in_group("interactable"), "it is an interactable")
@@ -128,20 +147,21 @@ func test_dormant_is_decor_that_twitches_in_pairs() -> void:
 	var it: Dictionary = e.get_interaction(d)
 	assert_eq(String(it.get("text", "")), "Inspect twitching pumpkin", "the announced interaction text (data inspect_text)")
 	assert_false(bool(e.visual.eyes_open()), "eyes shut: it reads as a pumpkin")
-	var twitch_times: Array = []
-	var last := int(e.stem_twitches)
-	var t := 0.0
-	while t < 14.0:
-		e.tick(DT)
-		t += DT
-		if int(e.stem_twitches) != last:
-			last = int(e.stem_twitches)
-			twitch_times.append(t)
+	var twitch_times := _twitch_times(e, 3)
 	assert_eq(e.state, "dormant", "Krystal far away: it stays dormant")
-	assert_true(twitch_times.size() >= 4, "the stem twitches now and then (%d)" % twitch_times.size())
+	assert_eq(twitch_times.size(), 6, "the stem twitches now and then: three pairs, nothing more (%d)" % twitch_times.size())
 	assert_eq(twitch_times.size() % 2, 0, "always in pairs (two twitches)")
 	for i in range(0, twitch_times.size() - 1, 2):
 		assert_almost(float(twitch_times[i + 1]) - float(twitch_times[i]), Mimic.TWITCH_GAP, DT * 2.0, "a quick double twitch")
+	for i in range(1, twitch_times.size() - 2, 2):
+		var rest := float(twitch_times[i + 1]) - float(twitch_times[i])
+		assert_true(rest >= Mimic.TWITCH_REST_MIN - DT * 2.0, "pairs are spaced apart (%.2f s)" % rest)
+	# The seed makes the schedule reproducible: a second mimic with the same seed twitches at the same moments.
+	var e2 := _mimic(d, Vector3(8, 0, 0), {"dormant": true, "seed": 1234})
+	var again := _twitch_times(e2, 3)
+	assert_eq(again.size(), twitch_times.size(), "same seed, same count")
+	for i in mini(again.size(), twitch_times.size()):
+		assert_almost(float(again[i]), float(twitch_times[i]), 0.0001, "same seed, same twitch %d" % i)
 
 
 func test_inspect_wakes_it_after_exactly_two_twitches() -> void:

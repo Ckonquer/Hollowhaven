@@ -14,7 +14,10 @@ extends "res://src/enemies/enemy_base.gd"
 ##             slow_seconds, bounded by enemy_base.apply_slow (never below SLOW_MIN_MULT, never over SLOW_MAX_SECONDS)
 ##             and never chained: refused while a slow is active and for data slow_immunity s after it ends.
 ##             A dodged clod slows nothing. Throws wait CLOD_COOLDOWN between them.
-## Intensity: Gentle = longer wind-ups / rests, no overlapping wind-ups; Intense = shorter rests.
+## Intensity (enemy_base intensity_* / overlap_blocked): Gentle = longer wind-ups / rests, no overlapping wind-ups;
+## Intense = shorter rests only - no feint (a feint is a boss / Intense-taught tell; among ordinary enemies only the
+## Velvet Wing's dash has one). The clod's 1.6 s wind-up sits above the 1.0-1.4 s guideline on purpose: longer tells
+## are fairer, never shorter (integration pass 2, P11).
 ## Stats: data/enemies.gd "patchwalker". Sounds (existing names only): dir_creak (rake raised / idle), swing (the
 ## sweep), dig (scooping mud), splash (throw / clod lands), grass_pull (alert / straw puffs), enemy_hurt.
 
@@ -33,9 +36,6 @@ const CLOD_START_FRACTION := 0.85    # may start a throw within 85% of the clod 
 const CLOD_COOLDOWN := 7.0
 const CLOD_KNOCKBACK := 2.0
 const CLOD_COLOR := Color("7a5236")
-const GENTLE_COOLDOWN := 1.35
-const INTENSE_COOLDOWN := 0.8
-const GENTLE_TELEGRAPH_BONUS := 0.2
 const LANE_REFRESH := 0.1
 const STRAW := Color("e0c070")
 
@@ -115,7 +115,7 @@ func attack_reach() -> float:
 
 
 func _can_start_attack() -> bool:
-	return _shot_clear and not _gentle_blocked()
+	return _shot_clear and not overlap_blocked()
 
 
 func _choose_attack() -> void:
@@ -131,7 +131,7 @@ func _choose_attack() -> void:
 
 
 func telegraph_duration() -> float:
-	return attack_telegraph(_def) + _telegraph_bonus()
+	return attack_telegraph(_def) + intensity_telegraph_bonus()
 
 
 func recover_duration() -> float:
@@ -223,17 +223,11 @@ func _throw_clod() -> Node:
 		Audio.play_3d("dig", global_position + Vector3.UP * 0.4, -8.0, 0.1)      # no clear line: the mud drops
 		return null
 	var from := attack_origin() + _attack_dir * 0.4
-	var fired: Node = null
-	var shared := _shared_projectile_script()
-	if shared != null:
-		var v: Variant = shared.call("fire", {"shooter": self, "from": from, "dir": _attack_dir, "groups": ["player"],
-			"damage": attack_damage_for(_def), "speed": CLOD_SPEED, "range": clod_range(), "radius": CLOD_RADIUS,
-			"knockback": CLOD_KNOCKBACK, "color": CLOD_COLOR, "max_per_shooter": 1, "hitstop": true, "kind": "mud_clod",
-			"on_hit": Callable(self, "_on_clod_hit")})
-		fired = v as Node if v is Node else null
-	else:
-		fired = fire_projectile(from, t, {"damage": attack_damage_for(_def), "speed": CLOD_SPEED, "range": clod_range(),
-			"knockback": CLOD_KNOCKBACK, "homing": 0.0, "color": CLOD_COLOR, "radius": CLOD_RADIUS})
+	# enemy_base.fire_projectile: the shared pooled projectile flies STRAIGHT along the locked lane ("dir"; `t` only
+	# gates the shot) and reports real hits to _on_clod_hit (the slow). The local fallback aims at `t` (no homing).
+	var fired: Node = fire_projectile(from, t, {"dir": _attack_dir, "on_hit": Callable(self, "_on_clod_hit"),
+		"damage": attack_damage_for(_def), "speed": CLOD_SPEED, "range": clod_range(), "radius": CLOD_RADIUS,
+		"knockback": CLOD_KNOCKBACK, "color": CLOD_COLOR, "max_per_shooter": 1, "kind": "mud_clod", "homing": 0.0})
 	if fired != null:
 		clod = fired
 		clods_thrown += 1
@@ -258,31 +252,7 @@ func _on_clod_hit(target: Node, dealt: float) -> void:
 
 func _on_state_changed(_prev: String, new_state: String) -> void:
 	if new_state == "recover":
-		_cooldown *= _cooldown_mult()
-
-
-# --- Intensity (Gentle / Intense) ---------------------------------------------------------------------------------
-
-func _cooldown_mult() -> float:
-	match Combat.current_intensity():
-		0:
-			return GENTLE_COOLDOWN
-		2:
-			return INTENSE_COOLDOWN
-	return 1.0
-
-
-func _telegraph_bonus() -> float:
-	return GENTLE_TELEGRAPH_BONUS if Combat.current_intensity() == 0 else 0.0
-
-
-func _gentle_blocked() -> bool:
-	if Combat.current_intensity() != 0:
-		return false
-	for id in _attackers.keys():
-		if int(id) != get_instance_id() and is_instance_id_valid(int(id)):
-			return true
-	return false
+		_cooldown *= intensity_cooldown_mult()
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

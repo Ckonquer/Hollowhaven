@@ -297,25 +297,34 @@ Always use `timeout` and `--max-seconds` / `--quit-at` so no process is left run
 * **Stalker**: Krystal's own light only repels it during the rattle directly above her; director passes
   recoil only from light at the stalker's own position. Retreats never step toward Krystal.
 
-## Chapter Two conventions (Waves B/C + integration pass)
+## Chapter Two conventions (Waves B-D + integration passes 1 and 2)
 The binding contract for Chapter Two is `docs/CHAPTER_TWO_SPEC.md`; what the foundation delivered is `docs/ch2/WAVE_A_REPORT.md`
 (schema v2, ChapterLog / OptionalLog, the rewards & flags rule, data catalogue, Game flow, music director). This section lists the
-conventions Waves B/C and the integration pass added; each points to the code map with the details (`docs/ch2/maps/*.md`, the
-"Chapter Two ... as built" sections). Module ownership: `docs/ch2/WAVES.md`; decisions: `docs/ch2/INTEGRATION_WAVE_BC.md`.
+conventions Waves B-D and the two integration passes added; each points to the code map with the details (`docs/ch2/maps/*.md`,
+the "Chapter Two ... as built" sections). Module ownership: `docs/ch2/WAVES.md`; decisions: `docs/ch2/INTEGRATION_WAVE_BC.md`
+(pass 1, after Waves B/C) and `docs/ch2/INTEGRATION_WAVE_D.md` (pass 2, after Wave D).
 * **New Game / look** (ui.md §11): title → overwrite confirm → comfort → "Meet Krystal" (`src/ui/screens/creation_screen.gd`) →
   `Game.new_game(look)`. Nothing is written before Confirm. A non-empty look sets `c1x_look_chosen` and `wardrobe.notice_shown`.
   The avatar (player_avatar.md §7) follows `GameState.appearance` / `wardrobe.show_armor` / `equipment` through
   `Events.appearance_changed` / `equipment_changed` / `game_loaded`; UI code writes GameState and emits the event, never pokes the avatar.
   Appearance is cosmetic only (no collision, speed or reach).
-* **UI root** (ui.md §11): panel `"wardrobe"` (fullscreen, gameplay panel, no hotkey yet); `ui_root.has_panel(name) -> bool`; the
+* **UI root** (ui.md §11-12): panel `"wardrobe"` (fullscreen, gameplay panel, hotkey **O** = Settings action `wardrobe`, rebindable;
+  pass 2 D02); panels `"expedition"` (fullscreen, gameplay panel; opened by the Expedition Board) and `"music_box"` (gameplay panel,
+  **not** fullscreen: a paused tree would silence the preview; opened by the Music Box); `ui_root.has_panel(name) -> bool`; the
   one-time wardrobe notice for older saves waits for 3 s of continuous safe play with nothing in `overlay_layer`, never in headless
   runs or with `NOTICE_OFF_ARGS`; `close()` defers `_focus_top()`; endings go through `show_ending()` (Chapter One) and
   `show_chapter_two_ending()` (awaitable, tracked in `_ending` like the Chapter One ending; `Game._show_chapter_two_ending()` prefers
   it). Pause "Return to safety" is per area ("Leave the trial" in the Echo Trial). Underground HUD look for every underground area.
-* **Journal / tracker / map / telemetry** (ui.md §11): journal tabs Story, Optional, Friends, Lore, Mastery (`args.tab`, alias
-  "goals" → story, `reopen(args)`); `tracker.objective_view()` kinds legacy | pointer | chapter2 | signpost | done | hidden;
-  `MapView.map_kind(area)` surface | reach | rooms | none (room names only in `MapView.ROOMS`); festival roads after
+* **Journal / tracker / map / telemetry** (ui.md §11-12): journal tabs Story, Optional, Friends, Lore, Mastery (`args.tab`, alias
+  "goals" → story, `reopen(args)`); `tracker.objective_view()` kinds legacy | pointer | chapter2 | signpost | expedition | done |
+  hidden (`expedition` = a running Lanternwake Expedition, only in place of signpost / done / hidden, pass 2 P36);
+  `MapView.map_kind(area)` surface | reach | rooms | none (room names only in `MapView.ROOMS`); the Reach map draws a running
+  expedition's route and resolves `exp_*` ids through `Expeditions.place_disc()` (P35); festival roads after
   `ch2_read_festival_map`; read-only telemetry keys `area_info, chapter2, tracker, optional, equipment, companion_skills, music`.
+* **Chapter Two quest rows** (state_save_data.md §14): a `data/quests_ch2.gd` objective may carry `"display": true` - a signpost row
+  listed with its real done state (`ChapterLog.check_objective` / `objective_status`, the row carries `"display": true`) that never
+  counts for completion (`step_done()` ignores it; a step needs at least one non-display objective). `ch2_quarry` shows "Calm the
+  Quarry Warden" and "Mend the mineral winch" this way before its lamp (pass 2 F03, the old R38).
 * **Stats and damage** (combat_enemies.md §11): `src/core/stats.gd` is static and recomputed from saved state (never cached across a
   load). Player damage order, once per hit: i-frames → `Stats.damage_reduction()` (cap 45%) → transient shield
   (`Game.player.add_shield(amount, seconds, source)`, read with `Stats.player_shield()`; never `GameState`) → Health. A hit fully
@@ -342,12 +351,67 @@ conventions Waves B/C and the integration pass added; each points to the code ma
   ground marks match the attack footprint and honour `reduce_flashing` / `high_visibility_cues`; spawner params `enemy_params`
   (merged into every enemy's spawn params) and `out_of_view` (never pop in within view); `EnemyFactory.can_spawn(id)` guards every
   spawn; elites use Settings `timing_assist` like bosses; `boss_defeated(id)` listeners must check the id.
+* **Chapter Two enemies and bosses** (combat_enemies.md §12, pass 2 P07): opt-in intensity helpers `intensity_cooldown_mult()` /
+  `intensity_telegraph_bonus()` / `overlap_blocked()` (the C5 enemies; legacy enemies unchanged); `fire_projectile` params `dir` /
+  `on_hit` / `kind`; the shared attack-token table for non-enemy_base attackers `claim_attack_token(id)` / `release_attack_token(id)`
+  (the Choir); `telegraph_fx.move_ring(at)`; `expose(seconds)` only on the light-fearing Velvet Wing (breaks a drain) and Borrowed
+  Wisp (forced reveal) - never on bosses. Setup keys: `pumpkin_mimic` `dormant` (never passed by spawners) / `seed`; `quarry_warden`
+  `arena`, `arena_center`, `arena_radius`, `pillars` (leash = arena radius + 6 m within a 3 m height band; timing assist ×1.5; the
+  charge lane is clipped 1 m inside the arena and a ledge bonks). Bosses take `"mode": "story" | "trial"` (trial: no flags, no
+  `boss_defeated`): `count_velour` (in group "enemy" only while fighting; one clean reset rule), `crossing_matron` (arena
+  `boss_params()` incl. `rail`; HP floor 60 % / 25 % until the first / second exposure; `retreat_seconds()`; `crossing_rules.gd`
+  assumes the bridge centre line at z = 0), `borrowed_choir` (three exposures per phase; holds an attack token while committed).
 * **Areas and loading** (world_areas.md §8): `Game.prefetch_area(area_id, extra := []) -> int` compiles an area's scene and its
   `AREA_WARMUP` scripts on loader threads (idempotent, never blocks, EnemyFactory first on the main thread); `load_area` uses it, and
-  the waygate / Bellhouse stair call it early behind `has_method` guards. `Game.wire_session_systems()` (mastery listeners + the
-  Chapter Two activity tracker; idempotent). A position saved on an upper storey is restored after the structures exist.
+  the waygate / Bellhouse stair call it early behind `has_method` guards; since pass 2 (P38) the Reach, the Chapter Two bosses and
+  the Echo Trial arenas are warmed too. `Game.wire_session_systems()` (idempotent; the test runner re-wires between suites): mastery
+  listeners, the Chapter Two activity tracker, and since pass 2 (P34) `init()` of Expeditions, the Music Box and the Echo Trial's gift
+  payer plus `attach(self)` of the onboarding hints - each safe-loaded and optional. A position saved on an upper storey is restored
+  after the structures exist.
+* **Echo Trials** (world_areas.md §8; spec §1): one area `echo_trial`, the table `data/trials.gd` (`matron`, `velour`, `choir`),
+  arena builders `src/world/trial/{velour,choir}_trial.gd` (`static build(area) -> Dictionary`, the real bosses in mode "trial"),
+  echo stones `src/world/trial/trial_entry.gd` at each origin checkpoint (Below `cp_arena`, manor `manor_ballroom`, Works
+  `bell_throat`). **A trial opens right after its boss is defeated** (its `requires_flag`; lead decision L07 - `ch2_trials_open`
+  gates nothing). `echo_trial.begin(id, origin_area, origin_spawn)`; leaving, falling and Continue all return to the origin; a trial
+  never reads or writes a story flag or emits `boss_defeated`. First clear = its content bundle through the ledger (pattern-unlock
+  flag `ch2_trial_<id>`); repeat clears are renewable and wait in `GameState.trials[id].pending` until `echo_trial.pay_pending()`
+  pays them on arrival at the origin (L08; `echo_trial.init()` wires it).
+* **Lanternwake Expeditions** (`src/expeditions/expeditions.gd`, static; data `data/expeditions.gd`; spec §3 extra key): `init()` /
+  `shutdown()` / `is_listening()` (Events.area_loaded gives the Reach its runner `expedition_runner.gd`, node `RUNNER_NODE`
+  "Expeditions", ONLY while a run is active), `template_ids()`, `template(id)`, `is_unlocked(id)`, `lock_reason(id)`, `preview(id)`,
+  `plan(id, seed)`, `state()`, `active()`, `is_active()`, `start(id, seed := -1)`, `abandon()`, `record_defeat(...)`, `complete()`
+  (records the completion BEFORE paying: once), `current_target()`, `tracker_view()` (kind "expedition", shown by the tracker only
+  when there is no chapter / legacy / pointer step), `map_marks(area)`, `place_disc("exp_*")`, `summary_line()`. Expeditions never
+  write a flag, the ledger or a quest layer; rewards are renewable materials, candy and sometimes a keepsake (a dye palette or a
+  festival decoration); no timers, no daily limits. Board `src/building/structures/expedition_board.gd` -> panel "expedition".
+* **Music Box** (`src/audio/music_box.gd`, static, autoload-free): `init()` / `shutdown()` / `is_listening()` (the discovery listener on
+  `Events.music_cue_changed`: cues of kind safe / explore / ending heard in play; `STARTER_CUES` m01 always known), `is_eligible`,
+  `eligible_cues`, `title`, `home_of`, `note_heard`, `is_discovered`, `discovered`, `heard_at`, `favourites`, `is_favourite`,
+  `set_favourite`, `toggle_favourite`, `preview(cue, source := null) -> bool` (false when higher music already plays),
+  `stop_preview(fade)`, `preview_cue()`, `is_previewing()`, `should_stop(area, zone, player_pos, box_pos, box_area)`,
+  `music_muted()`, `owns_music_box()`. The preview is the music director's `"musicbox"` context (**priority 40**, one pass; data in
+  `data/music.gd` CONTEXTS since pass 2 P46): above the Haven (30) and exploration (20), ended for good by any higher music (combat,
+  horror, boss, authored, title), by death and by leaving the area; boss / combat / horror cues are refused as previews. **House
+  rule**: the box stops its preview when Krystal leaves its house - she must stay in the box's own area and, on the surface, in the
+  Haven zone or within 12 m of the box (elsewhere, e.g. the Reach outpost, within 12 m). Favourites add at most 2 extra entries per
+  Haven round. The panel `music_box_panel.gd` is NOT fullscreen, never pauses, and closes when she is hurt
+  (`Events.player_damaged`). With the Music bus muted the director decides nothing: nothing is discovered and a started preview
+  stays "Now playing" until Stop / leaving (kept, P47).
+* **Onboarding hints** (`src/world/story_ch2/onboarding_hints.gd`): one node under Game (`static attach(parent) -> Node`, idempotent;
+  never steps by itself in headless runs - tests call `tick(dt)`); `arm(id, delay)`, `suppression_reason()` ("" or one of
+  `inactive, hints_off, cutscene, not_playing, no_ui, busy, boss, trial, combat, horror, unsafe, notice, card`), `is_shown(id)`,
+  `armed_ids()`, `hint_text(id)`. Emits through `Events.hint`; once per save via the HUD card's `hint_<id>` flag; writes nothing
+  else. Pacing `CALM_SECONDS` 2.5, `MIN_GAP` 25, `HORROR_QUIET` 30 (untuned until a real play session, P50). `"where"` is "", an area
+  id, `"outdoor"` or `"echo_origin"` (an area whose echo stone stands).
+* **Input (pass 2, D02 / D03)**: Settings actions `wardrobe` (O), `build_undo` (Z), `build_recolor` (P), `build_variant` (N) are in
+  `DEFAULT_BINDINGS` and `REBINDABLE`, with HUD tokens `{wardrobe}`, `{undo}`, `{recolor}`, `{variant}`; a settings file without them
+  gets the defaults. `build_mode.gd` prefers the InputMap action and keeps its `FALLBACK_KEYS`.
+* **Saved state of Wave D** (SAVE_MIGRATION.md §2, state_save_data.md §14): `GameState.trials[id]` keys `clears`, `best_seconds`,
+  `last_seconds`, `repeat_paid`, `paid`, `pending`, `pending_clears`; `GameState.extra["expeditions"]` and
+  `GameState.extra["music_box"]` (top-level keys GameState keeps verbatim; no migration; reset by New Game).
 * **Lore** (state_save_data.md §14): `src/core/lore_db.gd` `get_lore(id)`, `has_lore(id)`, `ids()`, `chapter_of(id)` (by source file;
   Tobin's annex notes are Chapter One); `UiUtil.lore_entry` delegates to it.
 * **Tests** (state_save_data.md §14): the runner isolates test files (restores Game flow state, frees strays, re-wires the session
-  listeners, prints `ISOLATION <suite>: ...`) and accepts comma-separated `--filter` fragments. Visual-QA commands for the new
-  screens are in AGENTS.md; the still-pending visual and real-input checks are in KNOWN_ISSUES.md.
+  listeners, prints `ISOLATION <suite>: ...`) and accepts comma-separated `--filter` fragments; the leaks it repairs are a known
+  test-hygiene item (F04). Visual-QA commands for the new screens are in AGENTS.md; the still-pending visual, listening and
+  real-input checks are in KNOWN_ISSUES.md.

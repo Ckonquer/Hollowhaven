@@ -9,15 +9,24 @@ extends "res://src/enemies/enemy_base.gd"
 ##             down along the lane to chest height (one hit at most) -> recover at data rest_height (1.4 m): a
 ##             missed (or landed) dash always leaves it within sword reach for data recover (1.4 s).
 ##   drain     telegraph (data 1.5 s) + channel (data 2.0 s): it hovers at DRAIN_HEIGHT (within reach) and a glowing
-##             drain MARK under Krystal plus a visible tether link them. The link breaks - it recoils, reachable, for
-##             data recover (1.2 s) - when a wall or structure cuts the line of sight, when Krystal stands in ward-light
-##             (light from lamps / braziers / candles, not her own lantern: WARD_LIGHT), when she walks out of range,
-##             or when the wing takes a hit. Only a channel that finishes drains: ONE hit of data damage through her
-##             health (i-frames, armour and shields apply) and it heals by exactly the damage dealt (0 = nothing).
-##             There is no other lifesteal. Drains wait DRAIN_COOLDOWN between them.
-## Intensity: Gentle = longer wind-ups / rests, no overlapping wind-ups; Intense = shorter rests and, once a real
-## dash has been seen, sometimes a dash FEINT: halfway through the fold it flicks its cloak open, then re-folds with
-## a full separate final tell (the lane is re-shown and a second sound plays) - never faster or invisible.
+##             drain MARK under Krystal (it follows her through the wind-up, then stays put for the channel) plus a
+##             visible tether link them. The link breaks - it recoils, reachable, for data recover (1.2 s) - when a
+##             wall or structure cuts the line of sight ("sight"), when WARD-LIGHT reaches her ("light", the lead rule
+##             of integration pass 2):
+##               * light sources at her position of at least WARD_LIGHT (ward_light_at): lit ward candles, lamps /
+##                 lantern posts / placed light structures, braziers, and Lumi's Glimmerstep pulse (a deliberate skill:
+##                 its "GlimmerPulse" light, which Glimmerstep's expose() call also breaks at once) - but NOT a
+##                 companion's passive glow (group "companion": Lumi beside her never breaks it) and not Krystal's own
+##                 body light;
+##               * Krystal's raised lantern while she stands INSIDE the drain mark (DRAIN_MARK_RADIUS of its centre);
+##             when she walks out of range ("range"), or when the wing takes a hit ("hit"). Only a channel that
+##             finishes drains: ONE hit of data damage through her health (i-frames, armour and shields apply) and it
+##             heals by exactly the damage dealt (0 = nothing). There is no other lifesteal. Drains wait DRAIN_COOLDOWN.
+## expose(seconds) (Lumi's Glimmerstep): breaks a drain in progress with reason "light"; otherwise nothing.
+## Intensity (enemy_base intensity_* / overlap_blocked): Gentle = longer wind-ups / rests, no overlapping wind-ups;
+## Intense = shorter rests and, once a real dash has been seen, sometimes a dash FEINT (the only ordinary enemy with
+## one: feints are an Intense-taught tell): halfway through the fold it flicks its cloak open, then re-folds with a
+## full separate final tell (the lane is re-shown and a second sound plays) - never faster or invisible.
 ## Stats: data/enemies.gd "velvet_wing". Sounds (existing names only): dir_wrong_squeak (alert / idle squeaks),
 ## shade_drift (cloak folds / dash whoosh), dodge (the dash), shade_telegraph (drain tell), shade_whisper (drain
 ## lands), gloomling_flinch (link broken), enemy_hurt, lantern_off (defeat).
@@ -45,16 +54,22 @@ const DRAIN_COLOR := Color(0.86, 0.36, 0.62)
 const WARD_LIGHT := 0.45
 const FEINT_CHANCE := 0.35
 const FEINT_AT := 0.5
-const GENTLE_COOLDOWN := 1.35
-const INTENSE_COOLDOWN := 0.8
-const GENTLE_TELEGRAPH_BONUS := 0.2
 const LANE_REFRESH := 0.1
 const VELVET := Color(0.62, 0.22, 0.38)
+const BREAK_CAPTIONS := {
+	"light": "[light floods the drain mark - the link snaps]",
+	"sight": "[the drain link is cut off - the mark snaps]",
+	"range": "[the drain link stretches too thin and snaps]",
+	"hit": "[the drain mark snaps]",
+	"target": "[the drain mark snaps]",
+}
+const HINT_DRAIN := "hint_velvet_wing_drain"
+const DRAIN_HINT_TEXT := "A Velvet Wing drained you. Break its mark next time: raise your lantern ({lantern}) inside the mark, step into candle or lamp light, out of its sight, or strike it."
 
 var hover_y: float = HANG_HEIGHT
 var next_attack: String = ""         # tests / scripted fights: "dash" | "drain"
 var attack_kind: String = ""
-var ward_light_override: float = -1.0   # tests: >= 0 replaces the ward-light sample at Krystal
+var ward_light_override: float = -1.0   # tests: >= 0 replaces the ward-light sample at Krystal (not her lantern)
 var dashes_done: int = 0
 var dashes_missed: int = 0
 var feints: int = 0
@@ -183,7 +198,7 @@ func attack_reach() -> float:
 
 
 func _can_start_attack() -> bool:
-	return _shot_clear and not _gentle_blocked()
+	return _shot_clear and not overlap_blocked()
 
 
 func _choose_attack() -> void:
@@ -206,7 +221,7 @@ func _choose_attack() -> void:
 
 
 func telegraph_duration() -> float:
-	return attack_telegraph(_def) + _telegraph_bonus()
+	return attack_telegraph(_def) + intensity_telegraph_bonus()
 
 
 func recover_duration() -> float:
@@ -257,11 +272,10 @@ func _update_mark(reclip: bool) -> void:
 	if attack_kind == "drain":
 		var t := current_target()
 		if t != null:
-			if not m.is_showing():
+			if not m.is_showing() or m.kind != "ring":
 				m.show_ring(t.global_position, DRAIN_MARK_RADIUS, DRAIN_COLOR)
 			else:
-				m.global_position = t.global_position + Vector3.UP * TelegraphFx.Y_OFFSET
-				m.center = t.global_position
+				m.move_ring(t.global_position)        # the mark follows her through the wind-up (no reallocation)
 			_update_tether()
 		m.set_progress(state_time / maxf(_state_len, 0.001), true)
 		return
@@ -329,7 +343,8 @@ func _end_dash() -> void:
 # --- Drain -------------------------------------------------------------------------------------------------------
 
 ## Why the drain link would break right now ("" = it holds): "sight" (a wall / structure cuts the line),
-## "light" (Krystal stands in ward-light), "range" (too far) or "target" (no valid target).
+## "light" (ward-light reaches her, or her raised lantern inside the drain mark), "range" (too far) or "target"
+## (no valid target).
 func _drain_break_reason(t: Node3D) -> String:
 	if t == null or not is_instance_valid(t) or not is_valid_victim(t) or not _can_hunt:
 		return "target"
@@ -338,9 +353,38 @@ func _drain_break_reason(t: Node3D) -> String:
 		return "range"
 	if not has_clear_shot(t):
 		return "sight"
-	if ward_light_at(p + Vector3.UP * 0.9) >= WARD_LIGHT:
+	if lantern_in_mark(t) or ward_light_at(p + Vector3.UP * 0.9) >= WARD_LIGHT:
 		return "light"
 	return ""
+
+
+## Krystal's raised lantern (the target's `lantern_on`: Game.player in play) is ward-light for the drain only while
+## she stands inside the drain mark (DRAIN_MARK_RADIUS of its centre, flat).
+func lantern_in_mark(t: Node3D) -> bool:
+	if t == null or not is_instance_valid(t) or not Combat.truthy(t.get("lantern_on")):
+		return false
+	var c := drain_mark_center(t)
+	var p := t.global_position
+	return Vector2(p.x - c.x, p.z - c.z).length() <= DRAIN_MARK_RADIUS
+
+
+## Centre of the drain mark on the ground (it follows her through the wind-up and stays put for the channel);
+## her own position while no drain mark is shown.
+func drain_mark_center(t: Node3D) -> Vector3:
+	if _mark != null and is_instance_valid(_mark) and String(_mark.get("kind")) == "ring":
+		var c: Vector3 = _mark.get("center")
+		return c
+	if t != null and is_instance_valid(t):
+		return t.global_position
+	return global_position
+
+
+## Lumi's Glimmerstep (companion_combat.gd calls expose(seconds) on enemies inside its light pulse): a deliberate
+## burst of ward-light, so a drain in progress (wind-up or channel) breaks at once with reason "light". Nothing else.
+func expose(_seconds: float) -> void:
+	if is_dead() or not is_draining():
+		return
+	_break_drain("light")
 
 
 func _drain_watch(delta: float) -> void:
@@ -353,7 +397,10 @@ func _drain_watch(delta: float) -> void:
 		_break_drain(why)
 
 
-## Ward-light at `pos`: every active light source EXCEPT Krystal's own lantern (lamps, braziers, candles, wards).
+## Ward-light at `pos` from the light sources that break a drain: lit ward candles, lamps / lantern posts / placed
+## light structures, braziers and Lumi's Glimmerstep pulse ("GlimmerPulse", a child light that is NOT in group
+## "companion"). Skipped: Krystal herself (group "player": her lantern counts only inside the mark, lantern_in_mark)
+## and companions' passive glow (group "companion": Lumi glowing beside her never breaks a drain).
 func ward_light_at(pos: Vector3) -> float:
 	if ward_light_override >= 0.0:
 		return ward_light_override
@@ -361,7 +408,9 @@ func ward_light_at(pos: Vector3) -> float:
 		return 0.0
 	var dark := 1.0
 	for n in get_tree().get_nodes_in_group("light_source"):
-		if not (n is Node3D) or not is_instance_valid(n) or (n as Node).is_in_group("player"):
+		if not (n is Node3D) or not is_instance_valid(n):
+			continue
+		if (n as Node).is_in_group("player") or (n as Node).is_in_group("companion"):
 			continue
 		if n.has_method("is_light_active") and not Combat.truthy(n.call("is_light_active")):
 			continue
@@ -383,7 +432,7 @@ func _break_drain(reason: String) -> void:
 	_hide_tether()
 	hide_mark()
 	Audio.play_3d("gloomling_flinch", get_aim_point(), -4.0, 0.1)
-	Events.caption.emit("[the drain mark snaps]")
+	Events.caption.emit(String(BREAK_CAPTIONS.get(reason, BREAK_CAPTIONS["hit"])))
 	_def = attack_def("drain")
 	_enter("recover", recover_duration())
 
@@ -398,6 +447,8 @@ func _finish_drain() -> void:
 		dealt = deal_damage_to(t, attack_damage_for(_def), dir, 1.5)
 	if dealt > 0.0 and health != null and not health.dead:
 		healed_total += float(health.heal(dealt))
+	if dealt > 0.0:
+		Events.hint.emit(HINT_DRAIN, DRAIN_HINT_TEXT)     # once per save (HUD): how to break the next one
 	drains_completed += 1
 	_hide_tether()
 	Audio.play_3d("shade_whisper", get_aim_point(), -4.0, 0.1)
@@ -466,7 +517,7 @@ func _on_hurt(_amount: float) -> void:
 
 func _on_state_changed(_prev: String, new_state: String) -> void:
 	if new_state == "recover":
-		_cooldown *= _cooldown_mult()
+		_cooldown *= intensity_cooldown_mult()
 		_feint_used = false
 	if new_state != "drain" and new_state != "telegraph":
 		_hide_tether()
@@ -475,30 +526,6 @@ func _on_state_changed(_prev: String, new_state: String) -> void:
 func _on_player_died() -> void:
 	super._on_player_died()
 	_hide_tether()
-
-
-# --- Intensity (Gentle / Intense) ---------------------------------------------------------------------------------
-
-func _cooldown_mult() -> float:
-	match Combat.current_intensity():
-		0:
-			return GENTLE_COOLDOWN
-		2:
-			return INTENSE_COOLDOWN
-	return 1.0
-
-
-func _telegraph_bonus() -> float:
-	return GENTLE_TELEGRAPH_BONUS if Combat.current_intensity() == 0 else 0.0
-
-
-func _gentle_blocked() -> bool:
-	if Combat.current_intensity() != 0:
-		return false
-	for id in _attackers.keys():
-		if int(id) != get_instance_id() and is_instance_id_valid(int(id)):
-			return true
-	return false
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

@@ -237,6 +237,11 @@ const SPAWNERS := {
 		"clear_message": "The empty coat slumps back into its locker."},
 	"hw_sp_bells": {"enemy": "bellcap_sentry", "count": 2, "radius": 2.5, "respawn_minutes": 1440.0,
 		"quest_flag_on_clear": "", "wander_radius": 4.0, "pos": Vector3(12.0, -16.0, 34.0), "clear_message": ""},
+	# One Borrowed Wisp at the quiet far (south) end of the Hall of Closed Eyes, past the Wrong Door moment that
+	# teaches "real light lights the floor": her lantern reveals it here before the Choir's wisps (integration
+	# pass 2, P13). >= 6 m from the eyes_route lantern hook, the carvings and every opening; never in a safe zone.
+	"hw_sp_eyes_wisp": {"enemy": "borrowed_wisp", "count": 1, "radius": 1.0, "respawn_minutes": 1440.0,
+		"quest_flag_on_clear": "", "wander_radius": 3.0, "pos": Vector3(-16.0, -13.0, 36.0), "clear_message": ""},
 }
 
 # --- Lore notes placed in rooms 1-8 (texts: data/lore_ch2_works.gd) -----------------------------------------------

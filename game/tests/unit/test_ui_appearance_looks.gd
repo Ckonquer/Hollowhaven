@@ -247,3 +247,32 @@ func test_how_to_earn_honours_arachnophobia() -> void:
 	for t in others:
 		for word in ["Matron", "Weaver", "spider", "Spider", "web"]:
 			assert_false(String(t).contains(word), "no '%s' with arachnophobia on: %s" % [word, t])
+
+
+## The Echo Trial patterns (lead decision L09): locked pieces name the trial that earns them (the same line with
+## arachnophobia on: nothing spider-like in them), and owning the pattern (a Loom recipe after the first clear)
+## makes both of its pieces choosable; they are free to wear.
+func test_echo_trial_pieces_say_how_to_earn_and_are_worn_once_owned() -> void:
+	var prev: Variant = Settings.get_value("arachnophobia")
+	var w := Looks.starter_wardrobe()
+	var cases := [["hair_acc", "masquerade_mask", "Count Velour"], ["back", "opera_cloak", "Count Velour"],
+		["hair_acc", "chime_ribbons", "Borrowed Choir"], ["back", "chorister_capelet", "Borrowed Choir"]]
+	for mode in [false, true]:
+		Settings.set_value("arachnophobia", mode)
+		for c in cases:
+			assert_false(Looks.can_choose(String(c[0]), String(c[1]), w), "%s is locked at first" % c[1])
+			var why := Looks.how_to_earn(String(c[0]), String(c[1]), w)
+			assert_true(why.begins_with("How to earn:") and why.contains(String(c[2])) and why.contains("Loom"), why)
+	Settings.set_value("arachnophobia", prev)
+	var owned := {"owned": ["pat_echo_masquerade"]}
+	assert_true(Looks.can_choose("hair_acc", "masquerade_mask", owned))
+	assert_true(Looks.can_choose("back", "opera_cloak", owned))
+	assert_false(Looks.can_choose("back", "chorister_capelet", owned), "each trial owns its own pattern")
+	GameState.unlock_pattern("pat_echo_chime")
+	var inv_before: Array = GameState.inventory.to_array().duplicate(true)
+	var l := Looks.with_choice(Looks.with_choice(Looks.current_look(), "hair_acc", "chime_ribbons"), "back", "chorister_capelet")
+	assert_true(Looks.wear(l), "worn")
+	assert_eq(String(GameState.appearance["hair_acc"]), "chime_ribbons")
+	assert_eq(String(GameState.appearance["back"]), "chorister_capelet")
+	assert_eq(GameState.inventory.to_array(), inv_before, "wearing costs nothing")
+	assert_eq(ItemDB.sanitize_look(GameState.appearance)["missing"], [], "a valid look")

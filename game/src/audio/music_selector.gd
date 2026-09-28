@@ -19,14 +19,17 @@ extends RefCounted
 ##
 ## Priority chain (MP 18.2): muted/paused policy -> authored ending/cutscene requests (and the title)
 ## -> active boss (phase layers) -> authored horror suppression (fade out) -> ordinary combat
-## (enter after ~1 s of sustained threat, release 4-8 s after it cleared) -> safe refuge -> regional
+## (enter after ~1 s of sustained threat, release 4-8 s after it cleared; never latched under a playable boss
+## context and reset when it ends, so a boss hands straight back to the area) -> safe refuge -> regional
 ## exploration -> ambience only. Base contexts (refuge/exploration/ambience) change only after the
 ## zone held for region_enter_s and the previous one lasted min_dwell_s; exploration changes wait for
 ## the current piece's phrase boundary. Pieces rotate from shuffle bags with rests in between.
 ##
 ## Music Box (MP 18.3, src/audio/music_box.gd): a home feature, never a global override.
-##   request_preview(cue, fade := -1.0, area := "") -> bool, stop_preview(fade := -1.0), preview_cue()
-##   The "musicbox" context (PREVIEW_DEF, added to the catalogue's contexts) sits above the regional base
+##   request_preview(cue, fade := -1.0, area := "") -> bool, stop_preview(fade := -1.0), preview_cue(),
+##   preview_playlist()
+##   The "musicbox" context (data/music.gd CONTEXTS["musicbox"]; PREVIEW_DEF is only the fallback added when an
+##   older catalogue lacks it; its one-cue playlist is the context's own "playlist") sits above the regional base
 ##   (safe 30 / explore 20) and below everything else: ordinary combat, horror suppression, bosses, authored
 ##   requests and the title. Any of those ENDS the preview (the request is dropped, not resumed), as do death,
 ##   leaving the area and an unplayable cue. It plays one pass of the chosen cue ("once"), cuts in at once,
@@ -42,6 +45,7 @@ const HOLD_KINDS := ["combat", "boss", "ending", "menu", "musicbox"]  # never he
 const BASE_KINDS := ["safe", "explore", "ambience"]
 const PREVIEW_CONTEXT := "musicbox"
 const PREVIEW_PLAYLIST := "~musicbox"
+## Fallback only (a catalogue without a "musicbox" context): the same values as data/music.gd CONTEXTS["musicbox"].
 const PREVIEW_DEF := {"kind": "musicbox", "priority": 40, "playlist": PREVIEW_PLAYLIST, "mode": "once",
 	"fade": 1.5, "exit_fade": 1.5}
 const FAVOURITE_CONTEXTS := ["haven"]
@@ -82,6 +86,7 @@ var _arrival := false             # the base was just committed because Krystal 
 var _threat_t := 0.0
 var _clear_t := 0.0
 var _release_s := 6.0
+var _boss_on := false             # a boss context could sound on the last update (see _wanted)
 # what is sounding
 var _eff := ""                    # context being served ("" = none)
 var _cue := ""
@@ -118,6 +123,7 @@ func setup(data: Dictionary, seed_value: int, tuning_override: Dictionary = {}) 
 	tuning = t.duplicate(true)
 	tuning.merge(tuning_override, true)
 	_has_data = not cues.is_empty() and not contexts.is_empty()
+	# data/music.gd carries the "musicbox" context; an older catalogue without it gets the built-in definition
 	if _has_data and not contexts.has(PREVIEW_CONTEXT):
 		contexts[PREVIEW_CONTEXT] = PREVIEW_DEF.duplicate()
 	reseed(seed_value)
@@ -144,6 +150,7 @@ func reset() -> void:
 	_cand_t = 0.0
 	_arrival = false
 	clear_combat()
+	_boss_on = false
 	_eff = ""
 	_cue = ""
 	_track = ""
@@ -252,9 +259,10 @@ func request_preview(cue: String, fade: float = -1.0, area: String = "") -> bool
 	if _requests.has(PREVIEW_CONTEXT) and cue == _preview_cue:
 		return true
 	_preview_cue = cue
-	playlists[PREVIEW_PLAYLIST] = {"cues": [cue], "fallback": ["keep"]}
-	_bags.erase(PREVIEW_PLAYLIST)
-	_last_drawn.erase(PREVIEW_PLAYLIST)
+	var pl := preview_playlist()
+	playlists[pl] = {"cues": [cue], "fallback": ["keep"]}      # this selector's own copy, never the catalogue
+	_bags.erase(pl)
+	_last_drawn.erase(pl)
 	if _eff == PREVIEW_CONTEXT:
 		_eff = ""                 # re-plan now: the new cue replaces the one playing (or the finished one)
 	_requests[PREVIEW_CONTEXT] = {"fade": fade, "area": area, "t": _now}
@@ -265,6 +273,12 @@ func request_preview(cue: String, fade: float = -1.0, area: String = "") -> bool
 ## Stop pressed (or Krystal left the house): the preview fades out, the Haven music returns after a rest.
 func stop_preview(fade: float = -1.0) -> void:
 	release(PREVIEW_CONTEXT, fade)
+
+
+## The playlist the "musicbox" context draws from (the context's own "playlist"; PREVIEW_PLAYLIST when it names none).
+func preview_playlist() -> String:
+	var pl := String((contexts.get(PREVIEW_CONTEXT, {}) as Dictionary).get("playlist", ""))
+	return pl if pl != "" else PREVIEW_PLAYLIST
 
 
 ## The cue the Music Box is previewing ("" when no preview is requested any more).
@@ -396,6 +410,16 @@ func _wanted(ctx: Dictionary, dt: float, mode: String, area: String) -> String:
 	if bc != "" and contexts.has(bc) and _priority(bc) > best_p and _playable(bc, ctx):
 		best = bc
 		best_p = _priority(bc)
+	# A boss fight owns its threat (the boss itself is an enemy near Krystal): the ordinary combat latch never
+	# builds underneath a playable boss context, and when that context ends it starts again from nothing, so a
+	# combat cue follows a boss only after the usual sustained threat from an enemy that is still there (CH2-008).
+	var boss_on := _boss_music_on(bc, ctx)
+	if boss_on or _boss_on:
+		if combat or _threat_t > 0.0 or _clear_t > 0.0:
+			clear_combat()
+		if boss_on != _boss_on:
+			_note("boss music %s: the ordinary combat latch starts again from nothing" % ("on" if boss_on else "over"))
+	_boss_on = boss_on
 	var frozen := FROZEN_MODES.has(mode)
 	if not frozen:
 		_update_combat(bool(ctx.get("threat", false)), dt)
@@ -427,6 +451,19 @@ func _wanted(ctx: Dictionary, dt: float, mode: String, area: String) -> String:
 	if preview and _priority(PREVIEW_CONTEXT) > _priority(_base):
 		return PREVIEW_CONTEXT
 	return _base
+
+
+## True while a boss context can sound: the reported boss's own context (bc) or an authored boss-kind request
+## (the legacy Weaver asks for "boss_matron" itself). An unplayable boss context does not count, so ordinary
+## combat music still stands in for it then.
+func _boss_music_on(bc: String, ctx: Dictionary) -> bool:
+	if bc != "" and contexts.has(bc) and _playable(bc, ctx):
+		return true
+	for id in _requests:
+		var sid := String(id)
+		if contexts.has(sid) and _kind(sid) == "boss" and _playable(sid, ctx):
+			return true
+	return false
 
 
 func _update_combat(threat: bool, dt: float) -> void:

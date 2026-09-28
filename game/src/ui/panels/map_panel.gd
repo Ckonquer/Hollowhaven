@@ -10,6 +10,9 @@ extends "res://src/ui/panels/panel_base.gd"
 ## either outdoor map (Krystal and her friends are drawn only on the map of the area she is in).
 ## Mastery map clarity (Wayfinding 2 resource pins, Wayfinding 4 cache hints) gets a legend row on an outdoor map
 ## while it has something to show there (legend_extras).
+## A Lanternwake Expedition under way: the Reach map draws its route (MapView expedition pins) and always marks its
+## current stop / cache, also while a chapter step owns the card (one extra "Expedition:" line then), plus a
+## legend row (lead decision P35). Nothing while no run is going.
 ## args: {"area": map area to show (optional; default = the area Krystal is in)}.
 
 const MapView := preload("res://src/ui/widgets/map_view.gd")
@@ -21,6 +24,7 @@ const Mastery := preload("res://src/core/mastery.gd")
 
 const LEGEND_PINS := "Where you gathered"
 const LEGEND_HINTS := "A hidden cache, maybe"
+const LEGEND_EXPEDITION := "Expedition stop"
 
 const REACH_ID := "hallowmere_reach"
 
@@ -177,7 +181,22 @@ static func goal_marks(map_area: String) -> Dictionary:
 		var how := way_text(String(area), map_area)
 		if how != "":
 			lines.append(["ui_info", how])
+	_add_expedition(out, map_area)
 	return out
+
+
+## The running expedition's current stop / cache is always marked on the Reach map (Expeditions.current_target, via
+## MapView); when another objective owns the card it gets one extra line naming it. Nothing without a run.
+static func _add_expedition(out: Dictionary, map_area: String) -> void:
+	if map_area != REACH_ID:
+		return
+	var t := MapView.expedition_target()
+	var id := String(t.get("id", ""))
+	var marks: Array = out["marks"]
+	if id == "" or marks.has(id):
+		return
+	marks.append(id)
+	(out["lines"] as Array).append(["ui_star", "Expedition: head to %s" % String(t.get("name", ""))])
 
 
 ## The place on `map_area`'s map that leads toward `target_area` ("" = none drawn there).
@@ -243,6 +262,8 @@ func _build_outdoor() -> void:
 		lg.add_child(_legend_ctrl(_unknown_swatch(), "Not found yet"))
 		for ex in legend_extras(shown_area):
 			lg.add_child(_legend_ctrl(_extra_swatch(ex), String(ex["text"])))
+		if not MapView.expedition_pins(REACH_ID).is_empty():
+			lg.add_child(_legend_ctrl(_expedition_swatch(), LEGEND_EXPEDITION))
 	else:
 		side.add_child(_legend_row(_arrow_icon(), "You (pointing where you look)"))
 		side.add_child(_legend_row(IconFactory.icon("ui_star", Color.WHITE, 48), "Your current goal"))
@@ -373,6 +394,16 @@ func _extra_swatch(ex: Dictionary) -> Control:
 			MapView.draw_spot_pin(c, c.size * 0.5, 1.3, tex)
 		else:
 			MapView.draw_hint_pin(c, c.size * 0.5, 1.15))
+	return c
+
+
+## Legend swatch drawn exactly like the map's expedition stop pin (the current one, with its ring).
+func _expedition_swatch() -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(34, 34)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.draw.connect(func() -> void:
+		MapView.draw_expedition_pin(c, c.size * 0.5, 0.85, {"kind": "stop", "n": 1, "current": true, "done": false}))
 	return c
 
 

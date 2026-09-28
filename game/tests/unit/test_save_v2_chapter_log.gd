@@ -23,6 +23,8 @@ const STEP_FLAGS := {
 	"ch2_weaver_crossing": ["ch2_crossing_cleared"], "ch2_false_home": ["ch2_false_home_revealed"],
 	"ch2_choir": ["ch2_choir_defeated"], "ch2_routes_restored": ["ch2_returned_to_reach"],
 	"ch2_homecoming": ["ch2_homecoming"], "ch2_feast": ["chapter_two_complete"]}
+## Display-only rows (shown with their done state, never required), in order, before the step's real objectives.
+const DISPLAY_FLAGS := {"ch2_quarry": ["hr_warden_defeated", "ch2_winch_repaired"]}
 
 var log: RefCounted
 
@@ -71,10 +73,16 @@ func test_twenty_steps_with_the_design_ids_in_order() -> void:
 		assert_true(s.get("target") is String, s["id"] + " target is a landmark id String")
 		assert_true(String(s.get("target_area", "")) in ["surface", Data.REACH, Data.WORKS, Data.MANOR], s["id"] + " target_area")
 		var flags_needed: Array = []
+		var flags_shown: Array = []
 		for o in s["objectives"]:
 			assert_eq(o["type"], "flag", s["id"] + " uses flag objectives")
-			flags_needed.append(o["flag"])
+			if ChapterLog.is_display_objective(o):
+				assert_true(flags_needed.is_empty(), s["id"] + ": display rows come before the real objectives")
+				flags_shown.append(o["flag"])
+			else:
+				flags_needed.append(o["flag"])
 		assert_eq(flags_needed, STEP_FLAGS[s["id"]], s["id"] + " flags")
+		assert_eq(flags_shown, DISPLAY_FLAGS.get(s["id"], []), s["id"] + " display rows")
 	var grouped: Array = []
 	for s in Data.STEPS:
 		if String(s.get("group", "")) == "lamps":
@@ -217,6 +225,80 @@ func test_lamp_steps_are_shown_together_and_done_in_any_order() -> void:
 	assert_true(GameState.get_flag("ch2_orchard_restored"), "lamp steps set their recipe unlock flags")
 	assert_true(GameState.get_flag("ch2_quarry_restored"))
 	assert_true(GameState.get_flag("ch2_manor_restored"))
+
+
+## R38 / F03: the quarry step shows what its lamp needs ("Calm the Quarry Warden", "Mend the mineral winch")
+## as display rows with their real done state, but completion still reads only ch2_quarry_lamp_lit.
+func test_quarry_display_rows_are_shown_but_never_required() -> void:
+	_activate()
+	for id in ["ch2_waygate", "ch2_commons", "ch2_outer_lamps"]:
+		_finish(id)
+	log.evaluate()
+	var q: Dictionary = log.step_by_id("ch2_quarry")
+	assert_eq(log.objective_status(q), [
+		{"label": "Calm the Quarry Warden", "done": false, "progress": 0, "target": 1, "display": true},
+		{"label": "Mend the mineral winch", "done": false, "progress": 0, "target": 1, "display": true},
+		{"label": "Light the quarry lamp", "done": false, "progress": 0, "target": 1}])
+	# Both display rows met: they tick, the step does not complete (nothing pending for the 1 s poll).
+	GameState.set_flag("hr_warden_defeated")
+	GameState.set_flag("ch2_winch_repaired")
+	var rows: Array = log.objective_status(q)
+	assert_eq([rows[0]["done"], rows[1]["done"], rows[2]["done"]], [true, true, false], "display rows show their state")
+	assert_false(log.step_done(q), "display rows never complete a step")
+	assert_false(log.has_pending_completion(), "nothing for the poll to do")
+	log.evaluate()
+	assert_false(log.is_done("ch2_quarry"))
+	# The combined objective (tracker / journal / telemetry) lists them under the quarry step, in order.
+	var labels: Array = []
+	for st in GameState.current_objective()["status"]:
+		if String(st["step"]) == "ch2_quarry":
+			labels.append(String(st["label"]))
+	assert_eq(labels, ["Calm the Quarry Warden", "Mend the mineral winch", "Light the quarry lamp"])
+	GameState.set_flag("ch2_quarry_lamp_lit")
+	assert_true(log.has_pending_completion())
+	log.evaluate()
+	assert_true(log.is_done("ch2_quarry"))
+	assert_true(GameState.has_reward("rw_ch2_quarry"))
+
+
+## A save with the quarry lamp lit but no Warden / winch flag (an old or repaired save, a fallback path) never
+## stalls: the step completes on the lamp alone, through a real save round trip, and pays once.
+func test_quarry_step_completes_on_the_lamp_alone() -> void:
+	_activate()
+	for id in ["ch2_waygate", "ch2_commons", "ch2_outer_lamps"]:
+		_finish(id)
+	log.evaluate()
+	GameState.set_flag("ch2_quarry_lamp_lit")
+	assert_false(GameState.get_flag("hr_warden_defeated"))
+	assert_false(GameState.get_flag("ch2_winch_repaired"))
+	GameState.from_dict(json_norm(GameState.to_dict()))
+	log = GameState.chapter2
+	assert_false(log.is_done("ch2_quarry"), "loading completes nothing by itself")
+	assert_true(log.has_pending_completion(), "the poll sees the lit lamp")
+	log.evaluate()
+	assert_true(log.is_done("ch2_quarry"), "completes without the Warden / winch rows")
+	assert_eq(_held("quarry_seal"), 1)
+	assert_eq(_ids(log.current_steps()), ["ch2_orchard", "ch2_manor"])
+	log.evaluate()
+	assert_eq(_held("quarry_seal"), 1, "paid once")
+
+
+## The display-row rule of ChapterLog itself: a display objective reports "display": true (others keep their
+## exact shape), a step whose only objectives are display rows never completes, and a display row that is not
+## met does not block the step.
+func test_display_rows_rule() -> void:
+	GameState.set_flag("shown")
+	assert_eq(ChapterLog.check_objective({"type": "flag", "flag": "shown", "label": "S", "display": true}),
+		{"label": "S", "done": true, "progress": 1, "target": 1, "display": true})
+	assert_eq(ChapterLog.check_objective({"type": "flag", "flag": "shown", "label": "S"}),
+		{"label": "S", "done": true, "progress": 1, "target": 1}, "no display key on a real objective")
+	assert_false(ChapterLog.is_display_objective({"type": "flag", "flag": "x", "display": false}))
+	assert_false(log.step_done({"id": "only_display", "objectives": [{"type": "flag", "flag": "shown", "display": true}]}),
+		"a step of display rows only never completes")
+	assert_true(log.step_done({"id": "mixed", "objectives": [{"type": "flag", "flag": "unset", "display": true},
+		{"type": "flag", "flag": "shown"}]}), "an unmet display row does not block")
+	assert_false(log.step_done({"id": "mixed2", "objectives": [{"type": "flag", "flag": "shown", "display": true},
+		{"type": "flag", "flag": "unset"}]}), "a met display row does not complete")
 
 
 func test_objectives_met_early_latch_when_the_step_is_reached() -> void:

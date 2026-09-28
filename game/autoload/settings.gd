@@ -72,6 +72,12 @@ const DEFAULT_BINDINGS := {
 	"screenshot": ["key:%d" % KEY_F12],
 	"build_rotate": ["key:%d" % KEY_R],
 	"build_dismantle": ["key:%d" % KEY_X],
+	# Chapter Two build-mode keys (build_mode.gd prefers these actions over its FALLBACK_KEYS, same keys).
+	"build_undo": ["key:%d" % KEY_Z],
+	"build_recolor": ["key:%d" % KEY_P],
+	"build_variant": ["key:%d" % KEY_N],
+	# Chapter Two wardrobe (ui_root HOTKEYS; O is free: not Q/E, which switch wardrobe categories).
+	"wardrobe": ["key:%d" % KEY_O],
 	"zoom_in": ["mouse:%d" % MOUSE_BUTTON_WHEEL_UP],
 	"zoom_out": ["mouse:%d" % MOUSE_BUTTON_WHEEL_DOWN],
 	"hotbar_1": ["key:%d" % KEY_1], "hotbar_2": ["key:%d" % KEY_2], "hotbar_3": ["key:%d" % KEY_3], "hotbar_4": ["key:%d" % KEY_4],
@@ -83,7 +89,9 @@ const REBINDABLE := [
 	["move_forward", "Move Forward"], ["move_back", "Move Back"], ["move_left", "Move Left"], ["move_right", "Move Right"],
 	["jump", "Jump"], ["sprint", "Sprint"], ["dodge", "Dodge Roll"], ["attack", "Attack / Gather"], ["use_item", "Use / Eat Item"],
 	["interact", "Interact"], ["lantern", "Lantern"], ["inventory", "Inventory"], ["craft", "Crafting"], ["build", "Build Mode"],
-	["journal", "Journal"], ["map", "Map"], ["companion_command", "Companion: Follow / Wait"], ["companion_skill", "Companion Skill"],
+	["build_undo", "Build: Undo last piece"], ["build_recolor", "Build: Recolour"], ["build_variant", "Build: Pumpkin face"],
+	["journal", "Journal"], ["map", "Map"], ["wardrobe", "Wardrobe"], ["companion_command", "Companion: Follow / Wait"],
+	["companion_skill", "Companion Skill"],
 ]
 
 ## Valid ranges of numeric settings; set_value() and load_settings() clamp into them.
@@ -376,6 +384,8 @@ func auto_quality(device_type: int = -1) -> String:
 
 # --- Input map ---------------------------------------------------------------------
 
+## Installs every DEFAULT_BINDINGS action. An action with no saved binding (e.g. a settings file from before the
+## wardrobe / Chapter Two build actions existed) gets its default keys; nothing is written back to the file.
 func setup_input_map() -> void:
 	var raw_binds: Variant = values.get("bindings", {})
 	var binds: Dictionary = raw_binds if raw_binds is Dictionary else {}

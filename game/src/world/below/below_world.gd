@@ -565,8 +565,9 @@ func _echo_trial_prompt() -> Dictionary:
 	return {"text": String(s.call("entry_text", "matron")), "enabled": true}
 
 
-## Explains that it is a memory (not undone history), then travels; the arena checkpoint becomes the
-## return point (leaving or falling in the trial brings Krystal back here).
+## The trial menu, then travels: the same menu as the other echo stones (echo_trial.gd menu_text("matron"): the
+## memory - not undone history -, the trial's record (clears, best time) and what a clear leaves); the arena
+## checkpoint becomes the return point (leaving or falling in the trial brings Krystal back here).
 func _enter_echo_trial(_player: Node) -> void:
 	if fight_active or _riding or Game.mode != "playing":
 		return
@@ -574,8 +575,8 @@ func _enter_echo_trial(_player: Node) -> void:
 	if s == null:
 		return
 	if Game.ui != null and is_instance_valid(Game.ui) and Game.ui.has_method("confirm"):
-		var c: String = await Game.ui.confirm(String(s.call("entry_text", "matron")),
-			"An echo of your battle with %s, remembered by the stone. It is a memory, not undone history: the real chamber stays at peace, and nothing on your journey changes. Leave by the pale door at any time, or fall, and you wake here at the lantern." % ItemDB.enemy_display_name("weaver_matron"),
+		var m: Dictionary = s.call("menu_text", "matron")
+		var c: String = await Game.ui.confirm(String(m.get("title", s.call("entry_text", "matron"))), String(m.get("body", "")),
 			[["enter", "Enter the echo", "AccentButton"], ["cancel", "Not now", ""]])
 		if c != "enter" or not is_instance_valid(self) or Game.mode != "playing":
 			return

@@ -29,7 +29,7 @@ CONTROLS (change them any time in Settings > Controls)
   Journal .................. J                Map ............. M
   Companion follow / wait .. G                Companion skill . T
   Friend's menu ............ E on a friend    Hotbar .......... 1 - 8
-  Wardrobe ................. Esc > Wardrobe, or a Wardrobe / Vanity Mirror you build
+  Wardrobe ................. O  (or Esc > Wardrobe, or a Wardrobe / Vanity Mirror)
   Pause / menu ............. Esc              All controls .... F1
   Screenshot ............... F12  (saved to %APPDATA%\Hollowhaven\screenshots)
 
@@ -49,11 +49,13 @@ TIPS
     window. Underground it is the lanterns that count.
   - Enemies always wiggle, flare or rattle before they attack - that's your cue to dodge.
   - If you ever get stuck, open the pause menu and choose "Return to the Haven"
-    ("Return to last lantern" below the old mine, "Return to safety" in the Chapter Two places).
+    ("Return to last lantern" below the old mine, "Return to safety" in the Chapter Two
+    places, "Leave the trial" inside an Echo Trial).
   - In Hallowmere Reach, the waygate where you arrive always leads home, and any lit lantern
     arch can take you back to the Haven along the Lantern Road.
   - Friends help in fights now. Press T for their special skill; the ring round their
     portrait shows when it's ready.
+  - Echo stones, the Expedition Board and the Music Box: see "Chapter Two - What's New.txt".
   - Nothing you build or befriend can be lost. Take your time.
 
 Made with love, for Krystal.

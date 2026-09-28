@@ -208,6 +208,49 @@ func test_rebindable_actions_are_all_defined() -> void:
 		assert_true(String(pair[1]) != "", "friendly name for " + String(pair[0]))
 
 
+## Chapter Two keys in Settings > Controls (lead decisions D02 / D03): the wardrobe and the three build-mode keys
+## are rebindable rows, and a new binding reaches the game (InputMap, build mode's own key label, the hint tokens).
+func test_wardrobe_and_build_keys_are_rebindable() -> void:
+	var names := {}
+	for pair in Settings.REBINDABLE:
+		names[String(pair[0])] = String(pair[1])
+	var want := {"wardrobe": "Wardrobe", "build_undo": "Build: Undo last piece", "build_recolor": "Build: Recolour",
+		"build_variant": "Build: Pumpkin face"}
+	for a in want:
+		assert_eq(String(names.get(a, "")), String(want[a]), "%s row name" % a)
+	var p: Control = SettingsPanel.new()
+	p.setup({"tab": "controls"})
+	add_child(p)
+	await wait_frames(2)
+	for a in want:
+		assert_true(p._bind_rows.has(a), "%s has a row on the Controls tab" % a)
+	assert_eq(String((p._bind_rows["wardrobe"]["btn"] as Button).text), Settings.action_label("wardrobe"), "shows the current key")
+	assert_eq(String((p._bind_rows["wardrobe"]["warn"] as Label).text), "", "the default key clashes with nothing")
+	for pair in [["wardrobe", KEY_K], ["build_undo", KEY_U], ["build_recolor", KEY_Y], ["build_variant", KEY_H]]:
+		var a := String(pair[0])
+		p._begin_capture(a)
+		var k := InputEventKey.new()
+		k.physical_keycode = int(pair[1]) as Key
+		k.pressed = true
+		p._input(k)
+		assert_false(p.is_capturing_input())
+		assert_eq(UiUtil.action_codes(a)[0], "key:%d" % int(pair[1]), "%s rebound" % a)
+	var bm: Script = load("res://src/building/build_mode.gd")
+	assert_eq(String(bm.call("key_label", "build_undo")), "U", "build mode listens to the rebound undo key")
+	assert_eq(UiUtil.fill_tokens("{undo} {recolor} {variant} {wardrobe}", Callable(UiUtil, "settings_label")), "U Y H K",
+		"hint tokens name the rebound keys")
+	# Rebinding onto a key another action uses names that action by its friendly name.
+	p._begin_capture("build_recolor")
+	var e := InputEventKey.new()
+	e.physical_keycode = KEY_K    # the wardrobe's key now
+	e.pressed = true
+	p._input(e)
+	var warn: Label = p._bind_rows["build_recolor"]["warn"]
+	assert_true(warn.text.contains("Wardrobe"), "conflict names the wardrobe: " + warn.text)
+	p.queue_free()
+	await wait_frames(1)
+
+
 func _mouse(button: int, at: Vector2 = Vector2.ZERO) -> InputEventMouseButton:
 	var mb := InputEventMouseButton.new()
 	mb.button_index = button as MouseButton

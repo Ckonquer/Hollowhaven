@@ -126,10 +126,14 @@ const PLAYLISTS := {
 	"crossing": {"cues": ["m25"], "fallback": ["m13"]},
 	"choir": {"cues": ["m26"], "fallback": ["m13"]},
 	"celebration": {"cues": ["m27"], "fallback": ["m14"]},
+	# the Music Box's one-cue preview playlist: empty here, the selector fills its own copy with the chosen cue
+	# (music_selector.gd request_preview); "keep" = never silence anything if it were ever drawn empty
+	"~musicbox": {"cues": [], "fallback": ["keep"]},
 }
 
-## Contexts. priority: higher wins (muted/paused policy comes before all of them). kind: ending |
-## menu | boss | horror | combat | safe | explore | ambience. mode: rotate (bag + rests between
+## Contexts (every music context, the Music Box's "musicbox" preview included). priority: higher wins
+## (muted/paused policy comes before all of them). kind: ending | menu | boss | horror | combat | musicbox |
+## safe | explore | ambience. mode: rotate (bag + rests between
 ## pieces), loop (one piece until the context ends), once (one piece, then the request ends).
 ## playlist / night_playlist / late_playlist ("" = no music: ambience only). signature: playlist
 ## played first on arrival (at most once per signature_cooldown_s), then `playlist` rotates.
@@ -173,6 +177,10 @@ const CONTEXTS := {
 	"manor_grounds": {"kind": "explore", "priority": 20, "playlist": "manor_grounds", "mode": "rotate", "rest": [20.0, 45.0], "fade": 5.0, "cut": "phrase"},
 	"manor": {"kind": "explore", "priority": 20, "playlist": "manor", "mode": "rotate", "rest": [20.0, 50.0], "fade": 5.0, "cut": "phrase"},
 	"works": {"kind": "explore", "priority": 20, "playlist": "works", "mode": "rotate", "rest": [30.0, 75.0], "fade": 6.0, "cut": "phrase"},
+	# the Music Box preview (MP 18.3, src/audio/music_box.gd): a home feature, never a global override. Above the
+	# regional base (safe 30 / explore 20), below ordinary combat and everything else, which END it (not resumed).
+	# Requested only through the selector's request_preview(cue) (never mapped to an area / zone); one pass ("once").
+	"musicbox": {"kind": "musicbox", "priority": 40, "playlist": "~musicbox", "mode": "once", "fade": 1.5, "exit_fade": 1.5},
 	# ambience only (no music)
 	"silk": {"kind": "ambience", "priority": 10, "playlist": "", "fade": 3.0},
 	"trial": {"kind": "ambience", "priority": 10, "playlist": "", "fade": 3.0},

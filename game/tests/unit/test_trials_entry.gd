@@ -54,17 +54,34 @@ func test_the_stone_offers_its_trial_only_after_the_story_fight() -> void:
 	assert_eq(String(it.get("text", "")), "Echo Trial: The Last Waltz (a remembered challenge)")
 	assert_true(bool(it.get("enabled", false)))
 	assert_eq(e.find_children("*", "StaticBody3D", true, false).size(), 0, "not solid unless asked: it blocks nobody")
-	# Not while a fight is on / outside ordinary play: no travel.
+	# Not while a fight is on / outside ordinary play: no travel. Only a boss fight says "a fight is on".
 	var respawn_before := [String(GameState.player.get("respawn_area", "")), String(GameState.player.get("respawn_spawn", ""))]
 	Game.mode = "cutscene"
 	var notes: Array = []
 	var on_note := func(t: String, _k: String) -> void: notes.append(t)
 	Events.notify.connect(on_note)
 	e.interact(null)
-	Events.notify.disconnect(on_note)
 	await wait_frames(1)
 	assert_eq(EchoTrial.pending_trial, "", "no trip starts")
-	assert_eq(notes.size(), 1, "says why")
+	assert_eq(notes, ["The echo stays quiet for now."], "a cutscene / menu: the plain line (no fight is on)")
+	# A boss fight on (even in ordinary play): the fight line.
+	notes.clear()
+	Game.mode = "playing"
+	Game._bosses["test_boss"] = true
+	e.interact(null)
+	await wait_frames(1)
+	Game._bosses.erase("test_boss")
+	assert_eq(EchoTrial.pending_trial, "", "no trip starts during a boss fight")
+	assert_eq(notes, ["The echo stays quiet while a fight is on."], "says a fight is on")
+	# Both at once: the fight is the reason.
+	notes.clear()
+	Game.mode = "cutscene"
+	Game._bosses["test_boss"] = true
+	e.interact(null)
+	await wait_frames(1)
+	Game._bosses.erase("test_boss")
+	assert_eq(notes, ["The echo stays quiet while a fight is on."])
+	Events.notify.disconnect(on_note)
 	assert_eq([String(GameState.player.get("respawn_area", "")), String(GameState.player.get("respawn_spawn", ""))], respawn_before, "the respawn is untouched")
 
 
@@ -115,11 +132,9 @@ func test_the_trial_menu_shows_the_record_and_what_a_clear_leaves() -> void:
 	assert_true(String(m["body"]).contains("memory, not undone history"), "a memory, not undone history")
 	assert_true(String(m["body"]).contains(ItemDB.enemy_display_name("count_velour")), "names the Count")
 	assert_eq(String(m["record"]), "Not cleared yet.")
-	# The menu promises the pattern only once data/appearance.gd has it (integrator request); never a false promise.
-	if ItemDB.pattern("pat_echo_masquerade").is_empty():
-		assert_eq(String(m["reward"]), "First clear: the echo will remember you.")
-	else:
-		assert_eq(String(m["reward"]), "First clear: the Moonlit Masquerade pattern, to sew at the Loom.")
+	# The catalogue has every trial pattern (data/appearance.gd), so the menu names it.
+	assert_eq(String(m["reward"]), "First clear: the Moonlit Masquerade pattern, to sew at the Loom.")
+	assert_eq(String(EchoTrial.menu_text("choir")["reward"]), "First clear: the Chime Chorister pattern, to sew at the Loom.")
 	assert_true(String(m["body"]).contains("Not cleared yet.") and String(m["body"]).contains(String(m["reward"])))
 	assert_eq(String(EchoTrial.menu_text("matron")["reward"]), "First clear: the Moon Moth Shawl pattern, to sew at the Loom.", "a catalogued pattern is named")
 	EchoTrial.record_clear("velour", 151.2)
@@ -134,7 +149,7 @@ func test_the_trial_menu_shows_the_record_and_what_a_clear_leaves() -> void:
 	assert_true(String(EchoTrial.menu_text("velour")["body"]).contains("best time 1:38"), "the menu body carries it")
 	assert_eq(EchoTrial.record_line("choir"), "Not cleared yet.", "each trial keeps its own record")
 	assert_eq(EchoTrial.menu_text("nope"), {})
-	# The Matron's menu uses the same record (the Below's stone: integrator request to show it there too).
+	# The Matron's menu uses the same record (the Below's stone shows it too: test_enemies_boss_trial).
 	assert_true(String(EchoTrial.menu_text("matron")["body"]).contains("Not cleared yet."))
 
 

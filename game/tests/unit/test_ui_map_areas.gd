@@ -4,6 +4,7 @@ extends "res://tests/unit/test_core_base.gd"
 ## discovered districts only (+ arches, the waygate home) with objective markers for every lamp, interiors list
 ## the rooms found, the Below / trials show a message, the outdoor toggle, "way there" marks for goals in
 ## another area, numeric layout checks (no overlapping stickers / names / pins) and windows that fit the canvas.
+## A Lanternwake Expedition under way: its route pinned on the Reach map, its current place marked (P35).
 
 const UiRootScript := preload("res://src/ui/ui_root.gd")
 const UiUtil := preload("res://src/ui/ui_util.gd")
@@ -16,16 +17,20 @@ const REACH := "hallowmere_reach"
 const ThemeFactory := preload("res://src/ui/theme_factory.gd")
 const Mastery := preload("res://src/core/mastery.gd")
 const MasteryData := preload("res://data/mastery.gd")
+const Ex := preload("res://src/expeditions/expeditions.gd")
+const ExData := preload("res://data/expeditions.gd")
 
 var ui: CanvasLayer
 var _mode_before := ""
 var _area_before := ""
 var _zone_before := ""
 var _views: Array = []
+var _ex_listening := false
 
 
 func setup() -> void:
 	UiUtil.allow_settings_save = false
+	_ex_listening = Ex.is_listening()
 	fresh_state()
 	GameState.active = true
 	Settings.set_value("arachnophobia", false)
@@ -55,6 +60,8 @@ func teardown() -> void:
 	Game.zone_id = _zone_before
 	for p in Game._ui_stack.duplicate():
 		Game.pop_ui(String(p))
+	if not _ex_listening:
+		Ex.shutdown()
 
 
 func _accept(extra_flags: Array = []) -> void:
@@ -565,3 +572,83 @@ func test_bramblewatch_named_on_the_woods_map_once_found() -> void:
 	await wait_frames(2)
 	assert_true(v.frames_drawn > 0, "drawn without errors")
 
+
+# --- Lanternwake Expeditions (P35) ------------------------------------------------------------------------------
+
+## A run under way: its stops and cache are pinned on the Reach map (the current one ringed and marked as a goal,
+## also while a chapter step owns the card), "exp_*" ids resolve like places, the legend names the pins; the
+## woods map never shows them; nothing is drawn or marked without a run.
+func test_expedition_route_on_the_reach_map() -> void:
+	_accept(TO_LAMPS)
+	GameState.discover(REACH, "hr_commons")
+	GameState.flags["ch2_orchard_restored"] = true
+	# no run: nothing
+	assert_eq(MapView.area_of("exp_op_meadow"), REACH, "expedition ids belong to the Reach")
+	assert_eq(MapView.place_disc("exp_op_meadow"), {}, "no run, no disc")
+	assert_eq(MapView.place_disc("exp_op_meadow", REACH), {})
+	assert_eq(MapView.expedition_pins(REACH), [])
+	assert_eq(_standalone(REACH, Vector2(1000, 800)).expedition_marks, [])
+	for id in MapPanel.goal_marks(REACH)["marks"]:
+		assert_false(String(id).begins_with("exp_"))
+	# a run (started in the woods: no runner is attached)
+	Game.area_id = "surface"
+	assert_true(Ex.start("orchard_patrol", 6))
+	var stops: Array = ExData.TEMPLATES["orchard_patrol"]["stops"]
+	var d: Dictionary = MapView.place_disc("exp_op_meadow")
+	assert_eq(d["pos"], stops[0]["pos"], "exp ids resolve through Expeditions.place_disc")
+	assert_eq(MapView.place_disc("exp_op_meadow", "surface"), {}, "never on the woods map")
+	assert_eq(MapView.place_name("exp_op_meadow", REACH), "Scarecrow Meadow")
+	var v := _standalone(REACH, Vector2(1000, 800))
+	var marks: Array = v.expedition_marks
+	assert_eq(marks.size(), stops.size() + 1, "every stop + the cache")
+	assert_true(bool(marks[0]["current"]))
+	assert_eq(String(marks[marks.size() - 1]["kind"]), "cache")
+	var r: Rect2 = v.map_rect()
+	for m in marks:
+		assert_true(r.has_point(v.to_map(m["pos"])), "%s inside the map" % m["id"])
+	assert_eq(_standalone("surface", Vector2(800, 800)).expedition_marks, [], "woods map: no pins")
+	# the chapter step keeps the card; the expedition's current stop is marked too, with its own line
+	var g: Dictionary = MapPanel.goal_marks(REACH)
+	assert_eq(String(g["view"]["kind"]), "chapter2")
+	assert_true((g["marks"] as Array).has("exp_op_meadow"), "the current stop is a target on the Reach map")
+	assert_true((g["marks"] as Array).has("hr_orchard"), "the chapter's own marks stay")
+	var lines: Array = []
+	for ln in g["lines"]:
+		lines.append(String(ln[1]))
+	assert_true(lines.has("Expedition: head to Scarecrow Meadow"))
+	assert_false((MapPanel.goal_marks("surface")["marks"] as Array).has("exp_op_meadow"), "the Reach map only")
+	v.target_ids = g["marks"]
+	await wait_frames(3)
+	assert_true(v.frames_drawn > 0, "the route drew without errors")
+	var want: Vector2 = stops[0]["pos"]
+	assert_true(v._target_world.has(want), "the current stop pulses")
+	# the panel: legend row, and the window still fits the canvas
+	Game.area_id = REACH
+	var m: Control = await _open_map()
+	await wait_frames(2)
+	assert_eq(m.view.expedition_marks.size(), stops.size() + 1)
+	assert_true(m.view.all_targets().has("exp_op_meadow"))
+	assert_true(_has_text(m, MapPanel.LEGEND_EXPEDITION))
+	assert_true(_has_text(m, "Expedition: head to Scarecrow Meadow"))
+	var ms: Vector2 = m.window.get_combined_minimum_size()
+	print("G5-LAYOUT map/%s with an expedition %s" % [REACH, ms])
+	assert_true(ms.x <= CANVAS.x and ms.y <= CANVAS.y - 30.0, "map fits with the expedition row (%s)" % ms)
+	ui.close("map")
+	await wait_frames(2)
+	# the ring moves on with the route
+	var a := Ex.active()
+	for e in Ex.current_plan()["stops"][0]["enemies"]:
+		assert_true(Ex.record_defeat("orchard_patrol", int(a["run"]), 0, String(e)))
+	var v2 := _standalone(REACH, Vector2(1000, 800))
+	assert_true(bool(v2.expedition_marks[0]["done"]) and not bool(v2.expedition_marks[0]["current"]))
+	assert_true(bool(v2.expedition_marks[1]["current"]))
+	assert_true((MapPanel.goal_marks(REACH)["marks"] as Array).has("exp_op_hedgerow"))
+	assert_false((MapPanel.goal_marks(REACH)["marks"] as Array).has("exp_op_meadow"))
+	await wait_frames(2)
+	assert_true(v2.frames_drawn > 0, "done + current pins drew without errors")
+	# set aside: nothing drawn or marked any more
+	assert_true(Ex.abandon())
+	assert_eq(_standalone(REACH, Vector2(1000, 800)).expedition_marks, [])
+	for id2 in MapPanel.goal_marks(REACH)["marks"]:
+		assert_false(String(id2).begins_with("exp_"))
+	assert_eq(MapView.place_disc("exp_op_hedgerow"), {})

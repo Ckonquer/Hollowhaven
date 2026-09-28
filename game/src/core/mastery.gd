@@ -28,11 +28,14 @@ extends RefCounted
 const MasteryData := preload("res://data/mastery.gd")
 
 ## Flags that mark the first clear of a distinct authored encounter -> canonical encounter id (bosses use the
-## same ids as Events.boss_defeated, so a boss counted by its flag and by the signal is still one encounter).
+## same ids as Events.boss_defeated, so a boss counted by its flag and by the signal is still one encounter:
+## award() dedupes on "encounter:<id>"). hr_warden_defeated = data/reach_east.gd FLAG_WARDEN (quarry_warden.gd
+## BAR_ID), ch2_velour_defeated = data/manor_layout.gd FLAG_VELOUR_DEFEATED (count_velour.gd BOSS_ID).
 const ENCOUNTER_FLAGS := {
 	"ruin_cleared": "thornthicket", "weaver_defeated": "weaver_matron", "c1x_elder_defeated": "knotted_elder",
 	"c1x_drudge_defeated": "hollow_drudge", "ch2_crossing_cleared": "crossing_matron",
-	"ch2_choir_defeated": "borrowed_choir",
+	"ch2_choir_defeated": "borrowed_choir", "hr_warden_defeated": "quarry_warden",
+	"ch2_velour_defeated": "count_velour",
 }
 ## Return shortcuts (spec §1 / optional goal "The Long Way Home").
 const SHORTCUT_FLAGS := ["ta_hatch_open", "ch2_shortcut_quarry", "ch2_shortcut_manor", "ch2_refuge_shortcut"]

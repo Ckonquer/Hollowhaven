@@ -232,6 +232,34 @@ func test_keyboard_switches_categories_and_turns_the_preview() -> void:
 	assert_true(f != null and f is Button, "a tile takes keyboard focus")
 
 
+## The wardrobe hotkey (O by default, lead decision D02) opens and closes the wardrobe; it never collides with the
+## wardrobe's own keys (Q / E switch categories) and typing a preset name never closes the panel.
+func test_wardrobe_hotkey_opens_and_closes_it() -> void:
+	assert_eq(String(UiRootScript.HOTKEYS.get("wardrobe", "")), "wardrobe")
+	var code: int = (InputMap.action_get_events("wardrobe")[0] as InputEventKey).physical_keycode
+	assert_false(code == KEY_Q or code == KEY_E, "the hotkey is not a category key")
+	ui._input(_key(code))
+	await wait_frames(2)
+	assert_true(ui.is_open("wardrobe"), "the hotkey opens the wardrobe")
+	assert_true(get_tree().paused, "full-screen: the world pauses")
+	var w: Control = ui.panels.get("wardrobe")
+	var cat := String(w.editor.category)
+	ui._input(_key(KEY_E))
+	assert_ne(String(w.editor.category), cat, "E still switches category")
+	assert_true(ui.is_open("wardrobe"))
+	(w._preset_rows[0]["save"] as Button).pressed.emit()
+	(w._preset_rows[0]["rename"] as Button).pressed.emit()
+	assert_true(w.is_capturing_input(), "renaming a preset")
+	ui._input(_key(code))
+	assert_true(ui.is_open("wardrobe"), "typing the hotkey's letter into a name never closes the wardrobe")
+	w._on_rename_input(_key(KEY_ESCAPE), 0)
+	assert_false(w.is_capturing_input())
+	ui._input(_key(code))
+	await wait_frames(1)
+	assert_false(ui.is_open("wardrobe"), "the hotkey closes it again")
+	assert_false(get_tree().paused)
+
+
 func test_presets_from_the_panel() -> void:
 	var w := await _open_wardrobe()
 	var rows: Array = w._preset_rows

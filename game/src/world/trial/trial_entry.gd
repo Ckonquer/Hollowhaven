@@ -86,11 +86,19 @@ func interact(_player: Node = null) -> void:
 	if menu_open or not available():
 		return
 	if Game.mode != "playing" or Game.boss_active():
-		Events.notify.emit("The echo stays quiet while a fight is on.", "info")
+		Events.notify.emit(refusal_text(), "info")
 		return
 	var choice := await open_menu()
 	if choice == "enter":
 		enter()
+
+
+## Why the stone will not open right now: a boss fight on (Game.boss_active()) says so; anything else outside
+## ordinary play (a cutscene, a menu, a load) gets the plain line.
+static func refusal_text() -> String:
+	if Game.boss_active():
+		return "The echo stays quiet while a fight is on."
+	return "The echo stays quiet for now."
 
 
 ## The trial menu (awaitable). Returns "enter" or "cancel". Without a UI (tests, tools) it returns "enter".

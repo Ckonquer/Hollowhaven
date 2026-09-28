@@ -3,12 +3,15 @@ extends "res://tests/test_case.gd"
 ## (registered in the enemy factory) with its three ward candles, curtains, cover and helper points; he waits
 ## until the TEACHING candle is lit with Krystal in the Gallery (never on proximity alone); leaving pauses him
 ## cleanly (the area relights the candles); victory commits ch2_velour_defeated inside the boss_defeated event,
-## BEFORE any presentation or dialogue, exactly once; the freed resident says the MP 17 line once (the boss does
-## not repeat it); a won save never spawns him again.
+## BEFORE any presentation or dialogue, exactly once; the freed resident appears only once his dispersal has played
+## (DEFEAT_PRESENT) and says the MP 17 line once (the boss does not repeat it); a won save never spawns him again.
 ## Headless; the scene is loaded like the manor tests do; the boss is ticked by hand.
 
 const Layout := preload("res://data/manor_layout.gd")
 const SCENE := "res://scenes/moonveil_manor.tscn"
+const Velour := preload("res://src/enemies/count_velour.gd")
+const ManorWorld := preload("res://src/world/areas_ch2/moonveil_manor_world.gd")
+const Resident := preload("res://src/world/manor/count_resident.gd")
 const DT := 0.05
 
 var _area: Node3D = null
@@ -162,12 +165,17 @@ func test_victory_commits_before_presentation_once_and_the_resident_speaks() -> 
 	assert_eq(String(b.state), "defeat", "the presentation plays after the commit")
 	assert_false(b.is_in_group("enemy"), "no longer a target while the enchantment disperses")
 	assert_false(bool(_area.get("fight_active")))
-	assert_not_null(_area.get("resident"), "the freed Count appears")
-	assert_true(bool((_area.get("balcony_door") as Node).call("is_open")), "the way on opens")
+	assert_null(_area.get("resident"), "the freed Count waits until the enchantment has dispersed")
+	assert_true(bool((_area.get("balcony_door") as Node).call("is_open")), "the way on opens at once")
 	var early: Array = _log.filter(func(e: Array) -> bool: return String(e[0]) == "say" and String(e[1]) == Layout.VELOUR_AFTER)
 	assert_eq(early.size(), 0, "no dialogue before the presentation")
-	await wait_seconds(1.8)
+	assert_almost(ManorWorld.RESIDENT_DELAY, Velour.DEFEAT_PRESENT, 0.0001, "the manor waits exactly the dispersal")
+	await wait_seconds(Velour.DEFEAT_PRESENT - 0.4)
+	assert_null(_area.get("resident"), "still dispersing where he fell")
+	await wait_seconds(0.7)
 	assert_eq(String(b.state), "gone", "the enchantment dispersed")
+	assert_not_null(_area.get("resident"), "then the freed Count appears")
+	await wait_seconds(Resident.GREET_DELAY + 0.4)
 	var lines: Array = _log.filter(func(e: Array) -> bool: return String(e[0]) == "say" and String(e[1]) == Layout.VELOUR_AFTER)
 	assert_eq(lines.size(), 1, "\"A dreadful host...\" said once (by the resident, not repeated by the boss)")
 	assert_true(bool(lines[0][2]), "said after the commit")

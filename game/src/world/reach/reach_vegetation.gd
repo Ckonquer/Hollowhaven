@@ -533,22 +533,39 @@ func _group(node_name: String) -> Node3D:
 	return g
 
 
+## ResourceNode.setup() params of one planned harvestable: `list` = "trees" | "rocks" | "sticks" | "stones" | "fibers"
+## (the plan key), `d` = its plan entry (id, seed, yaw [, scale, species]). Trees, sticks and fiber tufts get a fresh
+## custom Node3D visual (reach_flora.gd) on every call; rocks and stones use NodeVisuals ids. Tests build real Reach
+## nodes with it.
+static func node_params(list: String, d: Dictionary) -> Dictionary:
+	match list:
+		"trees":
+			var sp := String(d["species"])
+			return {"node_id": d["id"], "kind": "tree", "visual": Flora.tree_visual(sp, int(d["seed"])), "seed": d["seed"],
+				"yaw": d["yaw"], "scale": d["scale"], "name": String(Flora.TREE_NAMES.get(sp, "Tree"))}
+		"rocks":
+			return {"node_id": d["id"], "kind": "rock", "seed": d["seed"], "yaw": d["yaw"], "scale": d["scale"], "tint": ROCK_TINT}
+		"sticks":
+			return {"node_id": d["id"], "kind": "stick", "visual": Flora.stick_visual(int(d["seed"])), "yaw": d["yaw"]}
+		"stones":
+			return {"node_id": d["id"], "kind": "stone", "seed": d["seed"], "yaw": d["yaw"], "tint": STONE_TINT}
+		"fibers":
+			return {"node_id": d["id"], "kind": "grass", "visual": Flora.tuft_visual(int(d["seed"])), "yaw": d["yaw"]}
+	push_error("ReachVegetation.node_params: unknown list '%s'" % list)
+	return {}
+
+
 func _build_resource_nodes() -> void:
 	var gt := _group("Trees")
 	for d in plan_data["trees"]:
-		var sp := String(d["species"])
-		_add_node(gt, {"node_id": d["id"], "kind": "tree", "visual": Flora.tree_visual(sp, int(d["seed"])), "seed": d["seed"],
-			"yaw": d["yaw"], "scale": d["scale"], "name": String(Flora.TREE_NAMES.get(sp, "Tree"))}, d["pos"])
+		_add_node(gt, node_params("trees", d), d["pos"])
 	var gr := _group("Rocks")
 	for d in plan_data["rocks"]:
-		_add_node(gr, {"node_id": d["id"], "kind": "rock", "seed": d["seed"], "yaw": d["yaw"], "scale": d["scale"], "tint": ROCK_TINT}, d["pos"] - Vector3(0, 0.12, 0))
+		_add_node(gr, node_params("rocks", d), d["pos"] - Vector3(0, 0.12, 0))
 	var gs := _group("Forage")
-	for d in plan_data["sticks"]:
-		_add_node(gs, {"node_id": d["id"], "kind": "stick", "visual": Flora.stick_visual(int(d["seed"])), "yaw": d["yaw"]}, d["pos"])
-	for d in plan_data["stones"]:
-		_add_node(gs, {"node_id": d["id"], "kind": "stone", "seed": d["seed"], "yaw": d["yaw"], "tint": STONE_TINT}, d["pos"])
-	for d in plan_data["fibers"]:
-		_add_node(gs, {"node_id": d["id"], "kind": "grass", "visual": Flora.tuft_visual(int(d["seed"])), "yaw": d["yaw"]}, d["pos"])
+	for list in ["sticks", "stones", "fibers"]:
+		for d in plan_data[list]:
+			_add_node(gs, node_params(list, d), d["pos"])
 
 
 func _build_forest_belt() -> void:

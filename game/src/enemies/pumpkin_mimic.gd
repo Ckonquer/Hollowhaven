@@ -17,6 +17,10 @@ extends "res://src/enemies/enemy_base.gd"
 ##             locks after 60% -> it rolls along the lane (one hit at most) -> stuck: it wobbles in the dirt for
 ##             data recover (2.0 s, +STUCK_WALL_EXTRA after bumping a wall) - the punish window.
 ## Spawned by a spawner without "dormant" (the orchard pocket twitches its own props first) it starts awake.
+## Spawners must NOT pass "dormant" (integration pass 2, P12): spot_allowed() rejects crop / safe spots and a retired
+## mimic would be re-spawned by its spawner every tick. Dormant mimics are hand-placed only (no district uses them).
+## Setup key "seed" (int, optional): seeds this mimic's RNG (twitch gaps, idle waits) for deterministic tests;
+## default: randomized.
 ## Intensity: Gentle = longer wind-ups, longer rests and no overlapping wind-ups with other enemies;
 ## Intense = shorter rests (never faster tells, never invisible, never louder).
 ## Stats: data/enemies.gd "pumpkin_mimic". Sounds (existing names only): grass_pull (stem twitch), brambling_chatter
@@ -45,15 +49,13 @@ const TWITCH_REST_MAX := 6.5
 const CROP_CLEARANCE := 2.5
 const CROP_STRUCTURES := ["crop_plot", "sturdy_planter"]
 const INSPECT_TEXT := "Inspect twitching pumpkin"
-const GENTLE_COOLDOWN := 1.35
-const INTENSE_COOLDOWN := 0.8
-const GENTLE_TELEGRAPH_BONUS := 0.2
 const LANE_REFRESH := 0.1
 const PULP := Color("f2a042")
 const SEEDS := Color("fff0c8")
 const DIRT := Color("9c7650")
 
 var dormant := false                 # setup key "dormant"
+var rng_seed: int = -1               # setup key "seed" (>= 0 = deterministic RNG; tests)
 var next_attack: String = ""         # tests / scripted fights: "bite" | "roll"
 var attack_kind: String = ""
 var bites_done: int = 0
@@ -82,10 +84,17 @@ func _init() -> void:
 func setup(params: Dictionary) -> void:
 	super.setup(params)
 	dormant = bool(params.get("dormant", dormant))
+	if params.has("seed"):
+		rng_seed = maxi(int(params["seed"]), 0)
 
 
 func _ready() -> void:
-	super._ready()
+	super._ready()                       # randomizes the RNG ...
+	if rng_seed >= 0:
+		_rng.seed = rng_seed             # ... unless a seed was given: re-draw what the base drew unseeded, so the
+		_chatter_t = _rng.randf_range(4.0, 10.0)            # whole schedule (chatter, first wait, twitches) is fixed
+		if state == "idle":
+			_state_len = _rng.randf_range(0.6, 2.2)
 	_def = attack_def("bite")
 	if dormant:
 		if not spot_allowed(global_position):
@@ -203,7 +212,7 @@ func wake() -> bool:
 
 
 func wake_duration() -> float:
-	var t := float(data.get("wake_telegraph", 1.4)) + _telegraph_bonus()
+	var t := float(data.get("wake_telegraph", 1.4)) + intensity_telegraph_bonus()
 	if bool(Settings.get_value("timing_assist")):
 		t *= WAKE_ASSIST_MULT
 	return maxf(t, MIN_COMMITTED_TELEGRAPH)
@@ -274,7 +283,7 @@ func attack_reach() -> float:
 
 
 func _can_start_attack() -> bool:
-	return _shot_clear and not _gentle_blocked()
+	return _shot_clear and not overlap_blocked()
 
 
 func _choose_attack() -> void:
@@ -297,7 +306,7 @@ func _choose_attack() -> void:
 
 
 func telegraph_duration() -> float:
-	return attack_telegraph(_def) + _telegraph_bonus()
+	return attack_telegraph(_def) + intensity_telegraph_bonus()
 
 
 func recover_duration() -> float:
@@ -393,7 +402,7 @@ func _st_custom(state_name: String, delta: float) -> void:
 						_get_stuck(false)
 		"stuck":
 			if state_time >= _state_len:
-				_cooldown = float(data.get("cooldown", 2.2)) * _cooldown_mult()
+				_cooldown = float(data.get("cooldown", 2.2)) * intensity_cooldown_mult()
 				_resume_after_interrupt()
 
 
@@ -435,32 +444,7 @@ func _on_player_died() -> void:
 
 func _on_state_changed(_prev: String, new_state: String) -> void:
 	if new_state == "recover":
-		_cooldown *= _cooldown_mult()
-
-
-# --- Intensity (Gentle / Intense) ---------------------------------------------------------------------------------
-
-func _cooldown_mult() -> float:
-	match Combat.current_intensity():
-		0:
-			return GENTLE_COOLDOWN
-		2:
-			return INTENSE_COOLDOWN
-	return 1.0
-
-
-func _telegraph_bonus() -> float:
-	return GENTLE_TELEGRAPH_BONUS if Combat.current_intensity() == 0 else 0.0
-
-
-## Gentle: never winds up while another enemy is already winding up / attacking (no overlapping attacks).
-func _gentle_blocked() -> bool:
-	if Combat.current_intensity() != 0:
-		return false
-	for id in _attackers.keys():
-		if int(id) != get_instance_id() and is_instance_id_valid(int(id)):
-			return true
-	return false
+		_cooldown *= intensity_cooldown_mult()
 
 
 # --- Feedback ------------------------------------------------------------------------------------------------------

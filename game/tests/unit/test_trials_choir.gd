@@ -122,6 +122,11 @@ func test_a_win_pays_the_first_clear_once_then_bounded_repeats_and_no_story_flag
 	var rec := EchoTrial.record("choir")
 	assert_eq(int(rec["clears"]), 3)
 	assert_eq(GameState.ledger.size(), ledger_n, "the first-clear bundle never pays twice")
+	# Both repeat gifts wait (merged) for the trip home (lead decision L08); the arrival at the Bell Throat pays them.
+	assert_eq(GameState.count_item("echo_shard"), shards, "nothing is given inside the echo")
+	assert_eq(rec.get("pending", {}), {"echo_shard": 4, "iron_ore": 4, "moon_crystal": 1}, "two waiting gifts merge")
+	assert_eq(EchoTrial.pay_pending("hushed_works"), {"echo_shard": 4, "iron_ore": 4, "moon_crystal": 1}, "paid on arrival")
+	rec = EchoTrial.record("choir")
 	assert_eq(GameState.count_item("echo_shard"), shards + 4, "2 echo shards per repeat")
 	assert_eq(GameState.count_item("iron_ore"), ore + 4, "2 iron ore per repeat")
 	assert_eq(GameState.count_item("moon_crystal"), crystal + 1, "the third clear adds one moon crystal")

@@ -23,10 +23,16 @@ extends Node
 ##   * a hint may also wait for its area ("where"), a follower, or some minutes of play (new journeys start quietly)
 ##   * hints made redundant by play (a furnace already used, the invitation already accepted...) are dropped
 ## Timers only run while the game is unpaused (process_mode PAUSABLE); the work runs every STEP_SECONDS.
-## Key names use the HUD's {token} system (src/ui/ui_util.gd TOKEN_ACTIONS). The three build-mode keys (undo,
-## recolour, pumpkin face) are not Settings actions yet, so their label is read from build_mode.gd key_label()
-## when the hint is emitted (a {undo} / {recolor} token is used instead once the integrator adds it).
+## Key names use the HUD's {token} system (src/ui/ui_util.gd TOKEN_ACTIONS). The build-mode keys (undo, recolour)
+## use their {undo} / {recolor} tokens once Settings binds the actions (pass-2 D03: rebindable build_undo Z,
+## build_recolor P, build_variant N); without the action the label is read from build_mode.gd key_label() instead.
 ## Texts are arachnophobia-neutral (nothing spider-like is named) and every statement is checked against the code.
+## Echo Trials (pass-2 P49): ONE generic hint "ob_echo_trial" for every echo stone. Its "where" is the keyword
+## "echo_origin": the area Krystal is in is the origin of a trial whose story fight is won (data/trials.gd: the Below
+## after weaver_defeated, the manor after ch2_velour_defeated, the Hushed Works after ch2_choir_defeated; each trial
+## opens right after its boss is defeated - lead decision L07, no ch2_trials_open gate). Armed on arrival there, and
+## live when a Chapter Two boss falls (ECHO_LIVE_FLAGS; Chapter One's return home is never interrupted by it);
+## dropped once any trial has a clear.
 ##
 ## Public API:
 ##   static attach(parent: Node) -> Node     creates the single instance under `parent` (idempotent)
@@ -37,6 +43,7 @@ extends Node
 
 const UiUtil := preload("res://src/ui/ui_util.gd")
 const Reach := preload("res://data/hallowmere_layout.gd")
+const TrialsData := preload("res://data/trials.gd")
 
 const NODE_NAME := "OnboardingHints"
 const GROUP := "onboarding_hints"
@@ -55,19 +62,25 @@ const UNDO_AFTER_PLACEMENTS := 3              # pieces placed this session befor
 const WARDROBE_MIN_PLAY := 300.0              # play_seconds: a new journey is styled at creation, told later
 const OPTIONAL_MIN_PLAY := 600.0
 const COMPANION_MENU_AFTER_SKILL := 90.0
+## "where" keywords besides a real area id: "" anywhere, "outdoor" (OUTDOOR), "echo_origin" (see the header).
+const WHERE_KEYWORDS := ["", "outdoor", "echo_origin"]
+## Chapter Two boss flags that arm the echo trial hint the moment they are set (the stone appears at once).
+const ECHO_LIVE_FLAGS := ["ch2_velour_defeated", "ch2_choir_defeated"]
+const ECHO_LIVE_DELAY := 30.0
 
-## id -> {"where": "" (anywhere) | area id | "outdoor", "text"}. Texts marked "%s" are completed by hint_text().
+## id -> {"where": "" (anywhere) | area id | "outdoor" | "echo_origin", "text"}. Texts marked "%s" are completed by
+## hint_text().
 const HINTS := {
 	"ob_ch2_invitation": {"where": "surface",
 		"text": "The Ward Stone in your Haven has a new inscription. Read it with {interact} whenever you like: nothing changes until you choose to follow the lantern road."},
 	"ob_wardrobe": {"where": "outdoor",
-		"text": "Change Krystal's look any time: {pause} > Wardrobe, or build a Wardrobe or Vanity Mirror at the Workbench. Clothes are only for looks: your armor still protects you."},
+		"text": "Change Krystal's look any time: press {wardrobe}, or {pause} > Wardrobe, or build a Wardrobe or Vanity Mirror at the Workbench. Clothes are only for looks: your armor still protects you."},
 	"ob_reach_home": {"where": "hallowmere_reach",
 		"text": "The waygate where you arrived always leads home to Hollowhaven Woods. Your Haven stays just as you left it."},
 	"ob_lantern_road": {"where": "outdoor",
 		"text": "Lit arches are safe spots on the Lantern Road. Press {interact} at any lit arch to travel between them or home to the Haven. At home, the Ward Stone can send you back."},
-	"ob_echo_trial": {"where": "below",
-		"text": "By the lantern before the Heartseed Chamber, a pale echo stone offers an Echo Trial: that old fight, replayed as a memory, for a reward. Nothing on your journey changes."},
+	"ob_echo_trial": {"where": "echo_origin",
+		"text": "An echo stone waits by the lantern or candles before each great fight you have won. Press {interact} there to replay that fight as a memory, for a reward. Nothing on your journey changes."},
 	"ob_companion_skill": {"where": "", "text": ""},   # built by companion_skill_text() (reads the two companion settings)
 	"ob_equipment": {"where": "",
 		"text": "New gear! Open your backpack ({inventory}) and drag armor or a charm onto the Equipped column, or double-click it. The stats card shows what it adds."},
@@ -94,7 +107,7 @@ const HINTS := {
 	"ob_chest_crafting": {"where": "",
 		"text": "Crafting tip: tick \"Also use nearby chests\" in the crafting menu ({craft}) to use ingredients from your chests close by."},
 	"ob_expedition_board": {"where": "outdoor",
-		"text": "New at the Workbench: the Expedition Board. Place it at home and press {interact} there to find optional adventures."},
+		"text": "New at the Workbench: the Expedition Board. Place it at home and press {interact} there to set out on a Lanternwake Expedition, one of three hand-made routes through Hallowmere Reach."},
 	"ob_optional": {"where": "surface",
 		"text": "Your Journal ({journal}) has an Optional tab: little side stories and things to make, whenever you like."},
 }
@@ -110,7 +123,7 @@ const ITEM_TRIGGERS := {"copper_ore": "ob_furnace", "iron_ore": "ob_furnace", "s
 	"pumpkin_seeds": "ob_crops"}
 const GEAR_CATEGORIES := ["armor", "charm"]
 const STRUCTURE_TRIGGERS := {"wood_stairs": "ob_stairs", "loom": "ob_loom"}
-## Build-mode keys that have no Settings action (and so no HUD token) yet: wording when the key is unbound.
+## Build-mode keys without a Settings action (older settings code) and without a build-mode label: the wording used.
 const BUILD_KEY_FALLBACK := {"build_undo": "the Undo key on the build bar", "build_recolor": "the Recolour key on the build bar"}
 
 ## Steps by itself every STEP_SECONDS (off in headless runs: tests call tick()).
@@ -380,7 +393,33 @@ func _where_ok(id: String) -> bool:
 		return true
 	if w == "outdoor":
 		return OUTDOOR.has(Game.area_id)
+	if w == "echo_origin":
+		return echo_stone_here(Game.area_id)
 	return Game.area_id == w
+
+
+## True when `area_id` is the origin of an echo trial whose story fight is won (its echo stone stands there).
+static func echo_stone_here(area_id: String) -> bool:
+	for id in TrialsData.ORDER:
+		var t: Dictionary = TrialsData.trial(String(id))
+		var origin: Variant = t.get("origin", {})
+		if not (origin is Dictionary) or String((origin as Dictionary).get("area", "")) != area_id:
+			continue
+		if _truthy(GameState.get_flag(String(t.get("requires_flag", "")))):
+			return true
+	return false
+
+
+## True once any echo trial has been cleared (the stones need no more introduction).
+static func any_trial_cleared() -> bool:
+	var trials: Variant = GameState.trials
+	if not (trials is Dictionary):
+		return false
+	for id in trials:
+		var r: Variant = (trials as Dictionary)[id]
+		if r is Dictionary and int((r as Dictionary).get("clears", 0)) > 0:
+			return true
+	return false
 
 
 ## Made redundant by play: dropped without being marked.
@@ -396,8 +435,7 @@ func _obsolete(id: String) -> bool:
 			# build_mode.gd already told her the undo key on entering build mode (its own tip "build_controls_ch2").
 			return is_shown(BUILD_CH2_HINT)
 		"ob_echo_trial":
-			var t: Variant = GameState.trials.get("matron", {})
-			return t is Dictionary and int((t as Dictionary).get("clears", 0)) > 0
+			return any_trial_cleared()
 		"ob_optional":
 			return (GameState.optional_goals.pending_goals() as Array).is_empty()
 	return false
@@ -444,9 +482,8 @@ func _on_area_loaded(area_id: String) -> void:
 			arm("ob_reach_home", 3.0)
 			if _any_arch_lit():
 				arm("ob_lantern_road", 20.0)
-		"below":
-			if _truthy(GameState.get_flag("weaver_defeated")):
-				arm("ob_echo_trial", 3.0)
+	if echo_stone_here(area_id):
+		arm("ob_echo_trial", 3.0)
 	if _has_follower():
 		arm("ob_companion_skill", 45.0)
 	if _owns_dye():
@@ -479,6 +516,8 @@ func _on_flag_set(flag_name: String, _value: Variant) -> void:
 			arm("ob_ch2_invitation", 20.0)
 		"ch2_choir_defeated":
 			arm("ob_expedition_board", 30.0)
+	if ECHO_LIVE_FLAGS.has(flag_name):
+		arm("ob_echo_trial", ECHO_LIVE_DELAY)      # waits for the stone's area ("echo_origin") and a calm moment
 
 
 func _on_item_added(item_id: String, _count: int) -> void:

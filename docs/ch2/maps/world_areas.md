@@ -513,7 +513,7 @@ the area scripts below and of `autoload/game.gd`.
 | `moonveil_manor` | `moonveil_manor_world.gd` (C4) | its own room builder `src/world/manor/manor_builder.gd` + `data/manor_layout.gd` (not below_builder) |
 | `hushed_works` | `hushed_works_world.gd` (C7) | `data/works_layout.gd` (rooms 1-8) merged with `data/works_layout_deep.gd` (rooms 9-14) into one table for `below_builder.gd`, then `src/world/works/rooms_deep.gd` `build(area, builder)` (C8); Works horror director (`Game.DIRECTOR_AREAS` has "hushed_works") |
 | `tobin_annex` | `tobin_annex_world.gd` (B10; the scene's script, not `tobin_annex.gd`) | `src/world/annex/*` on the Below builder |
-| `echo_trial` | `echo_trial.gd` (B9) behind the 3-line `echo_trial_world.gd` shim that `scenes/echo_trial.tscn` loads | kept: no .tscn churn (R136 j); trial table `TRIALS` in `echo_trial.gd` holds the repeat rewards (trial-owned content data, R136 k) |
+| `echo_trial` | `echo_trial.gd` (B9, extended by D1 / pass 2) behind the 3-line `echo_trial_world.gd` shim that `scenes/echo_trial.tscn` loads | kept: no .tscn churn (R136 j); the trial table is `data/trials.gd` `TRIALS` (Wave D1 moved it there; R136 k: trial-owned content data): the Matron's room is built by `echo_trial.gd` itself, Count Velour's Gallery copy and the rotated Choir vault copy by `src/world/trial/velour_trial.gd` / `choir_trial.gd` (`static build(area) -> Dictionary`), which spawn the REAL boss scripts in mode "trial" |
 Surface additions are annexes (`src/world/surface/annexes.gd` `ANNEX_SCRIPTS`, safe-loaded, `static build(area)` + optional
 `grass_clearings()`): the c1x content (B7), `courage_lantern.gd` (B4), `tobin_door.gd` (B10) and C9's `story_ch2/haven_dressing.gd`
 (the lasting Haven keepsake after `chapter_two_complete`; R50). The legacy vegetation golden hash stays green.
@@ -537,8 +537,32 @@ Reusable Below nodes gained setup keys (spec §10); `lower_gate.gd` records `low
 `<its flag>_tried` (R74); `BelowProps.tint()` / `torus_mesh()` are public for the annex (R75); the Foreman's desk offers a lost key again
 while the Bellhouse service gate still needs it (`ch2_lamps_linked` and not `ch2_service_gate_open`; never duplicates it, R73).
 
+**Echo Trials (Wave D1 + integration pass 2).** One area, three remembered fights (`data/trials.gd`: `matron`, `velour`,
+`choir`; per trial `requires_flag`, `origin` {area, spawn}, `builder`, texts, `first_reward`, `pattern`, `repeat` / `bonus`).
+Echo stones (`src/world/trial/trial_entry.gd`: `setup({trial, origin_area, origin_spawn, solid})`, the trial menu from
+`echo_trial.menu_text(id)` = memory text, record (clears, best time) and what a clear leaves, "Enter the echo" / "Not now"):
+the Below beside the `cp_arena` lantern (`below_world.gd` `_place_echo_trial`, same menu since pass 2 P28), the manor ballroom
+rest candles (`data/manor_layout.gd` `ECHO_ENTRY`, origin spawn `manor_ballroom`, placed at once when Velour falls), the Hushed
+Works Bell Throat (`TRIALS.choir.entry` (153.6, -28, 27.6), origin `bell_throat`, placed on load and live on `ch2_choir_defeated`;
+lead decision L10: kept, to be checked on screen, else ~(153.4, -28, 24.75)). **Opening rule (lead decision L07): a trial opens
+right after its boss is defeated** - `weaver_defeated` / `ch2_velour_defeated` / `ch2_choir_defeated`; `ch2_trials_open` gates
+nothing (a story marker). Flow: `echo_trial.begin(id, origin_area, origin_spawn)` makes the origin the respawn point, then
+`Game.change_area("echo_trial", "trial_start")` (no save on arrival, the respawn never moves into the trial); the pale door, a
+fall and Continue all return to the origin; a win returns by itself after `RETURN_DELAY` 6 s. Isolation: no story flag, no
+`Events.boss_defeated`, no drops, props without persist flags. Rewards: first clear = the trial's content bundle through
+`GameState.grant_once` (pattern-unlock flag `ch2_trial_<id>`); repeat clears = `TrialsData.repeat_items(id, clears)` (≤
+`MAX_REPEAT_PER_CLEAR` 6), kept in `GameState.trials[id]["pending"]` and paid by `echo_trial.pay_pending(area_id)` on arrival in
+any non-transient area (the origin), never inside the trial (lead decision L08; `echo_trial.init()` wires it, called by
+`Game.wire_session_systems()` and by `record_clear()`). Pause "Return to safety" reads "Leave the trial" there (R17).
+
+**Session wiring and warm-up (pass 2, P34 / P38).** `Game.wire_session_systems()` also calls `init()` of
+`src/expeditions/expeditions.gd` (the Reach gets its expedition runner node only while a run is active), `src/audio/music_box.gd`
+(song discovery) and `echo_trial.gd` (the gift payer), and `attach(self)` of `src/world/story_ch2/onboarding_hints.gd`. `AREA_WARMUP`
+gained `hallowmere_reach` (the district and expedition enemies), the Chapter Two bosses in their areas (`count_velour` in the manor,
+`borrowed_wisp` / `crossing_matron` / `borrowed_choir` in the Works) and `echo_trial` (the trial bosses and both arena builders).
+
 **Kept as built (lead decisions R136, no change):** Celebrate at home before revisiting the Reach is allowed (step 18 skipped,
-`ch2_trials_open` still paid) (n); Hask's Rail completes on reaching the junction and the Works repairs `ch2_service_gate_open` on
+`ch2_trials_open` still paid; since pass 2 that flag gates nothing, L07) (n); Hask's Rail completes on reaching the junction and the Works repairs `ch2_service_gate_open` on
 arrival (no softlock possible) (p); after the Choir the Works respawn is `vault_exit` and the porch fragment still asks for "haven" (q);
 entering a trial may set the Below respawn to `cp_arena` even if unlit (the echo stone stands at that lantern) (l); minor keeps (s):
 the annex echo plays on the stair, the lantern niche is safe unlit, the no-enemy fallbacks (annex Drudge, quarry Warden) stay as

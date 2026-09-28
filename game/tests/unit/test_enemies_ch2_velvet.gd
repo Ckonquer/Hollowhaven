@@ -1,14 +1,19 @@
 extends "res://tests/test_case.gd"
 ## Velvet Wing (module C5): hangs still out of reach (never wanders), the dash (folded-cloak tell, marked lane = hit
 ## lane, one hit) and the reachable height it is left at after a dash - hit or missed - so Krystal's swing reaches it;
-## the drain: a visible mark + tether, broken by line of sight, by ward-light (not her own lantern) or by a hit, and a
-## completed channel heals it by exactly the damage dealt (a dodge heals nothing); Intense's dash feint always ends
-## with a full separate final tell; no feint below Intense.
+## the drain: a visible mark + tether, broken by line of sight, by ward-light or by a hit, and a completed channel
+## heals it by exactly the damage dealt (a dodge heals nothing); Intense's dash feint always ends with a full separate
+## final tell; no feint below Intense.
+## Integration pass 2 (lead rule L01 + D04 + P04): ward-light = lamps / candles / placed lights / braziers and Lumi's
+## Glimmerstep pulse, NOT Lumi's passive glow; Krystal's raised lantern breaks it only inside the drain mark;
+## Glimmerstep's expose() breaks a drain in progress; the mark follows her through the wind-up via move_ring().
 
 const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Base := preload("res://src/enemies/enemy_base.gd")
 const Combat := preload("res://src/combat/combat.gd")
 const Wing := preload("res://src/enemies/velvet_wing.gd")
+const CompanionCombat := preload("res://src/companions/companion_combat.gd")
+const TelegraphFx := preload("res://src/enemies/telegraph_fx.gd")
 
 const DT := 1.0 / 60.0
 
@@ -19,6 +24,7 @@ var _saved_area: Node = null
 class Dummy extends CharacterBody3D:
 	var health: Node
 	var damaged_count: int = 0
+	var lantern_on := false              # Krystal's raised lantern (player.gd contract)
 
 	func _init() -> void:
 		health = preload("res://src/combat/health.gd").new()
@@ -239,11 +245,12 @@ func test_drain_breaks_when_a_wall_cuts_the_line() -> void:
 	assert_almost(float(e.health.hp), 30.0, 0.001, "no heal")
 
 
-func test_drain_breaks_in_ward_light_but_not_her_own_lantern() -> void:
+func test_drain_breaks_in_ward_light_but_not_her_body_light() -> void:
 	var d := _dummy(Vector3(0, 0, -5.0))
 	var e := _wing(d)
 	e.ward_light_override = -1.0
-	# Her own lantern (the player is a light source) never counts as ward-light.
+	# Her own light source (group "player") is never sampled as ward-light; her RAISED lantern counts only inside the
+	# drain mark (lantern_in_mark - test_raised_lantern_breaks_the_drain_only_inside_the_mark).
 	var own := Lamp.new()
 	d.add_child(own)
 	own.add_to_group("player")
@@ -321,3 +328,142 @@ func test_no_feint_below_intense() -> void:
 		e.queue_free()
 		d.queue_free()
 		await wait_frames(1)
+
+
+# --- Integration pass 2 --------------------------------------------------------------------------------------------
+
+## A companion's passive glow (Lumi: groups "companion" + "light_source").
+class Glow extends Lamp:
+	func _ready() -> void:
+		add_to_group("companion")
+		add_to_group("light_source")
+
+
+## L01: Lumi glowing right beside Krystal is NOT ward-light - the drain runs its course.
+func test_lumi_glowing_beside_her_never_breaks_a_drain() -> void:
+	var d := _dummy(Vector3(0, 0, -5.0))
+	var e := _wing(d)
+	e.ward_light_override = -1.0
+	e.health.set_hp(30.0)
+	var lumi := Glow.new()
+	add_child(lumi)
+	lumi.global_position = Vector3(0.6, 0.6, -5.0)
+	_nodes.append(lumi)
+	assert_true(lumi.is_in_group("light_source") and lumi.is_light_active(), "Lumi glows (a light source)")
+	assert_almost(float(e.ward_light_at(d.global_position + Vector3.UP * 0.9)), 0.0, 0.001, "her passive glow is not ward-light")
+	e.next_attack = "drain"
+	_until(e, "drain", 5.0)
+	assert_eq(e.state, "drain", "the channel starts beside Lumi")
+	_until(e, "recover", 3.0)
+	assert_eq(String(e.last_break_reason), "", "never broken by Lumi's glow")
+	assert_eq(int(e.drains_completed), 1)
+	assert_almost(float(d.health.hp), 94.0, 0.001, "the drain landed")
+
+
+## L01: Glimmerstep's light pulse (companion_combat.gd PulseLight "GlimmerPulse", a child of Lumi that is NOT in group
+## "companion") is a deliberate skill: it counts as ward-light and breaks the drain.
+func test_the_glimmerstep_pulse_breaks_a_drain() -> void:
+	var d := _dummy(Vector3(0, 0, -5.0))
+	var e := _wing(d)
+	e.ward_light_override = -1.0
+	var lumi := Glow.new()
+	add_child(lumi)
+	lumi.global_position = Vector3(0.8, 0.2, -5.4)
+	_nodes.append(lumi)
+	e.next_attack = "drain"
+	_until(e, "drain", 5.0)
+	assert_eq(e.state, "drain")
+	var pulse: Node3D = CompanionCombat.PulseLight.new()
+	pulse.name = "GlimmerPulse"
+	lumi.add_child(pulse)
+	pulse.position = Vector3.UP * 0.4
+	pulse.call("set_on", true)
+	assert_false(pulse.is_in_group("companion"), "the pulse itself is not a companion")
+	assert_true(float(e.ward_light_at(d.global_position + Vector3.UP * 0.9)) >= Wing.WARD_LIGHT, "the pulse is ward-light")
+	_until(e, "recover", 1.0)
+	assert_eq(String(e.last_break_reason), "light", "the Glimmerstep pulse breaks the drain")
+	assert_almost(float(d.health.hp), 100.0, 0.001, "nothing drained")
+
+
+## L01: Krystal's raised lantern breaks the drain while she stands inside the drain mark - never outside it.
+func test_raised_lantern_breaks_the_drain_only_inside_the_mark() -> void:
+	# Inside the mark (it follows her through the wind-up): raising the lantern breaks it.
+	var d := _dummy(Vector3(0, 0, -5.0))
+	var e := _wing(d)
+	e.next_attack = "drain"
+	_until(e, "telegraph", 5.0)
+	e.tick(DT)
+	assert_false(bool(e.lantern_in_mark(d)), "lantern down: nothing")
+	d.lantern_on = true
+	assert_true(bool(e.lantern_in_mark(d)), "raised inside the mark")
+	_until(e, "recover", 1.0)
+	assert_eq(String(e.last_break_reason), "light", "her raised lantern inside the mark breaks the drain")
+	assert_almost(float(d.health.hp), 100.0, 0.001)
+	# Outside the mark (it stays put for the channel; she stepped out of it): the lantern does nothing.
+	Base.reset_attack_tokens()
+	var d2 := _dummy(Vector3(20, 0, -5.0))
+	var e2 := _wing(d2, Vector3(20, 0, 0))
+	e2.next_attack = "drain"
+	_until(e2, "drain", 5.0)
+	assert_eq(e2.state, "drain")
+	var c: Vector3 = e2.drain_mark_center(d2)
+	assert_true(Vector2(c.x - 20.0, c.z + 5.0).length() < 0.05, "the mark sits where she stood")
+	d2.global_position = c + Vector3(1.5, 0, 0)          # out of the 0.7 m mark, still in sight and range
+	d2.lantern_on = true
+	assert_false(bool(e2.lantern_in_mark(d2)), "outside the mark")
+	_until(e2, "recover", 3.0)
+	assert_eq(String(e2.last_break_reason), "", "a raised lantern outside the mark never breaks it")
+	assert_eq(int(e2.drains_completed), 1)
+	assert_almost(float(d2.health.hp), 94.0, 0.001, "the drain landed")
+
+
+## D04: Glimmerstep calls expose(seconds): a drain in progress (wind-up or channel) breaks with reason "light";
+## otherwise nothing happens.
+func test_expose_breaks_a_drain_in_progress_only() -> void:
+	var d := _dummy(Vector3(0, 0, -5.0))
+	var e := _wing(d)
+	_until(e, "chase", 2.0)
+	e.expose(3.0)
+	assert_eq(e.state, "chase", "not draining: nothing happens")
+	assert_eq(int(e.drains_broken), 0)
+	e.next_attack = "drain"
+	_until(e, "telegraph", 5.0)
+	e.expose(3.0)
+	assert_eq(e.state, "recover", "the drain wind-up breaks at once")
+	assert_eq(String(e.last_break_reason), "light")
+	Base.reset_attack_tokens()
+	e.set("_drain_cd", 0.0)
+	e.next_attack = "drain"
+	_until(e, "drain", 8.0)
+	e.expose(3.0)
+	assert_eq(e.state, "recover", "the channel breaks at once")
+	assert_eq(int(e.drains_broken), 2)
+	assert_almost(float(d.health.hp), 100.0, 0.001, "nothing drained")
+
+
+## P04: the drain mark follows her through the wind-up with telegraph_fx.move_ring (same meshes, outline moves too).
+func test_drain_mark_follows_her_with_move_ring() -> void:
+	var d := _dummy(Vector3(0, 0, -5.0))
+	var e := _wing(d)
+	e.next_attack = "drain"
+	_until(e, "telegraph", 5.0)
+	var m: Node3D = e.mark()
+	m.set_high_vis(true)
+	var fill: Mesh = m._fill.mesh
+	var bold: Mesh = m._bold.mesh
+	d.global_position = Vector3(1.0, 0, -6.0)
+	e.tick(DT)
+	assert_eq(String(m.footprint()["kind"]), "ring")
+	assert_true((m.footprint()["center"] as Vector3).is_equal_approx(d.global_position), "the mark moved to her")
+	assert_true(m.global_position.is_equal_approx(d.global_position + Vector3.UP * TelegraphFx.Y_OFFSET), "and its node")
+	assert_almost(float(m.footprint()["radius"]), Wing.DRAIN_MARK_RADIUS, 0.001, "same radius")
+	assert_true(m._fill.mesh == fill and m._bold.mesh == bold, "no new meshes")
+	assert_true(bool(m.bold_visible()), "the high-visibility outline is still shown (a child: it moved with it)")
+	# move_ring on a lane (or nothing) shows a ring instead.
+	var fx: Node3D = TelegraphFx.new()
+	add_child(fx)
+	_nodes.append(fx)
+	fx.show_lane(Vector3.ZERO, Vector3(0, 0, -3), 1.0)
+	fx.move_ring(Vector3(2, 0, 2))
+	assert_eq(String(fx.footprint()["kind"]), "ring")
+	assert_true((fx.footprint()["center"] as Vector3).is_equal_approx(Vector3(2, 0, 2)))

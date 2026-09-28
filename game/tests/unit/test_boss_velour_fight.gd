@@ -6,6 +6,7 @@ extends "res://tests/test_case.gd"
 ## and the engaged time stays bounded - it prints the simulated seconds so tuning has a baseline. These are
 ## lower-bound numbers for a tireless bot, NOT a claim about real play (MP 13.1 asks for ~2-4 minutes of engaged
 ## first-encounter play; that needs real-input playtesting).
+## Also: the retry hint names the manor in the story and the memory in the Echo Trial, under separate hint ids.
 
 const Factory := preload("res://src/enemies/enemy_factory.gd")
 const Boss := preload("res://src/enemies/count_velour.gd")
@@ -163,3 +164,54 @@ func test_strong_gear_helps_but_never_skips_the_rules() -> void:
 	assert_true(float(strong["seconds"]) <= float(weak["seconds"]) + 1.0, "strong equipment shortens the fight")
 	assert_true(int(strong["c_staggers"]) >= 1, "but the candle rule is still needed")
 	assert_eq(_phases.slice(0, 3), [1, 2, 3], "and no phase is skipped")
+
+
+## Starts, resets and restarts one Count in `mode`; returns the retry hints shown as [id, text].
+func _retry_hints(mode: String) -> Array:
+	var candles: Array = []
+	var spots := [Vector3(0, 0, -7.5), Vector3(-6.5, 0, 3.75), Vector3(6.5, 0, 3.75)]
+	for i in spots.size():
+		var c: Node3D = WardCandle.new()
+		c.setup({"id": "r%d" % i, "lit": true, "pool_radius": 3.2})
+		add_child(c)
+		c.global_position = spots[i]
+		_nodes.append(c)
+		candles.append(c)
+	var bot := Dummy.new()
+	add_child(bot)
+	bot.global_position = Vector3(0, 0, 8)
+	_nodes.append(bot)
+	var b: Node3D = Factory.create("count_velour", {"arena_center": CENTER, "arena_radius": 12.0, "candles": candles,
+		"seed": 5, "helper_points": [Vector3(-10, 0, 9), Vector3(10, 0, 9)], "mode": mode}, CENTER)
+	add_child(b)
+	_nodes.append(b)
+	b.set_process(false)
+	b.target_override = bot
+	var hints: Array = []
+	var cb := func(id: String, text: String) -> void:
+		if id.begins_with("velour_retry"):
+			hints.append([id, text])
+	Events.hint.connect(cb)
+	b.start_fight()
+	var first := hints.size()
+	b.reset_fight()
+	b.start_fight()
+	Events.hint.disconnect(cb)
+	b.reset_fight()
+	assert_eq(first, 0, "%s: no retry hint on the first attempt" % mode)
+	return hints
+
+
+func test_retry_hint_wording_in_the_story_and_the_echo_trial() -> void:
+	var story := _retry_hints("story")
+	assert_eq(story.size(), 1, "story: one retry hint")
+	if story.size() == 1:
+		assert_eq(String(story[0][0]), "velour_retry")
+		assert_true(String(story[0][1]).contains("while you stay in the manor"), "story wording")
+	var trial := _retry_hints("trial")
+	assert_eq(trial.size(), 1, "trial: one retry hint")
+	if trial.size() == 1:
+		assert_eq(String(trial[0][0]), "velour_retry_trial", "its own id (the story hint still shows once later)")
+		var t := String(trial[0][1])
+		assert_eq(t, "The echo keeps his wounds while you stay in the memory. Leave through the pale door and it starts afresh.")
+		assert_false(t.contains("manor"), "never talks about the manor inside the memory")

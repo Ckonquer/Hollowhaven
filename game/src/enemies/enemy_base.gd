@@ -15,7 +15,13 @@ extends CharacterBody3D
 ##   can_be_hit_by(source), can_stagger(amount, source), _is_uninterruptible(), _stagger(...)
 ##   mark() / hide_mark()      this enemy's ground telegraph (src/enemies/telegraph_fx.gd)
 ##   charge_begin/charge_step, leap_begin/leap_step/leap_land_hit, lane_clip, lane_hits, pulse_hits,
-##   deal_damage_to, fire_projectile, apply_slow (static), announce_tell
+##   deal_damage_to, fire_projectile (params dir / on_hit / kind pass through), apply_slow (static), announce_tell
+##   intensity_cooldown_mult(), intensity_telegraph_bonus(), overlap_blocked()   OPT-IN horror-intensity rules of the
+##                             Chapter Two ordinary enemies (Gentle: wind-ups +0.2 s, rests x1.35, never winds up while
+##                             another enemy winds up; Intense: rests x0.8; tells never shorter). Legacy / Chapter One
+##                             extra enemies never call them, so they keep their behaviour.
+##   claim_attack_token(id) / release_attack_token(id) (static)   the shared MAX_ATTACKERS table for attackers that are
+##                             not enemy_base nodes (the Borrowed Choir); same cap and stagger rule as a wind-up
 ##   setup key "defeat_flag"   flag set once when this enemy is defeated (content modules)
 
 signal defeated
@@ -47,6 +53,10 @@ const TARGET_BODY_RADIUS := 0.35     # Krystal's body radius for lane / landing 
 const SLOW_MIN_MULT := 0.5           # the strongest slow an enemy may apply (spec 9: bounded)
 const SLOW_MAX_SECONDS := 3.0
 const CAPTION_GAP_MS := 6000
+# Chapter Two horror-intensity rules (opt-in helpers below; the C5 enemies use them)
+const INTENSITY_GENTLE_REST := 1.35        # Gentle: every rest (cooldown after an attack) x this
+const INTENSITY_INTENSE_REST := 0.8        # Intense: shorter rests (never faster, never invisible tells)
+const INTENSITY_GENTLE_TELL_BONUS := 0.2   # Gentle: every wind-up + this (seconds)
 
 var enemy_id: String = ""
 var data: Dictionary = {}
@@ -136,16 +146,42 @@ static func reset_attack_tokens() -> void:
 
 
 func _attack_token_available() -> bool:
-	for id in _attackers.keys():
-		if not is_instance_id_valid(int(id)):
-			_attackers.erase(id)
-	if _attackers.has(get_instance_id()):
+	return attack_token_available_for(get_instance_id())
+
+
+## May instance `id` hold an attack token now? True when it already holds one; else a slot must be free
+## (MAX_ATTACKERS) and, unless `id` was the last attacker, ATTACK_STAGGER_MS must have passed since the last wind-up
+## began. Tokens of freed instances are dropped first. No side effects besides that clean-up.
+static func attack_token_available_for(id: int) -> bool:
+	for k in _attackers.keys():
+		if not is_instance_id_valid(int(k)):
+			_attackers.erase(k)
+	if _attackers.has(id):
 		return true
 	if _attackers.size() >= MAX_ATTACKERS:
 		return false
-	if _last_attacker == get_instance_id():
+	if _last_attacker == id:
 		return true                     # the stagger only spaces out *different* attackers
 	return _now_ms() - _last_attack_ms >= ATTACK_STAGGER_MS
+
+
+## Claims a slot of the shared attack-token table for instance `id` (an attacker that is not an enemy_base node,
+## e.g. the Borrowed Choir while it is committed). Same rules as an enemy's wind-up: refused while MAX_ATTACKERS
+## others hold one or inside the stagger of a different attacker's wind-up. A NEW claim starts the stagger clock
+## (like entering "telegraph"); re-claiming a held token changes nothing. Returns whether `id` holds a token.
+static func claim_attack_token(id: int) -> bool:
+	if not attack_token_available_for(id):
+		return false
+	if not _attackers.has(id):
+		_attackers[id] = true
+		_last_attack_ms = _now_ms()
+		_last_attacker = id
+	return true
+
+
+## Gives back the token of instance `id` (no-op when it holds none).
+static func release_attack_token(id: int) -> void:
+	_attackers.erase(id)
 
 
 func setup(params: Dictionary) -> void:
@@ -751,6 +787,34 @@ func attack_recover(def: Dictionary) -> float:
 	return float(def.get("recover", data.get("recover", 1.0)))
 
 
+## Horror intensity x rest (OPT-IN, Chapter Two ordinary enemies): Gentle INTENSITY_GENTLE_REST (1.35), Standard 1,
+## Intense INTENSITY_INTENSE_REST (0.8). Multiply the cooldown that starts with a recovery by it.
+func intensity_cooldown_mult() -> float:
+	match Combat.current_intensity():
+		0:
+			return INTENSITY_GENTLE_REST
+		2:
+			return INTENSITY_INTENSE_REST
+	return 1.0
+
+
+## Horror intensity + wind-up (OPT-IN): Gentle adds INTENSITY_GENTLE_TELL_BONUS (0.2 s); Standard / Intense add
+## nothing (Intense never shortens a tell). Add it to attack_telegraph(def), which keeps the 1.0 s committed floor.
+func intensity_telegraph_bonus() -> float:
+	return INTENSITY_GENTLE_TELL_BONUS if Combat.current_intensity() == 0 else 0.0
+
+
+## Gentle "no overlapping attacks" (OPT-IN): true while another enemy holds an attack token (winds up / attacks),
+## so this one must not start a wind-up. Always false on Standard / Intense (the MAX_ATTACKERS cap still applies).
+func overlap_blocked() -> bool:
+	if Combat.current_intensity() != 0:
+		return false
+	for id in _attackers.keys():
+		if int(id) != get_instance_id() and is_instance_id_valid(int(id)):
+			return true
+	return false
+
+
 ## Damage of an attack: data damage x horror intensity (underground threats only) x damage_scale.
 func attack_damage_for(def: Dictionary) -> float:
 	return float(def.get("damage", data.get("damage", 10.0))) * threat_damage_mult() * damage_scale
@@ -979,17 +1043,29 @@ func leap_land_hit(radius: float, damage: float, knockback_force: float) -> floa
 ## present, else the local src/enemies/enemy_projectile.gd. Either way it is parented to the area (never to
 ## the shooter, so it outlives a defeated shooter), checks walls on every step, targets only group "player",
 ## damages at most once and the number alive is capped. params: damage, speed, range, knockback, color, radius,
-## homing (local only), max_per_shooter (default 1). Returns the node, or null when refused.
+## homing (local only), max_per_shooter (default 1), and for the shared projectile: dir (a non-zero Vector3: fly
+## straight along it, e.g. a throw along a locked lane - `t` then only gates the shot; default: aim at `t`),
+## on_hit (Callable(target, dealt) after a hit, dealt 0 = blocked) and kind (tag; default enemy_id).
+## Returns the node, or null when refused.
 func fire_projectile(from: Vector3, t: Node3D, params: Dictionary) -> Node:
 	if t == null or not is_valid_victim(t):
 		return null
 	var shared := _shared_projectile_script()
 	if shared != null:
-		var sp := {"shooter": self, "from": from, "target": t, "groups": ["player"], "hitstop": true, "kind": enemy_id,
+		var sp := {"shooter": self, "from": from, "groups": ["player"], "hitstop": true,
+			"kind": String(params.get("kind", enemy_id)),
 			"damage": float(params.get("damage", 8.0)), "speed": float(params.get("speed", 6.0)),
 			"range": float(params.get("range", 12.0)), "knockback": float(params.get("knockback", 0.0)),
 			"radius": float(params.get("radius", 0.22)), "max_per_shooter": int(params.get("max_per_shooter", 1)),
 			"light": bool(params.get("light", false))}
+		var d: Variant = params.get("dir")
+		if d is Vector3 and (d as Vector3).length_squared() > 0.0001:
+			sp["dir"] = d                   # projectile.gd prefers "target" over "dir": pass only one
+		else:
+			sp["target"] = t
+		var oh: Variant = params.get("on_hit")
+		if oh is Callable and (oh as Callable).is_valid():
+			sp["on_hit"] = oh
 		if params.get("color") is Color:
 			sp["color"] = params["color"]
 		var fired: Variant = shared.call("fire", sp)
