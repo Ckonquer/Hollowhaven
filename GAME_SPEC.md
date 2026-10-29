@@ -1,4 +1,4 @@
-# Hollowhaven — For Krystal · Game Spec (Chapter One: "The Dimming Ward" · Chapter Two: "The Lanterns of Hallowmere")
+# Hollowhaven · Game Spec (Chapter One: "The Dimming Ward" · Chapter Two: "The Lanterns of Hallowmere")
 
 A small, complete 3D survival-adventure. Cozy storybook woodland on top (~70%), adventure and friendly
 combat (~20%), and a restrained, fair horror dungeon below (~10%). Target: 45–90 min first playthrough,

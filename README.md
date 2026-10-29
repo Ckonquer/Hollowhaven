@@ -1,4 +1,4 @@
-# Hollowhaven — For Krystal
+# Hollowhaven
 
 A small 3D cozy survival-adventure with creature companions and a restrained horror dungeon, made as
 a gift for Krystal. Chapter One: *The Dimming Ward* (designed for about 45–90 minutes; no player has timed it yet), then free-play in your own

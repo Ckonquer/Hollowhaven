@@ -1,6 +1,6 @@
 # Third-party notices and asset provenance
 
-Hollowhaven ("For Krystal") is an original game. This file lists everything in it that was not
+Hollowhaven is an original game. This file lists everything in it that was not
 written specifically for it, and where each generated asset comes from.
 
 ## Engine
